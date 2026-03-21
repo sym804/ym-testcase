@@ -3,11 +3,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Header from "../components/Header";
+import { UserRole } from "../types";
 
 // Mock contexts
 const mockUser = {
   id: 1, username: "admin", display_name: "관리자",
-  role: "admin", must_change_password: false, created_at: "2026-01-01",
+  role: UserRole.ADMIN, must_change_password: false, created_at: "2026-01-01",
 };
 const mockLogout = vi.fn();
 const mockToggleTheme = vi.fn();

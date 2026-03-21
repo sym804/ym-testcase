@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { SheetNode } from "../types";
 
 vi.mock("ag-grid-react", () => ({
   AgGridReact: (props: any) => (
@@ -58,8 +59,13 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+let sheetId = 1;
+function makeSheet(name: string, tc_count: number): SheetNode {
+  return { id: sheetId++, name, parent_id: null, sort_order: 0, tc_count, children: [] };
+}
+
 function setupSheets(
-  sheets: { name: string; tc_count: number }[],
+  sheets: SheetNode[],
   rows: any[] = []
 ) {
   vi.mocked(testCasesApi.listSheets).mockResolvedValue(sheets);
@@ -74,7 +80,7 @@ function renderGrid(project = adminProject) {
 
 describe("SheetTabs", () => {
   it("시트 1개 + 이름 '기본' → 탭 바가 보이지 않는다", async () => {
-    setupSheets([{ name: "기본", tc_count: 5 }]);
+    setupSheets([makeSheet("기본", 5)]);
     renderGrid();
 
     await waitFor(() => {
@@ -86,7 +92,7 @@ describe("SheetTabs", () => {
   });
 
   it("시트 1개 + 이름 '체크리스트' → 탭 바가 보인다", async () => {
-    setupSheets([{ name: "체크리스트", tc_count: 3 }]);
+    setupSheets([makeSheet("체크리스트", 3)]);
     renderGrid();
 
     await waitFor(() => {
@@ -96,8 +102,8 @@ describe("SheetTabs", () => {
 
   it("시트 2개 → 모든 탭과 '전체' 탭이 표시된다", async () => {
     setupSheets([
-      { name: "기능", tc_count: 10 },
-      { name: "UI", tc_count: 5 },
+      makeSheet("기능", 10),
+      makeSheet("UI", 5),
     ]);
     renderGrid();
 
@@ -110,8 +116,8 @@ describe("SheetTabs", () => {
 
   it("시트 탭 클릭 시 해당 시트의 TC가 로드된다", async () => {
     setupSheets([
-      { name: "기능", tc_count: 10 },
-      { name: "UI", tc_count: 5 },
+      makeSheet("기능", 10),
+      makeSheet("UI", 5),
     ]);
     const user = userEvent.setup();
     renderGrid();
@@ -132,8 +138,8 @@ describe("SheetTabs", () => {
 
   it("시트 삭제 × 버튼 클릭 + confirm → deleteSheet API 호출", async () => {
     setupSheets([
-      { name: "기능", tc_count: 2 },
-      { name: "UI", tc_count: 3 },
+      makeSheet("기능", 2),
+      makeSheet("UI", 3),
     ]);
     vi.mocked(testCasesApi.deleteSheet).mockResolvedValue({
       deleted: 2,
@@ -161,8 +167,8 @@ describe("SheetTabs", () => {
 
   it("시트 삭제 × 버튼 클릭 + confirm 취소 → API 미호출", async () => {
     setupSheets([
-      { name: "기능", tc_count: 2 },
-      { name: "UI", tc_count: 3 },
+      makeSheet("기능", 2),
+      makeSheet("UI", 3),
     ]);
     vi.spyOn(window, "confirm").mockReturnValue(false);
     const user = userEvent.setup();
@@ -182,13 +188,10 @@ describe("SheetTabs", () => {
 
   it("+ 버튼 클릭 → 시트 이름 입력 → createSheet API 호출", async () => {
     setupSheets([
-      { name: "기능", tc_count: 10 },
-      { name: "UI", tc_count: 5 },
+      makeSheet("기능", 10),
+      makeSheet("UI", 5),
     ]);
-    vi.mocked(testCasesApi.createSheet).mockResolvedValue({
-      name: "새시트",
-      tc_count: 0,
-    });
+    vi.mocked(testCasesApi.createSheet).mockResolvedValue(makeSheet("새시트", 0));
     const user = userEvent.setup();
     renderGrid();
 
@@ -214,7 +217,7 @@ describe("SheetTabs", () => {
 
   it("시트 추가 입력에서 Escape 키 시 입력 UI가 사라진다", async () => {
     setupSheets([
-      { name: "기능", tc_count: 10 },
+      makeSheet("기능", 10),
     ]);
     const user = userEvent.setup();
     renderGrid();

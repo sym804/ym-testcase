@@ -3,8 +3,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import AdminPage from "../pages/AdminPage";
+import { UserRole } from "../types";
 
-let mockRole = "admin";
+let mockRole: UserRole = UserRole.ADMIN;
 
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({
@@ -45,11 +46,10 @@ vi.mock("../api", () => ({
 }));
 
 import { usersApi, projectsApi, membersApi, searchApi } from "../api";
-import toast from "react-hot-toast";
 
 const mockUsers = [
-  { id: 1, username: "admin", display_name: "관리자", role: "admin", must_change_password: false, created_at: "2026-01-01T00:00:00" },
-  { id: 2, username: "tester1", display_name: "테스터1", role: "user", must_change_password: false, created_at: "2026-01-02T00:00:00" },
+  { id: 1, username: "admin", display_name: "관리자", role: UserRole.ADMIN, must_change_password: false, created_at: "2026-01-01T00:00:00" },
+  { id: 2, username: "tester1", display_name: "테스터1", role: UserRole.USER, must_change_password: false, created_at: "2026-01-02T00:00:00" },
 ];
 
 const mockProjects = [
@@ -58,16 +58,16 @@ const mockProjects = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockRole = "admin";
+  mockRole = UserRole.ADMIN;
   vi.mocked(usersApi.list).mockResolvedValue(mockUsers);
-  vi.mocked(usersApi.updateRole).mockResolvedValue({});
+  vi.mocked(usersApi.updateRole).mockResolvedValue({} as any);
   vi.mocked(usersApi.resetPassword).mockResolvedValue({ temp_password: "TempPass123!" });
   vi.mocked(usersApi.getAllAssignments).mockResolvedValue({});
   vi.mocked(usersApi.assignToAllProjects).mockResolvedValue({ assigned: 1, total_projects: 1 });
   vi.mocked(projectsApi.list).mockResolvedValue(mockProjects);
   vi.mocked(membersApi.list).mockResolvedValue([]);
-  vi.mocked(membersApi.add).mockResolvedValue({});
-  vi.mocked(membersApi.updateRole).mockResolvedValue({});
+  vi.mocked(membersApi.add).mockResolvedValue({} as any);
+  vi.mocked(membersApi.updateRole).mockResolvedValue({} as any);
   vi.mocked(membersApi.remove).mockResolvedValue(undefined);
   vi.mocked(searchApi.global).mockResolvedValue([]);
 });
@@ -82,7 +82,7 @@ function renderPage() {
 
 describe("AdminPage", () => {
   it("관리자가 아니면 권한 필요 메시지를 표시한다", async () => {
-    mockRole = "user";
+    mockRole = UserRole.USER;
     renderPage();
     await waitFor(() => {
       expect(screen.getByText("관리자 권한이 필요합니다.")).toBeInTheDocument();

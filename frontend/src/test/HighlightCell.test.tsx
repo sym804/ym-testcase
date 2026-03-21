@@ -7,7 +7,7 @@ function renderCell(value: string | number | null, keyword = "") {
   const props = {
     value,
     context: { searchKeyword: keyword },
-  } as never;
+  } as any;
   return render(<HighlightCell {...props} />);
 }
 

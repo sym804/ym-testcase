@@ -742,7 +742,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
 
   // ── Excel Import: 시트 선택 ──
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importSheets, setImportSheets] = useState<{ name: string; tc_count: number }[]>([]);
+  const [importSheets, setImportSheets] = useState<{ name: string; tc_count: number; existing: number }[]>([]);
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
   const [importLoading, setImportLoading] = useState(false);
 
@@ -1808,62 +1808,6 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     </div>
   );
 }
-
-const sheetTabStyles: Record<string, React.CSSProperties> = {
-  bar: {
-    display: "flex",
-    alignItems: "center",
-    gap: 2,
-    padding: "6px 12px",
-    backgroundColor: "var(--bg-card)",
-    borderTop: "1px solid var(--border-color)",
-    overflowX: "auto",
-  },
-  tab: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "5px 14px",
-    fontSize: 12,
-    fontWeight: 500,
-    color: "var(--text-secondary)",
-    backgroundColor: "transparent",
-    borderTop: "1px solid var(--border-color)",
-    borderLeft: "1px solid var(--border-color)",
-    borderRight: "1px solid var(--border-color)",
-    borderBottom: "none",
-    borderRadius: "6px 6px 0 0",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-    transition: "all 0.15s",
-  },
-  tabActive: {
-    color: "#fff",
-    backgroundColor: "#2D4A7A",
-    borderTopColor: "#2D4A7A",
-    borderLeftColor: "#2D4A7A",
-    borderRightColor: "#2D4A7A",
-    fontWeight: 700,
-  },
-  badge: {
-    fontSize: 10,
-    fontWeight: 600,
-    padding: "1px 6px",
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  closeBtn: {
-    fontSize: 14,
-    fontWeight: 700,
-    lineHeight: 1,
-    marginLeft: 2,
-    padding: "0 3px",
-    borderRadius: 3,
-    cursor: "pointer",
-    opacity: 0.5,
-    color: "inherit",
-  },
-};
 
 const sheetModalStyles: Record<string, React.CSSProperties> = {
   overlay: {

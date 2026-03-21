@@ -3,10 +3,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import ProjectPage from "../pages/ProjectPage";
+import { UserRole } from "../types";
 
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({
-    user: { id: 1, username: "admin", display_name: "관리자", role: "admin", must_change_password: false, created_at: "2026-01-01" },
+    user: { id: 1, username: "admin", display_name: "관리자", role: UserRole.ADMIN, must_change_password: false, created_at: "2026-01-01" },
     logout: vi.fn(),
   }),
 }));
@@ -81,7 +82,7 @@ beforeEach(() => {
   vi.mocked(dashboardApi.rounds).mockResolvedValue([]);
   vi.mocked(dashboardApi.assignee).mockResolvedValue([]);
   vi.mocked(dashboardApi.heatmap).mockResolvedValue([]);
-  vi.mocked(reportsApi.getData).mockResolvedValue(null);
+  vi.mocked(reportsApi.getData).mockResolvedValue(null as any);
   vi.mocked(membersApi.list).mockResolvedValue([]);
   vi.mocked(usersApi.list).mockResolvedValue([]);
 });

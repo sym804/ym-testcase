@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "../contexts/AuthContext";
 import App from "../App";
+import { UserRole } from "../types";
 
 // Mock API
 vi.mock("../api", () => ({
@@ -89,7 +90,7 @@ describe("App Routing", () => {
       id: 1,
       username: "tester",
       display_name: "테스터",
-      role: "user",
+      role: UserRole.USER,
       must_change_password: false,
       created_at: "2026-01-01",
     };

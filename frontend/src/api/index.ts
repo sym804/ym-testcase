@@ -143,7 +143,7 @@ export const testCasesApi = {
     const formData = new FormData();
     formData.append("file", file);
     const params = sheetNames?.length ? { sheet_names: sheetNames.join(",") } : {};
-    const res = await client.post<{ imported: number; sheets: { sheet: string; imported: number }[] }>(
+    const res = await client.post<{ created: number; updated: number; imported: number; sheets: { sheet: string; created: number; updated: number }[] }>(
       `/api/projects/${projectId}/testcases/import`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" }, params }
@@ -154,7 +154,7 @@ export const testCasesApi = {
   previewImport: async (projectId: number, file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await client.post<{ sheets: { name: string; tc_count: number }[] }>(
+    const res = await client.post<{ sheets: { name: string; tc_count: number; existing: number }[] }>(
       `/api/projects/${projectId}/testcases/import/preview`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } }

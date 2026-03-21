@@ -15,12 +15,13 @@ vi.mock("../api", () => ({
 }));
 
 import { testRunsApi } from "../api";
+import { TestRunStatus } from "../types";
 
-const mockTC = { id: 1, project_id: 1, no: 1, tc_id: "TC-001", type: "기능", category: "로그인", depth1: "로그인", depth2: "", priority: "High", test_type: "수동", precondition: "", test_steps: "로그인 테스트", expected_result: "성공", r1: "", r2: "", r3: "", issue_link: "", assignee: "테스터A", remarks: "", created_at: "2026-01-01", updated_at: "2026-01-01" };
+const mockTC = { id: 1, project_id: 1, no: 1, tc_id: "TC-001", type: "기능", category: "로그인", depth1: "로그인", depth2: "", priority: "High", test_type: "수동", precondition: "", test_steps: "로그인 테스트", expected_result: "성공", r1: "", r2: "", r3: "", issue_link: "", assignee: "테스터A", remarks: "", sheet_name: "기본", created_at: "2026-01-01", updated_at: "2026-01-01" };
 
 const mockRuns = [
-  { id: 1, project_id: 1, name: "R1 수행", version: "1.0", environment: "dev", round: 1, status: "completed", created_by: 1, created_at: "2026-01-01" },
-  { id: 2, project_id: 1, name: "R2 수행", version: "1.1", environment: "dev", round: 2, status: "completed", created_by: 1, created_at: "2026-01-02" },
+  { id: 1, project_id: 1, name: "R1 수행", version: "1.0", environment: "dev", round: 1, status: TestRunStatus.COMPLETED, created_by: 1, created_at: "2026-01-01" },
+  { id: 2, project_id: 1, name: "R2 수행", version: "1.1", environment: "dev", round: 2, status: TestRunStatus.COMPLETED, created_by: 1, created_at: "2026-01-02" },
 ];
 
 const mockLeftDetail = {

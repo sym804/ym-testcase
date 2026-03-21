@@ -6,7 +6,7 @@ function renderCell(value: string, keyword = "") {
   const props = {
     value,
     context: { searchKeyword: keyword },
-  } as never;
+  } as any;
   return render(<MarkdownCell {...props} />);
 }
 

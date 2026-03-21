@@ -6,7 +6,7 @@ import { type ReactElement, type ReactNode } from "react";
 /**
  * 테스트용 wrapper: MemoryRouter + AuthProvider
  */
-function AllProviders({ children }: { children: ReactNode }) {
+export function AllProviders({ children }: { children: ReactNode }) {
   return (
     <MemoryRouter>
       <AuthProvider>{children}</AuthProvider>

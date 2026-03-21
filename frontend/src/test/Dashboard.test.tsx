@@ -33,6 +33,7 @@ vi.mock("../api", () => ({
 }));
 
 import { dashboardApi, testRunsApi } from "../api";
+import { TestRunStatus } from "../types";
 
 const mockSummary = {
   total: 100, pass: 60, fail: 20, block: 10, na: 5, not_started: 5,
@@ -56,7 +57,7 @@ const mockHeatmap = [
   { category: "로그인", priority: "High", fail_count: 3 },
 ];
 const mockRuns = [
-  { id: 1, project_id: 1, name: "R1 수행", version: "1.0", environment: "dev", round: 1, status: "completed", created_by: 1, created_at: "2026-01-01" },
+  { id: 1, project_id: 1, name: "R1 수행", version: "1.0", environment: "dev", round: 1, status: TestRunStatus.COMPLETED, created_by: 1, created_at: "2026-01-01" },
 ];
 
 beforeEach(() => {

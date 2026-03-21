@@ -41,6 +41,7 @@ vi.mock("../api", () => ({
 
 import { testCasesApi } from "../api";
 import TestCaseGrid from "../components/TestCaseGrid";
+import type { SheetNode } from "../types";
 
 const adminProject = {
   id: 1,
@@ -58,8 +59,12 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+function makeSheet(name: string, tc_count: number, id: number = 1): SheetNode {
+  return { id, name, parent_id: null, sort_order: 0, tc_count, children: [] };
+}
+
 function setupDefaultMocks(
-  sheets: { name: string; tc_count: number }[] = [{ name: "기본", tc_count: 0 }],
+  sheets: SheetNode[] = [makeSheet("기본", 0)],
   rows: any[] = []
 ) {
   vi.mocked(testCasesApi.listSheets).mockResolvedValue(sheets);
@@ -91,8 +96,8 @@ describe("AutoSave - TestCaseGrid", () => {
 
   it("시트가 2개 이상일 때 시트 탭 바가 렌더링된다", async () => {
     setupDefaultMocks([
-      { name: "기능", tc_count: 10 },
-      { name: "UI", tc_count: 5 },
+      makeSheet("기능", 10, 1),
+      makeSheet("UI", 5, 2),
     ]);
     renderGrid();
 
@@ -104,7 +109,7 @@ describe("AutoSave - TestCaseGrid", () => {
   });
 
   it("시트가 '기본' 1개뿐이면 탭 바가 보이지 않는다", async () => {
-    setupDefaultMocks([{ name: "기본", tc_count: 3 }]);
+    setupDefaultMocks([makeSheet("기본", 3)]);
     renderGrid();
 
     await waitFor(() => {
@@ -117,7 +122,7 @@ describe("AutoSave - TestCaseGrid", () => {
   });
 
   it("시트 1개이지만 이름이 '기본'이 아니면 탭 바가 보인다", async () => {
-    setupDefaultMocks([{ name: "체크리스트", tc_count: 2 }]);
+    setupDefaultMocks([makeSheet("체크리스트", 2)]);
     renderGrid();
 
     await waitFor(() => {
@@ -153,14 +158,13 @@ describe("AutoSave - TestCaseGrid", () => {
 
   it("시트 추가 후 createSheet API가 호출된다", async () => {
     setupDefaultMocks([], []);
-    vi.mocked(testCasesApi.createSheet).mockResolvedValue({
-      name: "새시트",
-      tc_count: 0,
-    });
+    vi.mocked(testCasesApi.createSheet).mockResolvedValue(
+      makeSheet("새시트", 0, 1)
+    );
     // 시트 생성 후 loadSheets가 다시 호출되므로 재설정
     vi.mocked(testCasesApi.listSheets)
       .mockResolvedValueOnce([])
-      .mockResolvedValue([{ name: "새시트", tc_count: 0 }]);
+      .mockResolvedValue([makeSheet("새시트", 0, 1)]);
 
     const user = userEvent.setup();
     renderGrid();

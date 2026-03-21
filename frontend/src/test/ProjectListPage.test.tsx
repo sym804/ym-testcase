@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { AuthProvider } from "../contexts/AuthContext";
+
 
 // Mock auth context to return admin user
 const { mockState } = vi.hoisted(() => {
@@ -74,7 +74,7 @@ beforeEach(() => {
   mockState.role = "admin";
   mockState.display_name = "관리자";
   vi.mocked(projectsApi.list).mockResolvedValue(mockProjects);
-  vi.mocked(projectsApi.create).mockResolvedValue({ id: 3, name: "New Project" });
+  vi.mocked(projectsApi.create).mockResolvedValue({ id: 3, name: "New Project", description: "", jira_base_url: null, is_private: false, created_by: 1, created_at: "2026-01-10", updated_at: "2026-01-10" });
   vi.mocked(overviewApi.get).mockResolvedValue(mockOverview);
   vi.mocked(searchApi.global).mockResolvedValue([]);
 });

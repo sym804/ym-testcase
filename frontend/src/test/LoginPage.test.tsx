@@ -20,6 +20,7 @@ vi.mock("react-hot-toast", () => ({
 }));
 
 import { authApi } from "../api";
+import { UserRole } from "../types";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -58,7 +59,7 @@ describe("LoginPage", () => {
       id: 1,
       username: "tester",
       display_name: "테스터",
-      role: "user",
+      role: UserRole.USER,
       must_change_password: false,
       created_at: "2026-01-01",
     };

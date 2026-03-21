@@ -34,7 +34,7 @@ vi.mock("axios", () => {
   };
 });
 
-let client: typeof import("../api/client").default;
+let client: typeof import("../api/client").default = undefined!;
 let instance: {
   _requestInterceptors: Array<{ fulfilled: (c: unknown) => unknown; rejected: (e: unknown) => unknown }>;
   _responseInterceptors: Array<{ fulfilled: (r: unknown) => unknown; rejected: (e: unknown) => unknown }>;
@@ -72,7 +72,7 @@ describe("API Client Interceptors", () => {
       const originalHref = window.location.href;
 
       // Mock window.location
-      const locationSpy = vi.spyOn(window, "location", "get").mockReturnValue({
+      vi.spyOn(window, "location", "get").mockReturnValue({
         ...window.location,
         pathname: "/projects",
         href: "/projects",
@@ -113,5 +113,4 @@ describe("API Client Interceptors", () => {
   });
 });
 
-// Suppress unused variable warning
-void client;
+void client; // ensure client is referenced

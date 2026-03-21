@@ -25,6 +25,7 @@ vi.mock("react-hot-toast", () => ({
 
 import { authApi } from "../api";
 import toast from "react-hot-toast";
+import { UserRole } from "../types";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <MemoryRouter>
@@ -52,7 +53,7 @@ describe("AuthContext", () => {
         id: 1,
         username: "tester",
         display_name: "테스터",
-        role: "user",
+        role: UserRole.USER,
         must_change_password: false,
         created_at: "2026-01-01",
       };
@@ -84,7 +85,7 @@ describe("AuthContext", () => {
         id: 1,
         username: "tester",
         display_name: "테스터",
-        role: "user",
+        role: UserRole.USER,
         must_change_password: false,
         created_at: "2026-01-01",
       };
@@ -111,7 +112,7 @@ describe("AuthContext", () => {
         id: 1,
         username: "tester",
         display_name: "테스터",
-        role: "user",
+        role: UserRole.USER,
         must_change_password: true,
         created_at: "2026-01-01",
       };
@@ -186,7 +187,7 @@ describe("AuthContext", () => {
         id: 2,
         username: "new",
         display_name: "New",
-        role: "user" as never,
+        role: UserRole.USER as never,
         must_change_password: false,
         created_at: "2026-01-01",
       });
@@ -218,7 +219,7 @@ describe("AuthContext", () => {
         id: 1,
         username: "tester",
         display_name: "테스터",
-        role: "user",
+        role: UserRole.USER,
         must_change_password: false,
         created_at: "2026-01-01",
       };
@@ -244,7 +245,7 @@ describe("AuthContext", () => {
         id: 1,
         username: "tester",
         display_name: "테스터",
-        role: "user",
+        role: UserRole.USER,
         must_change_password: true,
         created_at: "2026-01-01",
       };

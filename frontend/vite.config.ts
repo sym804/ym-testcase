@@ -1,5 +1,6 @@
 /// <reference types="vitest" />
-import { defineConfig, type Plugin } from "vite";
+import { type Plugin } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 /** Vite plugin: 모든 응답에 charset=utf-8 헤더 추가 */
