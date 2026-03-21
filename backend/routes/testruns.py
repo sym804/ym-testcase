@@ -294,7 +294,8 @@ def delete_testrun(
                         os.remove(full_path)
                     except OSError:
                         pass
-            db.delete(att)
+        # bulk delete로 처리 (개별 db.delete()는 cascade와 충돌하여 경고 발생)
+        db.query(Attachment).filter(Attachment.test_result_id.in_(result_ids)).delete(synchronize_session=False)
     db.query(TestResult).filter(TestResult.test_run_id == run_id).delete(synchronize_session=False)
     db.delete(run)
     db.commit()
