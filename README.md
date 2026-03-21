@@ -47,19 +47,40 @@ cp .env.example .env
 # .env 파일에서 SECRET_KEY 등 설정
 ```
 
-### 3. 백엔드 실행
+### 3. 의존성 설치
 
 ```bash
+# 백엔드
 cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8008
-```
+pip install -r requirements.txt  # Mac: pip3 install -r requirements.txt
+cd ..
 
-### 4. 프론트엔드 실행
-
-```bash
+# 프론트엔드
 cd frontend
 npm install
+cd ..
+```
+
+### 4. 개발 서버 실행
+
+**한 번에 실행 (권장)**:
+```bash
+# Windows
+run_dev.bat
+
+# Mac / Linux
+chmod +x run_dev.sh
+./run_dev.sh
+```
+
+**수동 실행** (터미널 2개):
+```bash
+# 터미널 1 - 백엔드
+cd backend
+uvicorn main:app --reload --port 8008    # Mac: python3 -m uvicorn main:app --reload --port 8008
+
+# 터미널 2 - 프론트엔드
+cd frontend
 npm run dev
 ```
 
@@ -118,6 +139,8 @@ ym-testcase/
 │   └── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
+├── run_dev.bat        # Windows 개발 서버
+├── run_dev.sh         # Mac/Linux 개발 서버
 └── README.md
 ```
 
