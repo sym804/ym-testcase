@@ -236,8 +236,8 @@ export default function AdminPage() {
                                   key={a.id}
                                   style={{
                                     ...s.projectTag,
-                                    backgroundColor: a.role === "admin" ? "#DBEAFE" : "#F3F4F6",
-                                    color: a.role === "admin" ? "#1E40AF" : "#374151",
+                                    backgroundColor: a.role === "admin" ? "var(--bg-info-light)" : "var(--bg-badge-gray)",
+                                    color: a.role === "admin" ? "var(--text-info)" : "var(--text-badge-gray)",
                                     borderColor: a.role === "admin" ? "#93C5FD" : "#D1D5DB",
                                   }}
                                   title={`${a.project_name} (${a.role === "admin" ? "관리자" : "테스터"})`}
@@ -432,9 +432,9 @@ const s: Record<string, React.CSSProperties> = {
   assignBtn: {
     padding: "4px 10px",
     borderRadius: 6,
-    border: "1px solid #2D4A7A",
+    border: "1px solid var(--accent)",
     backgroundColor: "transparent",
-    color: "#2D4A7A",
+    color: "var(--accent)",
     fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",
@@ -469,7 +469,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   copyBtn: {
     padding: "8px 20px", borderRadius: 6, border: "none",
-    backgroundColor: "#2D4A7A", color: "#fff", fontSize: 13,
+    backgroundColor: "var(--accent)", color: "#fff", fontSize: 13,
     fontWeight: 600, cursor: "pointer", marginRight: 8,
   },
   closeBtn: {
@@ -478,8 +478,8 @@ const s: Record<string, React.CSSProperties> = {
     color: "var(--text-secondary)", fontSize: 13, cursor: "pointer",
   },
   assignAllBtn: {
-    padding: "8px 16px", borderRadius: 6, border: "1px solid #1A7F37",
-    backgroundColor: "transparent", color: "#1A7F37",
+    padding: "8px 16px", borderRadius: 6, border: "1px solid var(--color-pass)",
+    backgroundColor: "transparent", color: "var(--color-pass)",
     fontSize: 12, fontWeight: 600, cursor: "pointer",
   },
   projectTag: {

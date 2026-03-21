@@ -142,7 +142,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   tabActive: {
     color: "#fff",
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     fontWeight: 600,
   },
   content: {

@@ -718,7 +718,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 padding: "4px 12px",
                 borderRadius: 4,
                 border: "none",
-                backgroundColor: "#2D4A7A",
+                backgroundColor: "var(--accent)",
                 color: "#fff",
                 fontSize: 12,
                 fontWeight: 600,
@@ -947,7 +947,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   onKeyDown={(e) => e.key === "Enter" && handleAddSheet()}
                   autoFocus
                 />
-                <button style={{ padding: "8px 18px", borderRadius: 8, border: "none", backgroundColor: "#2D4A7A", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={handleAddSheet}>
+                <button style={{ padding: "8px 18px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={handleAddSheet}>
                   추가
                 </button>
                 <button style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-input)", backgroundColor: "transparent", color: "var(--text-secondary)", fontSize: 14, cursor: "pointer" }} onClick={() => { setShowAddSheet(false); setNewSheetName(""); }}>
@@ -956,7 +956,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8 }}>
-                <button style={{ padding: "10px 24px", borderRadius: 8, border: "none", backgroundColor: "#2D4A7A", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={() => setShowAddSheet(true)}>
+                <button style={{ padding: "10px 24px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={() => setShowAddSheet(true)}>
                   + 시트 추가
                 </button>
                 <button style={{ padding: "10px 24px", borderRadius: 8, border: "1px solid var(--border-input)", backgroundColor: "transparent", color: "var(--text-primary)", fontSize: 14, cursor: "pointer" }} onClick={() => emptyFileInputRef.current?.click()}>
@@ -1023,7 +1023,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               paddingLeft: 8 + depth * 16,
               cursor: "pointer",
               backgroundColor: isActive ? "rgba(45,74,122,0.15)" : "transparent",
-              borderLeft: isActive ? "3px solid #2D4A7A" : "3px solid transparent",
+              borderLeft: isActive ? "3px solid var(--accent)" : "3px solid transparent",
               fontSize: 13,
               color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
               fontWeight: isActive ? 600 : 400,
@@ -1160,7 +1160,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 autoFocus
               />
               <button
-                style={{ padding: "4px 8px", fontSize: 11, borderRadius: 4, border: "none", backgroundColor: "#2D4A7A", color: "#fff", cursor: "pointer" }}
+                style={{ padding: "4px 8px", fontSize: 11, borderRadius: 4, border: "none", backgroundColor: "var(--accent)", color: "#fff", cursor: "pointer" }}
                 onClick={handleAddSheet}
               >추가</button>
             </div>
@@ -1178,7 +1178,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 padding: "4px 8px",
                 cursor: "pointer",
                 backgroundColor: activeSheet === null ? "rgba(45,74,122,0.15)" : "transparent",
-                borderLeft: activeSheet === null ? "3px solid #2D4A7A" : "3px solid transparent",
+                borderLeft: activeSheet === null ? "3px solid var(--accent)" : "3px solid transparent",
                 fontSize: 13,
                 color: activeSheet === null ? "var(--text-primary)" : "var(--text-secondary)",
                 fontWeight: activeSheet === null ? 600 : 400,
@@ -1346,7 +1346,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               ...styles.btnGhost,
               fontSize: 11,
               padding: "4px 10px",
-              backgroundColor: filterConditions.length > 0 ? "#2D4A7A" : undefined,
+              backgroundColor: filterConditions.length > 0 ? "var(--accent)" : undefined,
               color: filterConditions.length > 0 ? "#fff" : undefined,
             }}
             onClick={() => setShowFilterPanel(!showFilterPanel)}
@@ -1828,7 +1828,7 @@ const sheetModalStyles: Record<string, React.CSSProperties> = {
   body: { padding: "16px 24px", maxHeight: 320, overflow: "auto" },
   actions: { display: "flex", gap: 12, marginBottom: 12 },
   linkBtn: {
-    background: "none", border: "none", color: "#5B9BD5",
+    background: "none", border: "none", color: "var(--color-link)",
     fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0,
   },
   sheetRow: {
@@ -1852,7 +1852,7 @@ const sheetModalStyles: Record<string, React.CSSProperties> = {
   },
   importBtn: {
     padding: "8px 20px", borderRadius: 6, border: "none",
-    backgroundColor: "#2D4A7A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+    backgroundColor: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
   },
 };
 
@@ -1933,7 +1933,7 @@ const historyStyles: Record<string, React.CSSProperties> = {
   tdField: {
     padding: "7px 10px",
     borderBottom: "1px solid var(--border-color)",
-    color: "#5B9BD5",
+    color: "var(--color-link)",
     fontWeight: 600,
     whiteSpace: "nowrap",
     verticalAlign: "top",
@@ -1941,7 +1941,7 @@ const historyStyles: Record<string, React.CSSProperties> = {
   tdOld: {
     padding: "7px 10px",
     borderBottom: "1px solid var(--border-color)",
-    color: "#EF4444",
+    color: "var(--color-fail)",
     maxWidth: 180,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -1951,7 +1951,7 @@ const historyStyles: Record<string, React.CSSProperties> = {
   tdNew: {
     padding: "7px 10px",
     borderBottom: "1px solid var(--border-color)",
-    color: "#22C55E",
+    color: "var(--color-pass)",
     maxWidth: 180,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -1983,7 +1983,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "5px 12px",
     borderRadius: 5,
     border: "none",
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     color: "#fff",
     fontSize: 12,
     fontWeight: 600,
@@ -2013,7 +2013,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "5px 18px",
     borderRadius: 5,
     border: "none",
-    backgroundColor: "#1A7F37",
+    backgroundColor: "var(--color-pass)",
     color: "#fff",
     fontSize: 12,
     fontWeight: 600,

@@ -99,7 +99,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   headerBar: {
     height: 56,
-    backgroundColor: "#0F1923",
+    backgroundColor: "var(--bg-header)",
     display: "flex",
     alignItems: "center",
     paddingLeft: 24,
@@ -127,7 +127,7 @@ const s: Record<string, React.CSSProperties> = {
     width: 48,
     height: 48,
     borderRadius: "50%",
-    backgroundColor: "#FEE2E2",
+    backgroundColor: "var(--bg-danger-light)",
     color: "#DC2626",
     fontSize: 24,
     fontWeight: 700,
@@ -171,7 +171,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   hintMsg: {
     fontSize: 12,
-    color: "#BF8700",
+    color: "var(--color-block)",
     marginTop: -4,
   },
   errorMsg: {
@@ -187,7 +187,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: "12px 0",
     borderRadius: 8,
     border: "none",
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     color: "#fff",
     fontSize: 15,
     fontWeight: 600,

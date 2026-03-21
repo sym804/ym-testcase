@@ -81,7 +81,7 @@ export default function Header() {
     const parts = text.split(new RegExp(`(${escaped})`, "gi"));
     return parts.map((part, i) =>
       part.toLowerCase() === query.toLowerCase()
-        ? <mark key={i} style={{ backgroundColor: "#FDE68A", color: "#92400E", padding: "0 1px", borderRadius: 2 }}>{part}</mark>
+        ? <mark key={i} style={{ backgroundColor: "var(--bg-warning-light)", color: "var(--text-warning)", padding: "0 1px", borderRadius: 2 }}>{part}</mark>
         : part
     );
   };
@@ -89,8 +89,8 @@ export default function Header() {
   if (!user) return null;
 
   const roleBadgeColor: Record<string, string> = {
-    admin: "#CF222E",
-    qa_manager: "#BF8700",
+    admin: "var(--color-fail)",
+    qa_manager: "var(--color-block)",
     user: "#6B7280",
   };
 
@@ -206,7 +206,7 @@ export default function Header() {
                 비밀번호 변경
               </button>
               <button
-                style={{ ...styles.userMenuItem, color: "#EF4444" }}
+                style={{ ...styles.userMenuItem, color: "var(--color-fail)" }}
                 onClick={() => { setShowUserMenu(false); logout(); }}
               >
                 로그아웃
@@ -293,7 +293,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     padding: "9px 12px", borderRadius: 6, border: "1px solid var(--border-input)",
     fontSize: 14, outline: "none", backgroundColor: "var(--bg-input)", color: "var(--text-primary)",
   },
-  hint: { fontSize: 12, color: "#BF8700", marginTop: -4 },
+  hint: { fontSize: 12, color: "var(--color-block)", marginTop: -4 },
   errorMsg: {
     marginTop: 4, padding: "8px 12px", borderRadius: 6,
     backgroundColor: "rgba(220,38,38,0.08)", color: "#DC2626", fontSize: 13,
@@ -305,7 +305,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
   },
   submitBtn: {
     padding: "8px 20px", borderRadius: 6, border: "none",
-    backgroundColor: "#2D4A7A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+    backgroundColor: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
   },
 };
 
@@ -316,8 +316,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     height: 52,
     padding: "0 24px",
-    backgroundColor: "#111827",
-    color: "#fff",
+    backgroundColor: "var(--bg-header)",
+    color: "var(--text-header)",
     position: "sticky",
     top: 0,
     zIndex: 100,
@@ -332,7 +332,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     letterSpacing: "-0.5px",
     cursor: "pointer",
-    color: "#fff",
+    color: "var(--text-header)",
   },
   center: {
     display: "flex",
@@ -341,9 +341,9 @@ const styles: Record<string, React.CSSProperties> = {
   projectSelect: {
     padding: "6px 12px",
     borderRadius: 6,
-    border: "1px solid #374151",
-    backgroundColor: "#1F2937",
-    color: "#fff",
+    border: "1px solid var(--border-header)",
+    backgroundColor: "var(--bg-header-input)",
+    color: "var(--text-header)",
     fontSize: 13,
     minWidth: 200,
     outline: "none",
@@ -355,7 +355,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   userName: {
     fontSize: 14,
-    color: "#CBD5E1",
+    color: "var(--text-header-secondary)",
   },
   roleBadge: {
     fontSize: 11,
@@ -367,9 +367,9 @@ const styles: Record<string, React.CSSProperties> = {
   adminBtn: {
     padding: "5px 12px",
     borderRadius: 6,
-    border: "1px solid #475569",
+    border: "1px solid var(--border-header)",
     backgroundColor: "transparent",
-    color: "#CBD5E1",
+    color: "var(--text-header-secondary)",
     fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",
@@ -377,7 +377,7 @@ const styles: Record<string, React.CSSProperties> = {
   themeBtn: {
     padding: "4px 8px",
     borderRadius: 6,
-    border: "1px solid #475569",
+    border: "1px solid var(--border-header)",
     backgroundColor: "transparent",
     fontSize: 16,
     cursor: "pointer",
@@ -389,7 +389,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     padding: "5px 12px",
     borderRadius: 6,
-    border: "1px solid #475569",
+    border: "1px solid var(--border-header)",
     backgroundColor: "transparent",
     cursor: "pointer",
   },
@@ -419,9 +419,9 @@ const styles: Record<string, React.CSSProperties> = {
   searchInput: {
     padding: "6px 12px",
     borderRadius: 6,
-    border: "1px solid #374151",
-    backgroundColor: "#1F2937",
-    color: "#fff",
+    border: "1px solid var(--border-header)",
+    backgroundColor: "var(--bg-header-input)",
+    color: "var(--text-header)",
     fontSize: 13,
     width: 200,
     outline: "none",
@@ -450,7 +450,7 @@ const styles: Record<string, React.CSSProperties> = {
   searchTcId: {
     fontSize: 12,
     fontWeight: 600,
-    color: "#5B9BD5",
+    color: "var(--color-link)",
     whiteSpace: "nowrap" as const,
   },
   searchText: {

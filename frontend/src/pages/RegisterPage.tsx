@@ -154,7 +154,7 @@ const styles: Record<string, React.CSSProperties> = {
   wrapper: { minHeight: "100vh", backgroundColor: "var(--bg-page)" },
   headerBar: {
     height: 56,
-    backgroundColor: "#0F1923",
+    backgroundColor: "var(--bg-header)",
     display: "flex",
     alignItems: "center",
     paddingLeft: 24,
@@ -192,11 +192,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-primary)",
   },
   checkingMsg: { fontSize: 12, color: "var(--text-secondary)", marginTop: -2 },
-  availableMsg: { fontSize: 12, color: "#1A7F37", marginTop: -2 },
+  availableMsg: { fontSize: 12, color: "var(--color-pass)", marginTop: -2 },
   takenMsg: { fontSize: 12, color: "#DC2626", marginTop: -2 },
   hintMsg: {
     fontSize: 12,
-    color: "#BF8700",
+    color: "var(--color-block)",
     marginTop: -2,
   },
   errorMsg: {
@@ -212,7 +212,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "12px 0",
     borderRadius: 8,
     border: "none",
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     color: "#fff",
     fontSize: 15,
     fontWeight: 600,
@@ -224,5 +224,5 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     color: "var(--text-secondary)",
   },
-  link: { color: "#5B9BD5", fontWeight: 600, textDecoration: "none" },
+  link: { color: "var(--color-link)", fontWeight: 600, textDecoration: "none" },
 };

@@ -88,7 +88,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   headerBar: {
     height: 56,
-    backgroundColor: "#0F1923",
+    backgroundColor: "var(--bg-header)",
     display: "flex",
     alignItems: "center",
     paddingLeft: 24,
@@ -151,7 +151,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "12px 0",
     borderRadius: 8,
     border: "none",
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     color: "#fff",
     fontSize: 15,
     fontWeight: 600,
@@ -164,7 +164,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-secondary)",
   },
   link: {
-    color: "#5B9BD5",
+    color: "var(--color-link)",
     fontWeight: 600,
     textDecoration: "none",
   },

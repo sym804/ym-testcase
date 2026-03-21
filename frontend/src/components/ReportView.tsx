@@ -149,19 +149,19 @@ export default function ReportView({ projectId }: Props) {
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>전체 현황</h3>
             <div style={styles.statsGrid}>
-              <div style={{ ...styles.statCard, borderLeftColor: "#2D4A7A" }}>
+              <div style={{ ...styles.statCard, borderLeftColor: "var(--accent)" }}>
                 <div style={styles.statLabel}>전체 TC</div>
                 <div style={styles.statValue}>{report.summary.total}</div>
               </div>
-              <div style={{ ...styles.statCard, borderLeftColor: "#1A7F37" }}>
+              <div style={{ ...styles.statCard, borderLeftColor: "var(--color-pass)" }}>
                 <div style={styles.statLabel}>PASS Rate</div>
                 <div style={styles.statValue}>{report.summary.pass_rate.toFixed(1)}%</div>
               </div>
-              <div style={{ ...styles.statCard, borderLeftColor: "#CF222E" }}>
+              <div style={{ ...styles.statCard, borderLeftColor: "var(--color-fail)" }}>
                 <div style={styles.statLabel}>FAIL</div>
                 <div style={styles.statValue}>{report.summary.fail}</div>
               </div>
-              <div style={{ ...styles.statCard, borderLeftColor: "#BF8700" }}>
+              <div style={{ ...styles.statCard, borderLeftColor: "var(--color-block)" }}>
                 <div style={styles.statLabel}>BLOCK</div>
                 <div style={styles.statValue}>{report.summary.block}</div>
               </div>
@@ -187,7 +187,7 @@ export default function ReportView({ projectId }: Props) {
                   {report.top_failures.map((f, i) => (
                     <tr key={i}>
                       <td style={styles.td}>{f.test_case?.tc_id || "-"}</td>
-                      <td style={{ ...styles.td, color: "#CF222E", fontWeight: 600 }}>
+                      <td style={{ ...styles.td, color: "var(--color-fail)", fontWeight: 600 }}>
                         {f.result}
                       </td>
                       <td style={styles.td}>{f.actual_result || "-"}</td>
@@ -251,9 +251,9 @@ export default function ReportView({ projectId }: Props) {
                   <tr key={row.category}>
                     <td style={styles.td}>{row.category}</td>
                     <td style={styles.tdNum}>{row.total}</td>
-                    <td style={{ ...styles.tdNum, color: "#1A7F37" }}>{row.pass}</td>
-                    <td style={{ ...styles.tdNum, color: "#CF222E" }}>{row.fail}</td>
-                    <td style={{ ...styles.tdNum, color: "#BF8700" }}>{row.block}</td>
+                    <td style={{ ...styles.tdNum, color: "var(--color-pass)" }}>{row.pass}</td>
+                    <td style={{ ...styles.tdNum, color: "var(--color-fail)" }}>{row.fail}</td>
+                    <td style={{ ...styles.tdNum, color: "var(--color-block)" }}>{row.block}</td>
                     <td style={{ ...styles.tdNum, color: "#6B7280" }}>{row.na}</td>
                   </tr>
                 ))}
@@ -292,7 +292,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "8px 20px",
     borderRadius: 6,
     border: "none",
-    backgroundColor: "#CF222E",
+    backgroundColor: "var(--color-fail)",
     color: "#fff",
     fontSize: 13,
     fontWeight: 600,
@@ -302,7 +302,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "8px 20px",
     borderRadius: 6,
     border: "none",
-    backgroundColor: "#1A7F37",
+    backgroundColor: "var(--color-pass)",
     color: "#fff",
     fontSize: 13,
     fontWeight: 600,
@@ -374,7 +374,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "4px 12px",
     borderRadius: 6,
     backgroundColor: "var(--bg-input)",
-    color: "#5B9BD5",
+    color: "var(--color-link)",
     fontSize: 13,
     fontWeight: 600,
   },

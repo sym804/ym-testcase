@@ -36,9 +36,9 @@ interface OverviewData {
 }
 
 const RESULT_COLORS = {
-  pass: "#1A7F37",
-  fail: "#CF222E",
-  block: "#BF8700",
+  pass: "var(--color-pass)",
+  fail: "var(--color-fail)",
+  block: "var(--color-block)",
   na: "#6B7280",
   not_started: "#D1D5DB",
 };
@@ -183,7 +183,7 @@ export default function ProjectListPage() {
               </div>
               <div style={s.summaryCard}>
                 <div style={s.summaryLabel}>진행률</div>
-                <div style={{ ...s.summaryValue, color: "#2D4A7A" }}>{sm.progress}%</div>
+                <div style={{ ...s.summaryValue, color: "var(--accent)" }}>{sm.progress}%</div>
               </div>
               <div style={s.summaryCard}>
                 <div style={s.summaryLabel}>Pass Rate</div>
@@ -314,10 +314,10 @@ export default function ProjectListPage() {
                     onClick={() => navigate(`/projects/${p.id}`)}
                     onMouseEnter={(e) => {
                       const el = e.currentTarget as HTMLDivElement;
-                      el.style.borderTopColor = "#2D4A7A";
-                      el.style.borderLeftColor = "#2D4A7A";
-                      el.style.borderRightColor = "#2D4A7A";
-                      el.style.borderBottomColor = "#2D4A7A";
+                      el.style.borderTopColor = "var(--accent)";
+                      el.style.borderLeftColor = "var(--accent)";
+                      el.style.borderRightColor = "var(--accent)";
+                      el.style.borderBottomColor = "var(--accent)";
                     }}
                     onMouseLeave={(e) => {
                       const el = e.currentTarget as HTMLDivElement;
@@ -491,7 +491,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: "10px 12px",
     borderBottom: "1px solid var(--border-color)",
     fontWeight: 600,
-    color: "#2D4A7A",
+    color: "var(--accent)",
   },
   tdNum: {
     padding: "10px 12px",
@@ -512,7 +512,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: "8px 18px",
     borderRadius: 8,
     border: "none",
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     color: "#fff",
     fontSize: 13,
     fontWeight: 600,
@@ -549,7 +549,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   cardAccent: {
     height: 4,
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     margin: "0 -20px",
     marginBottom: 16,
   },
@@ -611,7 +611,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: "10px 20px",
     borderRadius: 8,
     border: "none",
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     color: "#fff",
     fontSize: 14,
     fontWeight: 600,

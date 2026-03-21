@@ -17,11 +17,11 @@ interface Props {
 }
 
 const CARD_COLORS = {
-  total: "#2D4A7A",
-  pass: "#1A7F37",
-  fail: "#CF222E",
-  block: "#BF8700",
-  na: "#6366F1",
+  total: "var(--accent)",
+  pass: "var(--color-pass)",
+  fail: "var(--color-fail)",
+  block: "var(--color-block)",
+  na: "var(--color-na)",
   not_started: "#D1D5DB",
 };
 

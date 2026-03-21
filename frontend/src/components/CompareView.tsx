@@ -8,10 +8,10 @@ interface Props {
 }
 
 const resultColors: Record<string, { bg: string; fg: string }> = {
-  PASS: { bg: "rgba(26, 127, 55, 0.15)", fg: "#22C55E" },
-  FAIL: { bg: "rgba(207, 34, 46, 0.15)", fg: "#EF4444" },
-  BLOCK: { bg: "rgba(191, 135, 0, 0.15)", fg: "#EAB308" },
-  "N/A": { bg: "rgba(107, 114, 128, 0.15)", fg: "#9CA3AF" },
+  PASS: { bg: "rgba(26, 127, 55, 0.15)", fg: "var(--color-pass)" },
+  FAIL: { bg: "rgba(207, 34, 46, 0.15)", fg: "var(--color-fail)" },
+  BLOCK: { bg: "rgba(191, 135, 0, 0.15)", fg: "var(--color-block)" },
+  "N/A": { bg: "rgba(107, 114, 128, 0.15)", fg: "var(--text-secondary)" },
 };
 
 function displayResult(val: string) {
@@ -143,13 +143,13 @@ export default function CompareView({ projectId }: Props) {
           {/* Stats */}
           <div style={styles.statsBar}>
             <span style={styles.statBadge}>전체 {stats.total}</span>
-            <span style={{ ...styles.statBadge, backgroundColor: "#FEF3C7", color: "#92400E" }}>
+            <span style={{ ...styles.statBadge, backgroundColor: "var(--bg-warning-light)", color: "var(--text-warning)" }}>
               변경 {stats.changed}
             </span>
-            <span style={{ ...styles.statBadge, backgroundColor: "#FEE2E2", color: "#991B1B" }}>
+            <span style={{ ...styles.statBadge, backgroundColor: "var(--bg-danger-light)", color: "var(--text-danger)" }}>
               퇴보 {stats.regression}
             </span>
-            <span style={{ ...styles.statBadge, backgroundColor: "#DCFCE7", color: "#166534" }}>
+            <span style={{ ...styles.statBadge, backgroundColor: "var(--bg-success-light)", color: "var(--text-success)" }}>
               개선 {stats.improved}
             </span>
             <div style={{ flex: 1 }} />
@@ -321,9 +321,9 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
   },
   filterBtnActive: {
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     color: "#fff",
-    borderColor: "#2D4A7A",
+    borderColor: "var(--accent)",
   },
   tableWrapper: {
     maxHeight: "calc(100vh - 320px)",

@@ -71,7 +71,7 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
             <button
               style={{
                 ...s.toggleBtn,
-                backgroundColor: isPrivate ? "#CF222E" : "#1A7F37",
+                backgroundColor: isPrivate ? "var(--color-fail)" : "var(--color-pass)",
               }}
               onClick={handleTogglePrivate}
               disabled={saving}
@@ -82,8 +82,8 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
             <span
               style={{
                 ...s.statusBadge,
-                backgroundColor: isPrivate ? "#FEE2E2" : "#DCFCE7",
-                color: isPrivate ? "#CF222E" : "#1A7F37",
+                backgroundColor: isPrivate ? "var(--bg-danger-light)" : "var(--bg-success-light)",
+                color: isPrivate ? "var(--color-fail)" : "var(--color-pass)",
               }}
             >
               {isPrivate ? "비공개" : "공개"}
@@ -224,7 +224,7 @@ const s: Record<string, React.CSSProperties> = {
   myRole: {
     padding: "4px 14px",
     borderRadius: 6,
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     color: "#fff",
     fontSize: 13,
     fontWeight: 600,
@@ -235,20 +235,20 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 10,
     padding: 20,
     boxShadow: "var(--shadow)",
-    border: "1px solid #CF222E33",
+    border: "1px solid var(--color-fail)",
   },
   dangerTitle: {
     fontSize: 16,
     fontWeight: 700,
-    color: "#CF222E",
+    color: "var(--color-fail)",
     margin: "0 0 16px",
   },
   deleteBtn: {
     padding: "6px 20px",
     borderRadius: 6,
-    border: "1px solid #CF222E",
+    border: "1px solid var(--color-fail)",
     backgroundColor: "transparent",
-    color: "#CF222E",
+    color: "var(--color-fail)",
     fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
@@ -258,12 +258,12 @@ const s: Record<string, React.CSSProperties> = {
     marginTop: 16,
     padding: 16,
     borderRadius: 8,
-    backgroundColor: "#FEE2E2",
-    border: "1px solid #CF222E44",
+    backgroundColor: "var(--bg-danger-light)",
+    border: "1px solid var(--color-fail)",
   },
   confirmText: {
     fontSize: 13,
-    color: "#7F1D1D",
+    color: "var(--text-danger)",
     marginBottom: 10,
     lineHeight: 1.5,
   },
@@ -271,10 +271,10 @@ const s: Record<string, React.CSSProperties> = {
     width: "100%",
     padding: "8px 12px",
     borderRadius: 6,
-    border: "1px solid #CF222E88",
+    border: "1px solid var(--color-fail)",
     fontSize: 13,
-    backgroundColor: "#fff",
-    color: "#1a1a1a",
+    backgroundColor: "var(--bg-card)",
+    color: "var(--text-primary)",
     boxSizing: "border-box" as const,
   },
   confirmActions: {
@@ -287,8 +287,8 @@ const s: Record<string, React.CSSProperties> = {
     padding: "6px 16px",
     borderRadius: 6,
     border: "1px solid #ccc",
-    backgroundColor: "#fff",
-    color: "#333",
+    backgroundColor: "var(--bg-card)",
+    color: "var(--text-secondary)",
     fontSize: 13,
     cursor: "pointer",
   },
@@ -296,7 +296,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: "6px 16px",
     borderRadius: 6,
     border: "none",
-    backgroundColor: "#CF222E",
+    backgroundColor: "var(--color-fail)",
     color: "#fff",
     fontSize: 13,
     fontWeight: 600,
@@ -377,7 +377,7 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h3 style={s.title}>커스텀 필드</h3>
         <button
-          style={{ padding: "6px 14px", borderRadius: 6, border: "none", backgroundColor: "#2D4A7A", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          style={{ padding: "6px 14px", borderRadius: 6, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
           onClick={() => setShowAdd(!showAdd)}
         >
           {showAdd ? "취소" : "+ 필드 추가"}
@@ -419,7 +419,7 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
               </div>
             )}
             <button
-              style={{ padding: "6px 14px", borderRadius: 6, border: "none", backgroundColor: "#1A7F37", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+              style={{ padding: "6px 14px", borderRadius: 6, border: "none", backgroundColor: "var(--color-pass)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
               onClick={handleAdd}
               disabled={loading}
             >
@@ -455,7 +455,7 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
                 </td>
                 <td style={{ padding: "8px 10px", borderBottom: "1px solid var(--border-color)", textAlign: "center" }}>
                   <span
-                    style={{ cursor: "pointer", color: "#CF222E", fontSize: 16 }}
+                    style={{ cursor: "pointer", color: "var(--color-fail)", fontSize: 16 }}
                     onClick={() => handleDelete(f)}
                   >×</span>
                 </td>
