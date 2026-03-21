@@ -33,14 +33,51 @@ def list_projects(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from models import UserRole as _UR
+    user_role = current_user.role.value if isinstance(current_user.role, _UR) else current_user.role
+
     projects = db.query(Project).order_by(Project.created_at.desc()).all()
+
+    # 멤버십 한 번에 조회 (N+1 방지)
+    project_ids = [p.id for p in projects]
+    memberships = {}
+    if project_ids:
+        rows = (
+            db.query(ProjectMember.project_id, ProjectMember.role)
+            .filter(
+                ProjectMember.user_id == current_user.id,
+                ProjectMember.project_id.in_(project_ids),
+            )
+            .all()
+        )
+        for pid, role in rows:
+            memberships[pid] = role.value if isinstance(role, ProjectRole) else role
+
     result = []
     for p in projects:
-        proj_role = get_project_role(p.id, current_user, db)
-        # 프로젝트에 접근 권한이 없으면 목록에서 제외
-        if proj_role is None:
-            continue
-        result.append(_project_response(p, current_user, db))
+        # 역할 결정 (get_project_role 로직 인라인)
+        if user_role in ("admin", "qa_manager"):
+            proj_role = "admin"
+        elif p.created_by == current_user.id:
+            proj_role = "admin"
+        elif p.id in memberships:
+            proj_role = memberships[p.id]
+        elif not p.is_private:
+            proj_role = "viewer"
+        else:
+            continue  # 접근 불가
+
+        result.append({
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "jira_base_url": p.jira_base_url,
+            "is_private": p.is_private,
+            "created_by": p.created_by,
+            "created_at": p.created_at,
+            "updated_at": p.updated_at,
+            "my_role": proj_role,
+        })
     return result
 
 

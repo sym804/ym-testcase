@@ -206,13 +206,19 @@ def assign_to_all_projects(
         raise HTTPException(status_code=400, detail=f"유효하지 않은 역할입니다. ({', '.join(valid_roles)})")
 
     all_projects = db.query(Project).all()
+    project_ids = [p.id for p in all_projects]
+
+    # 기존 배정된 프로젝트 ID를 한 번에 조회 (N+1 방지)
+    existing_ids = set(
+        row[0] for row in db.query(ProjectMember.project_id).filter(
+            ProjectMember.user_id == payload.user_id,
+            ProjectMember.project_id.in_(project_ids),
+        ).all()
+    ) if project_ids else set()
+
     assigned = 0
     for p in all_projects:
-        existing = db.query(ProjectMember).filter(
-            ProjectMember.project_id == p.id,
-            ProjectMember.user_id == payload.user_id,
-        ).first()
-        if not existing:
+        if p.id not in existing_ids:
             db.add(ProjectMember(
                 project_id=p.id,
                 user_id=payload.user_id,

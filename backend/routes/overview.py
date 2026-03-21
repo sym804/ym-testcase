@@ -11,16 +11,6 @@ router = APIRouter(
 )
 
 
-def _get_latest_run_for_project(project_id: int, db: Session):
-    """Get the latest TestRun for a project."""
-    return (
-        db.query(TestRun)
-        .filter(TestRun.project_id == project_id)
-        .order_by(TestRun.created_at.desc())
-        .first()
-    )
-
-
 def _count_results(results: list) -> dict:
     """Count results from TestResult records."""
     counts = {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": 0}
@@ -70,6 +60,51 @@ def global_overview(
             or p.created_by == current_user.id
         ]
 
+    project_ids = [p.id for p in projects]
+
+    # 1) 프로젝트별 활성 TC 수를 한 번에 조회
+    from sqlalchemy import func
+    tc_counts_rows = (
+        db.query(TestCase.project_id, func.count(TestCase.id))
+        .filter(TestCase.project_id.in_(project_ids), TestCase.deleted_at.is_(None))
+        .group_by(TestCase.project_id)
+        .all()
+    ) if project_ids else []
+    tc_counts = dict(tc_counts_rows)
+
+    # 2) 프로젝트별 활성 TC ID 세트
+    active_tc_rows = (
+        db.query(TestCase.project_id, TestCase.id)
+        .filter(TestCase.project_id.in_(project_ids), TestCase.deleted_at.is_(None))
+        .all()
+    ) if project_ids else []
+    active_tc_by_project: dict[int, set] = {}
+    for pid, tid in active_tc_rows:
+        active_tc_by_project.setdefault(pid, set()).add(tid)
+
+    # 3) 프로젝트별 최신 TestRun 한 번에 조회
+    latest_runs_rows = (
+        db.query(TestRun)
+        .filter(TestRun.project_id.in_(project_ids))
+        .order_by(TestRun.project_id, TestRun.created_at.desc())
+        .all()
+    ) if project_ids else []
+    latest_run_by_project: dict[int, TestRun] = {}
+    for run in latest_runs_rows:
+        if run.project_id not in latest_run_by_project:
+            latest_run_by_project[run.project_id] = run
+
+    # 4) 최신 런들의 결과를 한 번에 조회
+    latest_run_ids = [run.id for run in latest_run_by_project.values()]
+    all_results = (
+        db.query(TestResult)
+        .filter(TestResult.test_run_id.in_(latest_run_ids))
+        .all()
+    ) if latest_run_ids else []
+    results_by_run: dict[int, list] = {}
+    for r in all_results:
+        results_by_run.setdefault(r.test_run_id, []).append(r)
+
     total_tc = 0
     total_pass = 0
     total_fail = 0
@@ -80,29 +115,17 @@ def global_overview(
     project_summaries = []
 
     for proj in projects:
-        count = db.query(TestCase).filter(TestCase.project_id == proj.id, TestCase.deleted_at.is_(None)).count()
+        count = tc_counts.get(proj.id, 0)
         total_tc += count
 
-        # Get latest TestRun for this project
-        latest_run = _get_latest_run_for_project(proj.id, db)
+        latest_run = latest_run_by_project.get(proj.id)
 
         if latest_run:
-            # 활성 TC의 결과만 집계 (소프트 삭제된 TC 제외)
-            active_tc_ids = set(
-                r[0] for r in db.query(TestCase.id).filter(
-                    TestCase.project_id == proj.id, TestCase.deleted_at.is_(None)
-                ).all()
-            )
-            results = [
-                r for r in db.query(TestResult).filter(
-                    TestResult.test_run_id == latest_run.id
-                ).all()
-                if r.test_case_id in active_tc_ids
-            ]
-            c = _count_results(results)
-            # 결과가 없는 활성 TC도 미수행으로 집계
-            tc_with_results = {r.test_case_id for r in results}
-            no_result_count = len(active_tc_ids - tc_with_results)
+            active_ids = active_tc_by_project.get(proj.id, set())
+            run_results = [r for r in results_by_run.get(latest_run.id, []) if r.test_case_id in active_ids]
+            c = _count_results(run_results)
+            tc_with_results = {r.test_case_id for r in run_results}
+            no_result_count = len(active_ids - tc_with_results)
             c["not_started"] += no_result_count
         else:
             c = {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": count}
