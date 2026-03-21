@@ -162,6 +162,17 @@ test("README + 매뉴얼 스크린샷 (ymseo_test)", async ({ page, request }) =
   // 13~15. 대시보드
   await page.getByRole("button", { name: "대시보드" }).click();
   await page.waitForTimeout(2000);
+  // 특정 런 선택 — 정확한 수치 표시
+  const dashSelect = page.locator("select").first();
+  if (await dashSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
+    const options = await dashSelect.locator("option").allTextContents();
+    // 첫 번째 비-전체 옵션 (가장 최근 런)
+    const runOption = options.find(o => o !== "전체" && o.trim() !== "");
+    if (runOption) {
+      await dashSelect.selectOption({ label: runOption });
+      await page.waitForTimeout(1500);
+    }
+  }
   await page.screenshot({ path: path.join(SAVE_DIR, "dashboard.png") });
   await page.screenshot({ path: path.join(MANUAL_DIR, "13_dashboard_top.png") });
   await page.screenshot({ path: path.join(MANUAL_DIR, "35_dashboard_with_plan.png") });
