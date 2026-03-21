@@ -175,7 +175,7 @@ describe("AutoSave - TestCaseGrid", () => {
     await user.click(screen.getByText("추가"));
 
     await waitFor(() => {
-      expect(testCasesApi.createSheet).toHaveBeenCalledWith(1, "새시트");
+      expect(testCasesApi.createSheet).toHaveBeenCalledWith(1, "새시트", null);
     });
   });
 

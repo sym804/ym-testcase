@@ -25,7 +25,7 @@ describe("testCasesApi", () => {
 
       expect(client.post).toHaveBeenCalledWith(
         "/api/projects/7/testcases/sheets",
-        { name: "체크리스트" }
+        { name: "체크리스트", parent_id: null }
       );
       expect(result).toEqual({ name: "체크리스트", tc_count: 0 });
     });

@@ -149,7 +149,7 @@ describe("SheetTabs", () => {
     });
 
     // × 버튼 찾기 (title 속성으로 식별)
-    const deleteBtn = screen.getByTitle("기능 시트 삭제");
+    const deleteBtn = screen.getAllByTitle("시트 삭제")[0];
     await user.click(deleteBtn);
 
     await waitFor(() => {
@@ -172,7 +172,7 @@ describe("SheetTabs", () => {
       expect(screen.getByText("기능")).toBeInTheDocument();
     });
 
-    const deleteBtn = screen.getByTitle("기능 시트 삭제");
+    const deleteBtn = screen.getAllByTitle("시트 삭제")[0];
     await user.click(deleteBtn);
 
     expect(testCasesApi.deleteSheet).not.toHaveBeenCalled();
@@ -197,7 +197,7 @@ describe("SheetTabs", () => {
     });
 
     // + 버튼 클릭 (title="시트 추가")
-    const addBtn = screen.getByTitle("시트 추가");
+    const addBtn = screen.getByTitle("루트 시트 추가");
     await user.click(addBtn);
 
     // 입력 UI 표시 확인
@@ -208,11 +208,11 @@ describe("SheetTabs", () => {
     await user.click(screen.getByText("추가"));
 
     await waitFor(() => {
-      expect(testCasesApi.createSheet).toHaveBeenCalledWith(1, "새시트");
+      expect(testCasesApi.createSheet).toHaveBeenCalledWith(1, "새시트", null);
     });
   });
 
-  it("시트 추가 입력에서 취소 버튼 클릭 시 입력 UI가 사라진다", async () => {
+  it("시트 추가 입력에서 Escape 키 시 입력 UI가 사라진다", async () => {
     setupSheets([
       { name: "기능", tc_count: 10 },
     ]);
@@ -223,12 +223,12 @@ describe("SheetTabs", () => {
       expect(screen.getByText("기능")).toBeInTheDocument();
     });
 
-    const addBtn = screen.getByTitle("시트 추가");
+    const addBtn = screen.getByTitle("루트 시트 추가");
     await user.click(addBtn);
 
     expect(screen.getByPlaceholderText("시트 이름")).toBeInTheDocument();
 
-    await user.click(screen.getByText("취소"));
+    await user.keyboard("{Escape}");
 
     expect(screen.queryByPlaceholderText("시트 이름")).not.toBeInTheDocument();
   });

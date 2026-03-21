@@ -89,8 +89,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     const result: { name: string; tc_count: number; id: number; depth: number; parent_id: number | null; hasChildren: boolean }[] = [];
     const walk = (nodes: SheetNode[], depth: number) => {
       for (const n of nodes) {
-        result.push({ name: n.name, tc_count: n.tc_count, id: n.id, depth, parent_id: n.parent_id, hasChildren: n.children.length > 0 });
-        if (n.children.length > 0) walk(n.children, depth + 1);
+        const kids = n.children || [];
+        result.push({ name: n.name, tc_count: n.tc_count, id: n.id, depth, parent_id: n.parent_id, hasChildren: kids.length > 0 });
+        if (kids.length > 0) walk(kids, depth + 1);
       }
     };
     walk(sheets, 0);
@@ -1009,7 +1010,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
 
     const renderNode = (node: SheetNode, depth: number): React.ReactNode => {
       const isExpanded = expandedSheets.has(node.id);
-      const hasChildren = node.children.length > 0;
+      const hasChildren = (node.children || []).length > 0;
       const isActive = activeSheet === node.name;
 
       return (
@@ -1081,7 +1082,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   style={{ cursor: "pointer", fontSize: 12, opacity: 0.4, padding: "0 2px" }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    const childInfo = hasChildren ? ` (하위 ${node.children.length}개 시트 포함)` : "";
+                    const childInfo = hasChildren ? ` (하위 ${(node.children || []).length}개 시트 포함)` : "";
                     if (!confirm(`"${node.name}" 시트를 삭제하시겠습니까?${childInfo}`)) return;
                     testCasesApi.deleteSheet(projectId, node.name).then(() => {
                       toast.success(`${node.name} 시트 삭제됨`);
@@ -1095,7 +1096,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             )}
           </div>
           {/* 하위 노드 */}
-          {hasChildren && isExpanded && node.children.map(child => renderNode(child, depth + 1))}
+          {hasChildren && isExpanded && (node.children || []).map(child => renderNode(child, depth + 1))}
         </div>
       );
     };
