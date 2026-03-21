@@ -35,24 +35,37 @@ def _count_from_results(results: list) -> dict:
 
 
 def _get_all_results(project_id: int, db: Session) -> list:
-    """전체(run_id 미지정) 시: 프로젝트의 모든 run 결과를 합산 반환.
+    """전체(run_id 미지정) 시: TC별 최신 런의 결과만 반환.
 
-    TODO: 대규모 프로젝트에서는 결과를 전부 메모리에 로드하므로 성능 이슈 가능.
-          필요 시 DB 집계 쿼리로 최적화할 것.
+    같은 TC가 여러 런에 존재할 경우, 가장 최근 런의 결과를 사용한다.
     """
     run_ids = [
         r.id for r in db.query(TestRun.id)
         .filter(TestRun.project_id == project_id)
+        .order_by(TestRun.created_at.desc())
         .all()
     ]
     if not run_ids:
         return []
 
-    return (
+    all_results = (
         db.query(TestResult)
         .filter(TestResult.test_run_id.in_(run_ids))
         .all()
     )
+
+    # TC별 최신 결과만 남기기 (run_ids는 최신순이므로 먼저 나온 게 최신)
+    seen_tc_ids: set[int] = set()
+    latest_results: list = []
+    # run_ids 순서대로 (최신 런 우선) 결과를 필터
+    run_order = {rid: i for i, rid in enumerate(run_ids)}
+    all_results.sort(key=lambda r: run_order.get(r.test_run_id, 999999))
+    for r in all_results:
+        if r.test_case_id not in seen_tc_ids:
+            seen_tc_ids.add(r.test_case_id)
+            latest_results.append(r)
+
+    return latest_results
 
 
 def _rates(counts: dict, total: int) -> dict:
@@ -85,14 +98,14 @@ def dashboard_summary(
         c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
         return {"total": total, **c, **_rates(c, total)}
 
-    # 전체 모드: 모든 run의 결과를 합산
+    # 전체 모드: TC별 최신 결과 기준
     results = _get_all_results(project_id, db)
     if results:
         c = _count_from_results(results)
     else:
         c = {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": total}
-    total_results = c["pass"] + c["fail"] + c["block"] + c["na"] + c["not_started"]
-    return {"total": total_results, **c, **_rates(c, total_results)}
+    c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
+    return {"total": total, **c, **_rates(c, total)}
 
 
 # ── Priority Distribution ────────────────────────────────────────────────────
@@ -137,8 +150,9 @@ def priority_distribution(
             c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
         else:
             results = [r for tid in tc_ids for r in results_by_tc.get(tid, [])]
+            total = len(tcs)
             c = _count_from_results(results)
-            total = c["pass"] + c["fail"] + c["block"] + c["na"] + c["not_started"]
+            c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
 
         result.append({"priority": priority, "total": total, **c})
 
@@ -186,8 +200,9 @@ def category_breakdown(
             c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
         else:
             results = [r for tid in tc_ids for r in results_by_tc.get(tid, [])]
+            total = len(tcs)
             c = _count_from_results(results)
-            total = c["pass"] + c["fail"] + c["block"] + c["na"] + c["not_started"]
+            c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
 
         result.append({"category": category, "total": total, **c})
 
@@ -278,8 +293,9 @@ def assignee_summary(
             c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
         else:
             results = [r for tid in tc_ids for r in results_by_tc.get(tid, [])]
+            total = len(tcs)
             c = _count_from_results(results)
-            total = c["pass"] + c["fail"] + c["block"] + c["na"] + c["not_started"]
+            c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
 
         done = total - c["not_started"]
         completion_rate = round(done / total * 100, 1) if total > 0 else 0.0
