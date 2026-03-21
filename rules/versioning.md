@@ -14,7 +14,7 @@
 ## 컴포넌트별 독립 버전
 
 ```
-TC Manager System  (전체 릴리즈 태그)
+YM TestCase System  (전체 릴리즈 태그)
 ├── Frontend       (UI/UX 변경, 페이지 추가, 컴포넌트 수정)
 ├── Backend        (API 변경, 비즈니스 로직, 보안 수정)
 └── Database       (테이블/컬럼 추가·변경·삭제, 마이그레이션)

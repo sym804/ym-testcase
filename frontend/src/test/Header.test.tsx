@@ -58,9 +58,9 @@ beforeEach(() => {
 });
 
 describe("Header", () => {
-  it("TC Manager 브랜드를 표시한다", async () => {
+  it("YM TestCase 브랜드를 표시한다", async () => {
     renderHeader();
-    expect(screen.getByText("TC Manager")).toBeInTheDocument();
+    expect(screen.getByText("YM TestCase")).toBeInTheDocument();
   });
 
   it("프로젝트 드롭다운을 표시한다", async () => {
@@ -98,10 +98,10 @@ describe("Header", () => {
     expect(btn).toBeInTheDocument();
   });
 
-  it("TC Manager 클릭 시 /projects로 이동한다", async () => {
+  it("YM TestCase 클릭 시 /projects로 이동한다", async () => {
     const user = userEvent.setup();
     renderHeader();
-    await user.click(screen.getByText("TC Manager"));
+    await user.click(screen.getByText("YM TestCase"));
     expect(mockNavigate).toHaveBeenCalledWith("/projects");
   });
 

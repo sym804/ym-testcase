@@ -17,7 +17,7 @@ export default function AdminManualPage() {
       <div style={s.topBar}>
         <div style={s.topLeft}>
           <span style={s.logo} onClick={() => navigate("/projects")}>
-            TC Manager
+            YM TestCase
           </span>
           <span style={s.badge}>운영 매뉴얼 (Admin)</span>
         </div>
@@ -50,7 +50,7 @@ export default function AdminManualPage() {
         <main style={s.main}>
           {/* 1. 시스템 구성 */}
           <section id="architecture" style={s.section}>
-            <h1 style={s.h1}>TC Manager 운영 매뉴얼</h1>
+            <h1 style={s.h1}>YM TestCase 운영 매뉴얼</h1>
             <p style={s.updatedAt}>최종 업데이트: 2026-03-20 | v0.6.0.0 | Admin 전용 문서</p>
 
             <h2 style={s.h2}>1. 시스템 구성</h2>
@@ -517,7 +517,7 @@ docker-compose restart backend`}</pre>
           </section>
 
           <div style={s.footer}>
-            <p>TC Manager v1.0 | 운영 매뉴얼 (Admin 전용)</p>
+            <p>YM TestCase v1.0 | 운영 매뉴얼 (Admin 전용)</p>
           </div>
         </main>
       </div>

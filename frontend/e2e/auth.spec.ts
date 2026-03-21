@@ -28,7 +28,7 @@ test.describe("인증 플로우", () => {
     await page.getByPlaceholder("비밀번호를 입력하세요").fill("test1234");
     await page.getByRole("button", { name: "로그인" }).click();
     await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
-    await expect(page.getByText("TC Manager")).toBeVisible();
+    await expect(page.getByText("YM TestCase")).toBeVisible();
   });
 
   test("비인증 상태에서 /projects 접근 시 /login 리다이렉트", async ({ page }) => {

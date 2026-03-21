@@ -107,7 +107,7 @@ export default function Header() {
           style={styles.title}
           onClick={() => navigate("/projects")}
         >
-          TC Manager
+          YM TestCase
         </span>
       </div>
 

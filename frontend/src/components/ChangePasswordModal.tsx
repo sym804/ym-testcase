@@ -31,7 +31,7 @@ export default function ChangePasswordModal() {
   return (
     <div style={s.wrapper}>
       <div style={s.headerBar}>
-        <span style={s.brand}>TC Manager</span>
+        <span style={s.brand}>YM TestCase</span>
       </div>
       <div style={s.container}>
         <div style={s.card}>

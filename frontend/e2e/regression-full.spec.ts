@@ -1,5 +1,5 @@
 /**
- * TC Manager 전체 회귀 테스트 (Playwright)
+ * YM TestCase 전체 회귀 테스트 (Playwright)
  * 체크리스트 192개 TC 중 자동화 가능한 항목 전부 커버
  */
 import { test, expect, type Page } from "@playwright/test";
@@ -230,14 +230,14 @@ test.describe("3. 헤더/네비게이션", () => {
   test.beforeEach(async ({ page }) => { await login(page); });
 
   test("TC-HDR-001: 프로젝트 선택기", async ({ page }) => {
-    await expect(page.getByText("TC Manager")).toBeVisible();
+    await expect(page.getByText("YM TestCase")).toBeVisible();
   });
 
   test("TC-HDR-002: 로고 클릭 → 프로젝트 목록", async ({ page }) => {
     // 다른 페이지로 이동 후 로고 클릭으로 복귀
     await page.locator("header button").filter({ hasText: /^관리$/ }).click();
     await expect(page).toHaveURL(/\/admin/);
-    await page.locator("header").getByText("TC Manager").click();
+    await page.locator("header").getByText("YM TestCase").click();
     await expect(page).toHaveURL(/\/projects/, { timeout: 5000 });
   });
 

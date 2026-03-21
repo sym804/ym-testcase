@@ -1,4 +1,4 @@
-"""TC Manager 보안 통합 테스트 (pytest 기반)
+"""YM TestCase 보안 통합 테스트 (pytest 기반)
 
 실행: cd backend && python -m pytest test_security.py -v
 """

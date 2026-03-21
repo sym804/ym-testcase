@@ -1,4 +1,4 @@
-# TC Manager 운영 매뉴얼 (Admin)
+# YM TestCase 운영 매뉴얼 (Admin)
 
 > **최종 업데이트**: 2026-03-18
 > **버전**: 0.4.0.0
@@ -406,4 +406,4 @@ docker-compose restart backend
 
 ---
 
-*TC Manager v0.4.0.0 | 운영 매뉴얼 (Admin 전용)*
+*YM TestCase v0.4.0.0 | 운영 매뉴얼 (Admin 전용)*

@@ -69,8 +69,8 @@ test.describe("프로젝트 관리", () => {
   });
 
   test("헤더 네비게이션", async ({ page }) => {
-    // TC Manager 로고 클릭
-    await page.getByText("TC Manager").click();
+    // YM TestCase 로고 클릭
+    await page.getByText("YM TestCase").click();
     await expect(page).toHaveURL(/\/projects/);
 
     // 도움말

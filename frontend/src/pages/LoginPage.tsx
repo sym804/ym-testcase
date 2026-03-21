@@ -35,7 +35,7 @@ export default function LoginPage() {
   return (
     <div style={styles.wrapper}>
       <div style={styles.headerBar}>
-        <span style={styles.brand}>TC Manager</span>
+        <span style={styles.brand}>YM TestCase</span>
       </div>
       <div style={styles.container}>
         <div style={styles.card}>

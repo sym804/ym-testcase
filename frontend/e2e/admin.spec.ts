@@ -23,7 +23,7 @@ test.describe("관리자 페이지", () => {
     await page.getByText("도움말").click();
     await expect(page).toHaveURL(/\/manual/);
     // 매뉴얼 콘텐츠
-    await expect(page.getByText("TC Manager")).toBeVisible();
+    await expect(page.getByText("YM TestCase")).toBeVisible();
   });
 
   test("운영 매뉴얼 페이지", async ({ page }) => {

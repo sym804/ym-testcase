@@ -11,7 +11,7 @@ export default function UserManualPage() {
       <div style={s.topBar}>
         <div style={s.topLeft}>
           <span style={s.logo} onClick={() => navigate("/projects")}>
-            TC Manager
+            YM TestCase
           </span>
           <span style={s.badge}>사용자 매뉴얼</span>
         </div>
@@ -53,10 +53,10 @@ export default function UserManualPage() {
         <main style={s.main}>
           {/* 1. 개요 */}
           <section id="overview" style={s.section}>
-            <h1 style={s.h1}>TC Manager 사용자 매뉴얼</h1>
+            <h1 style={s.h1}>YM TestCase 사용자 매뉴얼</h1>
             <p style={s.updatedAt}>최종 업데이트: 2026-03-20</p>
             <div style={s.infoBox}>
-              <strong>TC Manager</strong>는 테스트 케이스(TC)의 관리, 테스트 수행, 결과 분석 및 리포트 생성을 위한 웹 기반 테스트 관리 시스템입니다.
+              <strong>YM TestCase</strong>는 테스트 케이스(TC)의 관리, 테스트 수행, 결과 분석 및 리포트 생성을 위한 웹 기반 테스트 관리 시스템입니다.
               <br /><br />
               주요 기능:
               <ul style={{ margin: "8px 0 0 20px", lineHeight: 1.8 }}>
@@ -192,7 +192,7 @@ export default function UserManualPage() {
               </thead>
               <tbody>
                 <tr>
-                  <td style={s.td}>TC Manager 로고</td>
+                  <td style={s.td}>YM TestCase 로고</td>
                   <td style={s.td}>홈 이동</td>
                   <td style={s.td}>클릭 시 프로젝트 목록 페이지로 이동</td>
                 </tr>
@@ -755,7 +755,7 @@ export default function UserManualPage() {
           )}
 
           <div style={s.footer}>
-            <p>TC Manager v0.3.0.0 | 사용자 매뉴얼</p>
+            <p>YM TestCase v0.3.0.0 | 사용자 매뉴얼</p>
           </div>
         </main>
       </div>

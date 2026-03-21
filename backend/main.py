@@ -35,8 +35,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="TC Manager API",
-    description="Test Case Manager Backend",
+    title="YM TestCase API",
+    description="Your Method, Your Test Case Manager",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -152,4 +152,4 @@ if os.path.isdir(static_dir):
 
 @app.get("/")
 def root():
-    return {"status": "TC Manager API running"}
+    return {"status": "YM TestCase API running"}

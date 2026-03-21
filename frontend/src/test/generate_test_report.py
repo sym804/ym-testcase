@@ -118,14 +118,14 @@ test_cases = [
     ("마크다운 셀", "MarkdownCell.test.tsx", "link", "링크를 a 태그로 변환한다", "단위"),
 
     # Header
-    ("헤더", "Header.test.tsx", "brand", "TC Manager 브랜드를 표시한다", "UI"),
+    ("헤더", "Header.test.tsx", "brand", "YM TestCase 브랜드를 표시한다", "UI"),
     ("헤더", "Header.test.tsx", "project-dropdown", "프로젝트 드롭다운을 표시한다", "통합"),
     ("헤더", "Header.test.tsx", "search-input", "검색 입력란을 표시한다", "UI"),
     ("헤더", "Header.test.tsx", "user-info", "사용자 이름과 역할을 표시한다", "UI"),
     ("헤더", "Header.test.tsx", "admin-buttons", "admin 사용자에게 관리 버튼을 표시한다", "UI"),
     ("헤더", "Header.test.tsx", "help-button", "도움말 버튼을 표시한다", "UI"),
     ("헤더", "Header.test.tsx", "theme-toggle", "테마 토글 버튼이 있다", "UI"),
-    ("헤더", "Header.test.tsx", "brand-navigate", "TC Manager 클릭 시 /projects로 이동한다", "UI"),
+    ("헤더", "Header.test.tsx", "brand-navigate", "YM TestCase 클릭 시 /projects로 이동한다", "UI"),
     ("헤더", "Header.test.tsx", "user-menu", "사용자 메뉴 클릭 시 드롭다운을 표시한다", "UI"),
     ("헤더", "Header.test.tsx", "logout", "로그아웃 클릭 시 logout을 호출한다", "통합"),
     ("헤더", "Header.test.tsx", "search-min-chars", "2자 미만 검색어는 결과를 표시하지 않는다", "단위"),

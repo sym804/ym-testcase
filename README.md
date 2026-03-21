@@ -1,4 +1,6 @@
-# TC Manager
+# YM TestCase
+
+> **Y**our **M**ethod, Your Test Case Manager
 
 경량 테스트 케이스 관리 도구. TestRail/Kiwi TCMS 대안으로 설계된 셀프 호스팅 웹 애플리케이션.
 
@@ -34,8 +36,8 @@
 ### 1. 저장소 클론
 
 ```bash
-git clone https://github.com/your-username/tc-manager.git
-cd tc-manager
+git clone https://github.com/sym804/ym-testcase.git
+cd ym-testcase
 ```
 
 ### 2. 환경 설정
@@ -101,7 +103,7 @@ npx playwright test
 ## 프로젝트 구조
 
 ```
-tc-manager/
+ym-testcase/
 ├── backend/          # FastAPI 백엔드
 │   ├── main.py       # 앱 엔트리포인트
 │   ├── models.py     # SQLAlchemy 모델
