@@ -2,7 +2,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, and_
 
 from database import get_db
 from models import User, TestCase, TestRun, TestResult, TestResultValue
@@ -37,35 +37,33 @@ def _count_from_results(results: list) -> dict:
 def _get_all_results(project_id: int, db: Session) -> list:
     """전체(run_id 미지정) 시: TC별 최신 런의 결과만 반환.
 
-    같은 TC가 여러 런에 존재할 경우, 가장 최근 런의 결과를 사용한다.
+    DB 서브쿼리로 TC별 가장 최신 런의 result_id를 구하고,
+    해당 결과만 조회한다. 런이 많아도 성능 OK.
     """
-    run_ids = [
-        r.id for r in db.query(TestRun.id)
+    # 서브쿼리: TC별 최신 런의 test_run_id
+    latest_run_per_tc = (
+        db.query(
+            TestResult.test_case_id,
+            func.max(TestResult.test_run_id).label("max_run_id"),
+        )
+        .join(TestRun, TestResult.test_run_id == TestRun.id)
         .filter(TestRun.project_id == project_id)
-        .order_by(TestRun.created_at.desc())
-        .all()
-    ]
-    if not run_ids:
-        return []
-
-    all_results = (
-        db.query(TestResult)
-        .filter(TestResult.test_run_id.in_(run_ids))
-        .all()
+        .group_by(TestResult.test_case_id)
+        .subquery()
     )
 
-    # TC별 최신 결과만 남기기 (run_ids는 최신순이므로 먼저 나온 게 최신)
-    seen_tc_ids: set[int] = set()
-    latest_results: list = []
-    # run_ids 순서대로 (최신 런 우선) 결과를 필터
-    run_order = {rid: i for i, rid in enumerate(run_ids)}
-    all_results.sort(key=lambda r: run_order.get(r.test_run_id, 999999))
-    for r in all_results:
-        if r.test_case_id not in seen_tc_ids:
-            seen_tc_ids.add(r.test_case_id)
-            latest_results.append(r)
-
-    return latest_results
+    # 최신 런의 결과만 조회
+    return (
+        db.query(TestResult)
+        .join(
+            latest_run_per_tc,
+            and_(
+                TestResult.test_case_id == latest_run_per_tc.c.test_case_id,
+                TestResult.test_run_id == latest_run_per_tc.c.max_run_id,
+            ),
+        )
+        .all()
+    )
 
 
 def _rates(counts: dict, total: int) -> dict:
