@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 const __filename2 = fileURLToPath(import.meta.url);
 const __dirname2 = path.dirname(__filename2);
 const SAVE_DIR = path.join(__dirname2, "../public/manual-images");
-const PASSWORD = "test1234";
+const PASSWORD = process.env.TEST_ADMIN_PASSWORD || "test1234";
 
 async function login(page: Page) {
   await page.goto("/login");
@@ -255,6 +255,14 @@ test("전체 매뉴얼 스크린샷 재캡처", async ({ page, request }) => {
   // 라이트모드 복구
   await themeBtn.click();
   await page.waitForTimeout(500);
+
+  // 22. Admin 페이지 (사용자 관리)
+  await page.goto("/admin");
+  await page.waitForTimeout(2000);
+  await page.screenshot({ path: path.join(SAVE_DIR, "22_admin_page.png") });
+
+  // 25. Admin 페이지 (비밀번호 초기화 버튼 포함)
+  await page.screenshot({ path: path.join(SAVE_DIR, "25_admin_page_with_reset.png") });
 
   // 정리
   await request.delete(`/api/projects/${projId}`, { headers: h });

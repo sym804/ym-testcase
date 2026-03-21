@@ -4,6 +4,29 @@
 
 경량 테스트 케이스 관리 도구. TestRail/Kiwi TCMS 대안으로 설계된 셀프 호스팅 웹 애플리케이션.
 
+## 스크린샷
+
+### 프로젝트 목록
+![프로젝트 목록](docs/screenshots/project_list.png)
+
+### 테스트 케이스 관리 (스프레드시트 스타일)
+![TC 관리](docs/screenshots/tc_grid.png)
+
+### 시트 트리 구조
+![시트 트리](docs/screenshots/sheet_tree.png)
+
+### 테스트 수행 결과
+![테스트 수행](docs/screenshots/testrun.png)
+
+### 대시보드
+![대시보드](docs/screenshots/dashboard.png)
+
+### 고급 필터
+![고급 필터](docs/screenshots/filter.png)
+
+### 다크 모드
+![다크 모드](docs/screenshots/dark_mode.png)
+
 ## 주요 기능
 
 - **스프레드시트 스타일 TC 편집** — ag-grid 기반 인라인 편집, 다중 행 추가, 벌크 삭제

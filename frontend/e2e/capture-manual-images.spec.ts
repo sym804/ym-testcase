@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SAVE_DIR = path.join(__dirname, "../public/manual-images");
-const PASSWORD = "test1234";
+const PASSWORD = process.env.TEST_ADMIN_PASSWORD || "test1234";
 
 async function login(page: Page) {
   await page.goto("/login");
