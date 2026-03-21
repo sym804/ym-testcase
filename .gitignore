@@ -1,0 +1,76 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# ── Node ──
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ── Database ──
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Environment ──
+.env
+.env.local
+.env.production
+
+# ── Uploads / Data ──
+backend/uploads/*
+!backend/uploads/.gitkeep
+data/
+
+# ── IDE / Editor ──
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# ── Logs ──
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ── Test artifacts ──
+test-results/
+playwright-report/
+blob-report/
+
+# ── OS ──
+Thumbs.db
+Desktop.ini
+
+# ── Claude Code ──
+.claude/
+skills/
+
+# ── Project-specific excludes ──
+blog/
+주식데이터/
+*.xlsx
+*.pdf
+product_review_*.md
+review_result*.txt
+review_result*.md
+rules_review_*.md
+security_review_*.md
+tistory_post_*.md
+한국_주식데이터_*.html
+add_backend_sheet.py
+merge_test_checklist.py
+run_regression.py
+IMPLEMENTATION_PLAN.md
+WORK_PLAN.md

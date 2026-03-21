@@ -1,0 +1,39 @@
+"""pytest 전역 설정 — 테스트 세션 동안 uvicorn 서버를 자동으로 시작/종료"""
+import threading
+import time
+
+import pytest
+import requests
+import uvicorn
+
+
+def _wait_for_server(url: str, timeout: float = 15):
+    """서버가 응답할 때까지 대기"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            r = requests.get(url, timeout=2)
+            if r.status_code < 500:
+                return True
+        except requests.ConnectionError:
+            pass
+        time.sleep(0.3)
+    raise RuntimeError(f"Server did not start within {timeout}s at {url}")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _server():
+    """세션 시작 시 uvicorn 서버를 백그라운드 스레드로 실행"""
+    from main import app
+
+    port = int(__import__("os").getenv("TEST_PORT", "8008"))
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+    server = uvicorn.Server(config)
+
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+
+    _wait_for_server(f"http://localhost:{port}/docs")
+    yield
+    server.should_exit = True
+    thread.join(timeout=5)

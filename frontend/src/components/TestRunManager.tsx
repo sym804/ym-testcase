@@ -1,0 +1,1682 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AgGridReact } from "ag-grid-react";
+import {
+  AllCommunityModule,
+  ModuleRegistry,
+  type ColDef,
+  type CellClassParams,
+  type CellStyle,
+  type GridApi,
+  type GridReadyEvent,
+  type CellKeyDownEvent,
+  type CellClickedEvent,
+  type CellValueChangedEvent,
+} from "ag-grid-community";
+import { testRunsApi, testCasesApi, attachmentsApi } from "../api";
+import type { TestRun, TestResult, Attachment } from "../types";
+import { TestRunStatus } from "../types";
+import { AG_GRID_LOCALE_KO } from "../agGridLocaleKo";
+import toast from "react-hot-toast";
+import MarkdownCell from "./MarkdownCell";
+import HighlightCell from "./HighlightCell";
+
+ModuleRegistry.registerModules([AllCommunityModule]);
+
+interface Props {
+  projectId: number;
+  project: import("../types").Project;
+}
+
+const RESULT_OPTIONS = ["", "PASS", "FAIL", "BLOCK", "N/A"];
+
+const resultColors: Record<string, { bg: string; fg: string }> = {
+  PASS: { bg: "rgba(26, 127, 55, 0.15)", fg: "#22C55E" },
+  FAIL: { bg: "rgba(207, 34, 46, 0.15)", fg: "#EF4444" },
+  BLOCK: { bg: "rgba(191, 135, 0, 0.15)", fg: "#EAB308" },
+  "N/A": { bg: "rgba(107, 114, 128, 0.15)", fg: "#9CA3AF" },
+};
+
+function resultCellStyle(params: CellClassParams) {
+  const val = params.value as string;
+  const c = resultColors[val];
+  const base: CellStyle = { textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" };
+  if (c) return { ...base, backgroundColor: c.bg, color: c.fg, fontWeight: 600 };
+  return base;
+}
+
+export default function TestRunManager({ projectId, project }: Props) {
+  const canManageRun = project.my_role === "admin";
+  const [runs, setRuns] = useState<TestRun[]>([]);
+  const [selectedRun, setSelectedRun] = useState<TestRun | null>(null);
+  const [results, setResults] = useState<TestResult[]>([]);
+  const [loadingRuns, setLoadingRuns] = useState(true);
+  const [loadingResults, setLoadingResults] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: "", version: "", environment: "", round: 1 });
+  const [creating, setCreating] = useState(false);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [countTick, setCountTick] = useState(0);
+  const gridApiRef = useRef<GridApi | null>(null);
+
+  // ── 시트 탭 ──
+  const [sheets, setSheets] = useState<{ name: string; tc_count: number }[]>([]);
+  const [activeSheet, setActiveSheet] = useState<string | null>(null);
+  const sheetInitRef = useRef(false);
+
+  // ── Undo 스택 ──
+  const undoStackRef = useRef<{ rowId: number; field: string; oldValue: string }[]>([]);
+
+  // ── 타이머 상태 ──
+  const [timerEnabled, setTimerEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem("tc_timer_enabled");
+    return saved === null ? false : saved === "true";
+  });
+  const [timerRowId, setTimerRowId] = useState<number | null>(null);
+  const [timerStart, setTimerStart] = useState<number | null>(null);
+  const [timerDisplay, setTimerDisplay] = useState("");
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── 필터 상태 ──
+  const [filterText, setFilterText] = useState("");
+  const [filterResult, setFilterResult] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterPriority, setFilterPriority] = useState("");
+
+  // ── 첨부 이미지 상태 ──
+  const [attachmentsMap, setAttachmentsMap] = useState<Record<number, Attachment[]>>({});
+  const [previewImage, setPreviewImage] = useState<{ url: string; filename: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadTargetResultId, setUploadTargetResultId] = useState<number | null>(null);
+
+  // ── 첨부파일 로드 (개별 result — 포커스 시) ──
+  const loadAttachmentFor = useCallback(async (resultId: number) => {
+    if (attachmentsMap[resultId] !== undefined) return; // 이미 로드됨
+    try {
+      const atts = await attachmentsApi.list(resultId);
+      setAttachmentsMap((prev) => ({ ...prev, [resultId]: atts }));
+    } catch { /* ignore */ }
+  }, [attachmentsMap]);
+
+  // ── 이미지 업로드 ──
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadTargetResultId) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("이미지 파일만 업로드 가능합니다.");
+      return;
+    }
+    try {
+      const att = await attachmentsApi.upload(uploadTargetResultId, file);
+      setAttachmentsMap((prev) => ({
+        ...prev,
+        [uploadTargetResultId]: [...(prev[uploadTargetResultId] || []), att],
+      }));
+      gridApiRef.current?.refreshCells({ force: true });
+      toast.success("이미지 첨부 완료");
+    } catch {
+      toast.error("업로드 실패");
+    }
+    e.target.value = "";
+    setUploadTargetResultId(null);
+  }, [uploadTargetResultId]);
+
+  // ── 첨부파일 삭제 ──
+  const handleDeleteAttachment = useCallback(async (attachmentId: number, resultId: number) => {
+    if (!confirm("이 첨부파일을 삭제하시겠습니까?")) return;
+    try {
+      await attachmentsApi.delete(attachmentId);
+      setAttachmentsMap((prev) => ({
+        ...prev,
+        [resultId]: (prev[resultId] || []).filter((a) => a.id !== attachmentId),
+      }));
+      gridApiRef.current?.refreshCells({ force: true });
+      toast.success("삭제 완료");
+    } catch {
+      toast.error("삭제 실패");
+    }
+  }, []);
+
+  // ── 여러 행 일괄 저장 ──
+  const saveManyResults = useCallback(async (rows: TestResult[]) => {
+    if (!selectedRun || rows.length === 0) return;
+    const payload = rows.map((r) => ({
+      test_case_id: r.test_case_id,
+      result: r.result === "" ? "NS" : r.result === "N/A" ? "NA" : r.result,
+      actual_result: r.actual_result || undefined,
+      issue_link: r.issue_link || undefined,
+      remarks: r.remarks || undefined,
+    }));
+    try {
+      await testRunsApi.submitResults(projectId, selectedRun.id, payload);
+    } catch {
+      toast.error("저장 실패");
+    }
+  }, [projectId, selectedRun]);
+
+  // ── Shift+Click 범위 채우기용 앵커 ──
+  const fillAnchorRef = useRef<{ rowIndex: number; field: string; value: string } | null>(null);
+
+  const onCellClicked = useCallback((event: CellClickedEvent) => {
+    const field = event.column?.getColId();
+    if (!field || field !== "result") return;
+
+    const browserEvent = event.event as MouseEvent;
+    const api = gridApiRef.current;
+    if (!api || event.rowIndex == null) return;
+
+    if (browserEvent?.shiftKey && fillAnchorRef.current && fillAnchorRef.current.field === field) {
+      // Shift+Click: 앵커부터 현재 행까지 같은 값으로 채우기
+      const anchor = fillAnchorRef.current;
+      const startIdx = Math.min(anchor.rowIndex, event.rowIndex);
+      const endIdx = Math.max(anchor.rowIndex, event.rowIndex);
+      const changed: TestResult[] = [];
+
+      api.forEachNodeAfterFilterAndSort((node) => {
+        if (node.rowIndex != null && node.rowIndex >= startIdx && node.rowIndex <= endIdx && node.data) {
+          node.data[field] = anchor.value;
+          changed.push(node.data);
+        }
+      });
+
+      if (changed.length > 0) {
+        api.refreshCells({ force: true });
+        setCountTick((t) => t + 1);
+        toast.success(`${changed.length}개 행에 "${anchor.value}" 채움`);
+        saveManyResults(changed);
+      }
+      fillAnchorRef.current = null;
+    } else {
+      // 일반 클릭: 앵커 저장
+      fillAnchorRef.current = {
+        rowIndex: event.rowIndex,
+        field,
+        value: event.value as string,
+      };
+    }
+  }, [saveManyResults]);
+
+  const loadRuns = useCallback(async () => {
+    setLoadingRuns(true);
+    try {
+      const data = await testRunsApi.list(projectId);
+      setRuns(data);
+    } catch {
+      toast.error("테스트 수행 목록을 불러오지 못했습니다.");
+    } finally {
+      setLoadingRuns(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    loadRuns();
+  }, [loadRuns]);
+
+  // ── 시트 목록 로드 ──
+  useEffect(() => {
+    testCasesApi.listSheets(projectId).then((s) => {
+      setSheets(s);
+      if (s.length > 1 && !sheetInitRef.current) {
+        sheetInitRef.current = true;
+        setActiveSheet(s[0].name);
+      }
+    }).catch(() => {});
+  }, [projectId]);
+
+  // 시트 변경 시 선택된 런 다시 로드
+  useEffect(() => {
+    if (selectedRun) loadRunDetail(selectedRun);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSheet]);
+
+  const loadRunDetail = useCallback(
+    async (run: TestRun) => {
+      setSelectedRun(run);
+      setLoadingResults(true);
+      setAttachmentsMap({}); // 첨부파일 캐시 초기화
+      try {
+        const detail = await testRunsApi.getOne(projectId, run.id);
+        // 백엔드 값 → 표시 값 변환 (NS→"", NA→"N/A")
+        const mapped = (detail.results || []).map((r: TestResult) => ({
+          ...r,
+          result: r.result === "NS" ? "" : r.result === "NA" ? "N/A" : r.result,
+        }));
+        // 시트 필터 적용
+        if (activeSheet) {
+          setResults(mapped.filter((r) => r.test_case?.sheet_name === activeSheet));
+        } else if (sheets.length > 1) {
+          // 전체 보기: 시트 순서대로 정렬 + 연속 번호
+          const sheetOrder = sheets.map((s) => s.name);
+          const sorted = [...mapped].sort((a, b) => {
+            const ai = sheetOrder.indexOf(a.test_case?.sheet_name || "기본");
+            const bi = sheetOrder.indexOf(b.test_case?.sheet_name || "기본");
+            if (ai !== bi) return ai - bi;
+            return (a.test_case?.no || 0) - (b.test_case?.no || 0);
+          });
+          let seq = 1;
+          for (const r of sorted) {
+            if (r.test_case) r.test_case = { ...r.test_case, no: seq++ };
+          }
+          setResults(sorted);
+        } else {
+          setResults(mapped);
+        }
+      } catch {
+        toast.error("테스트 결과를 불러오지 못했습니다.");
+      } finally {
+        setLoadingResults(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [projectId, activeSheet]
+  );
+
+  // countTick을 의존성에 넣어 그리드 변경 시 재계산
+  const getGridRows = useCallback(() => {
+    const rows: TestResult[] = [];
+    gridApiRef.current?.forEachNode((node) => { if (node.data) rows.push(node.data); });
+    return rows.length > 0 ? rows : results;
+  }, [results]);
+
+  const completionRate = useMemo(() => {
+    void countTick;
+    const rows = getGridRows();
+    if (rows.length === 0) return 0;
+    const done = rows.filter((r) => r.result && r.result !== "").length;
+    return Math.round((done / rows.length) * 100);
+  }, [countTick, getGridRows]);
+
+  // ── 타이머: 행 포커스 시 시작, 이동 시 종료 ──
+  const stopTimer = useCallback(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (timerRowId && timerStart) {
+      const elapsed = Math.round((Date.now() - timerStart) / 1000);
+      const api = gridApiRef.current;
+      if (api) {
+        api.forEachNode((node) => {
+          if (node.data?.id === timerRowId) {
+            node.data.duration_sec = (node.data.duration_sec || 0) + elapsed;
+            api.refreshCells({ rowNodes: [node], columns: ["duration_sec"], force: true });
+          }
+        });
+      }
+    }
+    setTimerRowId(null);
+    setTimerStart(null);
+    setTimerDisplay("");
+  }, [timerRowId, timerStart]);
+
+  const startTimer = useCallback((rowId: number) => {
+    stopTimer();
+    setTimerRowId(rowId);
+    setTimerStart(Date.now());
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    timerIntervalRef.current = setInterval(() => {
+      setTimerStart((prev) => {
+        if (!prev) return prev;
+        const sec = Math.round((Date.now() - prev) / 1000);
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        setTimerDisplay(`${m}:${s.toString().padStart(2, "0")}`);
+        return prev;
+      });
+    }, 1000);
+  }, [stopTimer]);
+
+  // 행 포커스 변경 시 타이머 전환 + 첨부파일 lazy 로드
+  const onRowFocused = useCallback((rowId: number | null) => {
+    if (!rowId) return;
+    loadAttachmentFor(rowId);
+    if (!timerEnabled || rowId === timerRowId) return;
+    startTimer(rowId);
+  }, [timerEnabled, timerRowId, startTimer, loadAttachmentFor]);
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, []);
+
+  // ── 셀 편집 시 즉시 저장 ──
+  const saveResultRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveOneResult = useCallback(async (row: TestResult) => {
+    if (!selectedRun) return;
+    const mapped = {
+      test_case_id: row.test_case_id,
+      result: row.result === "" ? "NS" : row.result === "N/A" ? "NA" : row.result,
+      actual_result: row.actual_result || undefined,
+      issue_link: row.issue_link || undefined,
+      remarks: row.remarks || undefined,
+    };
+    try {
+      await testRunsApi.submitResults(projectId, selectedRun.id, [mapped]);
+    } catch {
+      toast.error("저장 실패");
+    }
+  }, [projectId, selectedRun]);
+
+  // ── 키보드 숏컷: P/F/B/N = 결과 빠른 입력, Ctrl+D = 선택 행 채우기 ──
+  const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK", n: "N/A" };
+
+  const onCellKeyDown = useCallback((event: CellKeyDownEvent) => {
+    const e = event.event as KeyboardEvent;
+    if (!e) return;
+    const api = gridApiRef.current;
+    if (!api) return;
+
+    // P/F/B/N 단축키 (편집 중이 아닐 때, Ctrl/Alt 미사용)
+    const key = e.key.toLowerCase();
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && SHORTCUT_MAP[key]) {
+      const col = event.column?.getColId();
+      // 편집 가능한 텍스트 셀 편집중이면 무시
+      if (col && col !== "result" && col !== "actual_result" && col !== "issue_link" && col !== "remarks") {
+        // read-only 컬럼이면 결과 입력
+      } else if (col && col !== "result") {
+        return; // 텍스트 편집 컬럼에서는 무시
+      }
+
+      e.preventDefault();
+      const value = SHORTCUT_MAP[key];
+      const focusedCell = api.getFocusedCell();
+      if (focusedCell) {
+        const node = api.getDisplayedRowAtIndex(focusedCell.rowIndex);
+        if (node?.data) {
+          undoStackRef.current.push({ rowId: node.data.id, field: "result", oldValue: node.data.result ?? "" });
+          node.data.result = value;
+          api.refreshCells({ rowNodes: [node], force: true });
+          setCountTick((t) => t + 1);
+          saveOneResult(node.data);
+          // 다음 행으로 포커스 이동
+          const nextIdx = focusedCell.rowIndex + 1;
+          if (nextIdx < (api.getDisplayedRowCount())) {
+            api.setFocusedCell(nextIdx, "result");
+          }
+        }
+      }
+      return;
+    }
+
+    // Ctrl+D: 현재 셀 값을 선택된 행에 채우기
+    if (e.key === "d" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (!event.column) return;
+      const field = event.column.getColId();
+      const sourceValue = event.value;
+      const selectedNodes = api.getSelectedNodes();
+      if (selectedNodes.length === 0) return;
+
+      const changed: TestResult[] = [];
+      selectedNodes.forEach((node) => {
+        if (node.data && node !== event.node) {
+          node.data[field] = sourceValue;
+          changed.push(node.data);
+        }
+      });
+      if (changed.length > 0) {
+        api.refreshCells({ force: true });
+        setCountTick((t) => t + 1);
+        toast.success(`${changed.length}개 행에 "${sourceValue}" 채움`);
+        saveManyResults(changed);
+      }
+    }
+
+    // Ctrl+Z: Undo
+    if (e.key === "z" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      e.preventDefault();
+      const entry = undoStackRef.current.pop();
+      if (!entry) { toast("되돌릴 항목이 없습니다."); return; }
+      api.forEachNode((node) => {
+        if (node.data?.id === entry.rowId) {
+          node.data[entry.field] = entry.oldValue;
+          api.refreshCells({ rowNodes: [node], force: true });
+          setCountTick((t) => t + 1);
+          saveOneResult(node.data);
+        }
+      });
+      toast.success("되돌리기 완료");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveManyResults, saveOneResult]);
+
+  // ── 선택 행 결과 일괄 입력 ──
+  const handleBulkResult = (value: string) => {
+    const api = gridApiRef.current;
+    if (!api) return;
+    const selectedNodes = api.getSelectedNodes();
+    if (selectedNodes.length === 0) {
+      toast.error("행을 먼저 선택해 주세요.");
+      return;
+    }
+    const changed: TestResult[] = [];
+    selectedNodes.forEach((node) => {
+      if (node.data) {
+        node.data.result = value;
+        changed.push(node.data);
+      }
+    });
+    api.refreshCells({ force: true });
+    setCountTick((t) => t + 1);
+    toast.success(`${selectedNodes.length}개 행 → ${value || "(빈값)"}`);
+    saveManyResults(changed);
+  };
+
+  // ── 결과 일괄 드롭다운 ──
+  const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
+  const bulkMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target as Node)) {
+        setBulkMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // ── 결과 카운트 ──
+  const resultCounts = useMemo(() => {
+    void countTick;
+    const rows = getGridRows();
+    const counts: Record<string, number> = { PASS: 0, FAIL: 0, BLOCK: 0, "N/A": 0, "미입력": 0 };
+    rows.forEach((r) => {
+      const val = (r.result as string) || "";
+      if (val === "PASS") counts["PASS"]++;
+      else if (val === "FAIL") counts["FAIL"]++;
+      else if (val === "BLOCK") counts["BLOCK"]++;
+      else if (val === "N/A") counts["N/A"]++;
+      else counts["미입력"]++;
+    });
+    return counts;
+  }, [countTick, getGridRows]);
+
+  // ── 필터용 고유값 목록 ──
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    results.forEach((r) => { if (r.test_case?.category) set.add(r.test_case.category); });
+    return Array.from(set).sort();
+  }, [results]);
+
+  const priorityOptions = useMemo(() => {
+    const set = new Set<string>();
+    results.forEach((r) => { if (r.test_case?.priority) set.add(r.test_case.priority); });
+    return Array.from(set).sort();
+  }, [results]);
+
+  // ── 외부 필터 ──
+  const isExternalFilterPresent = useCallback(() => {
+    return filterText !== "" || filterResult !== "" || filterCategory !== "" || filterPriority !== "";
+  }, [filterText, filterResult, filterCategory, filterPriority]);
+
+  const doesExternalFilterPass = useCallback((node: { data?: TestResult }) => {
+    const row = node.data;
+    if (!row) return true;
+
+    // Result 필터
+    if (filterResult) {
+      const val = (row.result as string) || "";
+      if (filterResult === "미입력") {
+        if (val !== "") return false;
+      } else {
+        if (val !== filterResult) return false;
+      }
+    }
+
+    // Category 필터
+    if (filterCategory && row.test_case?.category !== filterCategory) return false;
+
+    // Priority 필터
+    if (filterPriority && row.test_case?.priority !== filterPriority) return false;
+
+    // 텍스트 검색
+    if (filterText) {
+      const q = filterText.toLowerCase();
+      const fields = [
+        row.test_case?.tc_id,
+        row.test_case?.category,
+        row.test_case?.depth1,
+        row.test_case?.depth2,
+        row.test_case?.test_steps,
+        row.test_case?.expected_result,
+        row.actual_result,
+        row.remarks,
+      ];
+      const match = fields.some((f) => f && f.toLowerCase().includes(q));
+      if (!match) return false;
+    }
+
+    return true;
+  }, [filterText, filterResult, filterCategory, filterPriority]);
+
+  // 필터 변경 시 그리드 재필터링
+  useEffect(() => {
+    gridApiRef.current?.onFilterChanged();
+  }, [filterText, filterResult, filterCategory, filterPriority]);
+
+  const columnDefs = useMemo<ColDef[]>(
+    () => [
+      {
+        headerCheckboxSelection: true,
+        checkboxSelection: true,
+        width: 40,
+        pinned: "left",
+        suppressHeaderMenuButton: true,
+        resizable: false,
+      },
+      {
+        field: "test_case.no",
+        headerName: "No",
+        width: 60,
+        valueGetter: (params) => params.data?.test_case?.no ?? "",
+      },
+      {
+        field: "test_case.tc_id",
+        headerName: "TC ID",
+        width: 100,
+        valueGetter: (params) => params.data?.test_case?.tc_id || "",
+        cellRenderer: HighlightCell,
+      },
+      {
+        field: "test_case.category",
+        headerName: "Category",
+        width: 100,
+        valueGetter: (params) => params.data?.test_case?.category || "",
+        cellRenderer: HighlightCell,
+      },
+      {
+        field: "test_case.depth1",
+        headerName: "Depth 1",
+        width: 120,
+        valueGetter: (params) => params.data?.test_case?.depth1 || "",
+        cellRenderer: HighlightCell,
+      },
+      {
+        field: "test_case.depth2",
+        headerName: "Depth 2",
+        width: 120,
+        valueGetter: (params) => params.data?.test_case?.depth2 || "",
+        cellRenderer: HighlightCell,
+      },
+      {
+        field: "test_case.priority",
+        headerName: "Priority",
+        width: 80,
+        valueGetter: (params) => params.data?.test_case?.priority || "",
+      },
+      {
+        field: "test_case.test_steps",
+        headerName: "Test Steps",
+        width: 280,
+        wrapText: true,
+        autoHeight: true,
+        cellClass: "ag-cell-left",
+        cellRenderer: MarkdownCell,
+        valueGetter: (params) => params.data?.test_case?.test_steps || "",
+      },
+      {
+        field: "test_case.expected_result",
+        headerName: "Expected",
+        width: 220,
+        wrapText: true,
+        autoHeight: true,
+        cellClass: "ag-cell-left",
+        cellRenderer: MarkdownCell,
+        valueGetter: (params) => params.data?.test_case?.expected_result || "",
+      },
+      {
+        field: "result",
+        headerName: "Result",
+        width: 90,
+        editable: true,
+        cellEditor: "agSelectCellEditor",
+        cellEditorParams: { values: RESULT_OPTIONS },
+        cellStyle: resultCellStyle,
+      },
+      {
+        field: "actual_result",
+        headerName: "Actual Result",
+        width: 250,
+        wrapText: true,
+        autoHeight: true,
+        editable: true,
+        cellEditor: "agLargeTextCellEditor",
+        cellEditorPopup: true,
+        cellClass: "ag-cell-left",
+        cellRenderer: MarkdownCell,
+      },
+      {
+        field: "issue_link",
+        headerName: "Issue Link",
+        width: 160,
+        editable: true,
+      },
+      ...(timerEnabled ? [{
+        field: "duration_sec",
+        headerName: "소요(초)",
+        width: 80,
+        valueFormatter: (params: { value: unknown }) => {
+          const v = params.value as number;
+          if (!v) return "";
+          return v < 60 ? `${v.toFixed(0)}s` : `${(v / 60).toFixed(1)}m`;
+        },
+      }] : []),
+      {
+        field: "attachments",
+        headerName: "첨부",
+        width: 140,
+        cellRenderer: (params: { data: TestResult }) => {
+          const row = params.data;
+          if (!row) return null;
+          const atts = attachmentsMap[row.id] || [];
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", padding: "2px 0" }}>
+              {atts.map((att) => (
+                <span key={att.id} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "#2563EB",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      maxWidth: 70,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      display: "inline-block",
+                    }}
+                    title={att.filename}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const token = localStorage.getItem("token");
+                      fetch(`/api/attachments/download/${att.id}`, {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      })
+                        .then((res) => {
+                          if (!res.ok) throw new Error("Failed");
+                          return res.blob();
+                        })
+                        .then((blob) => {
+                          setPreviewImage({ url: URL.createObjectURL(blob), filename: att.filename });
+                        })
+                        .catch(() => toast.error("이미지를 불러올 수 없습니다."));
+                    }}
+                  >
+                    {att.filename}
+                  </span>
+                  <span
+                    style={{ fontSize: 11, color: "#EF4444", cursor: "pointer", fontWeight: 700 }}
+                    title="삭제"
+                    onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(att.id, row.id); }}
+                  >×</span>
+                </span>
+              ))}
+              <button
+                style={{
+                  fontSize: 14,
+                  border: "1px solid var(--border-input)",
+                  borderRadius: 4,
+                  backgroundColor: "var(--bg-input)",
+                  color: "#64748B",
+                  cursor: "pointer",
+                  padding: "0 5px",
+                  lineHeight: "20px",
+                }}
+                title="이미지 첨부"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUploadTargetResultId(row.id);
+                  fileInputRef.current?.click();
+                }}
+              >
+                +
+              </button>
+            </div>
+          );
+        },
+      },
+      {
+        field: "remarks",
+        headerName: "Remarks",
+        minWidth: 200,
+        flex: 1,
+        editable: true,
+        wrapText: true,
+        autoHeight: true,
+        cellClass: "ag-cell-left",
+        cellRenderer: MarkdownCell,
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [attachmentsMap, timerEnabled]
+  );
+
+  const defaultColDef = useMemo<ColDef>(
+    () => ({ resizable: true, sortable: true, tooltipShowDelay: 300, wrapText: true, autoHeight: true }),
+    []
+  );
+
+  const onCellValueChanged = useCallback((event: CellValueChangedEvent) => {
+    if (!event.data) return;
+    // Undo 스택에 기록
+    if (event.column && event.oldValue !== event.newValue) {
+      undoStackRef.current.push({
+        rowId: event.data.id,
+        field: event.column.getColId(),
+        oldValue: event.oldValue ?? "",
+      });
+      if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+    }
+    // 카운트 뱃지 갱신
+    setCountTick((t) => t + 1);
+    // debounce로 즉시 저장
+    if (saveResultRef.current) clearTimeout(saveResultRef.current);
+    saveResultRef.current = setTimeout(() => saveOneResult(event.data), 300);
+  }, [saveOneResult]);
+
+  const handleDelete = async () => {
+    if (!selectedRun) return;
+    if (!confirm(`"${selectedRun.name}"을 삭제하시겠습니까? 결과 데이터도 모두 삭제됩니다.`)) return;
+    try {
+      await testRunsApi.delete(projectId, selectedRun.id);
+      toast.success("테스트 수행이 삭제되었습니다.");
+      setSelectedRun(null);
+      setResults([]);
+      loadRuns();
+    } catch {
+      toast.error("삭제에 실패했습니다.");
+    }
+  };
+
+  const handleClone = async () => {
+    if (!selectedRun) return;
+    if (!confirm(`"${selectedRun.name}"을 복제하시겠습니까?`)) return;
+    try {
+      const cloned = await testRunsApi.clone(projectId, selectedRun.id);
+      toast.success("테스트 수행이 복제되었습니다.");
+      loadRuns();
+      loadRunDetail(cloned);
+    } catch {
+      toast.error("복제에 실패했습니다.");
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!selectedRun) return;
+    // 전체 결과 조회 (모든 시트 포함 — 현재 화면은 시트 필터링된 상태일 수 있음)
+    try {
+      const fullDetail = await testRunsApi.getOne(projectId, selectedRun.id);
+      const allResults = fullDetail.results || [];
+      const nsCount = allResults.filter((r: TestResult) => !r.result || r.result === "NS").length;
+      if (nsCount > 0) {
+        const proceed = confirm(
+          `수행되지 않은 TC가 ${nsCount}개 있습니다.\n\n그래도 완료 처리하시겠습니까?`
+        );
+        if (!proceed) return;
+      } else {
+        if (!confirm("이 테스트 수행을 완료 처리하시겠습니까?")) return;
+      }
+    } catch {
+      if (!confirm("미수행 TC 확인에 실패했습니다. 그래도 완료 처리하시겠습니까?")) return;
+    }
+    try {
+      await testRunsApi.complete(projectId, selectedRun.id);
+      toast.success("테스트 수행이 완료되었습니다.");
+      loadRuns();
+      setSelectedRun((prev) =>
+        prev ? { ...prev, status: TestRunStatus.COMPLETED } : null
+      );
+    } catch {
+      toast.error("완료 처리에 실패했습니다.");
+    }
+  };
+
+  const handleCreateRun = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      toast.error("수행 이름을 입력해 주세요.");
+      return;
+    }
+    setCreating(true);
+    try {
+      const newRun = await testRunsApi.create(projectId, form);
+      toast.success("테스트 수행이 생성되었습니다.");
+      setShowModal(false);
+      setForm({ name: "", version: "", environment: "", round: 1 });
+      loadRuns();
+      loadRunDetail(newRun);
+    } catch {
+      toast.error("생성에 실패했습니다.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div style={styles.wrapper}>
+      {/* Left panel: Run list */}
+      {!panelCollapsed && (
+        <div style={styles.leftPanel}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)" }}>
+            <h3 style={{ ...styles.panelTitle, borderBottom: "none" }}>테스트 수행 목록</h3>
+            <button
+              style={styles.collapseBtn}
+              onClick={() => setPanelCollapsed(true)}
+              title="패널 숨기기"
+            >
+              ◀
+            </button>
+          </div>
+          <div style={styles.runList}>
+            {loadingRuns ? (
+              <div style={styles.loadingText}>불러오는 중...</div>
+            ) : runs.length === 0 ? (
+              <div style={styles.emptyText}>등록된 수행이 없습니다.</div>
+            ) : (
+              runs.map((run) => (
+                <div
+                  key={run.id}
+                  style={{
+                    ...styles.runItem,
+                    ...(selectedRun?.id === run.id ? styles.runItemActive : {}),
+                  }}
+                  onClick={() => loadRunDetail(run)}
+                >
+                  <div style={styles.runName}>{run.name}</div>
+                  <div style={styles.runMeta}>
+                    R{run.round} | {run.version || "-"}
+                  </div>
+                  <span
+                    style={{
+                      ...styles.statusBadge,
+                      backgroundColor:
+                        run.status === TestRunStatus.COMPLETED ? "rgba(26, 127, 55, 0.15)" : "rgba(37, 99, 235, 0.15)",
+                      color:
+                        run.status === TestRunStatus.COMPLETED ? "#22C55E" : "#60A5FA",
+                    }}
+                  >
+                    {run.status === TestRunStatus.COMPLETED ? "완료" : "진행 중"}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+          <button style={styles.newRunBtn} onClick={() => setShowModal(true)}>
+            + New Test Run
+          </button>
+        </div>
+      )}
+
+      {/* Right panel: Run detail */}
+      <div style={styles.rightPanel}>
+        {!selectedRun ? (
+          <div style={styles.placeholder}>
+            {panelCollapsed && (
+              <button
+                style={{ ...styles.collapseBtn, marginRight: 12 }}
+                onClick={() => setPanelCollapsed(false)}
+                title="목록 펼치기"
+              >
+                ▶
+              </button>
+            )}
+            왼쪽에서 테스트 수행을 선택하세요.
+          </div>
+        ) : (
+          <>
+            <div style={styles.runHeader}>
+              {panelCollapsed && (
+                <button
+                  style={{ ...styles.collapseBtn, marginRight: 8 }}
+                  onClick={() => setPanelCollapsed(false)}
+                  title="목록 펼치기"
+                >
+                  ▶
+                </button>
+              )}
+              <div>
+                <h3 style={styles.runHeaderTitle}>{selectedRun.name}</h3>
+                <div style={styles.runHeaderMeta}>
+                  버전: {selectedRun.version || "-"} | 환경:{" "}
+                  {selectedRun.environment || "-"} | 라운드: R{selectedRun.round}
+                </div>
+              </div>
+              <div style={styles.runActions}>
+                {canManageRun && (
+                  <button style={styles.btnDanger} onClick={handleDelete}>
+                    삭제
+                  </button>
+                )}
+                <button style={styles.btnGhost} onClick={handleClone}>
+                  복제
+                </button>
+                <button style={styles.btnGhost} onClick={async () => {
+                  if (!selectedRun) return;
+                  try {
+                    const blob = await testRunsApi.exportExcel(projectId, selectedRun.id);
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `${selectedRun.name}_results.xlsx`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success("Excel 파일 다운로드");
+                  } catch { toast.error("Excel 내보내기 실패"); }
+                }}>
+                  Excel
+                </button>
+                {selectedRun.status !== TestRunStatus.COMPLETED ? (
+                  <button style={styles.btnComplete} onClick={handleComplete}>
+                    수행 완료
+                  </button>
+                ) : (
+                  <button style={{ ...styles.btnComplete, backgroundColor: "#D97706" }} onClick={async () => {
+                    if (!confirm("이 테스트 수행을 다시 진행 중으로 변경하시겠습니까?")) return;
+                    try {
+                      await testRunsApi.reopen(projectId, selectedRun.id);
+                      toast.success("테스트 수행이 다시 진행 중으로 변경되었습니다.");
+                      loadRuns();
+                      setSelectedRun((prev) => prev ? { ...prev, status: TestRunStatus.IN_PROGRESS, completed_at: undefined } : null);
+                    } catch {
+                      toast.error("상태 변경에 실패했습니다.");
+                    }
+                  }}>
+                    다시 수행
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Toolbar: bulk result + progress + counts */}
+            <div style={styles.toolbar}>
+              <div style={styles.toolbarLeft}>
+                <div style={{ position: "relative" }} ref={bulkMenuRef}>
+                  <button
+                    style={styles.btnGhost}
+                    onClick={() => setBulkMenuOpen((v) => !v)}
+                  >
+                    결과 일괄입력 ▾
+                  </button>
+                  {bulkMenuOpen && (
+                    <div style={styles.bulkMenu}>
+                      {RESULT_OPTIONS.filter((v) => v !== "NS").map((val) => (
+                        <button
+                          key={val}
+                          style={{
+                            ...styles.bulkMenuBtn,
+                            backgroundColor: resultColors[val]?.bg || "#F8FAFC",
+                            color: resultColors[val]?.fg || "#334155",
+                          }}
+                          onClick={() => { handleBulkResult(val); setBulkMenuOpen(false); }}
+                        >
+                          {val}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span style={styles.hintText}>P/F/B/N: 빠른 결과 입력 | Ctrl+D: 선택 행 채우기 | Ctrl+Z: 되돌리기 | Shift+Click: 범위 채우기</span>
+                <button
+                  style={{
+                    ...styles.timerToggleBtn,
+                    ...(timerEnabled ? styles.timerToggleBtnActive : {}),
+                  }}
+                  onClick={() => {
+                    const next = !timerEnabled;
+                    setTimerEnabled(next);
+                    localStorage.setItem("tc_timer_enabled", String(next));
+                    if (!next) stopTimer();
+                  }}
+                  title={timerEnabled ? "타이머 끄기" : "타이머 켜기"}
+                >
+                  ⏱
+                </button>
+                {timerEnabled && timerRowId && (
+                  <span style={styles.timerBadge}>
+                    {timerDisplay || "0:00"}
+                    <button style={styles.timerStopBtn} onClick={stopTimer} title="타이머 정지">■</button>
+                  </span>
+                )}
+              </div>
+              <div style={styles.toolbarRight}>
+                <div style={styles.countBadges}>
+                  {Object.entries(resultCounts).map(([key, count]) => (
+                    <span
+                      key={key}
+                      style={{
+                        ...styles.countBadge,
+                        backgroundColor: resultColors[key]?.bg || (key === "미입력" ? "rgba(220, 38, 38, 0.1)" : "var(--bg-input)"),
+                        color: resultColors[key]?.fg || (key === "미입력" ? "#EF4444" : "var(--text-secondary)"),
+                      }}
+                    >
+                      {key} {count}
+                    </span>
+                  ))}
+                </div>
+                <span style={styles.progressText}>진행률 {completionRate}%</span>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div style={styles.progressWrapper}>
+              <div style={styles.progressBg}>
+                <div
+                  style={{
+                    ...styles.progressBar,
+                    width: `${completionRate}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Filter bar */}
+            <div style={styles.filterBar}>
+              <input
+                style={styles.filterInput}
+                type="text"
+                placeholder="검색 (TC ID, Steps, Expected...)"
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+              />
+              <select style={styles.filterSelect} value={filterResult} onChange={(e) => setFilterResult(e.target.value)}>
+                <option value="">Result: 전체</option>
+                {["PASS", "FAIL", "BLOCK", "N/A", "미입력"].map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+              <select style={styles.filterSelect} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                <option value="">Category: 전체</option>
+                {categoryOptions.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+              <select style={styles.filterSelect} value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
+                <option value="">Priority: 전체</option>
+                {priorityOptions.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+              {(filterText || filterResult || filterCategory || filterPriority) && (
+                <button
+                  style={styles.filterClearBtn}
+                  onClick={() => { setFilterText(""); setFilterResult(""); setFilterCategory(""); setFilterPriority(""); }}
+                >
+                  초기화
+                </button>
+              )}
+            </div>
+
+            {/* Grid */}
+            <div
+              className="ag-theme-alpine"
+              style={{ height: "calc(100vh - 320px)", width: "100%" }}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+                if (files.length === 0) { toast.error("이미지 파일만 드롭할 수 있습니다."); return; }
+                const focused = gridApiRef.current?.getFocusedCell();
+                if (!focused) { toast.error("먼저 그리드 행을 선택해 주세요."); return; }
+                const node = gridApiRef.current?.getDisplayedRowAtIndex(focused.rowIndex);
+                const resultId = node?.data?.id;
+                if (!resultId) return;
+                files.forEach(async (file) => {
+                  try {
+                    const att = await attachmentsApi.upload(resultId, file);
+                    setAttachmentsMap((prev) => ({ ...prev, [resultId]: [...(prev[resultId] || []), att] }));
+                    gridApiRef.current?.refreshCells({ force: true });
+                    toast.success(`"${file.name}" 첨부 완료`);
+                  } catch { toast.error(`"${file.name}" 업로드 실패`); }
+                });
+              }}
+            >
+              {loadingResults ? (
+                <div style={{ textAlign: "center", padding: 40, color: "var(--text-secondary)" }}>
+                  불러오는 중...
+                </div>
+              ) : (
+                <AgGridReact
+                  rowData={results}
+                  columnDefs={columnDefs}
+                  defaultColDef={defaultColDef}
+                  localeText={AG_GRID_LOCALE_KO}
+                  rowSelection={{ mode: "multiRow", checkboxes: false, headerCheckbox: false }}
+                  onGridReady={(params: GridReadyEvent) => {
+                    gridApiRef.current = params.api;
+                  }}
+                  onCellValueChanged={onCellValueChanged}
+                  onCellKeyDown={onCellKeyDown}
+                  onCellClicked={onCellClicked}
+                  onCellFocused={(e) => {
+                    if (e.rowIndex != null) {
+                      const node = gridApiRef.current?.getDisplayedRowAtIndex(e.rowIndex);
+                      if (node?.data?.id) onRowFocused(node.data.id);
+                    }
+                  }}
+                  context={{ searchKeyword: filterText }}
+                  singleClickEdit={true}
+                  stopEditingWhenCellsLoseFocus={true}
+                  getRowId={(params) => String(params.data.id)}
+                  isExternalFilterPresent={isExternalFilterPresent}
+                  doesExternalFilterPass={doesExternalFilterPass}
+                />
+              )}
+            </div>
+          </>
+        )}
+        {/* ── 시트 탭 바 (그리드 하단) ── */}
+        {sheets.length >= 1 && !(sheets.length === 1 && sheets[0].name === "기본") && selectedRun && results.length > 0 && (
+          <div style={sheetTabStyles.bar}>
+            {sheets.map((s) => (
+              <div
+                key={s.name}
+                style={{
+                  ...sheetTabStyles.tab,
+                  ...(activeSheet === s.name ? sheetTabStyles.tabActive : {}),
+                }}
+                onClick={() => setActiveSheet(s.name)}
+              >
+                {s.name}
+                <span style={sheetTabStyles.badge}>{s.tc_count}</span>
+              </div>
+            ))}
+            {sheets.length > 1 && (
+              <div
+                style={{
+                  ...sheetTabStyles.tab,
+                  ...(activeSheet === null ? sheetTabStyles.tabActive : {}),
+                }}
+                onClick={() => setActiveSheet(null)}
+              >
+                전체
+                <span style={sheetTabStyles.badge}>{sheets.reduce((a, s) => a + s.tc_count, 0)}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileUpload}
+      />
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div
+          style={styles.overlay}
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            style={{
+              backgroundColor: "var(--bg-card)",
+              borderRadius: 12,
+              padding: 16,
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              width: "100%",
+              marginBottom: 12,
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                {previewImage.filename}
+              </span>
+              <button
+                style={{
+                  border: "none",
+                  background: "none",
+                  fontSize: 20,
+                  cursor: "pointer",
+                  color: "var(--text-secondary)",
+                  padding: "0 4px",
+                }}
+                onClick={() => setPreviewImage(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <img
+              src={previewImage.url}
+              alt={previewImage.filename}
+              style={{
+                maxWidth: "85vw",
+                maxHeight: "80vh",
+                objectFit: "contain",
+                borderRadius: 8,
+              }}
+              onError={() => toast.error("이미지를 표시할 수 없습니다.")}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showModal && (
+        <div style={styles.overlay} onClick={() => setShowModal(false)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.modalTitle}>새 테스트 수행</h2>
+            <form onSubmit={handleCreateRun} style={styles.modalForm}>
+              <label style={styles.label}>수행 이름 *</label>
+              <input
+                style={styles.input}
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="예: Sprint 5 기능 테스트"
+                autoFocus
+              />
+              <label style={styles.label}>버전</label>
+              <input
+                style={styles.input}
+                value={form.version}
+                onChange={(e) => setForm({ ...form, version: e.target.value })}
+                placeholder="예: v1.2.0"
+              />
+              <label style={styles.label}>환경</label>
+              <input
+                style={styles.input}
+                value={form.environment}
+                onChange={(e) =>
+                  setForm({ ...form, environment: e.target.value })
+                }
+                placeholder="예: Staging"
+              />
+              <label style={styles.label}>라운드</label>
+              <select
+                style={styles.input}
+                value={form.round}
+                onChange={(e) =>
+                  setForm({ ...form, round: Number(e.target.value) })
+                }
+              >
+                <option value={1}>R1</option>
+                <option value={2}>R2</option>
+                <option value={3}>R3</option>
+              </select>
+              <div style={styles.modalActions}>
+                <button
+                  type="button"
+                  style={styles.cancelBtn}
+                  onClick={() => setShowModal(false)}
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  style={styles.submitBtn}
+                  disabled={creating}
+                >
+                  {creating ? "생성 중..." : "생성"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+const sheetTabStyles: Record<string, React.CSSProperties> = {
+  bar: {
+    display: "flex", alignItems: "center", gap: 2,
+    padding: "6px 12px", backgroundColor: "var(--bg-card)",
+    borderTop: "1px solid var(--border-color)", overflowX: "auto",
+  },
+  tab: {
+    display: "inline-flex", alignItems: "center", gap: 6,
+    padding: "5px 14px", fontSize: 12, fontWeight: 500,
+    color: "var(--text-secondary)", backgroundColor: "transparent",
+    border: "1px solid var(--border-color)", borderBottom: "none",
+    borderRadius: "6px 6px 0 0", cursor: "pointer",
+    whiteSpace: "nowrap", transition: "all 0.15s",
+  },
+  tabActive: {
+    color: "#fff", backgroundColor: "#2D4A7A",
+    borderColor: "#2D4A7A", fontWeight: 700,
+  },
+  badge: {
+    fontSize: 10, fontWeight: 600, padding: "1px 6px",
+    borderRadius: 8, backgroundColor: "rgba(255,255,255,0.2)",
+  },
+};
+
+const styles: Record<string, React.CSSProperties> = {
+  wrapper: { display: "flex", gap: 12, height: "calc(100vh - 160px)" },
+  leftPanel: {
+    width: 240,
+    minWidth: 240,
+    backgroundColor: "var(--bg-card)",
+    borderRadius: 12,
+    border: "1px solid var(--border-color)",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+  },
+  panelTitle: {
+    padding: "12px 14px 10px",
+    margin: 0,
+    fontSize: 13,
+    fontWeight: 700,
+    color: "var(--text-primary)",
+    borderBottom: "1px solid var(--border-color)",
+  },
+  runList: { flex: 1, overflow: "auto", padding: "8px" },
+  loadingText: { textAlign: "center", color: "var(--text-secondary)", padding: 20, fontSize: 14 },
+  emptyText: { textAlign: "center", color: "var(--text-secondary)", padding: 20, fontSize: 14 },
+  runItem: {
+    padding: "10px",
+    borderRadius: 6,
+    cursor: "pointer",
+    marginBottom: 4,
+    transition: "background-color 0.1s",
+    position: "relative" as const,
+  },
+  runItemActive: {
+    backgroundColor: "var(--bg-input)",
+    border: "1px solid #2D4A7A",
+  },
+  runName: {
+    fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 2,
+    paddingRight: 56, overflow: "hidden" as const, textOverflow: "ellipsis" as const, whiteSpace: "nowrap" as const,
+  },
+  runMeta: { fontSize: 11, color: "var(--text-secondary)", paddingRight: 56 },
+  statusBadge: {
+    position: "absolute" as const,
+    top: 10,
+    right: 10,
+    fontSize: 11,
+    fontWeight: 600,
+    padding: "2px 8px",
+    borderRadius: 4,
+  },
+  collapseBtn: {
+    border: "1px solid var(--border-input)",
+    borderRadius: 4,
+    backgroundColor: "var(--bg-input)",
+    color: "var(--text-secondary)",
+    fontSize: 12,
+    cursor: "pointer",
+    padding: "2px 8px",
+    lineHeight: "22px",
+    flexShrink: 0,
+  },
+  newRunBtn: {
+    margin: 8,
+    padding: "8px 0",
+    borderRadius: 6,
+    border: "1px dashed var(--text-secondary)",
+    backgroundColor: "transparent",
+    color: "var(--text-secondary)",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  rightPanel: { flex: 1, minWidth: 0 },
+  placeholder: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    height: "100%",
+    color: "#94A3B8",
+    fontSize: 14,
+  },
+  runHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  runHeaderTitle: { margin: "0 0 2px", fontSize: 15, fontWeight: 700, color: "var(--text-primary)" },
+  runHeaderMeta: { fontSize: 12, color: "var(--text-secondary)" },
+  runActions: { display: "flex", gap: 8 },
+  btnDanger: {
+    padding: "5px 14px",
+    borderRadius: 5,
+    border: "1px solid rgba(220, 38, 38, 0.3)",
+    backgroundColor: "rgba(220, 38, 38, 0.1)",
+    color: "#EF4444",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  btnComplete: {
+    padding: "5px 14px",
+    borderRadius: 5,
+    border: "1px solid #3B82F6",
+    backgroundColor: "#2563EB",
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  toolbar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+    gap: 8,
+  },
+  toolbarLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+  },
+  toolbarRight: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+  },
+  btnGhost: {
+    padding: "4px 12px",
+    borderRadius: 5,
+    border: "1px solid var(--border-input)",
+    backgroundColor: "var(--bg-card)",
+    color: "var(--text-primary)",
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+  bulkMenu: {
+    position: "absolute" as const,
+    top: "100%",
+    left: 0,
+    marginTop: 4,
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border-color)",
+    borderRadius: 8,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+    padding: 6,
+    zIndex: 100,
+    display: "flex",
+    gap: 4,
+  },
+  bulkMenuBtn: {
+    padding: "4px 14px",
+    borderRadius: 4,
+    border: "1px solid var(--border-color)",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  hintText: {
+    fontSize: 11,
+    color: "#94A3B8",
+  },
+  timerToggleBtn: {
+    padding: "2px 8px",
+    borderRadius: 5,
+    border: "1px solid var(--border-input)",
+    backgroundColor: "var(--bg-input)",
+    fontSize: 14,
+    cursor: "pointer",
+    lineHeight: 1,
+    opacity: 0.5,
+  },
+  timerToggleBtnActive: {
+    opacity: 1,
+    borderColor: "#EAB308",
+    backgroundColor: "rgba(234, 179, 8, 0.15)",
+  },
+  timerBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "2px 10px",
+    borderRadius: 5,
+    backgroundColor: "rgba(234, 179, 8, 0.15)",
+    color: "#92400E",
+    fontSize: 12,
+    fontWeight: 700,
+    fontVariantNumeric: "tabular-nums" as const,
+  },
+  timerStopBtn: {
+    border: "none",
+    background: "none",
+    color: "#DC2626",
+    fontSize: 10,
+    cursor: "pointer",
+    padding: "0 2px",
+    lineHeight: 1,
+  },
+  countBadges: {
+    display: "flex",
+    gap: 4,
+  },
+  countBadge: {
+    padding: "2px 8px",
+    borderRadius: 4,
+    fontSize: 11,
+    fontWeight: 600,
+  },
+  progressText: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "var(--text-primary)",
+  },
+  filterBar: {
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+    marginBottom: 12,
+    paddingBottom: 4,
+    flexWrap: "wrap" as const,
+    overflow: "visible" as const,
+  },
+  filterInput: {
+    padding: "5px 10px",
+    borderRadius: 6,
+    border: "1px solid var(--border-input)",
+    fontSize: 12,
+    width: 220,
+    outline: "none",
+    fontFamily: "inherit",
+    backgroundColor: "var(--bg-input)",
+    color: "var(--text-primary)",
+  },
+  filterSelect: {
+    padding: "5px 8px",
+    borderRadius: 6,
+    border: "1px solid var(--border-input)",
+    fontSize: 12,
+    height: 30,
+    outline: "none",
+    fontFamily: "inherit",
+    backgroundColor: "var(--bg-input)",
+    color: "var(--text-primary)",
+    cursor: "pointer",
+  },
+  filterClearBtn: {
+    padding: "4px 10px",
+    borderRadius: 5,
+    border: "1px solid rgba(220, 38, 38, 0.3)",
+    backgroundColor: "rgba(220, 38, 38, 0.1)",
+    color: "#EF4444",
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  progressWrapper: { marginBottom: 6 },
+  progressBg: {
+    height: 8,
+    backgroundColor: "var(--border-color)",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  progressBar: {
+    height: "100%",
+    backgroundColor: "#2D4A7A",
+    borderRadius: 4,
+    transition: "width 0.3s",
+  },
+  overlay: {
+    position: "fixed" as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 200,
+  },
+  modal: {
+    backgroundColor: "var(--bg-card)",
+    borderRadius: 12,
+    padding: 32,
+    width: 460,
+    maxWidth: "90vw",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+  },
+  modalTitle: { margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "var(--text-primary)" },
+  modalForm: { display: "flex", flexDirection: "column" as const, gap: 8 },
+  label: { fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", marginTop: 8 },
+  input: {
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1px solid var(--border-input)",
+    fontSize: 14,
+    outline: "none",
+    fontFamily: "inherit",
+    backgroundColor: "var(--bg-input)",
+    color: "var(--text-primary)",
+  },
+  modalActions: { display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 20 },
+  cancelBtn: {
+    padding: "10px 20px",
+    borderRadius: 8,
+    border: "1px solid var(--border-input)",
+    backgroundColor: "var(--bg-card)",
+    color: "var(--text-primary)",
+    fontSize: 14,
+    cursor: "pointer",
+  },
+  submitBtn: {
+    padding: "10px 20px",
+    borderRadius: 8,
+    border: "none",
+    backgroundColor: "#2D4A7A",
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+};
