@@ -55,6 +55,7 @@ export default function TestRunManager({ projectId, project }: Props) {
   const [form, setForm] = useState({ name: "", version: "", environment: "", round: 1 });
   const [creating, setCreating] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [showAllCompleted, setShowAllCompleted] = useState(false);
   const [countTick, setCountTick] = useState(0);
   const gridApiRef = useRef<GridApi | null>(null);
 
@@ -875,34 +876,59 @@ export default function TestRunManager({ projectId, project }: Props) {
               <div style={styles.loadingText}>불러오는 중...</div>
             ) : runs.length === 0 ? (
               <div style={styles.emptyText}>등록된 수행이 없습니다.</div>
-            ) : (
-              runs.map((run) => (
-                <div
-                  key={run.id}
-                  style={{
-                    ...styles.runItem,
-                    ...(selectedRun?.id === run.id ? styles.runItemActive : {}),
-                  }}
-                  onClick={() => loadRunDetail(run)}
-                >
-                  <div style={styles.runName}>{run.name}</div>
-                  <div style={styles.runMeta}>
-                    R{run.round} | {run.version || "-"}
-                  </div>
-                  <span
+            ) : (() => {
+              const inProgress = runs.filter(r => r.status !== TestRunStatus.COMPLETED);
+              const completed = runs.filter(r => r.status === TestRunStatus.COMPLETED);
+              const INITIAL_SHOW = 5;
+              const visibleCompleted = showAllCompleted ? completed : completed.slice(0, INITIAL_SHOW);
+              const hiddenCount = completed.length - INITIAL_SHOW;
+              const allVisible = [...inProgress, ...visibleCompleted];
+
+              return <>
+                {allVisible.map((run) => (
+                  <div
+                    key={run.id}
                     style={{
-                      ...styles.statusBadge,
-                      backgroundColor:
-                        run.status === TestRunStatus.COMPLETED ? "rgba(26, 127, 55, 0.15)" : "rgba(37, 99, 235, 0.15)",
-                      color:
-                        run.status === TestRunStatus.COMPLETED ? "#22C55E" : "#60A5FA",
+                      ...styles.runItem,
+                      ...(selectedRun?.id === run.id ? styles.runItemActive : {}),
                     }}
+                    onClick={() => loadRunDetail(run)}
                   >
-                    {run.status === TestRunStatus.COMPLETED ? "완료" : "진행 중"}
-                  </span>
-                </div>
-              ))
-            )}
+                    <div style={styles.runName}>{run.name}</div>
+                    <div style={styles.runMeta}>
+                      R{run.round} | {run.version || "-"}
+                    </div>
+                    <span
+                      style={{
+                        ...styles.statusBadge,
+                        backgroundColor:
+                          run.status === TestRunStatus.COMPLETED ? "rgba(26, 127, 55, 0.15)" : "rgba(37, 99, 235, 0.15)",
+                        color:
+                          run.status === TestRunStatus.COMPLETED ? "#22C55E" : "#60A5FA",
+                      }}
+                    >
+                      {run.status === TestRunStatus.COMPLETED ? "완료" : "진행 중"}
+                    </span>
+                  </div>
+                ))}
+                {!showAllCompleted && hiddenCount > 0 && (
+                  <div
+                    style={{ padding: "8px 12px", textAlign: "center", cursor: "pointer", color: "var(--text-secondary)", fontSize: 12, borderBottom: "1px solid var(--border-color)" }}
+                    onClick={() => setShowAllCompleted(true)}
+                  >
+                    이전 런 {hiddenCount}개 더보기 ▼
+                  </div>
+                )}
+                {showAllCompleted && hiddenCount > 0 && (
+                  <div
+                    style={{ padding: "8px 12px", textAlign: "center", cursor: "pointer", color: "var(--text-secondary)", fontSize: 12, borderBottom: "1px solid var(--border-color)" }}
+                    onClick={() => setShowAllCompleted(false)}
+                  >
+                    접기 ▲
+                  </div>
+                )}
+              </>;
+            })()}
           </div>
           <button style={styles.newRunBtn} onClick={() => setShowModal(true)}>
             + New Test Run
