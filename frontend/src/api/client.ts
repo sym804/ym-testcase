@@ -2,23 +2,28 @@ import axios from "axios";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 const client = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
-// TODO: JWT를 localStorage에 저장하는 방식은 XSS에 취약함.
-// httpOnly 쿠키 기반 인증으로 전환 필요. (백엔드 Set-Cookie + withCredentials)
-// TODO: CSRF 토큰 미적용 상태. httpOnly 쿠키 전환 시 CSRF 방어도 함께 구현 필요.
-
-// Request interceptor: attach JWT token
+// Request interceptor: CSRF 토큰 전송 (상태 변경 요청)
 client.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const method = (config.method || "get").toUpperCase();
+    if (["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
+      const csrfToken = getCookie("csrf_token");
+      if (csrfToken) {
+        config.headers["X-CSRF-Token"] = csrfToken;
+      }
     }
     return config;
   },
@@ -30,7 +35,6 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("token");
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }

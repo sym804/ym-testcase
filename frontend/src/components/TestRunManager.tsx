@@ -30,10 +30,10 @@ interface Props {
 const RESULT_OPTIONS = ["", "PASS", "FAIL", "BLOCK", "N/A"];
 
 const resultColors: Record<string, { bg: string; fg: string }> = {
-  PASS: { bg: "rgba(26, 127, 55, 0.15)", fg: "#22C55E" },
-  FAIL: { bg: "rgba(207, 34, 46, 0.15)", fg: "#EF4444" },
-  BLOCK: { bg: "rgba(191, 135, 0, 0.15)", fg: "#EAB308" },
-  "N/A": { bg: "rgba(107, 114, 128, 0.15)", fg: "#9CA3AF" },
+  PASS: { bg: "rgba(26, 127, 55, 0.15)", fg: "var(--color-pass)" },
+  FAIL: { bg: "rgba(207, 34, 46, 0.15)", fg: "var(--color-fail)" },
+  BLOCK: { bg: "rgba(191, 135, 0, 0.15)", fg: "var(--color-block)" },
+  "N/A": { bg: "rgba(107, 114, 128, 0.15)", fg: "var(--text-secondary)" },
 };
 
 function resultCellStyle(params: CellClassParams) {
@@ -692,9 +692,8 @@ export default function TestRunManager({ projectId, project }: Props) {
                     title={att.filename}
                     onClick={(e) => {
                       e.stopPropagation();
-                      const token = localStorage.getItem("token");
                       fetch(`/api/attachments/download/${att.id}`, {
-                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                        credentials: "include",
                       })
                         .then((res) => {
                           if (!res.ok) throw new Error("Failed");
@@ -709,7 +708,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                     {att.filename}
                   </span>
                   <span
-                    style={{ fontSize: 11, color: "#EF4444", cursor: "pointer", fontWeight: 700 }}
+                    style={{ fontSize: 11, color: "var(--color-fail)", cursor: "pointer", fontWeight: 700 }}
                     title="삭제"
                     onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(att.id, row.id); }}
                   >×</span>
@@ -904,7 +903,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                         backgroundColor:
                           run.status === TestRunStatus.COMPLETED ? "rgba(26, 127, 55, 0.15)" : "rgba(37, 99, 235, 0.15)",
                         color:
-                          run.status === TestRunStatus.COMPLETED ? "#22C55E" : "#60A5FA",
+                          run.status === TestRunStatus.COMPLETED ? "var(--color-pass)" : "#60A5FA",
                       }}
                     >
                       {run.status === TestRunStatus.COMPLETED ? "완료" : "진행 중"}
@@ -1075,7 +1074,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                       style={{
                         ...styles.countBadge,
                         backgroundColor: resultColors[key]?.bg || (key === "미입력" ? "rgba(220, 38, 38, 0.1)" : "var(--bg-input)"),
-                        color: resultColors[key]?.fg || (key === "미입력" ? "#EF4444" : "var(--text-secondary)"),
+                        color: resultColors[key]?.fg || (key === "미입력" ? "var(--color-fail)" : "var(--text-secondary)"),
                       }}
                     >
                       {key} {count}
@@ -1375,8 +1374,8 @@ const sheetTabStyles: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap", transition: "all 0.15s",
   },
   tabActive: {
-    color: "#fff", backgroundColor: "#2D4A7A",
-    borderColor: "#2D4A7A", fontWeight: 700,
+    color: "#fff", backgroundColor: "var(--accent)",
+    borderColor: "var(--accent)", fontWeight: 700,
   },
   badge: {
     fontSize: 10, fontWeight: 600, padding: "1px 6px",
@@ -1417,7 +1416,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   runItemActive: {
     backgroundColor: "var(--bg-input)",
-    border: "1px solid #2D4A7A",
+    border: "1px solid var(--accent)",
   },
   runName: {
     fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 2,
@@ -1478,7 +1477,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 5,
     border: "1px solid rgba(220, 38, 38, 0.3)",
     backgroundColor: "rgba(220, 38, 38, 0.1)",
-    color: "#EF4444",
+    color: "var(--color-fail)",
     fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",
@@ -1558,7 +1557,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   timerToggleBtnActive: {
     opacity: 1,
-    borderColor: "#EAB308",
+    borderColor: "var(--color-block)",
     backgroundColor: "rgba(234, 179, 8, 0.15)",
   },
   timerBadge: {
@@ -1568,7 +1567,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "2px 10px",
     borderRadius: 5,
     backgroundColor: "rgba(234, 179, 8, 0.15)",
-    color: "#92400E",
+    color: "var(--text-warning)",
     fontSize: 12,
     fontWeight: 700,
     fontVariantNumeric: "tabular-nums" as const,
@@ -1634,7 +1633,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 5,
     border: "1px solid rgba(220, 38, 38, 0.3)",
     backgroundColor: "rgba(220, 38, 38, 0.1)",
-    color: "#EF4444",
+    color: "var(--color-fail)",
     fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
@@ -1648,7 +1647,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     borderRadius: 4,
     transition: "width 0.3s",
   },
@@ -1699,7 +1698,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "10px 20px",
     borderRadius: 8,
     border: "none",
-    backgroundColor: "#2D4A7A",
+    backgroundColor: "var(--accent)",
     color: "#fff",
     fontSize: 14,
     fontWeight: 600,

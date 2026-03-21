@@ -12,6 +12,7 @@ vi.mock("../api", () => ({
     getMe: vi.fn(),
     checkUsername: vi.fn(),
     changePassword: vi.fn(),
+    logout: vi.fn(),
   },
 }));
 
@@ -35,11 +36,13 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // 기본: getMe 실패 (미로그인 상태)
+  vi.mocked(authApi.getMe).mockRejectedValue(new Error("Unauthorized"));
 });
 
 describe("AuthContext", () => {
   describe("초기 상태", () => {
-    it("토큰이 없으면 user는 null이고 loading이 false가 된다", async () => {
+    it("쿠키가 없으면 user는 null이고 loading이 false가 된다", async () => {
       const { result } = renderHook(() => useAuth(), { wrapper });
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -47,8 +50,7 @@ describe("AuthContext", () => {
       expect(result.current.user).toBeNull();
     });
 
-    it("토큰이 있으면 getMe를 호출하여 사용자를 로드한다", async () => {
-      localStorage.setItem("token", "valid-token");
+    it("유효한 쿠키가 있으면 getMe를 호출하여 사용자를 로드한다", async () => {
       const mockUser = {
         id: 1,
         username: "tester",
@@ -66,8 +68,7 @@ describe("AuthContext", () => {
       expect(result.current.user).toEqual(mockUser);
     });
 
-    it("토큰이 유효하지 않으면 토큰을 제거한다", async () => {
-      localStorage.setItem("token", "invalid-token");
+    it("쿠키가 만료되었으면 user는 null이다", async () => {
       vi.mocked(authApi.getMe).mockRejectedValue(new Error("Unauthorized"));
 
       const { result } = renderHook(() => useAuth(), { wrapper });
@@ -75,12 +76,11 @@ describe("AuthContext", () => {
         expect(result.current.loading).toBe(false);
       });
       expect(result.current.user).toBeNull();
-      expect(localStorage.getItem("token")).toBeNull();
     });
   });
 
   describe("login", () => {
-    it("로그인 성공 시 토큰을 저장하고 사용자를 로드한다", async () => {
+    it("로그인 성공 시 사용자를 로드한다 (쿠키는 서버가 설정)", async () => {
       const mockUser = {
         id: 1,
         username: "tester",
@@ -93,7 +93,9 @@ describe("AuthContext", () => {
         access_token: "new-token",
         token_type: "bearer",
       });
-      vi.mocked(authApi.getMe).mockResolvedValue(mockUser);
+      vi.mocked(authApi.getMe)
+        .mockRejectedValueOnce(new Error("Unauthorized")) // 초기 loadUser
+        .mockResolvedValue(mockUser); // login 후 getMe
 
       const { result } = renderHook(() => useAuth(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -102,7 +104,6 @@ describe("AuthContext", () => {
         await result.current.login({ username: "tester", password: "pass1234" });
       });
 
-      expect(localStorage.getItem("token")).toBe("new-token");
       expect(result.current.user).toEqual(mockUser);
       expect(toast.success).toHaveBeenCalledWith("테스터님, 환영합니다!");
     });
@@ -120,7 +121,9 @@ describe("AuthContext", () => {
         access_token: "new-token",
         token_type: "bearer",
       });
-      vi.mocked(authApi.getMe).mockResolvedValue(mockUser);
+      vi.mocked(authApi.getMe)
+        .mockRejectedValueOnce(new Error("Unauthorized"))
+        .mockResolvedValue(mockUser);
 
       const { result } = renderHook(() => useAuth(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -213,8 +216,7 @@ describe("AuthContext", () => {
   });
 
   describe("logout", () => {
-    it("로그아웃 시 토큰과 사용자를 제거한다", async () => {
-      localStorage.setItem("token", "valid-token");
+    it("로그아웃 시 API를 호출하고 사용자를 제거한다", async () => {
       const mockUser = {
         id: 1,
         username: "tester",
@@ -224,23 +226,23 @@ describe("AuthContext", () => {
         created_at: "2026-01-01",
       };
       vi.mocked(authApi.getMe).mockResolvedValue(mockUser);
+      vi.mocked(authApi.logout).mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useAuth(), { wrapper });
       await waitFor(() => expect(result.current.user).toEqual(mockUser));
 
-      act(() => {
-        result.current.logout();
+      await act(async () => {
+        await result.current.logout();
       });
 
+      expect(authApi.logout).toHaveBeenCalled();
       expect(result.current.user).toBeNull();
-      expect(localStorage.getItem("token")).toBeNull();
       expect(toast.success).toHaveBeenCalledWith("로그아웃 되었습니다.");
     });
   });
 
   describe("changePassword", () => {
     it("비밀번호 변경 성공 시 mustChangePassword를 false로 설정한다", async () => {
-      localStorage.setItem("token", "valid-token");
       const mockUser = {
         id: 1,
         username: "tester",

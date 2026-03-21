@@ -96,7 +96,6 @@ describe("App Routing", () => {
     };
 
     it("인증된 사용자는 프로젝트 목록에 접근할 수 있다", async () => {
-      localStorage.setItem("token", "valid-token");
       vi.mocked(authApi.getMe).mockResolvedValue(mockUser);
 
       renderApp("/projects");
@@ -110,7 +109,6 @@ describe("App Routing", () => {
     });
 
     it("must_change_password가 true이면 비밀번호 변경 모달을 표시한다", async () => {
-      localStorage.setItem("token", "valid-token");
       vi.mocked(authApi.getMe).mockResolvedValue({
         ...mockUser,
         must_change_password: true,
@@ -126,7 +124,6 @@ describe("App Routing", () => {
 
   describe("ProtectedRoute", () => {
     it("로딩 중에는 로딩 메시지를 표시한다", () => {
-      localStorage.setItem("token", "valid-token");
       // getMe를 지연시켜 loading 상태 유지
       vi.mocked(authApi.getMe).mockImplementation(
         () => new Promise(() => {}) // 영원히 pending

@@ -5,13 +5,16 @@ import time
 from collections import defaultdict
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User, UserRole
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
-from auth import hash_password, verify_password, create_access_token, get_current_user, role_required
+from auth import (
+    hash_password, verify_password, create_access_token, get_current_user, role_required,
+    COOKIE_SECURE, COOKIE_SAMESITE, COOKIE_MAX_AGE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +116,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)):
+def login(payload: UserLogin, request: Request, response: Response, db: Session = Depends(get_db)):
     _check_rate_limit(request, payload.username)
 
     user = db.query(User).filter(User.username == payload.username).first()
@@ -130,7 +133,38 @@ def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)):
     _clear_failures(request, payload.username)
     logger.info("User logged in: %s", user.username)
     token = create_access_token(data={"sub": str(user.id), "role": user.role.value})
+
+    # httpOnly 쿠키에 JWT 설정
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        max_age=COOKIE_MAX_AGE,
+        path="/",
+    )
+    # CSRF 토큰 (JS에서 읽을 수 있도록 httpOnly=False)
+    csrf_token = secrets.token_urlsafe(32)
+    response.set_cookie(
+        key="csrf_token",
+        value=csrf_token,
+        httponly=False,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        max_age=COOKIE_MAX_AGE,
+        path="/",
+    )
+
     return Token(access_token=token, must_change_password=user.must_change_password)
+
+
+@router.post("/logout")
+def logout(response: Response, current_user: User = Depends(get_current_user)):
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("csrf_token", path="/")
+    logger.info("User logged out: %s", current_user.username)
+    return {"message": "로그아웃 되었습니다."}
 
 
 @router.get("/me", response_model=UserResponse)

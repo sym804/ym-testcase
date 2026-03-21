@@ -6,7 +6,7 @@ from typing import Optional, List
 
 import bcrypt
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -27,7 +27,13 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("TOKEN_EXPIRE_HOURS", "2"))
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+# Cookie 설정
+COOKIE_SECURE = _ENV == "production"
+COOKIE_SAMESITE = "lax"
+COOKIE_MAX_AGE = ACCESS_TOKEN_EXPIRE_HOURS * 3600
+
+# Swagger UI용 (OpenAPI docs에서 Authorization 버튼 표시)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 # System role hierarchy – higher index = more privileged
 SYSTEM_ROLE_HIERARCHY: List[str] = ["user", "qa_manager", "admin"]
@@ -51,8 +57,37 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def _extract_token(request: Request, bearer_token: Optional[str] = None) -> tuple[str, str]:
+    """쿠키 또는 Authorization 헤더에서 JWT 추출. (token, source) 반환."""
+    # 1) Authorization 헤더 (Swagger UI, API 클라이언트)
+    if bearer_token:
+        return bearer_token, "header"
+    # 2) httpOnly 쿠키
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        return cookie_token, "cookie"
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def _check_csrf(request: Request, auth_source: str):
+    """쿠키 인증 시 상태 변경 요청에 CSRF 검증."""
+    if auth_source != "cookie":
+        return  # Authorization 헤더 인증은 CSRF 면역
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    csrf_cookie = request.cookies.get("csrf_token")
+    csrf_header = request.headers.get("X-CSRF-Token")
+    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+        raise HTTPException(status_code=403, detail="CSRF 토큰이 유효하지 않습니다.")
+
+
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
@@ -60,8 +95,13 @@ def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    jwt_token, auth_source = _extract_token(request, token)
+
+    # CSRF 검증 (쿠키 인증 + 상태 변경 요청)
+    _check_csrf(request, auth_source)
+
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id_str = payload.get("sub")
         if user_id_str is None:
             raise credentials_exception

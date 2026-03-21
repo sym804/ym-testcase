@@ -16,7 +16,7 @@ interface AuthContextType {
   mustChangePassword: boolean;
   login: (form: LoginForm) => Promise<void>;
   register: (form: RegisterForm) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   changePassword: (currentPw: string, newPw: string) => Promise<void>;
 }
 
@@ -28,17 +28,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mustChangePassword, setMustChangePassword] = useState(false);
 
   const loadUser = useCallback(async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     try {
       const me = await authApi.getMe();
       setUser(me);
       setMustChangePassword(me.must_change_password);
     } catch {
-      localStorage.removeItem("token");
+      // 쿠키 없거나 만료 — 미로그인 상태
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -49,8 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadUser]);
 
   const login = async (form: LoginForm) => {
-    const data = await authApi.login(form);
-    localStorage.setItem("token", data.access_token);
+    await authApi.login(form);
+    // 서버가 httpOnly 쿠키를 설정하므로 별도 저장 불필요
     const me = await authApi.getMe();
     setUser(me);
     if (me.must_change_password) {
@@ -81,8 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     toast.success("비밀번호가 변경되었습니다.");
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // 서버 에러여도 클라이언트 상태는 정리
+    }
     setUser(null);
     setMustChangePassword(false);
     toast.success("로그아웃 되었습니다.");

@@ -57,6 +57,10 @@ export const authApi = {
     });
     return res.data;
   },
+
+  logout: async () => {
+    await client.post("/api/auth/logout");
+  },
 };
 
 // ─── Projects ────────────────────────────────────────

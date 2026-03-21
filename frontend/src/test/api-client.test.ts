@@ -49,36 +49,36 @@ beforeEach(async () => {
 });
 
 describe("API Client Interceptors", () => {
-  describe("Request Interceptor", () => {
-    it("토큰이 있으면 Authorization 헤더를 추가한다", () => {
-      localStorage.setItem("token", "test-jwt-token");
+  describe("Request Interceptor (CSRF)", () => {
+    it("POST 요청 시 csrf_token 쿠키가 있으면 X-CSRF-Token 헤더를 추가한다", () => {
+      Object.defineProperty(document, "cookie", { value: "csrf_token=test-csrf-123", writable: true, configurable: true });
       const interceptor = instance._requestInterceptors[0];
-      const config = { headers: {} as Record<string, string> };
+      const config = { method: "post", headers: {} as Record<string, string> };
       const result = interceptor.fulfilled(config) as typeof config;
-      expect(result.headers.Authorization).toBe("Bearer test-jwt-token");
+      expect(result.headers["X-CSRF-Token"]).toBe("test-csrf-123");
+      Object.defineProperty(document, "cookie", { value: "", writable: true, configurable: true });
     });
 
-    it("토큰이 없으면 Authorization 헤더를 추가하지 않는다", () => {
+    it("GET 요청에는 CSRF 헤더를 추가하지 않는다", () => {
+      Object.defineProperty(document, "cookie", { value: "csrf_token=test-csrf-123", writable: true, configurable: true });
       const interceptor = instance._requestInterceptors[0];
-      const config = { headers: {} as Record<string, string> };
+      const config = { method: "get", headers: {} as Record<string, string> };
       const result = interceptor.fulfilled(config) as typeof config;
-      expect(result.headers.Authorization).toBeUndefined();
+      expect(result.headers["X-CSRF-Token"]).toBeUndefined();
+      Object.defineProperty(document, "cookie", { value: "", writable: true, configurable: true });
+    });
+
+    it("csrf_token 쿠키가 없으면 헤더를 추가하지 않는다", () => {
+      Object.defineProperty(document, "cookie", { value: "", writable: true, configurable: true });
+      const interceptor = instance._requestInterceptors[0];
+      const config = { method: "post", headers: {} as Record<string, string> };
+      const result = interceptor.fulfilled(config) as typeof config;
+      expect(result.headers["X-CSRF-Token"]).toBeUndefined();
     });
   });
 
   describe("Response Interceptor", () => {
-    it("401 응답 시 토큰을 제거하고 로그인 페이지로 리다이렉트한다", async () => {
-      localStorage.setItem("token", "some-token");
-      const originalHref = window.location.href;
-
-      // Mock window.location
-      vi.spyOn(window, "location", "get").mockReturnValue({
-        ...window.location,
-        pathname: "/projects",
-        href: "/projects",
-      } as Location);
-
-      // location.href setter를 위한 별도 처리
+    it("401 응답 시 로그인 페이지로 리다이렉트한다", async () => {
       Object.defineProperty(window, "location", {
         value: { ...window.location, pathname: "/projects", href: "/projects" },
         writable: true,
@@ -89,14 +89,6 @@ describe("API Client Interceptors", () => {
       const error = { response: { status: 401 } };
 
       await expect(interceptor.rejected(error)).rejects.toEqual(error);
-      expect(localStorage.getItem("token")).toBeNull();
-
-      // Restore
-      Object.defineProperty(window, "location", {
-        value: { ...window.location, pathname: originalHref },
-        writable: true,
-        configurable: true,
-      });
     });
 
     it("401이 아닌 에러는 그대로 reject한다", async () => {
