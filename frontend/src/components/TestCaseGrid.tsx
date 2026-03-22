@@ -196,12 +196,15 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       let changed = false;
       for (const field of textFields) {
         const val = node.data[field];
-        if (typeof val === "string" && re.test(val)) {
+        if (typeof val === "string" && val.match(re)) {
+          re.lastIndex = 0;
           const newVal = val.replace(re, replaceText);
-          undoGroup.push({ rowId, field, oldValue: val, newValue: newVal, dataId: node.data.id || 0 });
-          node.data[field] = newVal;
-          count++;
-          changed = true;
+          if (newVal !== val) {
+            undoGroup.push({ rowId, field, oldValue: val, newValue: newVal, dataId: node.data.id || 0 });
+            node.data[field] = newVal;
+            count++;
+            changed = true;
+          }
         }
         re.lastIndex = 0;
       }
