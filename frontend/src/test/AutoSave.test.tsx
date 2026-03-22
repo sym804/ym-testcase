@@ -59,8 +59,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function makeSheet(name: string, tc_count: number, id: number = 1): SheetNode {
-  return { id, name, parent_id: null, sort_order: 0, tc_count, children: [] };
+function makeSheet(name: string, tc_count: number, id: number = 1, is_folder: boolean = false): SheetNode {
+  return { id, name, parent_id: null, sort_order: 0, is_folder, tc_count, children: [] };
 }
 
 function setupDefaultMocks(
@@ -136,10 +136,10 @@ describe("AutoSave - TestCaseGrid", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("시트를 추가하여 테스트 케이스를 관리하세요.")
+        screen.getByText("폴더나 시트를 추가하여 테스트 케이스를 관리하세요.")
       ).toBeInTheDocument();
     });
-    expect(screen.getByText("+ 시트 추가")).toBeInTheDocument();
+    expect(screen.getByText("+ 시트 추가", { exact: false })).toBeInTheDocument();
   });
 
   it("빈 프로젝트에서 시트 추가 버튼 클릭 시 입력 UI가 나타난다", async () => {
@@ -148,10 +148,10 @@ describe("AutoSave - TestCaseGrid", () => {
     renderGrid();
 
     await waitFor(() => {
-      expect(screen.getByText("+ 시트 추가")).toBeInTheDocument();
+      expect(screen.getByText("+ 시트 추가", { exact: false })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("+ 시트 추가"));
+    await user.click(screen.getByText("+ 시트 추가", { exact: false }));
     expect(screen.getByPlaceholderText("시트 이름")).toBeInTheDocument();
     expect(screen.getByText("추가")).toBeInTheDocument();
   });
@@ -170,16 +170,16 @@ describe("AutoSave - TestCaseGrid", () => {
     renderGrid();
 
     await waitFor(() => {
-      expect(screen.getByText("+ 시트 추가")).toBeInTheDocument();
+      expect(screen.getByText("+ 시트 추가", { exact: false })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("+ 시트 추가"));
+    await user.click(screen.getByText("+ 시트 추가", { exact: false }));
     const input = screen.getByPlaceholderText("시트 이름");
     await user.type(input, "새시트");
     await user.click(screen.getByText("추가"));
 
     await waitFor(() => {
-      expect(testCasesApi.createSheet).toHaveBeenCalledWith(1, "새시트", null);
+      expect(testCasesApi.createSheet).toHaveBeenCalledWith(1, "새시트", null, false);
     });
   });
 
@@ -189,10 +189,10 @@ describe("AutoSave - TestCaseGrid", () => {
     renderGrid();
 
     await waitFor(() => {
-      expect(screen.getByText("+ 시트 추가")).toBeInTheDocument();
+      expect(screen.getByText("+ 시트 추가", { exact: false })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("+ 시트 추가"));
+    await user.click(screen.getByText("+ 시트 추가", { exact: false }));
     // 빈 이름 상태에서 추가 클릭
     await user.click(screen.getByText("추가"));
 

@@ -91,6 +91,7 @@ def _build_sheet_tree(sheets, tc_counts):
             "name": s.name,
             "parent_id": s.parent_id,
             "sort_order": s.sort_order,
+            "is_folder": getattr(s, "is_folder", False),
             "tc_count": tc_counts.get(s.name, 0),
             "children": [],
         }
@@ -188,6 +189,7 @@ def list_sheets(
 class _SheetCreate(BaseModel):
     name: str
     parent_id: Optional[int] = None
+    is_folder: bool = False
 
 
 @router.post("/sheets")
@@ -218,6 +220,9 @@ def create_sheet(
         ).first()
         if not parent:
             raise HTTPException(status_code=400, detail="부모 시트를 찾을 수 없습니다.")
+        # 시트는 폴더 아래에만 생성 가능
+        if not payload.is_folder and not parent.is_folder:
+            raise HTTPException(status_code=400, detail="시트 아래에는 하위 항목을 추가할 수 없습니다. 폴더를 사용하세요.")
 
     # 같은 부모 아래에서 최대 sort_order
     sibling_q = db.query(TestCaseSheet.sort_order).filter(
@@ -227,11 +232,11 @@ def create_sheet(
     max_order = sibling_q.order_by(TestCaseSheet.sort_order.desc()).first()
     next_order = (max_order[0] + 1) if max_order else 0
 
-    sheet = TestCaseSheet(project_id=project_id, name=name, sort_order=next_order, parent_id=payload.parent_id)
+    sheet = TestCaseSheet(project_id=project_id, name=name, sort_order=next_order, parent_id=payload.parent_id, is_folder=payload.is_folder)
     db.add(sheet)
     db.commit()
     db.refresh(sheet)
-    return {"id": sheet.id, "name": sheet.name, "parent_id": sheet.parent_id, "sort_order": sheet.sort_order, "tc_count": 0, "children": []}
+    return {"id": sheet.id, "name": sheet.name, "parent_id": sheet.parent_id, "sort_order": sheet.sort_order, "is_folder": sheet.is_folder, "tc_count": 0, "children": []}
 
 
 class _SheetRename(BaseModel):
@@ -383,6 +388,17 @@ def create_testcase(
     current_user: User = Depends(check_project_access("admin")),
 ):
     _get_project_or_404(project_id, db)
+
+    # 폴더에는 TC를 직접 추가할 수 없음
+    if payload.sheet_name:
+        from models import TestCaseSheet
+        folder = db.query(TestCaseSheet).filter(
+            TestCaseSheet.project_id == project_id,
+            TestCaseSheet.name == payload.sheet_name,
+            TestCaseSheet.is_folder == True,
+        ).first()
+        if folder:
+            raise HTTPException(status_code=400, detail="폴더에는 TC를 직접 추가할 수 없습니다. 하위 시트를 사용하세요.")
 
     tc = TestCase(
         project_id=project_id,

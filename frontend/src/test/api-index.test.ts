@@ -233,13 +233,14 @@ describe("testCasesApi", () => {
     expect(result).toEqual(resp);
   });
 
-  it("createSheet sends POST with name and parent_id", async () => {
+  it("createSheet sends POST with name, parent_id, and is_folder", async () => {
     const sheet = { id: 1, name: "NewSheet" };
     mockPost.mockResolvedValueOnce({ data: sheet });
-    const result = await testCasesApi.createSheet(1, "NewSheet", 5);
+    const result = await testCasesApi.createSheet(1, "NewSheet", 5, false);
     expect(mockPost).toHaveBeenCalledWith("/api/projects/1/testcases/sheets", {
       name: "NewSheet",
       parent_id: 5,
+      is_folder: false,
     });
     expect(result).toEqual(sheet);
   });
@@ -250,6 +251,17 @@ describe("testCasesApi", () => {
     expect(mockPost).toHaveBeenCalledWith("/api/projects/1/testcases/sheets", {
       name: "S",
       parent_id: null,
+      is_folder: false,
+    });
+  });
+
+  it("createSheet as folder sends is_folder=true", async () => {
+    mockPost.mockResolvedValueOnce({ data: { id: 2, name: "F" } });
+    await testCasesApi.createSheet(1, "F", null, true);
+    expect(mockPost).toHaveBeenCalledWith("/api/projects/1/testcases/sheets", {
+      name: "F",
+      parent_id: null,
+      is_folder: true,
     });
   });
 

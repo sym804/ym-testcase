@@ -60,8 +60,8 @@ beforeEach(() => {
 });
 
 let sheetId = 1;
-function makeSheet(name: string, tc_count: number): SheetNode {
-  return { id: sheetId++, name, parent_id: null, sort_order: 0, tc_count, children: [] };
+function makeSheet(name: string, tc_count: number, is_folder: boolean = false): SheetNode {
+  return { id: sheetId++, name, parent_id: null, sort_order: 0, is_folder, tc_count, children: [] };
 }
 
 function setupSheets(
@@ -186,7 +186,7 @@ describe("SheetTabs", () => {
     vi.mocked(window.confirm).mockRestore();
   });
 
-  it("+ 버튼 클릭 → 시트 이름 입력 → createSheet API 호출", async () => {
+  it("시트 추가 버튼 클릭 → 시트 이름 입력 → createSheet API 호출", async () => {
     setupSheets([
       makeSheet("기능", 10),
       makeSheet("UI", 5),
@@ -199,8 +199,8 @@ describe("SheetTabs", () => {
       expect(screen.getByText("기능")).toBeInTheDocument();
     });
 
-    // + 버튼 클릭 (title="시트 추가")
-    const addBtn = screen.getByTitle("루트 시트 추가");
+    // 시트 추가 버튼 클릭
+    const addBtn = screen.getByTitle("시트 추가");
     await user.click(addBtn);
 
     // 입력 UI 표시 확인
@@ -211,7 +211,7 @@ describe("SheetTabs", () => {
     await user.click(screen.getByText("추가"));
 
     await waitFor(() => {
-      expect(testCasesApi.createSheet).toHaveBeenCalledWith(1, "새시트", null);
+      expect(testCasesApi.createSheet).toHaveBeenCalledWith(1, "새시트", null, false);
     });
   });
 
@@ -226,7 +226,7 @@ describe("SheetTabs", () => {
       expect(screen.getByText("기능")).toBeInTheDocument();
     });
 
-    const addBtn = screen.getByTitle("루트 시트 추가");
+    const addBtn = screen.getByTitle("시트 추가");
     await user.click(addBtn);
 
     expect(screen.getByPlaceholderText("시트 이름")).toBeInTheDocument();

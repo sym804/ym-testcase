@@ -114,6 +114,7 @@ def _migrate_sheet_parent_id():
         "ALTER TABLE test_case_sheets ADD COLUMN parent_id INTEGER REFERENCES test_case_sheets(id) ON DELETE CASCADE",
         "ALTER TABLE test_cases ADD COLUMN custom_fields TEXT",
         "ALTER TABLE test_runs ADD COLUMN test_plan_id INTEGER REFERENCES test_plans(id) ON DELETE SET NULL",
+        "ALTER TABLE test_case_sheets ADD COLUMN is_folder BOOLEAN NOT NULL DEFAULT 0",
     ]
     for sql in migrations:
         try:
@@ -121,6 +122,16 @@ def _migrate_sheet_parent_id():
             db.commit()
         except Exception:
             db.rollback()
+
+    # 기존 데이터: children이 있는 노드를 is_folder=True로 마이그레이션
+    try:
+        db.execute(sa.text(
+            "UPDATE test_case_sheets SET is_folder = 1 "
+            "WHERE id IN (SELECT DISTINCT parent_id FROM test_case_sheets WHERE parent_id IS NOT NULL)"
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
 
     db.close()
 

@@ -42,7 +42,7 @@ export default function UserManualPage() {
           <a href="#theme" style={s.tocItem}>12. 테마 (다크모드)</a>
           <a href="#shortcuts" style={s.tocItem}>13. 단축키 모음</a>
           <a href="#roles" style={s.tocItem}>14. 역할별 권한</a>
-          <a href="#sheet-tree" style={s.tocItem}>15. 시트 트리 구조</a>
+          <a href="#sheet-tree" style={s.tocItem}>15. 폴더 / 시트 트리</a>
           <a href="#custom-fields" style={s.tocItem}>16. 커스텀 필드</a>
           <a href="#test-plans" style={s.tocItem}>17. 테스트 플랜</a>
           <a href="#csv-import" style={s.tocItem}>18. CSV Import (Jira)</a>
@@ -54,7 +54,7 @@ export default function UserManualPage() {
           {/* 1. 개요 */}
           <section id="overview" style={s.section}>
             <h1 style={s.h1}>YM TestCase 사용자 매뉴얼</h1>
-            <p style={s.updatedAt}>최종 업데이트: 2026-03-20</p>
+            <p style={s.updatedAt}>최종 업데이트: 2026-03-22</p>
             <div style={s.infoBox}>
               <strong>YM TestCase</strong>는 테스트 케이스(TC)의 관리, 테스트 수행, 결과 분석 및 리포트 생성을 위한 웹 기반 테스트 관리 시스템입니다.
               <br /><br />
@@ -264,27 +264,35 @@ export default function UserManualPage() {
                 <tr><td style={s.td}>+ 행 추가</td><td style={s.td}>TC 생성</td><td style={s.td}>새 TC를 즉시 생성하여 그리드에 추가 (자동 저장)</td></tr>
                 <tr><td style={s.td}>다중 추가 (▼)</td><td style={s.td}>다중 행 추가</td><td style={s.td}>드롭다운에서 1/3/5/10/20/30행을 선택하여 한 번에 여러 TC를 추가</td></tr>
                 <tr><td style={s.td}>선택 복사</td><td style={s.td}>행 복사</td><td style={s.td}>선택한 TC 행을 복사하여 새 행으로 추가</td></tr>
-                <tr><td style={s.td}>선택 삭제</td><td style={s.td}>TC 삭제</td><td style={s.td}>선택한 TC를 소프트 삭제 (7일 후 자동 영구삭제)</td></tr>
-                <tr><td style={s.td}>Undo / Redo</td><td style={s.td}>실행 취소/재실행</td><td style={s.td}>그리드 편집 작업을 취소하거나 재실행</td></tr>
-                <tr><td style={s.td}>TC ID 자동채우기</td><td style={s.td}>ID 자동 생성</td><td style={s.td}>비어있는 TC ID 필드를 자동으로 채움</td></tr>
+                <tr><td style={s.td}>선택 삭제</td><td style={s.td}>TC 삭제</td><td style={s.td}>선택한 TC를 소프트 삭제. 삭제된 TC는 7일간 복원 가능하며, 7일 후 자동 영구삭제됨</td></tr>
+                <tr><td style={s.td}>Undo / Redo</td><td style={s.td}>실행 취소/재실행</td><td style={s.td}>그리드 편집 작업을 취소(Ctrl+Z)하거나 재실행(Ctrl+Shift+Z). 최대 200단계까지 지원. 페이지 이동 시 히스토리는 초기화됨</td></tr>
+                <tr><td style={s.td}>TC ID 자동채우기</td><td style={s.td}>ID 자동 생성</td><td style={s.td}>비어있는 TC ID를 <code>TC-001, TC-002...</code> 형식으로 자동 채움. 기존 ID의 최대 번호 다음부터 순차 부여</td></tr>
                 <tr><td style={s.td}>일괄 변경</td><td style={s.td}>벌크 수정</td><td style={s.td}>선택한 TC의 특정 필드를 일괄 변경</td></tr>
                 <tr><td style={s.td}>Excel Import</td><td style={s.td}>엑셀 가져오기</td><td style={s.td}>엑셀 파일에서 TC 가져오기. 여러 시트가 있으면 선택 가능. 동일 TC ID는 덮어쓰기</td></tr>
                 <tr><td style={s.td}>Excel Export</td><td style={s.td}>엑셀 내보내기</td><td style={s.td}>현재 TC 목록을 서식이 적용된 엑셀 파일로 다운로드</td></tr>
-                <tr><td style={s.td}>변경이력</td><td style={s.td}>수정 내역 확인</td><td style={s.td}>TC별 필드 변경 이력(변경 전/후, 변경자, 시각) 확인</td></tr>
-                <tr><td style={s.td}>바꾸기</td><td style={s.td}>찾기/바꾸기</td><td style={s.td}>선택한 셀 범위에서 텍스트를 찾아 일괄 치환</td></tr>
+                <tr><td style={s.td}>변경이력</td><td style={s.td}>수정 내역 확인</td><td style={s.td}>변경이력 패널이 열리며, 각 TC의 필드별 변경 전/후 값, 변경자, 변경 시각을 시간순으로 확인. 프로젝트 전체 이력 또는 특정 TC 이력 조회 가능</td></tr>
+                <tr><td style={s.td}>바꾸기</td><td style={s.td}>찾기/바꾸기</td><td style={s.td}>찾을 텍스트와 바꿀 텍스트를 입력 → 대상 필드를 선택 → "바꾸기" 클릭으로 일괄 치환. 선택한 행만 또는 전체 행 대상 선택 가능</td></tr>
                 <tr><td style={s.td}>검색...</td><td style={s.td}>TC 검색</td><td style={s.td}>TC ID, 제목, 카테고리 등으로 필터링</td></tr>
               </tbody>
             </table>
 
-            <h3 style={s.h3}>6-2. 시트 관리 (사이드바)</h3>
-            <p style={s.p}>프로젝트 내에서 TC를 시트 단위로 분류할 수 있습니다. 왼쪽 사이드바에서 VS Code 스타일의 트리로 시트를 관리합니다.</p>
+            <h3 style={s.h3}>6-2. 폴더 / 시트 관리 (사이드바)</h3>
+            <p style={s.p}>프로젝트 내에서 TC를 <strong>폴더</strong>와 <strong>시트</strong>로 계층 분류할 수 있습니다. 왼쪽 사이드바에서 VS Code 스타일의 트리로 관리합니다.</p>
+            <div style={s.infoBox}>
+              <strong>폴더와 시트의 차이:</strong>
+              <ul style={{ margin: "8px 0 0 20px", lineHeight: 1.8 }}>
+                <li><strong>📁 폴더</strong> — TC를 직접 담지 않고, 하위 폴더나 시트를 그룹화하는 용도. 클릭 시 펼침/접기만 동작</li>
+                <li><strong>📄 시트</strong> — 실제 TC가 저장되는 단위. 클릭 시 해당 시트의 TC가 그리드에 표시</li>
+              </ul>
+            </div>
             <ul style={s.ul}>
-              <li><strong>빈 프로젝트</strong>에서는 화면 중앙에 "시트 추가" 또는 "Excel Import" 버튼이 표시됩니다.</li>
-              <li><strong>시트 추가:</strong> 사이드바 상단의 <strong>+</strong> 버튼 또는 각 시트의 인라인 <strong>+</strong> 버튼으로 시트를 추가할 수 있습니다.</li>
-              <li><strong>시트 전환:</strong> 사이드바에서 시트를 클릭하면 해당 시트의 TC만 표시됩니다.</li>
+              <li><strong>빈 프로젝트</strong>에서는 화면 중앙에 "폴더 추가", "시트 추가", "Excel Import" 버튼이 표시됩니다.</li>
+              <li><strong>폴더 추가:</strong> 사이드바 상단의 <strong>📁+</strong> 버튼으로 루트 폴더를 추가합니다. 폴더 노드의 <strong>📁+</strong> 버튼으로 하위 폴더를 추가할 수 있습니다.</li>
+              <li><strong>시트 추가:</strong> 사이드바 상단의 <strong>📄+</strong> 버튼으로 루트 시트를 추가합니다. 폴더 노드의 <strong>📄+</strong> 버튼으로 폴더 안에 시트를 추가할 수 있습니다.</li>
+              <li><strong>시트 전환:</strong> 사이드바에서 시트(📄)를 클릭하면 해당 시트의 TC만 표시됩니다.</li>
               <li><strong>전체 보기:</strong> 시트가 2개 이상일 때 사이드바 상단에 "전체" 항목이 나타나며, 모든 시트의 TC를 한 번에 볼 수 있습니다.</li>
-              <li><strong>시트 삭제:</strong> 시트의 인라인 <strong>×</strong> 버튼으로 시트와 속한 TC를 삭제할 수 있습니다.</li>
-              <li><strong>Excel Import 시</strong> 엑셀 파일의 시트 이름이 그대로 사이드바 트리에 생성됩니다.</li>
+              <li><strong>삭제:</strong> 폴더/시트의 인라인 <strong>×</strong> 버튼으로 삭제합니다. 폴더 삭제 시 하위 항목과 TC가 모두 함께 삭제됩니다.</li>
+              <li><strong>Excel Import 시</strong> 엑셀 파일의 시트 이름이 그대로 사이드바 트리에 시트로 생성됩니다.</li>
               <li><strong>사이드바 접기/펼치기:</strong> ◀/▶ 토글 버튼으로 사이드바를 접거나 펼칠 수 있습니다.</li>
             </ul>
 
@@ -298,7 +306,17 @@ export default function UserManualPage() {
               <li>행 추가 시에도 즉시 서버에 저장되며, Undo(Ctrl+Z)로 되돌릴 수 있습니다.</li>
             </ul>
 
-            <h3 style={s.h3}>6-4. TC 필드 설명</h3>
+            <h3 style={s.h3}>6-4. TC 삭제 및 복원</h3>
+            <ul style={s.ul}>
+              <li>TC를 삭제하면 <strong>소프트 삭제</strong>됩니다. 즉시 영구 삭제되지 않습니다.</li>
+              <li>삭제된 TC는 <strong>7일간 복원 가능</strong>합니다. 7일이 지나면 자동으로 영구 삭제됩니다.</li>
+              <li>복원이 필요한 경우 관리자에게 요청하거나, API를 통해 복원할 수 있습니다: <code>POST /api/projects/:id/testcases/:tc_id/restore</code></li>
+            </ul>
+            <div style={s.warnBox}>
+              <strong>주의:</strong> 시트 삭제 시에는 소속된 모든 TC가 함께 삭제됩니다. 하위 시트가 있는 경우 하위 시트의 TC까지 모두 삭제됩니다.
+            </div>
+
+            <h3 style={s.h3}>6-5. TC 필드 설명</h3>
             <table style={s.table}>
               <thead>
                 <tr><th style={s.th}>필드</th><th style={s.th}>설명</th><th style={s.th}>예시</th></tr>
@@ -315,7 +333,7 @@ export default function UserManualPage() {
                 <tr><td style={s.td}>Precondition</td><td style={s.td}>사전 조건</td><td style={s.td}>의뢰인으로 로그인</td></tr>
                 <tr><td style={s.td}>Test Steps</td><td style={s.td}>테스트 절차</td><td style={s.td}>1. 메뉴를 클릭한다. 2. ...</td></tr>
                 <tr><td style={s.td}>Expected Result</td><td style={s.td}>기대 결과</td><td style={s.td}>1. 페이지가 표시된다.</td></tr>
-                <tr><td style={s.td}>Issue Link</td><td style={s.td}>Jira 이슈 링크</td><td style={s.td}>PROJ-123</td></tr>
+                <tr><td style={s.td}>Issue Link</td><td style={s.td}>Jira 이슈 키. 설정 탭에서 Jira Base URL을 입력하면 클릭 시 해당 이슈 페이지로 이동 (예: https://jira.example.com/browse/PROJ-123)</td><td style={s.td}>PROJ-123</td></tr>
                 <tr><td style={s.td}>Assignee</td><td style={s.td}>담당자</td><td style={s.td}>홍길동</td></tr>
                 <tr><td style={s.td}>Remarks</td><td style={s.td}>비고</td><td style={s.td}>추가 참고사항</td></tr>
               </tbody>
@@ -387,15 +405,21 @@ export default function UserManualPage() {
                 <tr><th style={s.th}>기능</th><th style={s.th}>설명</th></tr>
               </thead>
               <tbody>
-                <tr><td style={s.td}>완료</td><td style={s.td}>런 상태를 "완료"로 변경합니다. 모든 시트의 미수행(NS) TC가 있으면 확인 메시지가 표시됩니다.</td></tr>
-                <tr><td style={s.td}>다시 수행</td><td style={s.td}>완료된 런을 다시 "진행중" 상태로 변경합니다. 노란색 버튼으로 표시됩니다.</td></tr>
-                <tr><td style={s.td}>복제</td><td style={s.td}>기존 런을 복제합니다. 모든 결과가 NS로 초기화됩니다.</td></tr>
-                <tr><td style={s.td}>삭제</td><td style={s.td}>런과 모든 결과, 첨부파일을 영구 삭제합니다.</td></tr>
-                <tr><td style={s.td}>내보내기</td><td style={s.td}>런 결과를 Excel 파일로 다운로드합니다.</td></tr>
+                <tr><td style={s.td}>완료</td><td style={s.td}>런 상태를 "완료"로 변경합니다. 미수행(NS) TC가 남아있으면 확인 메시지가 표시됩니다. 완료된 런은 편집이 잠깁니다.</td></tr>
+                <tr><td style={s.td}>다시 수행</td><td style={s.td}>완료된 런을 "진행중"으로 되돌립니다. 기존 결과 데이터는 그대로 유지되며 초기화되지 않습니다. 추가 수행이나 결과 수정이 필요할 때 사용합니다.</td></tr>
+                <tr><td style={s.td}>복제</td><td style={s.td}>런 구조(이름, 라운드, 환경, TC 목록)를 복제하여 새 런을 생성합니다. 모든 결과는 NS로 초기화되며, 첨부파일과 코멘트는 복제되지 않습니다.</td></tr>
+                <tr><td style={s.td}>삭제</td><td style={s.td}>런과 모든 결과, 첨부파일을 영구 삭제합니다. 복원할 수 없으므로 주의하세요.</td></tr>
+                <tr><td style={s.td}>내보내기</td><td style={s.td}>런 결과를 Excel(.xlsx) 파일로 다운로드합니다. TC ID, 제목, 결과, 코멘트 등 전체 필드가 포함됩니다.</td></tr>
               </tbody>
             </table>
+            <h3 style={s.h3}>7-6. 타이머 기능</h3>
+            <ul style={s.ul}>
+              <li>런 결과 그리드 상단의 <strong>타이머 토글</strong>을 켜면 각 TC 행에 타이머가 표시됩니다.</li>
+              <li>TC 수행 시작 시 타이머가 자동으로 시작되고, 결과 입력 시 경과 시간이 기록됩니다.</li>
+              <li>기록된 시간은 리포트 및 내보내기에 포함됩니다.</li>
+            </ul>
             <div style={s.tipBox}>
-              <strong>TIP:</strong> 내장 타이머 기능을 활용하여 각 TC의 수행 시간을 기록할 수 있습니다. 타이머 토글은 런 화면에서 설정할 수 있습니다.
+              <strong>TIP:</strong> 타이머는 선택 사항입니다. 토글을 끄면 시간 기록 없이 결과만 입력할 수 있습니다.
             </div>
           </section>
 
@@ -438,7 +462,7 @@ export default function UserManualPage() {
               </thead>
               <tbody>
                 <tr><td style={s.td}>결과 분포 (도넛)</td><td style={s.td}>PASS/FAIL/BLOCK/N/A/미수행 비율을 도넛 차트로 시각화</td></tr>
-                <tr><td style={s.td}>라운드별 비교 (바)</td><td style={s.td}>라운드(R1, R2...)별 결과 추이를 스택 바 차트로 표시</td></tr>
+                <tr><td style={s.td}>라운드별 비교 (바)</td><td style={s.td}>테스트 런 생성 시 지정한 라운드(R1, R2, R3...)별 결과 추이를 스택 바 차트로 표시. 동일 라운드에 여러 런이 있으면 합산됨</td></tr>
                 <tr><td style={s.td}>우선순위별 분포</td><td style={s.td}>우선순위별 TC 수, PASS/FAIL/BLOCK/N/A/미수행 건수 테이블</td></tr>
                 <tr><td style={s.td}>카테고리별 분포</td><td style={s.td}>카테고리별 결과 분포 테이블</td></tr>
                 <tr><td style={s.td}>담당자별 현황</td><td style={s.td}>담당자별 할당/완료/통과율 테이블</td></tr>
@@ -469,8 +493,8 @@ export default function UserManualPage() {
             <h3 style={s.h3}>11-1. 프로젝트 정보</h3>
             <ul style={s.ul}>
               <li>프로젝트명, 설명을 수정할 수 있습니다.</li>
-              <li>Jira Base URL을 설정하여 이슈 링크를 연동할 수 있습니다.</li>
-              <li>공개/비공개 설정을 변경할 수 있습니다.</li>
+              <li><strong>Jira Base URL:</strong> Jira 서버 주소를 입력합니다 (예: <code>https://jira.example.com</code>). 설정하면 TC의 Issue Link 필드에 입력한 이슈 키(예: PROJ-123)를 클릭할 때 <code>Jira Base URL/browse/PROJ-123</code>으로 이동합니다.</li>
+              <li><strong>공개/비공개:</strong> 공개 프로젝트는 모든 로그인 사용자가 조회할 수 있습니다 (수정은 멤버만 가능). 비공개 프로젝트는 프로젝트 멤버와 생성자만 접근할 수 있습니다. 기본값은 <strong>공개</strong>입니다.</li>
             </ul>
 
             <h3 style={s.h3}>11-2. 멤버 관리</h3>
@@ -554,46 +578,64 @@ export default function UserManualPage() {
                 <tr><td style={s.td}>-</td><td style={s.td}>System Admin / QA Manager는 모든 프로젝트에 접근 가능</td></tr>
               </tbody>
             </table>
+
+            <h3 style={s.h3}>14-3. 시스템 역할과 프로젝트 역할의 관계</h3>
+            <div style={s.infoBox}>
+              <strong>이중 역할 구조:</strong> 시스템 역할(Admin/QA Manager/User)은 전역 권한을 결정하고, 프로젝트 역할(Project Admin/Project Tester)은 해당 프로젝트 내 권한을 결정합니다.
+              <ul style={{ margin: "8px 0 0 20px", lineHeight: 1.8 }}>
+                <li><strong>System Admin</strong>: 모든 프로젝트에 전체 권한. 프로젝트 역할과 무관하게 모든 기능 사용 가능</li>
+                <li><strong>QA Manager</strong>: 모든 프로젝트에 접근 가능. 프로젝트 생성 가능. 프로젝트 내에서는 관리자급 권한</li>
+                <li><strong>User + Project Admin</strong>: 해당 프로젝트에서 TC 생성/편집/삭제, 런 관리, 설정 변경 가능</li>
+                <li><strong>User + Project Tester</strong>: 해당 프로젝트에서 테스트 결과 기록, 대시보드/리포트 조회 가능. TC 생성/삭제는 불가</li>
+                <li><strong>User (멤버 아님)</strong>: 공개 프로젝트만 조회 가능. 비공개 프로젝트는 접근 불가</li>
+              </ul>
+            </div>
           </section>
 
-          {/* 15. 시트 트리 구조 (VS Code 스타일 사이드바) */}
+          {/* 15. 폴더/시트 트리 구조 (VS Code 스타일 사이드바) */}
           <section id="sheet-tree" style={s.section}>
-            <h2 style={s.h2}>15. 시트 트리 구조 (사이드바)</h2>
-            <img src="/manual-images/30_sheet_tree_tabs.png" alt="시트 사이드바 트리" style={s.img} />
-            <p style={s.p}>시트를 VS Code 스타일의 왼쪽 사이드바에서 폴더/파일 트리처럼 관리할 수 있습니다. 폴더 아이콘과 들여쓰기로 계층 구조를 직관적으로 파악할 수 있습니다.</p>
+            <h2 style={s.h2}>15. 폴더 / 시트 트리 구조</h2>
+            <img src="/manual-images/30_sheet_tree_tabs.png" alt="폴더/시트 트리 사이드바" style={s.img} />
+            <p style={s.p}>TC를 <strong>폴더</strong>(📁)와 <strong>시트</strong>(📄)로 계층화하여 관리합니다. VS Code 스타일의 왼쪽 사이드바에서 트리 형태로 표시됩니다.</p>
 
-            <h3 style={s.h3}>15-1. 사이드바 구조</h3>
+            <h3 style={s.h3}>15-1. 폴더와 시트의 차이</h3>
+            <table style={s.table}>
+              <thead>
+                <tr><th style={s.th}>구분</th><th style={s.th}>아이콘</th><th style={s.th}>역할</th><th style={s.th}>TC 저장</th><th style={s.th}>하위 항목</th></tr>
+              </thead>
+              <tbody>
+                <tr><td style={s.td}>폴더</td><td style={s.td}>📁 / 📂</td><td style={s.td}>시트를 그룹화하는 컨테이너</td><td style={s.td}>불가</td><td style={s.td}>하위 폴더, 시트 추가 가능</td></tr>
+                <tr><td style={s.td}>시트</td><td style={s.td}>📄</td><td style={s.td}>TC가 실제 저장되는 단위</td><td style={s.td}>가능</td><td style={s.td}>하위 항목 추가 불가</td></tr>
+              </tbody>
+            </table>
+
+            <h3 style={s.h3}>15-2. 사이드바 구조</h3>
             <ul style={s.ul}>
-              <li>화면 왼쪽에 사이드바가 표시되며, 시트가 트리 형태로 나열됩니다.</li>
-              <li>폴더 시트는 <strong>📁</strong>(접힌 상태) / <strong>📂</strong>(펼친 상태) 아이콘, 리프 시트는 <strong>📄</strong> 아이콘으로 표시됩니다.</li>
-              <li>하위 시트는 들여쓰기로 깊이(depth)를 시각적으로 구분합니다.</li>
-              <li>각 시트 옆에 인라인 <strong>+</strong>(하위 시트 추가) / <strong>×</strong>(시트 삭제) 버튼이 표시됩니다.</li>
+              <li>화면 왼쪽에 사이드바가 표시되며, 폴더와 시트가 트리 형태로 나열됩니다.</li>
+              <li>폴더는 <strong>📁</strong>(접힌 상태) / <strong>📂</strong>(펼친 상태) 아이콘으로 표시됩니다.</li>
+              <li>시트는 <strong>📄</strong> 아이콘으로 표시되며, 옆에 TC 수가 표시됩니다.</li>
+              <li>하위 항목은 들여쓰기로 깊이(depth)를 시각적으로 구분합니다.</li>
+              <li>사이드바 상단의 <strong>◀/▶</strong> 토글 버튼으로 사이드바를 접거나 펼칠 수 있습니다.</li>
             </ul>
 
-            <h3 style={s.h3}>15-2. 사이드바 접기/펼치기</h3>
+            <h3 style={s.h3}>15-3. 폴더/시트 추가</h3>
+            <img src="/manual-images/31_sheet_tree_add_child.png" alt="폴더/시트 추가" style={s.img} />
             <ul style={s.ul}>
-              <li>사이드바 상단의 <strong>◀</strong> / <strong>▶</strong> 토글 버튼으로 사이드바를 접거나 펼칠 수 있습니다.</li>
-              <li>사이드바를 접으면 그리드 영역이 전체 너비로 확장됩니다.</li>
-              <li>접힌 상태에서 <strong>▶</strong> 버튼을 클릭하면 다시 펼쳐집니다.</li>
+              <li><strong>루트에 추가:</strong> 사이드바 상단의 <strong>📁+</strong>(폴더 추가) 또는 <strong>📄+</strong>(시트 추가) 버튼을 클릭합니다.</li>
+              <li><strong>폴더 안에 추가:</strong> 폴더 노드의 <strong>📁+</strong>(하위 폴더) 또는 <strong>📄+</strong>(하위 시트) 버튼을 클릭합니다.</li>
+              <li>시트(📄) 노드에는 하위 항목을 추가할 수 없습니다.</li>
+              <li>입력 폼에 추가 유형(📁 폴더 / 📄 시트)이 표시되며, 이름을 입력 후 Enter 또는 "추가" 버튼을 클릭합니다.</li>
             </ul>
 
-            <h3 style={s.h3}>15-3. 하위 시트 생성</h3>
-            <img src="/manual-images/31_sheet_tree_add_child.png" alt="하위 시트 추가" style={s.img} />
+            <h3 style={s.h3}>15-4. 삭제 (CASCADE)</h3>
             <ul style={s.ul}>
-              <li>사이드바에서 부모 시트의 인라인 <strong>+</strong> 버튼을 클릭하면 하위 시트를 생성할 수 있습니다.</li>
-              <li>루트 시트를 추가하려면 사이드바 상단의 <strong>+</strong> 버튼을 클릭합니다.</li>
-              <li>하위 시트 생성 시 부모 시트명이 입력 필드 앞에 표시됩니다.</li>
-            </ul>
-
-            <h3 style={s.h3}>15-4. 시트 삭제 (CASCADE)</h3>
-            <ul style={s.ul}>
-              <li>부모 시트를 삭제하면 <strong>모든 하위 시트와 TC가 함께 삭제</strong>됩니다.</li>
-              <li>삭제 확인 메시지에 하위 시트 수가 표시됩니다.</li>
-              <li>시트의 인라인 <strong>×</strong> 버튼으로 삭제합니다.</li>
+              <li>폴더를 삭제하면 <strong>모든 하위 폴더, 시트, TC가 함께 삭제</strong>됩니다.</li>
+              <li>삭제 확인 메시지에 하위 항목 수가 표시됩니다.</li>
+              <li>폴더/시트의 인라인 <strong>×</strong> 버튼으로 삭제합니다.</li>
             </ul>
 
             <div style={s.infoBox}>
-              <strong>기존 호환:</strong> 하위 시트를 만들지 않으면 기존과 동일하게 1단계 시트로 사용됩니다.
+              <strong>기존 호환:</strong> 폴더를 사용하지 않으면 기존과 동일하게 시트만으로 TC를 관리할 수 있습니다.
             </div>
           </section>
 
@@ -609,12 +651,12 @@ export default function UserManualPage() {
                 <tr><th style={s.th}>타입</th><th style={s.th}>설명</th><th style={s.th}>예시</th></tr>
               </thead>
               <tbody>
-                <tr><td style={s.td}>text</td><td style={s.td}>자유 텍스트 입력</td><td style={s.td}>메모, 참고사항</td></tr>
-                <tr><td style={s.td}>number</td><td style={s.td}>숫자 입력</td><td style={s.td}>예상 시간(분), 점수</td></tr>
-                <tr><td style={s.td}>select</td><td style={s.td}>단일 선택 (드롭다운)</td><td style={s.td}>환경: Dev/QA/Prod</td></tr>
-                <tr><td style={s.td}>multiselect</td><td style={s.td}>복수 선택</td><td style={s.td}>태그: Smoke, Regression</td></tr>
-                <tr><td style={s.td}>checkbox</td><td style={s.td}>체크박스 (참/거짓)</td><td style={s.td}>자동화 여부</td></tr>
-                <tr><td style={s.td}>date</td><td style={s.td}>날짜 입력</td><td style={s.td}>마감일</td></tr>
+                <tr><td style={s.td}>text</td><td style={s.td}>자유 텍스트 입력. 셀 더블클릭으로 편집</td><td style={s.td}>메모, 참고사항</td></tr>
+                <tr><td style={s.td}>number</td><td style={s.td}>숫자만 입력 가능. 문자 입력 시 무시됨</td><td style={s.td}>예상 시간(분), 점수</td></tr>
+                <tr><td style={s.td}>select</td><td style={s.td}>단일 선택 드롭다운. 설정에서 정의한 옵션 중 하나를 선택</td><td style={s.td}>환경: Dev/QA/Prod</td></tr>
+                <tr><td style={s.td}>multiselect</td><td style={s.td}>복수 선택 드롭다운. 여러 옵션을 체크하여 선택 가능</td><td style={s.td}>태그: Smoke, Regression</td></tr>
+                <tr><td style={s.td}>checkbox</td><td style={s.td}>체크박스 토글. 클릭으로 참/거짓 전환</td><td style={s.td}>자동화 여부</td></tr>
+                <tr><td style={s.td}>date</td><td style={s.td}>날짜 선택기(캘린더 팝업)로 날짜 입력</td><td style={s.td}>마감일</td></tr>
               </tbody>
             </table>
 
@@ -696,7 +738,7 @@ export default function UserManualPage() {
             <ul style={s.ul}>
               <li>UTF-8, UTF-8 BOM, CP949(EUC-KR) 인코딩을 자동 감지합니다.</li>
               <li>한글 헤더(<code>대분류</code>, <code>우선순위</code>, <code>테스트 절차</code> 등)도 자동 매핑됩니다.</li>
-              <li>동일 TC ID가 이미 존재하면 덮어쓰기됩니다.</li>
+              <li><strong>덮어쓰기 정책:</strong> Import 파일의 TC ID가 기존 TC와 동일하면 해당 TC의 모든 필드가 파일 내용으로 갱신됩니다. TC ID가 없는 행은 신규 TC로 추가됩니다.</li>
             </ul>
 
             <div style={s.tipBox}>
@@ -726,7 +768,7 @@ export default function UserManualPage() {
                 <tr><td style={s.td}>필드</td><td style={s.td}>TC ID, Type, Category, Priority, Assignee 등 선택</td></tr>
                 <tr><td style={s.td}>연산자</td><td style={s.td}>포함, 미포함, 일치, 불일치, 비어있음, 비어있지 않음</td></tr>
                 <tr><td style={s.td}>값</td><td style={s.td}>필터링할 값 입력 (비어있음/비어있지 않음은 값 불필요)</td></tr>
-                <tr><td style={s.td}>논리</td><td style={s.td}><strong>AND</strong> (모두 일치) 또는 <strong>OR</strong> (하나라도 일치)</td></tr>
+                <tr><td style={s.td}>논리</td><td style={s.td}><strong>AND</strong> (모두 일치) 또는 <strong>OR</strong> (하나라도 일치). 전체 조건에 하나의 논리 연산자가 적용됨 (예: 조건 3개 + AND → 3개 모두 만족하는 TC만 표시)</td></tr>
               </tbody>
             </table>
 
@@ -755,7 +797,7 @@ export default function UserManualPage() {
           )}
 
           <div style={s.footer}>
-            <p>YM TestCase v0.3.0.0 | 사용자 매뉴얼</p>
+            <p>YM TestCase v0.7.1 | 사용자 매뉴얼</p>
           </div>
         </main>
       </div>

@@ -86,11 +86,11 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
 
   // 트리를 flat 리스트로 펼치기 (시트 순서, tc_count 합산 등에 사용)
   const flatSheets = useMemo(() => {
-    const result: { name: string; tc_count: number; id: number; depth: number; parent_id: number | null; hasChildren: boolean }[] = [];
+    const result: { name: string; tc_count: number; id: number; depth: number; parent_id: number | null; hasChildren: boolean; is_folder: boolean }[] = [];
     const walk = (nodes: SheetNode[], depth: number) => {
       for (const n of nodes) {
         const kids = n.children || [];
-        result.push({ name: n.name, tc_count: n.tc_count, id: n.id, depth, parent_id: n.parent_id, hasChildren: kids.length > 0 });
+        result.push({ name: n.name, tc_count: n.tc_count, id: n.id, depth, parent_id: n.parent_id, hasChildren: kids.length > 0, is_folder: n.is_folder });
         if (kids.length > 0) walk(kids, depth + 1);
       }
     };
@@ -746,28 +746,31 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
   const [importLoading, setImportLoading] = useState(false);
 
-  // ── 시트 추가 ──
+  // ── 시트/폴더 추가 ──
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [newSheetName, setNewSheetName] = useState("");
   const [addSheetParentId, setAddSheetParentId] = useState<number | null>(null);
+  const [addingFolder, setAddingFolder] = useState(false);
 
   const handleAddSheet = async () => {
     const name = newSheetName.trim();
-    if (!name) { toast.error("시트 이름을 입력해 주세요."); return; }
+    const label = addingFolder ? "폴더" : "시트";
+    if (!name) { toast.error(`${label} 이름을 입력해 주세요.`); return; }
     try {
-      await testCasesApi.createSheet(projectId, name, addSheetParentId);
+      await testCasesApi.createSheet(projectId, name, addSheetParentId, addingFolder);
       setShowAddSheet(false);
       setNewSheetName("");
       setAddSheetParentId(null);
-      setActiveSheet(name);
+      setAddingFolder(false);
+      if (!addingFolder) setActiveSheet(name);
       // 부모가 있으면 자동 펼침
       if (addSheetParentId) {
         setExpandedSheets(prev => new Set([...prev, addSheetParentId!]));
       }
       loadSheets();
-      toast.success(`"${name}" 시트가 추가되었습니다.`);
+      toast.success(`"${name}" ${label}가 추가되었습니다.`);
     } catch (err) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "시트 추가에 실패했습니다.";
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || `${label} 추가에 실패했습니다.`;
       toast.error(msg);
     }
   };
@@ -934,14 +937,14 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "calc(100vh - 220px)", gap: 20 }}>
           <div style={{ fontSize: 48, opacity: 0.3 }}>📋</div>
           <div style={{ fontSize: 16, color: "var(--text-secondary)", textAlign: "center", lineHeight: 1.8 }}>
-            시트를 추가하여 테스트 케이스를 관리하세요.
+            폴더나 시트를 추가하여 테스트 케이스를 관리하세요.
           </div>
           {canEditTC && (
             showAddSheet ? (
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <input
                   style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-input)", fontSize: 14, outline: "none", width: 200, backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }}
-                  placeholder="시트 이름"
+                  placeholder={addingFolder ? "폴더 이름" : "시트 이름"}
                   value={newSheetName}
                   onChange={(e) => setNewSheetName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddSheet()}
@@ -950,13 +953,16 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 <button style={{ padding: "8px 18px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={handleAddSheet}>
                   추가
                 </button>
-                <button style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-input)", backgroundColor: "transparent", color: "var(--text-secondary)", fontSize: 14, cursor: "pointer" }} onClick={() => { setShowAddSheet(false); setNewSheetName(""); }}>
+                <button style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-input)", backgroundColor: "transparent", color: "var(--text-secondary)", fontSize: 14, cursor: "pointer" }} onClick={() => { setShowAddSheet(false); setNewSheetName(""); setAddingFolder(false); }}>
                   취소
                 </button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8 }}>
-                <button style={{ padding: "10px 24px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={() => setShowAddSheet(true)}>
+                <button style={{ padding: "10px 24px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={() => { setAddingFolder(true); setShowAddSheet(true); }}>
+                  + 폴더 추가
+                </button>
+                <button style={{ padding: "10px 24px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: 0.85 }} onClick={() => { setAddingFolder(false); setShowAddSheet(true); }}>
                   + 시트 추가
                 </button>
                 <button style={{ padding: "10px 24px", borderRadius: 8, border: "1px solid var(--border-input)", backgroundColor: "transparent", color: "var(--text-primary)", fontSize: 14, cursor: "pointer" }} onClick={() => emptyFileInputRef.current?.click()}>
@@ -1030,14 +1036,26 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               gap: 4,
               userSelect: "none",
             }}
-            onClick={() => setActiveSheet(node.name)}
+            onClick={() => {
+              if (node.is_folder) {
+                // 폴더: 펼침/접기 토글
+                setExpandedSheets(prev => {
+                  const next = new Set(prev);
+                  next.has(node.id) ? next.delete(node.id) : next.add(node.id);
+                  return next;
+                });
+              } else {
+                // 시트: TC 표시
+                setActiveSheet(node.name);
+              }
+            }}
             onContextMenu={(e) => {
               e.preventDefault();
               // 컨텍스트 메뉴 대신 인라인으로
             }}
           >
             {/* 펼침/접기 */}
-            {hasChildren ? (
+            {(node.is_folder || hasChildren) ? (
               <span
                 style={{ fontSize: 10, width: 16, textAlign: "center", flexShrink: 0, color: "var(--text-secondary)" }}
                 onClick={(e) => {
@@ -1055,48 +1073,68 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               <span style={{ width: 16, flexShrink: 0 }} />
             )}
             {/* 아이콘 */}
-            <span style={{ fontSize: 14, flexShrink: 0 }}>{hasChildren ? (isExpanded ? "📂" : "📁") : "📄"}</span>
+            <span style={{ fontSize: 14, flexShrink: 0 }}>{node.is_folder ? (isExpanded ? "📂" : "📁") : "📄"}</span>
             {/* 이름 */}
             <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {node.name}
             </span>
-            {/* TC 수 */}
-            <span style={{ fontSize: 10, color: "var(--text-secondary)", flexShrink: 0 }}>
-              {node.tc_count}
-            </span>
-            {/* 액션 버튼 (hover로 보이게 할 수 있지만 일단 항상 표시) */}
+            {/* TC 수 (시트만) */}
+            {!node.is_folder && (
+              <span style={{ fontSize: 10, color: "var(--text-secondary)", flexShrink: 0 }}>
+                {node.tc_count}
+              </span>
+            )}
+            {/* 액션 버튼 */}
             {canEditTC && (
               <span style={{ display: "flex", gap: 2, marginLeft: 4, flexShrink: 0 }}>
+                {/* 폴더: 하위 폴더/시트 추가 가능 */}
+                {node.is_folder && (
+                  <>
+                    <span
+                      title="하위 폴더 추가"
+                      style={{ cursor: "pointer", fontSize: 10, opacity: 0.4, padding: "0 1px" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAddSheetParentId(node.id);
+                        setAddingFolder(true);
+                        setShowAddSheet(true);
+                        setNewSheetName("");
+                      }}
+                    >📁+</span>
+                    <span
+                      title="하위 시트 추가"
+                      style={{ cursor: "pointer", fontSize: 10, opacity: 0.4, padding: "0 1px" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAddSheetParentId(node.id);
+                        setAddingFolder(false);
+                        setShowAddSheet(true);
+                        setNewSheetName("");
+                      }}
+                    >📄+</span>
+                  </>
+                )}
                 <span
-                  title="하위 시트 추가"
+                  title={node.is_folder ? "폴더 삭제" : "시트 삭제"}
                   style={{ cursor: "pointer", fontSize: 12, opacity: 0.4, padding: "0 2px" }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setAddSheetParentId(node.id);
-                    setShowAddSheet(true);
-                    setNewSheetName("");
-                  }}
-                >+</span>
-                <span
-                  title="시트 삭제"
-                  style={{ cursor: "pointer", fontSize: 12, opacity: 0.4, padding: "0 2px" }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const childInfo = hasChildren ? ` (하위 ${(node.children || []).length}개 시트 포함)` : "";
-                    if (!confirm(`"${node.name}" 시트를 삭제하시겠습니까?${childInfo}`)) return;
+                    const label = node.is_folder ? "폴더" : "시트";
+                    const childInfo = hasChildren ? ` (하위 ${(node.children || []).length}개 항목 포함)` : "";
+                    if (!confirm(`"${node.name}" ${label}를 삭제하시겠습니까?${childInfo}`)) return;
                     testCasesApi.deleteSheet(projectId, node.name).then(() => {
-                      toast.success(`${node.name} 시트 삭제됨`);
+                      toast.success(`${node.name} ${label} 삭제됨`);
                       if (activeSheet === node.name) setActiveSheet(null);
                       loadSheets();
                       loadData();
-                    }).catch(() => toast.error("시트 삭제 실패"));
+                    }).catch(() => toast.error(`${label} 삭제 실패`));
                   }}
                 >×</span>
               </span>
             )}
           </div>
           {/* 하위 노드 */}
-          {hasChildren && isExpanded && (node.children || []).map(child => renderNode(child, depth + 1))}
+          {(node.is_folder || hasChildren) && isExpanded && (node.children || []).map(child => renderNode(child, depth + 1))}
         </div>
       );
     };
@@ -1133,11 +1171,18 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             onClick={() => setSidebarOpen(!sidebarOpen)}
           >{sidebarOpen ? "◀" : "▶"}</span>
           {canEditTC && sidebarOpen && (
-            <span
-              style={{ cursor: "pointer", fontSize: 14, opacity: 0.6, padding: "0 4px" }}
-              title="루트 시트 추가"
-              onClick={() => { setAddSheetParentId(null); setShowAddSheet(true); setNewSheetName(""); }}
-            >+</span>
+            <span style={{ display: "flex", gap: 2 }}>
+              <span
+                style={{ cursor: "pointer", fontSize: 12, opacity: 0.6, padding: "0 3px" }}
+                title="폴더 추가"
+                onClick={() => { setAddSheetParentId(null); setAddingFolder(true); setShowAddSheet(true); setNewSheetName(""); }}
+              >📁+</span>
+              <span
+                style={{ cursor: "pointer", fontSize: 12, opacity: 0.6, padding: "0 3px" }}
+                title="시트 추가"
+                onClick={() => { setAddSheetParentId(null); setAddingFolder(false); setShowAddSheet(true); setNewSheetName(""); }}
+              >📄+</span>
+            </span>
           )}
         </div>
 
@@ -1150,13 +1195,16 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 {flatSheets.find(s => s.id === addSheetParentId)?.name} 하위
               </div>
             )}
+            <div style={{ fontSize: 10, color: "var(--accent)", marginBottom: 2, fontWeight: 600 }}>
+              {addingFolder ? "📁 폴더" : "📄 시트"} 추가
+            </div>
             <div style={{ display: "flex", gap: 4 }}>
               <input
                 style={{ flex: 1, padding: "4px 6px", fontSize: 12, borderRadius: 4, border: "1px solid var(--border-input)", backgroundColor: "var(--bg-input)", color: "var(--text-primary)", outline: "none" }}
-                placeholder="시트 이름"
+                placeholder={addingFolder ? "폴더 이름" : "시트 이름"}
                 value={newSheetName}
                 onChange={(e) => setNewSheetName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleAddSheet(); if (e.key === "Escape") { setShowAddSheet(false); setNewSheetName(""); setAddSheetParentId(null); } }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleAddSheet(); if (e.key === "Escape") { setShowAddSheet(false); setNewSheetName(""); setAddSheetParentId(null); setAddingFolder(false); } }}
                 autoFocus
               />
               <button

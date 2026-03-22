@@ -166,10 +166,10 @@ export const testCasesApi = {
     return res.data;
   },
 
-  createSheet: async (projectId: number, name: string, parentId?: number | null) => {
+  createSheet: async (projectId: number, name: string, parentId?: number | null, isFolder: boolean = false) => {
     const res = await client.post<SheetNode>(
       `/api/projects/${projectId}/testcases/sheets`,
-      { name, parent_id: parentId ?? null }
+      { name, parent_id: parentId ?? null, is_folder: isFolder }
     );
     return res.data;
   },

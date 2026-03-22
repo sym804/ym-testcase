@@ -134,6 +134,7 @@ export interface SheetNode {
   name: string;
   parent_id: number | null;
   sort_order: number;
+  is_folder: boolean;
   tc_count: number;
   children: SheetNode[];
 }

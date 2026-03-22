@@ -88,6 +88,7 @@ class TestCaseSheet(Base):
     name = Column(String(100), nullable=False)
     sort_order = Column(Integer, default=0, nullable=False)
     parent_id = Column(Integer, ForeignKey("test_case_sheets.id", ondelete="CASCADE"), nullable=True)
+    is_folder = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=now_kst)
 
     project = relationship("Project")
