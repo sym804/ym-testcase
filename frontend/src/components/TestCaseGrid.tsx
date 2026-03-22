@@ -2014,6 +2014,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
+    padding: "0 12px",
     flexWrap: "wrap",
     gap: 8,
   },
