@@ -1150,7 +1150,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         backgroundColor: "var(--bg-card)",
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 160px)",
+        height: "100%",
         overflow: "hidden",
         transition: "width 0.15s, min-width 0.15s",
       }}>
@@ -1253,12 +1253,12 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   };
 
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", height: "calc(100vh - 160px)" }}>
       {/* 왼쪽: 시트 트리 사이드바 */}
       {renderSheetTree()}
 
       {/* 오른쪽: 툴바 + 그리드 */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Toolbar */}
       <div style={styles.toolbar}>
         <div style={styles.toolbarLeft}>
@@ -1355,12 +1355,21 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         <div style={styles.toolbarRight}>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <input
-              style={styles.searchInput}
+              style={{ ...styles.searchInput, width: replaceOpen ? 120 : undefined }}
               type="text"
               placeholder="검색..."
               value={searchText}
               onChange={onSearchChange}
             />
+            {canEditTC && replaceOpen && (
+              <input
+                style={{ ...styles.searchInput, width: 120 }}
+                type="text"
+                placeholder="바꿀 내용..."
+                value={replaceText}
+                onChange={(e) => setReplaceText(e.target.value)}
+              />
+            )}
             <button
               style={{
                 ...styles.btnGhost,
@@ -1373,6 +1382,15 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             >
               바꾸기
             </button>
+            {canEditTC && replaceOpen && (
+              <button
+                style={{ ...styles.btnPrimary, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}
+                onClick={handleReplaceAll}
+                disabled={!searchText}
+              >
+                모두 바꾸기
+              </button>
+            )}
           </div>
           <button
             style={{
@@ -1389,28 +1407,6 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           </button>
         </div>
       </div>
-
-      {/* ── 바꾸기 바 ── */}
-      {canEditTC && replaceOpen && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--border-color)" }}>
-          <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>바꿀 내용:</span>
-          <input
-            style={{ ...styles.searchInput, width: 200 }}
-            type="text"
-            placeholder="바꿀 내용..."
-            value={replaceText}
-            onChange={(e) => setReplaceText(e.target.value)}
-            autoFocus
-          />
-          <button
-            style={{ ...styles.btnPrimary, fontSize: 12, padding: "5px 14px", whiteSpace: "nowrap" }}
-            onClick={handleReplaceAll}
-            disabled={!searchText}
-          >
-            모두 바꾸기
-          </button>
-        </div>
-      )}
 
       {/* ── 고급 필터 패널 ── */}
       {showFilterPanel && (
@@ -1566,7 +1562,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       {/* Grid */}
       <div
         className="ag-theme-alpine"
-        style={{ height: "calc(100vh - 220px)", width: "100%" }}
+        style={{ flex: 1, width: "100%" }}
       >
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>
@@ -2021,6 +2017,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
+    padding: "0 12px",
     flexWrap: "wrap",
     gap: 8,
   },
