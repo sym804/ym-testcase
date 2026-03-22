@@ -1150,7 +1150,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         backgroundColor: "var(--bg-card)",
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 160px)",
+        height: "100%",
         overflow: "hidden",
         transition: "width 0.15s, min-width 0.15s",
       }}>
@@ -1253,12 +1253,12 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   };
 
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", height: "calc(100vh - 160px)", overflow: "hidden" }}>
       {/* 왼쪽: 시트 트리 사이드바 */}
       {renderSheetTree()}
 
       {/* 오른쪽: 툴바 + 그리드 */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Toolbar */}
       <div style={styles.toolbar}>
         <div style={styles.toolbarLeft}>
@@ -1562,7 +1562,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       {/* Grid */}
       <div
         className="ag-theme-alpine"
-        style={{ height: "calc(100vh - 220px)", width: "100%" }}
+        style={{ flex: 1, minHeight: 0, width: "100%" }}
       >
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>
