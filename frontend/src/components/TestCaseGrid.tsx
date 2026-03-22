@@ -1374,24 +1374,6 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               바꾸기
             </button>
           </div>
-          {canEditTC && replaceOpen && (
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <input
-                style={{ ...styles.searchInput, width: 140 }}
-                type="text"
-                placeholder="바꿀 내용..."
-                value={replaceText}
-                onChange={(e) => setReplaceText(e.target.value)}
-              />
-              <button
-                style={{ ...styles.btnPrimary, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}
-                onClick={handleReplaceAll}
-                disabled={!searchText}
-              >
-                모두 바꾸기
-              </button>
-            </div>
-          )}
           <button
             style={{
               ...styles.btnGhost,
@@ -1407,6 +1389,28 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           </button>
         </div>
       </div>
+
+      {/* ── 바꾸기 바 ── */}
+      {canEditTC && replaceOpen && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--border-color)" }}>
+          <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>바꿀 내용:</span>
+          <input
+            style={{ ...styles.searchInput, width: 200 }}
+            type="text"
+            placeholder="바꿀 내용..."
+            value={replaceText}
+            onChange={(e) => setReplaceText(e.target.value)}
+            autoFocus
+          />
+          <button
+            style={{ ...styles.btnPrimary, fontSize: 12, padding: "5px 14px", whiteSpace: "nowrap" }}
+            onClick={handleReplaceAll}
+            disabled={!searchText}
+          >
+            모두 바꾸기
+          </button>
+        </div>
+      )}
 
       {/* ── 고급 필터 패널 ── */}
       {showFilterPanel && (
