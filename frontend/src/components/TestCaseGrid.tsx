@@ -1572,7 +1572,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
             localeText={AG_GRID_LOCALE_KO}
-            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true }}
+            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, selectAll: "filtered" }}
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
             onCellKeyDown={onCellKeyDown}
