@@ -9,7 +9,12 @@ TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트
 - **테스트 런 · 플랜 · 대시보드** — 실행부터 결과 집계, PDF 리포트까지
 - **역할 기반 접근 제어 + 커스텀 필드** — 팀 규모와 프로세스에 맞게 구성
 
-![대시보드](docs/screenshots/dashboard.png)
+| ![TC 관리](docs/screenshots/tc_grid.png) | ![대시보드](docs/screenshots/dashboard.png) |
+|---|---|
+| **TC 관리** — 스프레드시트 스타일 편집 | **대시보드** — 프로젝트 통계 한눈에 |
+
+![프로젝트 목록](docs/screenshots/project_list.png)
+> **프로젝트 목록** — 전체 프로젝트 현황 및 진행률
 
 ## 왜 이 도구인가
 
