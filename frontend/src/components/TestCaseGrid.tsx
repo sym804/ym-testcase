@@ -175,75 +175,18 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     applyUndoRedo(group, "redo");
   }, [applyUndoRedo]);
 
-  // ── 찾기/바꾸기 (구글 시트 스타일) ──
+  // ── 찾기/바꾸기 ──
+  const [replaceOpen, setReplaceOpen] = useState(false);
   const [replaceText, setReplaceText] = useState("");
-  const replaceFields = useMemo(() => ["tc_id", "type", "category", "depth1", "depth2", "precondition", "test_steps", "expected_result", "remarks", "assignee", "issue_link"], []);
-  const [matchIndex, setMatchIndex] = useState(0);
 
-  // 매치 목록 수집
-  const findMatches = useCallback(() => {
-    const api = gridApiRef.current;
-    if (!api || !searchText) return [];
-    const re = new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-    const matches: { rowIndex: number; field: string }[] = [];
-    api.forEachNodeAfterFilterAndSort((node, idx) => {
-      if (!node.data) return;
-      for (const field of replaceFields) {
-        const val = node.data[field];
-        re.lastIndex = 0;
-        if (typeof val === "string" && re.test(val)) {
-          matches.push({ rowIndex: idx, field });
-        }
-      }
-    });
-    return matches;
-  }, [searchText, replaceFields]);
-
-  useEffect(() => { setMatchIndex(0); }, [searchText]);
-
-  // 바꾸기: 현재 매치 1건 치환 → 다음으로
-  const handleReplaceOne = useCallback(() => {
-    if (!searchText) return;
-    const api = gridApiRef.current;
-    if (!api) return;
-    const matches = findMatches();
-    if (matches.length === 0) { toast("일치하는 항목이 없습니다."); return; }
-
-    const m = matches[matchIndex % matches.length];
-    const node = api.getDisplayedRowAtIndex(m.rowIndex);
-    if (!node?.data) return;
-
-    const re = new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-    const val = node.data[m.field];
-    if (typeof val !== "string") return;
-    const newVal = val.replace(re, replaceText);
-    if (newVal === val) { setMatchIndex((matchIndex + 1) % matches.length); return; }
-
-    const rowId = node.data.id ? String(node.data.id) : `new_${node.data.no}`;
-    pushUndo([{ rowId, field: m.field, oldValue: val, newValue: newVal, dataId: node.data.id || 0 }]);
-    node.data[m.field] = newVal;
-    api.refreshCells({ rowNodes: [node], columns: [m.field], force: true });
-    autoSaveRowRef.current(node.data);
-    toast.success("1건 치환");
-
-    const next = findMatches();
-    const nextIdx = next.length > 0 ? matchIndex % next.length : 0;
-    setMatchIndex(nextIdx);
-    if (next.length > 0) {
-      const nm = next[nextIdx];
-      api.ensureIndexVisible(nm.rowIndex, "middle");
-      api.flashCells({ rowNodes: [api.getDisplayedRowAtIndex(nm.rowIndex)!].filter(Boolean), columns: [nm.field], flashDuration: 500, fadeDuration: 500 });
-    }
-  }, [searchText, replaceText, matchIndex, findMatches, pushUndo]);
-
-  // 모두 바꾸기: 전체 치환
-  const handleReplaceAll = useCallback(() => {
+  const handleReplaceAll = () => {
     if (!searchText) return;
     const api = gridApiRef.current;
     if (!api) return;
 
-    const re = new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    const textFields = ["tc_id", "type", "category", "depth1", "depth2", "precondition", "test_steps", "expected_result", "remarks", "assignee", "issue_link"];
     let count = 0;
+    const re = new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
     const undoGroup: UndoGroup = [];
     const changedRows: TestCase[] = [];
 
@@ -251,17 +194,14 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       if (!node.data) return;
       const rowId = node.data.id ? String(node.data.id) : `new_${node.data.no}`;
       let changed = false;
-      for (const field of replaceFields) {
+      for (const field of textFields) {
         const val = node.data[field];
-        if (typeof val === "string" && val.match(re)) {
-          re.lastIndex = 0;
+        if (typeof val === "string" && re.test(val)) {
           const newVal = val.replace(re, replaceText);
-          if (newVal !== val) {
-            undoGroup.push({ rowId, field, oldValue: val, newValue: newVal, dataId: node.data.id || 0 });
-            node.data[field] = newVal;
-            count++;
-            changed = true;
-          }
+          undoGroup.push({ rowId, field, oldValue: val, newValue: newVal, dataId: node.data.id || 0 });
+          node.data[field] = newVal;
+          count++;
+          changed = true;
         }
         re.lastIndex = 0;
       }
@@ -271,13 +211,12 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     if (count > 0) {
       pushUndo(undoGroup);
       api.refreshCells({ force: true });
-      changedRows.forEach((r) => autoSaveRowRef.current(r));
+      changedRows.forEach((r) => autoSaveRow(r));
       toast.success(`${count}건 치환 완료`);
-      setMatchIndex(0);
     } else {
       toast("일치하는 항목이 없습니다.");
     }
-  }, [searchText, replaceText, replaceFields, pushUndo]);
+  };
 
   // ── 일괄 변경 ──
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -1208,7 +1147,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         backgroundColor: "var(--bg-card)",
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 160px)",
+        height: "100%",
         overflow: "hidden",
         transition: "width 0.15s, min-width 0.15s",
       }}>
@@ -1311,12 +1250,12 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   };
 
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", height: "calc(100vh - 160px)" }}>
       {/* 왼쪽: 시트 트리 사이드바 */}
       {renderSheetTree()}
 
       {/* 오른쪽: 툴바 + 그리드 */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Toolbar */}
       <div style={styles.toolbar}>
         <div style={styles.toolbarLeft}>
@@ -1413,36 +1352,43 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         <div style={styles.toolbarRight}>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <input
-              style={{ ...styles.searchInput, width: 120 }}
+              style={styles.searchInput}
               type="text"
               placeholder="검색..."
               value={searchText}
               onChange={onSearchChange}
             />
-            <input
-              style={{ ...styles.searchInput, width: 120 }}
-              type="text"
-              placeholder="바꿀 내용..."
-              value={replaceText}
-              onChange={(e) => setReplaceText(e.target.value)}
-            />
             <button
-              style={{ ...styles.btnGhost, fontSize: 11, padding: "4px 8px" }}
-              onClick={handleReplaceOne}
-              disabled={!searchText}
-              title="현재 매치 1건 바꾸기"
+              style={{
+                ...styles.btnGhost,
+                fontSize: 11,
+                padding: "4px 8px",
+                opacity: replaceOpen ? 1 : 0.6,
+              }}
+              onClick={() => setReplaceOpen(!replaceOpen)}
+              title="찾기/바꾸기"
             >
               바꾸기
             </button>
-            <button
-              style={{ ...styles.btnPrimary, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}
-              onClick={handleReplaceAll}
-              disabled={!searchText}
-              title="전체 바꾸기"
-            >
-              모두 바꾸기
-            </button>
           </div>
+          {canEditTC && replaceOpen && (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <input
+                style={{ ...styles.searchInput, width: 140 }}
+                type="text"
+                placeholder="바꿀 내용..."
+                value={replaceText}
+                onChange={(e) => setReplaceText(e.target.value)}
+              />
+              <button
+                style={{ ...styles.btnPrimary, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}
+                onClick={handleReplaceAll}
+                disabled={!searchText}
+              >
+                모두 바꾸기
+              </button>
+            </div>
+          )}
           <button
             style={{
               ...styles.btnGhost,
@@ -1613,7 +1559,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       {/* Grid */}
       <div
         className="ag-theme-alpine"
-        style={{ height: "calc(100vh - 220px)", width: "100%" }}
+        style={{ flex: 1, width: "100%" }}
       >
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>
@@ -2068,6 +2014,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
+    padding: "0 12px",
     flexWrap: "wrap",
     gap: 8,
   },
