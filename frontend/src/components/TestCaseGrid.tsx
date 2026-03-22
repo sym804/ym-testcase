@@ -1250,7 +1250,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   };
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 160px)", borderRadius: 8, overflow: "hidden", border: "1px solid var(--border-color)" }}>
+    <div style={{ display: "flex", height: "calc(100vh - 160px)" }}>
       {/* 왼쪽: 시트 트리 사이드바 */}
       {renderSheetTree()}
 
