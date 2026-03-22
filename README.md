@@ -2,14 +2,74 @@
 
 > **Y**our **M**ethod, Your Test Case Manager
 
-경량 테스트 케이스 관리 도구. TestRail/Kiwi TCMS 대안으로 설계된 셀프 호스팅 웹 애플리케이션.
+셀프 호스팅형 테스트케이스 관리 도구.
+TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트**를 한 곳에서 관리합니다.
+
+- **스프레드시트 스타일 TC 편집** — 익숙한 그리드 UI로 빠르게 작성
+- **테스트 런 · 플랜 · 대시보드** — 실행부터 결과 집계, PDF 리포트까지
+- **역할 기반 접근 제어 + 커스텀 필드** — 팀 규모와 프로세스에 맞게 구성
+
+![대시보드](docs/screenshots/dashboard.png)
+
+## 왜 이 도구인가
+
+| 기존 방식 | YM TestCase |
+|---|---|
+| 스프레드시트로 TC 관리 → 버전 충돌, 통계 불가 | 웹 기반 실시간 편집, 자동 집계 |
+| 상용 도구(TestRail 등) → 비용, 셀프호스팅 불가 | 무료 오픈소스, Docker 한 줄로 배포 |
+| 자체 개발 → 구축 기간, 유지보수 부담 | 설치 즉시 사용 가능, MIT 라이선스 |
+
+## 빠른 시작
+
+```bash
+git clone https://github.com/sym804/ym-testcase.git
+cd ym-testcase
+cp .env.example .env        # SECRET_KEY 변경 권장
+```
+
+**Docker (권장)**:
+```bash
+docker compose up -d
+# → http://localhost (Frontend)  |  http://localhost:8008 (API)
+```
+
+**로컬 개발**:
+```bash
+# 백엔드
+cd backend && pip install -r requirements.txt
+uvicorn main:app --reload --port 8008
+
+# 프론트엔드 (새 터미널)
+cd frontend && npm install && npm run dev
+# → http://localhost:5173
+```
+
+> 첫 번째로 가입하는 사용자가 자동으로 **admin** 권한을 받습니다.
+
+## 주요 기능
+
+| 기능 | 설명 |
+|---|---|
+| 스프레드시트 TC 편집 | ag-grid 기반 인라인 편집, 다중 행 추가, 벌크 삭제 |
+| 시트 트리 구조 | N-depth 계층형 Test Suite 관리 |
+| 커스텀 필드 | text, number, select, multiselect, checkbox, date |
+| 테스트 런 | 실행 결과 기록, 진행률 추적, 재실행 |
+| 테스트 플랜 | 릴리즈 단위 수행 관리, 마일스톤별 진행률 |
+| 대시보드 | 프로젝트별 통계 차트 (Chart.js) |
+| 고급 필터 | AND/OR 다중 조건, 필터 저장/불러오기 |
+| Import/Export | Excel(xlsx), Jira CSV, PDF 리포트 |
+| 접근 제어 | 시스템 역할 + 프로젝트 역할 이중 구조 |
+| 보안 | httpOnly 쿠키 인증, CSRF 보호, Rate Limiting, bcrypt |
 
 ## 스크린샷
+
+<details>
+<summary>더 보기</summary>
 
 ### 프로젝트 목록
 ![프로젝트 목록](docs/screenshots/project_list.png)
 
-### 테스트 케이스 관리 (스프레드시트 스타일)
+### TC 관리 (스프레드시트 스타일)
 ![TC 관리](docs/screenshots/tc_grid.png)
 
 ### 시트 트리 구조
@@ -18,27 +78,13 @@
 ### 테스트 수행 결과
 ![테스트 수행](docs/screenshots/testrun.png)
 
-### 대시보드
-![대시보드](docs/screenshots/dashboard.png)
-
 ### 고급 필터
 ![고급 필터](docs/screenshots/filter.png)
 
 ### 다크 모드
 ![다크 모드](docs/screenshots/dark_mode.png)
 
-## 주요 기능
-
-- **스프레드시트 스타일 TC 편집** — ag-grid 기반 인라인 편집, 다중 행 추가, 벌크 삭제
-- **시트 트리 구조** — N-depth 계층형 Test Suite 관리
-- **커스텀 필드** — 프로젝트별 컬럼 정의 (text, number, select, multiselect, checkbox, date)
-- **테스트 수행(Test Run)** — 실행 결과 기록, 진행률 추적, 다시 수행
-- **테스트 플랜/마일스톤** — 릴리즈 단위 수행 관리, 마일스톤별 진행률
-- **대시보드** — 프로젝트별 통계, 차트 (Chart.js)
-- **Import/Export** — Excel(xlsx), Jira CSV, PDF 리포트
-- **고급 필터 + 저장된 뷰** — AND/OR 다중 조건, 필터 저장/불러오기
-- **역할 기반 접근 제어** — 시스템 역할(admin/qa_manager/user) + 프로젝트 역할(admin/tester/viewer)
-- **보안** — JWT 인증, Rate Limiting, CORS, 비밀번호 bcrypt 해싱
+</details>
 
 ## 기술 스택
 
@@ -46,102 +92,20 @@
 |---|---|
 | Frontend | React 19, TypeScript, Vite, ag-grid, Chart.js |
 | Backend | Python 3.12, FastAPI, SQLAlchemy, SQLite |
-| Test | Vitest, Playwright, pytest |
+| Test | Vitest (357 tests), Playwright (E2E), pytest |
 | Deploy | Docker Compose, Nginx |
-
-## 빠른 시작
-
-### 사전 요구사항
-
-- Python 3.12+
-- Node.js 20+
-
-### 1. 저장소 클론
-
-```bash
-git clone https://github.com/sym804/ym-testcase.git
-cd ym-testcase
-```
-
-### 2. 환경 설정
-
-```bash
-cp .env.example .env
-# .env 파일에서 SECRET_KEY 등 설정
-```
-
-### 3. 의존성 설치
-
-```bash
-# 백엔드
-cd backend
-pip install -r requirements.txt  # Mac: pip3 install -r requirements.txt
-cd ..
-
-# 프론트엔드
-cd frontend
-npm install
-cd ..
-```
-
-### 4. 개발 서버 실행
-
-**한 번에 실행 (권장)**:
-```bash
-# Windows
-run_dev.bat
-
-# Mac / Linux
-chmod +x run_dev.sh
-./run_dev.sh
-```
-
-**수동 실행** (터미널 2개):
-```bash
-# 터미널 1 - 백엔드
-cd backend
-uvicorn main:app --reload --port 8008    # Mac: python3 -m uvicorn main:app --reload --port 8008
-
-# 터미널 2 - 프론트엔드
-cd frontend
-npm run dev
-```
-
-### 5. 접속
-
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8008
-- API Docs (Swagger): http://localhost:8008/docs
-
-> 첫 번째로 가입하는 사용자가 자동으로 **admin** 권한을 받습니다.
-
-## Docker로 실행
-
-```bash
-# 환경변수 설정
-cp .env.example .env
-# SECRET_KEY를 반드시 변경하세요!
-
-docker compose up -d
-```
-
-- Frontend: http://localhost (포트 80)
-- Backend API: http://localhost:8008
 
 ## 테스트
 
 ```bash
-# Backend API 테스트
-cd backend
-python -m pytest test_security.py -v
-
 # Frontend 단위 테스트
-cd frontend
-npm run test
+cd frontend && npm run test
+
+# Backend API 테스트
+cd backend && python -m pytest -v
 
 # E2E 테스트
-cd frontend
-npx playwright test
+cd frontend && npx playwright test
 ```
 
 ## 프로젝트 구조
@@ -151,7 +115,7 @@ ym-testcase/
 ├── backend/          # FastAPI 백엔드
 │   ├── main.py       # 앱 엔트리포인트
 │   ├── models.py     # SQLAlchemy 모델
-│   ├── routes/       # API 라우터
+│   ├── routes/       # API 라우터 (15 모듈)
 │   └── Dockerfile
 ├── frontend/         # React 프론트엔드
 │   ├── src/
@@ -162,8 +126,8 @@ ym-testcase/
 │   └── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
-├── run_dev.bat        # Windows 개발 서버
-├── run_dev.sh         # Mac/Linux 개발 서버
+├── run_dev.bat       # Windows 개발 서버
+├── run_dev.sh        # Mac/Linux 개발 서버
 └── README.md
 ```
 
