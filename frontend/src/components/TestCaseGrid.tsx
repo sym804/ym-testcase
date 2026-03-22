@@ -1353,7 +1353,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           </button>
         </div>
         <div style={styles.toolbarRight}>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
             <input
               style={styles.searchInput}
               type="text"
@@ -1373,25 +1373,25 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             >
               바꾸기
             </button>
+            {canEditTC && replaceOpen && (
+              <>
+                <input
+                  style={{ ...styles.searchInput, width: 140 }}
+                  type="text"
+                  placeholder="바꿀 내용..."
+                  value={replaceText}
+                  onChange={(e) => setReplaceText(e.target.value)}
+                />
+                <button
+                  style={{ ...styles.btnPrimary, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}
+                  onClick={handleReplaceAll}
+                  disabled={!searchText}
+                >
+                  모두 바꾸기
+                </button>
+              </>
+            )}
           </div>
-          {canEditTC && replaceOpen && (
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <input
-                style={{ ...styles.searchInput, width: 140 }}
-                type="text"
-                placeholder="바꿀 내용..."
-                value={replaceText}
-                onChange={(e) => setReplaceText(e.target.value)}
-              />
-              <button
-                style={{ ...styles.btnPrimary, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}
-                onClick={handleReplaceAll}
-                disabled={!searchText}
-              >
-                모두 바꾸기
-              </button>
-            </div>
-          )}
           <button
             style={{
               ...styles.btnGhost,
