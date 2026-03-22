@@ -1355,42 +1355,33 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         <div style={styles.toolbarRight}>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <input
-              style={{ ...styles.searchInput, width: replaceOpen ? 120 : undefined }}
+              style={{ ...styles.searchInput, width: 120 }}
               type="text"
               placeholder="검색..."
               value={searchText}
               onChange={onSearchChange}
             />
-            {canEditTC && replaceOpen && (
-              <input
-                style={{ ...styles.searchInput, width: 120 }}
-                type="text"
-                placeholder="바꿀 내용..."
-                value={replaceText}
-                onChange={(e) => setReplaceText(e.target.value)}
-              />
-            )}
+            <input
+              style={{ ...styles.searchInput, width: 120 }}
+              type="text"
+              placeholder="바꿀 내용..."
+              value={replaceText}
+              onChange={(e) => setReplaceText(e.target.value)}
+            />
             <button
-              style={{
-                ...styles.btnGhost,
-                fontSize: 11,
-                padding: "4px 8px",
-                opacity: replaceOpen ? 1 : 0.6,
-              }}
-              onClick={() => setReplaceOpen(!replaceOpen)}
-              title="찾기/바꾸기"
+              style={{ ...styles.btnGhost, fontSize: 11, padding: "4px 8px" }}
+              onClick={handleReplaceAll}
+              disabled={!searchText}
             >
               바꾸기
             </button>
-            {canEditTC && replaceOpen && (
-              <button
-                style={{ ...styles.btnPrimary, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}
-                onClick={handleReplaceAll}
-                disabled={!searchText}
-              >
-                모두 바꾸기
-              </button>
-            )}
+            <button
+              style={{ ...styles.btnPrimary, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}
+              onClick={handleReplaceAll}
+              disabled={!searchText}
+            >
+              모두 바꾸기
+            </button>
           </div>
           <button
             style={{
