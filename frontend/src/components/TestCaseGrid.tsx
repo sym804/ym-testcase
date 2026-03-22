@@ -1150,7 +1150,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         backgroundColor: "var(--bg-card)",
         display: "flex",
         flexDirection: "column",
-        height: "100%",
+        height: "calc(100vh - 160px)",
         overflow: "hidden",
         transition: "width 0.15s, min-width 0.15s",
       }}>
@@ -1253,12 +1253,12 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   };
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 160px)" }}>
+    <div style={{ display: "flex" }}>
       {/* 왼쪽: 시트 트리 사이드바 */}
       {renderSheetTree()}
 
       {/* 오른쪽: 툴바 + 그리드 */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
       {/* Toolbar */}
       <div style={styles.toolbar}>
         <div style={styles.toolbarLeft}>
@@ -1353,7 +1353,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           </button>
         </div>
         <div style={styles.toolbarRight}>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <input
               style={styles.searchInput}
               type="text"
@@ -1373,25 +1373,25 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             >
               바꾸기
             </button>
-            {canEditTC && replaceOpen && (
-              <>
-                <input
-                  style={{ ...styles.searchInput, width: 140 }}
-                  type="text"
-                  placeholder="바꿀 내용..."
-                  value={replaceText}
-                  onChange={(e) => setReplaceText(e.target.value)}
-                />
-                <button
-                  style={{ ...styles.btnPrimary, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}
-                  onClick={handleReplaceAll}
-                  disabled={!searchText}
-                >
-                  모두 바꾸기
-                </button>
-              </>
-            )}
           </div>
+          {canEditTC && replaceOpen && (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <input
+                style={{ ...styles.searchInput, width: 140 }}
+                type="text"
+                placeholder="바꿀 내용..."
+                value={replaceText}
+                onChange={(e) => setReplaceText(e.target.value)}
+              />
+              <button
+                style={{ ...styles.btnPrimary, fontSize: 11, padding: "4px 10px", whiteSpace: "nowrap" }}
+                onClick={handleReplaceAll}
+                disabled={!searchText}
+              >
+                모두 바꾸기
+              </button>
+            </div>
+          )}
           <button
             style={{
               ...styles.btnGhost,
@@ -1562,7 +1562,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       {/* Grid */}
       <div
         className="ag-theme-alpine"
-        style={{ flex: 1, width: "100%" }}
+        style={{ height: "calc(100vh - 220px)", width: "100%" }}
       >
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>
@@ -2017,7 +2017,6 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
-    padding: "0 12px",
     flexWrap: "wrap",
     gap: 8,
   },

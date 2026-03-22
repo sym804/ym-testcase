@@ -302,10 +302,9 @@ select:focus {
   --ag-header-height: 36px;
   --ag-foreground-color: var(--text-primary);
   --ag-background-color: var(--bg-card);
-  border-radius: 0;
+  border-radius: var(--radius);
   overflow: hidden;
-  border: none;
-  border-top: 1px solid var(--border-color);
+  border: 1px solid var(--border-color);
 }
 
 .ag-header-cell-label {
