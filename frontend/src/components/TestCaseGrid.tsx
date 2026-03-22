@@ -62,6 +62,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const [rowData, setRowData] = useState<TestCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
+  const [selectedCount, setSelectedCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emptyFileInputRef = useRef<HTMLInputElement>(null);
   const gridApiRef = useRef<GridApi | null>(null);
@@ -1576,6 +1577,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
             onCellKeyDown={onCellKeyDown}
+            onSelectionChanged={() => setSelectedCount(gridApiRef.current?.getSelectedRows().length || 0)}
             context={{ jiraBaseUrl: project.jira_base_url, searchKeyword: searchText }}
             animateRows={true}
             singleClickEdit={true}
@@ -1586,6 +1588,13 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           />
         )}
       </div>
+      {/* 하단 상태바 */}
+      {selectedCount > 0 && (
+        <div style={{ padding: "4px 12px", fontSize: 12, color: "var(--text-secondary)", backgroundColor: "var(--bg-card)", borderTop: "1px solid var(--border-color)", display: "flex", gap: 12 }}>
+          <span><strong>{selectedCount}</strong>개 행 선택</span>
+          <span>전체 {rowData.length}개</span>
+        </div>
+      )}
       {/* Bulk Edit Modal */}
       {bulkOpen && (
         <div style={historyStyles.overlay} onClick={() => setBulkOpen(false)}>
