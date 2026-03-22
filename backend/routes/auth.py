@@ -107,7 +107,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         password_hash=hash_password(payload.password),
         display_name=payload.display_name,
         role=initial_role,
-        must_change_password=is_first_user,
+        must_change_password=False,
     )
     db.add(user)
     db.commit()

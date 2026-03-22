@@ -203,21 +203,23 @@ export default function ProjectListPage() {
               <ProgressBar data={{ ...sm, total: sm.total_tc }} />
             </div>
 
+            {/* 프로젝트 추가/삭제 버튼 */}
+            {isAdmin && (
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
+                {selectedIds.size > 0 && (
+                  <button style={s.deleteBtn} onClick={handleBulkDelete} disabled={deleting}>
+                    {deleting ? "삭제 중..." : `${selectedIds.size}개 삭제`}
+                  </button>
+                )}
+                <button style={s.newBtn} onClick={() => setShowModal(true)}>
+                  + 새 프로젝트
+                </button>
+              </div>
+            )}
+
             {/* Per-project table */}
             {overview.projects.length > 0 && (
               <>
-              {isAdmin && (
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
-                  {selectedIds.size > 0 && (
-                    <button style={s.deleteBtn} onClick={handleBulkDelete} disabled={deleting}>
-                      {deleting ? "삭제 중..." : `${selectedIds.size}개 삭제`}
-                    </button>
-                  )}
-                  <button style={s.newBtn} onClick={() => setShowModal(true)}>
-                    + 새 프로젝트
-                  </button>
-                </div>
-              )}
               <div style={s.tableWrap}>
                 <table style={s.table}>
                   <thead>
