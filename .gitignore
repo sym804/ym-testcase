@@ -61,6 +61,7 @@ skills/
 blog/
 주식데이터/
 *.xlsx
+!Issue_list.xlsx
 *.pdf
 product_review_*.md
 review_result*.txt
