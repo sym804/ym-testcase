@@ -23,7 +23,7 @@ TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트
 </thead>
 <tbody>
 <tr><td>스프레드시트로 TC 관리 → 버전 충돌, 통계 불가</td><td><b><a href="#">웹 기반 실시간 편집, 자동 집계</a></b></td></tr>
-<tr><td>상용 도구(TestRail 등) → 비용, 셀프호스팅 불가</td><td><b><a href="#">무료 오픈소스, Docker 한 줄로 배포</a></b></td></tr>
+<tr><td>상용 도구(TestRail 등) → 비용, 셀프호스팅 불가</td><td><b><a href="#">무료 오픈소스, 셀프호스팅 가능</a></b></td></tr>
 <tr><td>자체 개발 → 구축 기간, 유지보수 부담</td><td><b><a href="#">설치 즉시 사용 가능, AGPL-3.0 라이선스</a></b></td></tr>
 </tbody>
 </table>
@@ -40,13 +40,7 @@ cp backend/.env.example backend/.env
 > 이 키는 JWT 인증 토큰 서명에 사용됩니다. 미설정 시 서버 시작마다 랜덤 키가 생성되어
 > **재시작할 때 기존 로그인이 모두 풀립니다.** 운영 환경에서는 반드시 고정 값을 설정하세요.
 
-**Docker (권장)**:
-```bash
-docker compose up -d
-# → http://localhost (Frontend)  |  http://localhost:8008 (API)
-```
-
-**로컬 개발**:
+**서버 실행**:
 ```bash
 # 백엔드
 cd backend && pip install -r requirements.txt
@@ -106,7 +100,7 @@ cd frontend && npm install && npm run dev
 | Frontend | React 19, TypeScript, Vite, ag-grid, Chart.js |
 | Backend | Python 3.12, FastAPI, SQLAlchemy, SQLite |
 | Test | Vitest (357 tests), Playwright (E2E), pytest |
-| Deploy | Docker Compose, Nginx |
+| Deploy | 셀프호스팅 (로컬 실행) |
 
 ## 테스트
 
@@ -129,15 +123,12 @@ ym-testcase/
 │   ├── main.py       # 앱 엔트리포인트
 │   ├── models.py     # SQLAlchemy 모델
 │   ├── routes/       # API 라우터 (15 모듈)
-│   └── Dockerfile
 ├── frontend/         # React 프론트엔드
 │   ├── src/
 │   │   ├── pages/    # 페이지 컴포넌트
 │   │   ├── components/
 │   │   └── api/      # API 클라이언트
 │   ├── e2e/          # Playwright E2E 테스트
-│   └── Dockerfile
-├── docker-compose.yml
 ├── backend/.env.example
 ├── run_dev.bat       # Windows 개발 서버
 ├── run_dev.sh        # Mac/Linux 개발 서버
