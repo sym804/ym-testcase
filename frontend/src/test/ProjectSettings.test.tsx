@@ -351,7 +351,7 @@ describe("ProjectSettings - Custom Fields CRUD", () => {
     vi.mocked(customFieldsApi.list).mockResolvedValue([
       { id: 5, project_id: 1, field_name: "환경", field_type: "text", sort_order: 0, is_required: false, created_at: "2026-01-01" },
     ]);
-    vi.mocked(customFieldsApi.delete).mockResolvedValue(undefined);
+    vi.mocked(customFieldsApi.delete).mockResolvedValue({ deleted: "환경" });
     window.confirm = vi.fn().mockReturnValue(true);
     const user = userEvent.setup();
     renderSettings();

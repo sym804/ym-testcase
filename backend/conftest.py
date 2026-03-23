@@ -2,6 +2,9 @@
 import threading
 import time
 
+# 독립 실행 스크립트를 pytest 수집에서 제외
+collect_ignore = ["test_v060_full.py", "test_v060_edge_cases.py"]
+
 import pytest
 import requests
 import uvicorn

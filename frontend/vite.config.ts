@@ -11,10 +11,8 @@ function charsetPlugin(): Plugin {
       server.middlewares.use((_req, res, next) => {
         // setHeader를 래핑하지 않고 writeHead를 한 번만 패치
         const origWriteHead = res.writeHead.bind(res);
-        res.writeHead = function (
-          statusCode: number,
-          ...args: unknown[]
-        ) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        res.writeHead = function (statusCode: number, ...args: any[]) {
           const ct = res.getHeader("content-type");
           if (typeof ct === "string" && !ct.includes("charset")) {
             res.setHeader("content-type", `${ct}; charset=utf-8`);

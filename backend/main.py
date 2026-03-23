@@ -1,5 +1,8 @@
+import logging
 import os
 from contextlib import asynccontextmanager
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -99,6 +102,7 @@ def _migrate_roles():
         )
         db.commit()
     except Exception:
+        logger.warning("Role migration failed (may already be migrated)", exc_info=True)
         db.rollback()
     finally:
         db.close()
@@ -121,6 +125,7 @@ def _migrate_sheet_parent_id():
             db.execute(sa.text(sql))
             db.commit()
         except Exception:
+            logger.debug("Migration SQL skipped (may already exist): %s", sql[:60])
             db.rollback()
 
     # 기존 데이터: children이 있는 노드를 is_folder=True로 마이그레이션
@@ -131,6 +136,7 @@ def _migrate_sheet_parent_id():
         ))
         db.commit()
     except Exception:
+        logger.warning("is_folder migration failed", exc_info=True)
         db.rollback()
 
     db.close()

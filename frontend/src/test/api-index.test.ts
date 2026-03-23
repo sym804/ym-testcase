@@ -149,16 +149,16 @@ describe("testCasesApi", () => {
   it("create sends POST with test case data", async () => {
     const tc = { id: 1, title: "New TC" };
     mockPost.mockResolvedValueOnce({ data: tc });
-    const result = await testCasesApi.create(2, { title: "New TC" });
-    expect(mockPost).toHaveBeenCalledWith("/api/projects/2/testcases", { title: "New TC" });
+    const result = await testCasesApi.create(2, { depth1: "New TC" });
+    expect(mockPost).toHaveBeenCalledWith("/api/projects/2/testcases", { depth1: "New TC" });
     expect(result).toEqual(tc);
   });
 
   it("update sends PUT with tc id and data", async () => {
     const tc = { id: 10, title: "Updated" };
     mockPut.mockResolvedValueOnce({ data: tc });
-    const result = await testCasesApi.update(1, 10, { title: "Updated" });
-    expect(mockPut).toHaveBeenCalledWith("/api/projects/1/testcases/10", { title: "Updated" });
+    const result = await testCasesApi.update(1, 10, { depth1: "Updated" });
+    expect(mockPut).toHaveBeenCalledWith("/api/projects/1/testcases/10", { depth1: "Updated" });
     expect(result).toEqual(tc);
   });
 
@@ -342,7 +342,7 @@ describe("testRunsApi", () => {
   it("submitResults sends POST with results array", async () => {
     const results = [{ id: 1, status: "PASS" }];
     mockPost.mockResolvedValueOnce({ data: results });
-    const input = [{ testcase_id: 1, status: "PASS" }];
+    const input: Partial<import("../types").TestResult>[] = [{ test_case_id: 1, result: "PASS" }];
     const result = await testRunsApi.submitResults(1, 5, input);
     expect(mockPost).toHaveBeenCalledWith("/api/projects/1/testruns/5/results", input);
     expect(result).toEqual(results);
@@ -675,8 +675,8 @@ describe("customFieldsApi", () => {
   it("update sends PUT with field id and data", async () => {
     const field = { id: 2, name: "Updated" };
     mockPut.mockResolvedValueOnce({ data: field });
-    const result = await customFieldsApi.update(1, 2, { name: "Updated" });
-    expect(mockPut).toHaveBeenCalledWith("/api/projects/1/custom-fields/2", { name: "Updated" });
+    const result = await customFieldsApi.update(1, 2, { field_name: "Updated" });
+    expect(mockPut).toHaveBeenCalledWith("/api/projects/1/custom-fields/2", { field_name: "Updated" });
     expect(result).toEqual(field);
   });
 

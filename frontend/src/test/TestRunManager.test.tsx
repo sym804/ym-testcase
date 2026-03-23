@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("ag-grid-react", () => ({
@@ -64,12 +64,12 @@ const adminProject = {
   created_by: 1,
   created_at: "2026-01-01",
   updated_at: "2026-01-01",
-  my_role: "admin" as const,
+  my_role: "admin" as string,
 };
 
 const viewerProject = {
   ...adminProject,
-  my_role: "viewer" as const,
+  my_role: "viewer" as string,
 };
 
 const mockTC = {
@@ -153,7 +153,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Default: return mock runs
   vi.mocked(testRunsApi.list).mockResolvedValue(mockRuns);
-  vi.mocked(testCasesApi.listSheets).mockResolvedValue([{ name: "기본", tc_count: 2, id: 1, parent_id: null, sort_order: 0, children: [] }]);
+  vi.mocked(testCasesApi.listSheets).mockResolvedValue([{ name: "기본", tc_count: 2, id: 1, parent_id: null, sort_order: 0, is_folder: false, children: [] }]);
   vi.mocked(testRunsApi.getOne).mockResolvedValue(mockRunDetail as any);
   vi.mocked(testRunsApi.create).mockResolvedValue(makeRun({ id: 3, name: "새 수행" }));
   vi.mocked(testRunsApi.clone).mockResolvedValue(makeRun({ id: 4, name: "Sprint 1 테스트 (복제)" }));

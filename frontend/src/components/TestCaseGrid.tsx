@@ -132,9 +132,6 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         if (nodeRowId === entry.rowId && node.data) {
           node.data[entry.field] = value;
           updatedNodes.add(nodeRowId);
-          if (node.data.id) {
-
-          }
         }
       });
       reverseGroup.push({ ...entry, oldValue: reverseValue, newValue: value });
@@ -893,9 +890,6 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           undoGroup.push({ rowId, field, oldValue: node.data[field], newValue: sourceValue, dataId: node.data.id || 0 });
           node.data[field] = sourceValue;
           filled++;
-          if (node.data.id) {
-
-          }
         }
       });
       if (filled > 0) {
@@ -989,7 +983,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 </div>
                 {importSheets.map((sheet) => (
                   <label key={sheet.name} style={sheetModalStyles.sheetRow}>
-                    <input type="checkbox" checked={selectedSheets.has(sheet.name)} onChange={(e) => { const next = new Set(selectedSheets); e.target.checked ? next.add(sheet.name) : next.delete(sheet.name); setSelectedSheets(next); }} style={{ width: 16, height: 16 }} />
+                    <input type="checkbox" checked={selectedSheets.has(sheet.name)} onChange={(e) => { const next = new Set(selectedSheets); if (e.target.checked) { next.add(sheet.name); } else { next.delete(sheet.name); } setSelectedSheets(next); }} style={{ width: 16, height: 16 }} />
                     <span style={sheetModalStyles.sheetName}>{sheet.name}</span>
                     <span style={sheetModalStyles.sheetCount}>{sheet.tc_count}개 TC</span>
                   </label>
@@ -1042,7 +1036,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 // 폴더: 펼침/접기 토글
                 setExpandedSheets(prev => {
                   const next = new Set(prev);
-                  next.has(node.id) ? next.delete(node.id) : next.add(node.id);
+                  if (next.has(node.id)) { next.delete(node.id); } else { next.add(node.id); }
                   return next;
                 });
               } else {
@@ -1063,7 +1057,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   e.stopPropagation();
                   setExpandedSheets(prev => {
                     const next = new Set(prev);
-                    next.has(node.id) ? next.delete(node.id) : next.add(node.id);
+                    if (next.has(node.id)) { next.delete(node.id); } else { next.add(node.id); }
                     return next;
                   });
                 }}
@@ -1823,7 +1817,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                     checked={selectedSheets.has(sheet.name)}
                     onChange={(e) => {
                       const next = new Set(selectedSheets);
-                      e.target.checked ? next.add(sheet.name) : next.delete(sheet.name);
+                      if (e.target.checked) { next.add(sheet.name); } else { next.delete(sheet.name); }
                       setSelectedSheets(next);
                     }}
                     style={{ width: 16, height: 16 }}
