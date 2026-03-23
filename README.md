@@ -17,11 +17,16 @@ TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트
 
 ## 기존 도구와의 비교
 
-| 기존 방식 | YM TestCase |
-|---|---|
-| 스프레드시트로 TC 관리 → 버전 충돌, 통계 불가 | 웹 기반 실시간 편집, 자동 집계 |
-| 상용 도구(TestRail 등) → 비용, 셀프호스팅 불가 | 무료 오픈소스, Docker 한 줄로 배포 |
-| 자체 개발 → 구축 기간, 유지보수 부담 | 설치 즉시 사용 가능, MIT 라이선스 |
+<table>
+<thead>
+<tr><th>기존 방식</th><th>YM TestCase</th></tr>
+</thead>
+<tbody>
+<tr><td>스프레드시트로 TC 관리 → 버전 충돌, 통계 불가</td><td><b><a href="#">웹 기반 실시간 편집, 자동 집계</a></b></td></tr>
+<tr><td>상용 도구(TestRail 등) → 비용, 셀프호스팅 불가</td><td><b><a href="#">무료 오픈소스, Docker 한 줄로 배포</a></b></td></tr>
+<tr><td>자체 개발 → 구축 기간, 유지보수 부담</td><td><b><a href="#">설치 즉시 사용 가능, MIT 라이선스</a></b></td></tr>
+</tbody>
+</table>
 
 ## 환경설정 방법
 
