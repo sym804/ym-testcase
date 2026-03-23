@@ -82,7 +82,7 @@ test.describe("시트 트리 구조", () => {
     await page.waitForTimeout(1000);
 
     // 사이드바에서 + 버튼으로 두 번째 시트 추가
-    const sidebarPlus = page.locator("[title='루트 시트 추가']");
+    const sidebarPlus = page.locator("[title='시트 추가']");
     await sidebarPlus.click();
     await page.getByPlaceholder("시트 이름").fill("UI");
     await page.getByRole("button", { name: "추가", exact: true }).click();
@@ -118,7 +118,7 @@ test.describe("시트 트리 구조", () => {
     await page.waitForTimeout(1000);
 
     // 사이드바에서 두 번째 시트 추가
-    const sidebarPlus = page.locator("[title='루트 시트 추가']");
+    const sidebarPlus = page.locator("[title='시트 추가']");
     await sidebarPlus.click();
     await page.getByPlaceholder("시트 이름").fill("Sheet-B");
     await page.getByRole("button", { name: "추가", exact: true }).click();
