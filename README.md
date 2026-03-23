@@ -30,6 +30,11 @@ TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트
 
 ## 환경설정 방법
 
+**사전 요구사항**:
+- [Python 3.12+](https://www.python.org/downloads/)
+- [Node.js 18+](https://nodejs.org/)
+- [Git](https://git-scm.com/)
+
 ```bash
 git clone https://github.com/sym804/ym-testcase.git
 cd ym-testcase
