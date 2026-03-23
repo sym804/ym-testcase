@@ -24,7 +24,7 @@ TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트
 <tbody>
 <tr><td>스프레드시트로 TC 관리 → 버전 충돌, 통계 불가</td><td><b><a href="#">웹 기반 실시간 편집, 자동 집계</a></b></td></tr>
 <tr><td>상용 도구(TestRail 등) → 비용, 셀프호스팅 불가</td><td><b><a href="#">무료 오픈소스, Docker 한 줄로 배포</a></b></td></tr>
-<tr><td>자체 개발 → 구축 기간, 유지보수 부담</td><td><b><a href="#">설치 즉시 사용 가능, MIT 라이선스</a></b></td></tr>
+<tr><td>자체 개발 → 구축 기간, 유지보수 부담</td><td><b><a href="#">설치 즉시 사용 가능, AGPL-3.0 라이선스</a></b></td></tr>
 </tbody>
 </table>
 
@@ -142,4 +142,4 @@ ym-testcase/
 
 ## 라이선스
 
-MIT License
+AGPL-3.0 — [GNU Affero General Public License v3.0](LICENSE)
