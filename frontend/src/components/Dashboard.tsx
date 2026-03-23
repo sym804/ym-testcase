@@ -16,18 +16,28 @@ interface Props {
   projectId: number;
 }
 
-const CARD_COLORS = {
-  total: "var(--accent)",
-  pass: "var(--color-pass)",
-  fail: "var(--color-fail)",
-  block: "var(--color-block)",
-  na: "var(--color-na)",
+const COLORS_LIGHT = {
+  total: "#2563EB",
+  pass: "#1A7F37",
+  fail: "#CF222E",
+  block: "#BF8700",
+  na: "#6366F1",
   not_started: "#D1D5DB",
+};
+
+const COLORS_DARK = {
+  total: "#60A5FA",
+  pass: "#22C55E",
+  fail: "#EF4444",
+  block: "#EAB308",
+  na: "#818CF8",
+  not_started: "#6B7280",
 };
 
 export default function Dashboard({ projectId }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const CARD_COLORS = isDark ? COLORS_DARK : COLORS_LIGHT;
   const chartTextColor = isDark ? "#E2E8F0" : "#334155";
   const chartGridColor = isDark ? "rgba(45, 74, 122, 0.3)" : "rgba(0, 0, 0, 0.1)";
   const [runs, setRuns] = useState<TestRun[]>([]);
