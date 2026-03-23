@@ -113,10 +113,10 @@ cd frontend && npm install && npm run dev
 # Frontend 단위 테스트
 cd frontend && npm run test
 
-# Backend API 테스트
+# Backend API 테스트 (서버 실행 상태에서)
 cd backend && python -m pytest -v
 
-# E2E 테스트
+# E2E 테스트 (서버 실행 상태에서)
 cd frontend && npx playwright test
 ```
 
