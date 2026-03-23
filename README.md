@@ -33,8 +33,12 @@ TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트
 ```bash
 git clone https://github.com/sym804/ym-testcase.git
 cd ym-testcase
-cp backend/.env.example backend/.env   # SECRET_KEY 변경 권장
+cp backend/.env.example backend/.env
 ```
+
+> **SECRET_KEY 설정**: `backend/.env` 파일 안의 `SECRET_KEY` 값을 변경하세요.
+> 이 키는 JWT 인증 토큰 서명에 사용됩니다. 미설정 시 서버 시작마다 랜덤 키가 생성되어
+> **재시작할 때 기존 로그인이 모두 풀립니다.** 운영 환경에서는 반드시 고정 값을 설정하세요.
 
 **Docker (권장)**:
 ```bash
