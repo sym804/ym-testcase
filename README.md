@@ -33,7 +33,7 @@ TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트
 ```bash
 git clone https://github.com/sym804/ym-testcase.git
 cd ym-testcase
-cp .env.example .env        # SECRET_KEY 변경 권장
+cp backend/.env.example backend/.env   # SECRET_KEY 변경 권장
 ```
 
 **Docker (권장)**:
@@ -134,7 +134,7 @@ ym-testcase/
 │   ├── e2e/          # Playwright E2E 테스트
 │   └── Dockerfile
 ├── docker-compose.yml
-├── .env.example
+├── backend/.env.example
 ├── run_dev.bat       # Windows 개발 서버
 ├── run_dev.sh        # Mac/Linux 개발 서버
 └── README.md
