@@ -961,9 +961,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   + 시트 추가
                 </button>
                 <button style={{ padding: "10px 24px", borderRadius: 8, border: "1px solid var(--border-input)", backgroundColor: "transparent", color: "var(--text-primary)", fontSize: 14, cursor: "pointer" }} onClick={() => emptyFileInputRef.current?.click()}>
-                  Excel Import
+                  Import
                 </button>
-                <input ref={emptyFileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={handleImport} />
+                <input ref={emptyFileInputRef} type="file" accept=".xlsx,.xls,.csv,.md" style={{ display: "none" }} onChange={handleImport} />
               </div>
             )
           )}
@@ -1309,12 +1309,12 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               </button>
               <div style={styles.separator} />
               <button style={styles.btnGhost} onClick={() => fileInputRef.current?.click()}>
-                Excel Import
+                Import
               </button>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls,.csv,.md"
                 style={{ display: "none" }}
                 onChange={handleImport}
               />

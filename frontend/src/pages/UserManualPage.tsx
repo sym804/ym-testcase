@@ -46,7 +46,8 @@ export default function UserManualPage() {
           <a href="#custom-fields" style={s.tocItem}>16. 커스텀 필드</a>
           <a href="#test-plans" style={s.tocItem}>17. 테스트 플랜</a>
           <a href="#csv-import" style={s.tocItem}>18. CSV Import (Jira)</a>
-          <a href="#advanced-filter" style={s.tocItem}>19. 고급 필터</a>
+          <a href="#md-import" style={s.tocItem}>19. Markdown Import</a>
+          <a href="#advanced-filter" style={s.tocItem}>20. 고급 필터</a>
         </nav>
 
         {/* 본문 */}
@@ -712,8 +713,8 @@ export default function UserManualPage() {
 
             <h3 style={s.h3}>18-1. 사용 방법</h3>
             <ol style={s.ol}>
-              <li>TC 관리 툴바에서 <strong>Excel Import</strong> 버튼을 클릭합니다.</li>
-              <li>파일 선택 대화상자에서 <strong>.csv</strong> 또는 <strong>.xlsx</strong> 파일을 선택합니다.</li>
+              <li>TC 관리 툴바에서 <strong>Import</strong> 버튼을 클릭합니다.</li>
+              <li>파일 선택 대화상자에서 <strong>.csv</strong>, <strong>.xlsx</strong>, 또는 <strong>.md</strong> 파일을 선택합니다.</li>
               <li>CSV 파일의 경우 자동으로 헤더를 분석하여 TC 필드에 매핑합니다.</li>
             </ol>
 
@@ -746,9 +747,78 @@ export default function UserManualPage() {
             </div>
           </section>
 
-          {/* 19. 고급 필터 */}
+          {/* 19. Markdown Import */}
+          <section id="md-import" style={s.section}>
+            <h2 style={s.h2}>19. Markdown Import</h2>
+            <p style={s.p}>Markdown(.md) 파일에 작성한 테이블을 TC로 가져올 수 있습니다. 문서 기반 TC 관리나 GitHub/Wiki에서 작성한 TC를 바로 import할 때 유용합니다.</p>
+
+            <h3 style={s.h3}>19-1. 사용 방법</h3>
+            <ol style={s.ol}>
+              <li>TC 관리 툴바에서 <strong>Import</strong> 버튼을 클릭합니다.</li>
+              <li>파일 선택 대화상자에서 <strong>.md</strong> 파일을 선택합니다.</li>
+              <li>파일 내 Markdown 테이블이 자동 파싱됩니다.</li>
+              <li>테이블이 여러 개면 시트 선택 모달이 표시됩니다.</li>
+            </ol>
+
+            <h3 style={s.h3}>19-2. 지원 형식</h3>
+            <p style={s.p}>표준 Markdown 테이블 문법을 사용합니다. 첫 번째 행은 헤더, 두 번째 행은 구분자(<code>|---|</code>), 그 이후가 데이터입니다.</p>
+            <pre style={{...s.p, backgroundColor: "var(--bg-secondary)", padding: "16px", borderRadius: "8px", fontFamily: "monospace", fontSize: "13px", whiteSpace: "pre", overflowX: "auto"}}>{`# 로그인 테스트
+
+| TC ID  | Category | Priority | Test Steps         | Expected Result    |
+|--------|----------|----------|--------------------|--------------------|
+| TC-001 | 로그인   | High     | 정상 로그인 시도    | 메인 화면 이동      |
+| TC-002 | 로그인   | Medium   | 잘못된 비번 입력    | 에러 메시지 표시    |
+
+## 검색 기능
+
+| TC ID  | Category | Priority | Test Steps         | Expected Result    |
+|--------|----------|----------|--------------------|--------------------|
+| TC-003 | 검색     | High     | 키워드 입력 후 검색 | 검색 결과 표시      |`}</pre>
+
+            <h3 style={s.h3}>19-3. 시트 이름 규칙</h3>
+            <ul style={s.ul}>
+              <li>테이블 위의 <code>#</code> 또는 <code>##</code> 제목이 <strong>시트 이름</strong>이 됩니다.</li>
+              <li>위 예시에서 "로그인 테스트"와 "검색 기능"이 각각 시트 이름이 됩니다.</li>
+              <li>제목이 없는 테이블은 "MD Import"라는 기본 이름이 사용됩니다.</li>
+              <li>하나의 .md 파일에 여러 테이블을 넣으면 각각 다른 시트로 import됩니다.</li>
+            </ul>
+
+            <h3 style={s.h3}>19-4. 헤더 매핑</h3>
+            <table style={s.table}>
+              <thead>
+                <tr><th style={s.th}>Markdown 헤더</th><th style={s.th}>TC 필드</th></tr>
+              </thead>
+              <tbody>
+                <tr><td style={s.td}>TC ID / tc_id</td><td style={s.td}>TC ID</td></tr>
+                <tr><td style={s.td}>Category / 카테고리 / 대분류</td><td style={s.td}>Category</td></tr>
+                <tr><td style={s.td}>Priority / 우선순위</td><td style={s.td}>Priority</td></tr>
+                <tr><td style={s.td}>Test Steps / Steps / 테스트 절차</td><td style={s.td}>Test Steps</td></tr>
+                <tr><td style={s.td}>Expected Result / 기대 결과</td><td style={s.td}>Expected Result</td></tr>
+                <tr><td style={s.td}>Depth1 / Depth2</td><td style={s.td}>Depth 1 / Depth 2</td></tr>
+                <tr><td style={s.td}>Precondition / 사전조건</td><td style={s.td}>Precondition</td></tr>
+                <tr><td style={s.td}>Assignee / 담당자</td><td style={s.td}>Assignee</td></tr>
+                <tr><td style={s.td}>Remarks / 비고</td><td style={s.td}>Remarks</td></tr>
+              </tbody>
+            </table>
+            <p style={s.p}>Excel/CSV Import와 동일한 헤더 매핑 규칙을 사용합니다. 한글/영문 헤더 모두 지원됩니다.</p>
+
+            <h3 style={s.h3}>19-5. 주의사항</h3>
+            <ul style={s.ul}>
+              <li>셀 안에 파이프(<code>|</code>)를 사용하려면 <code>\|</code>로 이스케이프하세요.</li>
+              <li>TC ID가 기존 TC와 동일하면 해당 TC가 덮어쓰기됩니다.</li>
+              <li>TC ID가 없는 행은 <code>MD-0001</code>, <code>MD-0002</code> 형식으로 자동 생성됩니다.</li>
+              <li>테이블 사이의 일반 텍스트(설명, 목록 등)는 무시됩니다.</li>
+              <li>인코딩: UTF-8, UTF-8 BOM, CP949(EUC-KR) 자동 감지됩니다.</li>
+            </ul>
+
+            <div style={s.tipBox}>
+              <strong>TIP:</strong> GitHub, Notion, Obsidian 등에서 작성한 Markdown 테이블을 그대로 .md 파일로 저장하여 import할 수 있습니다.
+            </div>
+          </section>
+
+          {/* 20. 고급 필터 */}
           <section id="advanced-filter" style={s.section}>
-            <h2 style={s.h2}>19. 고급 필터 + 저장된 뷰</h2>
+            <h2 style={s.h2}>20. 고급 필터 + 저장된 뷰</h2>
             <img src="/manual-images/33_advanced_filter_panel.png" alt="고급 필터 패널" style={s.img} />
             <p style={s.p}>다중 조건으로 TC를 필터링하고, 자주 쓰는 필터를 저장하여 재사용할 수 있습니다.</p>
 

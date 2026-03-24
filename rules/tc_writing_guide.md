@@ -74,7 +74,7 @@ TC ID: TC-PM-099
 ## FAIL 시 필수 기록
 
 1. **Actual Result**: 실제 발생한 동작 (구체적으로)
-2. **Issue Link**: Jira 이슈 키 (버그 티켓 생성 후)
+2. **Issue Link**: GitHub Issue 번호 (버그 티켓 생성 후, 예: #78)
 3. **첨부파일**: 증빙 스크린샷 (가능한 경우)
 
 ## 라운드 관리

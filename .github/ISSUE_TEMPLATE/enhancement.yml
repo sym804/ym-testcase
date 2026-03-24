@@ -1,0 +1,68 @@
+name: 개선 요청
+description: 기능 개선, 성능 향상, UX 개선 등을 요청합니다.
+title: "[ENH] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: 영역
+      options:
+        - Frontend
+        - Backend
+        - DB
+        - 보안
+        - 기타
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 심각도
+      description: |
+        Major: 업무에 지장이 있는 개선
+        Minor: 불편하지만 우회 가능한 개선
+        Trivial: 외관/텍스트 등 사소한 개선
+      options:
+        - Major
+        - Minor
+        - Trivial
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 발생 버전
+      description: 개선 대상 버전 (예: 0.7.1.0)
+      placeholder: "0.7.1.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: improvement
+    attributes:
+      label: 개선 사항
+      description: 개선하고자 하는 내용을 기술합니다.
+      placeholder: "Import 버튼 라벨을 'Excel Import'에서 'Import'로 변경"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: 개선 사유
+      description: 왜 이 개선이 필요한지 사유를 기술합니다.
+      placeholder: "Markdown 기반 TC 작성이 증가하는 추세에 맞춰 지원 필요"
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: 영향 범위
+      description: 개선으로 인한 영향 범위를 기술합니다.
+      placeholder: "TC 관리 툴바, Import 플로우"
+    validations:
+      required: false

@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YM TestCase — Portfolio</title>
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0b0f1a;
+  --bg-card: #111827;
+  --bg-card-hover: #1a2332;
+  --surface: #1e293b;
+  --border: #1e3a5f;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --accent: #22c55e;
+  --accent-glow: rgba(34,197,94,0.15);
+  --accent2: #3b82f6;
+  --accent3: #f59e0b;
+  --gradient: linear-gradient(135deg, #22c55e 0%, #3b82f6 100%);
+  --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+a { color: var(--accent); text-decoration: none; transition: color .2s; }
+a:hover { color: #4ade80; }
+img { max-width: 100%; border-radius: var(--radius); }
+
+/* ── Layout ── */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+section { padding: 6rem 0; }
+
+/* ── Navigation ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(11,15,26,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: .8rem 0;
+  transition: box-shadow .3s;
+}
+nav.scrolled { box-shadow: 0 4px 30px rgba(0,0,0,.5); }
+nav .container { display: flex; align-items: center; justify-content: space-between; }
+nav .logo { font-size: 1.25rem; font-weight: 700; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+nav .links { display: flex; gap: 2rem; list-style: none; }
+nav .links a { color: var(--text-dim); font-size: .9rem; font-weight: 500; transition: color .2s; }
+nav .links a:hover { color: var(--text); }
+
+/* ── Hero ── */
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center;
+  position: relative;
+  overflow: hidden;
+  padding-top: 5rem;
+}
+.hero::before {
+  content: '';
+  position: absolute; top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: radial-gradient(ellipse at 30% 50%, rgba(34,197,94,.08) 0%, transparent 50%),
+              radial-gradient(ellipse at 70% 50%, rgba(59,130,246,.06) 0%, transparent 50%);
+  animation: pulse 8s ease-in-out infinite alternate;
+}
+@keyframes pulse {
+  0% { opacity: .6; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1.05); }
+}
+.hero-content { position: relative; z-index: 1; }
+.hero-badge {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .4rem 1rem; border-radius: 999px;
+  background: var(--accent-glow);
+  border: 1px solid rgba(34,197,94,.3);
+  font-size: .85rem; color: var(--accent);
+  margin-bottom: 1.5rem;
+}
+.hero h1 {
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 1rem;
+}
+.hero h1 .gradient { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero p.subtitle {
+  font-size: 1.25rem; color: var(--text-dim);
+  max-width: 600px; margin-bottom: 2.5rem;
+}
+.hero-btns { display: flex; gap: 1rem; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .75rem 1.5rem; border-radius: var(--radius-sm);
+  font-size: .95rem; font-weight: 600;
+  transition: all .2s;
+  cursor: pointer; border: none;
+}
+.btn-primary { background: var(--gradient); color: #fff; }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(34,197,94,.3); color: #fff; }
+.btn-outline {
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Section headers ── */
+.section-label {
+  display: inline-block;
+  font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: .75rem;
+}
+.section-title {
+  font-size: 2.25rem; font-weight: 800; margin-bottom: .75rem;
+}
+.section-desc {
+  color: var(--text-dim); font-size: 1.05rem; max-width: 640px; margin-bottom: 3rem;
+}
+
+/* ── Stats Bar ── */
+.stats-bar {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;
+  padding: 3rem 0;
+}
+.stat-card {
+  text-align: center;
+  padding: 2rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: transform .2s, border-color .2s;
+}
+.stat-card:hover { transform: translateY(-4px); border-color: var(--accent); }
+.stat-number {
+  font-size: 2.5rem; font-weight: 800;
+  background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: .9rem; color: var(--text-dim); margin-top: .25rem; }
+
+/* ── Problem / Solution ── */
+.problem-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;
+}
+.problem-card, .solution-card {
+  padding: 2rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.problem-card { background: rgba(239,68,68,.05); border-color: rgba(239,68,68,.2); }
+.solution-card { background: var(--accent-glow); border-color: rgba(34,197,94,.2); }
+.problem-card h3 { color: #ef4444; margin-bottom: 1rem; }
+.solution-card h3 { color: var(--accent); margin-bottom: 1rem; }
+.problem-card ul, .solution-card ul { list-style: none; }
+.problem-card li, .solution-card li {
+  padding: .5rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+  color: var(--text-dim);
+}
+.problem-card li::before { content: '✕'; position: absolute; left: 0; color: #ef4444; font-weight: 700; }
+.solution-card li::before { content: '✓'; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+
+/* ── Features ── */
+.features-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+}
+.feature-card {
+  padding: 1.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all .2s;
+}
+.feature-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.feature-icon {
+  width: 48px; height: 48px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent-glow);
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+.feature-card h3 { font-size: 1.1rem; margin-bottom: .5rem; }
+.feature-card p { color: var(--text-dim); font-size: .9rem; line-height: 1.6; }
+
+/* ── Screenshots ── */
+.screenshots-section { background: var(--surface); }
+.screenshot-tabs {
+  display: flex; gap: .5rem; margin-bottom: 2rem; flex-wrap: wrap;
+}
+.screenshot-tab {
+  padding: .5rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: .85rem; font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+}
+.screenshot-tab.active, .screenshot-tab:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.screenshot-display {
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+.screenshot-display img {
+  width: 100%; display: block; border-radius: 0;
+  transition: opacity .3s;
+}
+.screenshot-caption {
+  padding: 1rem 1.5rem;
+  background: var(--bg-card);
+  font-size: .9rem; color: var(--text-dim);
+  border-top: 1px solid var(--border);
+}
+
+/* ── Tech Stack ── */
+.tech-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;
+}
+.tech-group {
+  padding: 2rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.tech-group h3 {
+  font-size: 1rem; font-weight: 700;
+  margin-bottom: 1.25rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.tech-list { display: flex; flex-wrap: wrap; gap: .75rem; }
+.tech-tag {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .4rem .9rem;
+  border-radius: 999px;
+  font-size: .82rem; font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color .2s;
+}
+.tech-tag:hover { border-color: var(--accent); }
+.tech-tag .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.dot-green { background: var(--accent); }
+.dot-blue { background: var(--accent2); }
+.dot-yellow { background: var(--accent3); }
+.dot-red { background: #ef4444; }
+.dot-purple { background: #a855f7; }
+
+/* ── Architecture ── */
+.arch-diagram {
+  display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 1rem; align-items: center;
+  padding: 3rem 0;
+}
+.arch-box {
+  padding: 2rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.arch-box h4 { font-size: 1rem; margin-bottom: .75rem; color: var(--accent); }
+.arch-box p { font-size: .85rem; color: var(--text-dim); }
+.arch-arrow {
+  font-size: 1.5rem; color: var(--text-dim); text-align: center;
+}
+
+/* ── Timeline / Versions ── */
+.timeline { position: relative; padding-left: 2rem; }
+.timeline::before {
+  content: '';
+  position: absolute; left: 7px; top: 0; bottom: 0;
+  width: 2px; background: var(--border);
+}
+.timeline-item {
+  position: relative;
+  padding: 1.25rem 0 1.25rem 1.5rem;
+}
+.timeline-item::before {
+  content: '';
+  position: absolute; left: -2rem; top: 1.6rem;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg);
+}
+.timeline-item.dim::before { background: var(--text-dim); }
+.timeline-version {
+  font-size: .85rem; font-weight: 700; color: var(--accent);
+  font-family: var(--mono);
+}
+.timeline-date { font-size: .8rem; color: var(--text-dim); margin-left: .75rem; }
+.timeline-desc { font-size: .95rem; color: var(--text); margin-top: .25rem; }
+
+/* ── Blog ── */
+.blog-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;
+}
+.blog-card {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all .2s;
+}
+.blog-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.blog-num {
+  font-size: 1.5rem; font-weight: 800; font-family: var(--mono);
+  background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  min-width: 3rem; text-align: center;
+}
+.blog-card h4 { font-size: .95rem; }
+.blog-card p { font-size: .8rem; color: var(--text-dim); margin-top: .15rem; }
+
+/* ── Quality ── */
+.quality-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+}
+.quality-card {
+  padding: 2rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.quality-ring {
+  width: 100px; height: 100px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1rem;
+  font-size: 1.5rem; font-weight: 800;
+  background: conic-gradient(var(--accent) var(--pct), var(--surface) var(--pct));
+  position: relative;
+}
+.quality-ring::after {
+  content: attr(data-label);
+  position: absolute;
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; font-weight: 800; color: var(--accent);
+}
+.quality-card h4 { font-size: 1rem; margin-bottom: .25rem; }
+.quality-card p { font-size: .85rem; color: var(--text-dim); }
+
+/* ── Footer ── */
+footer {
+  padding: 3rem 0;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  color: var(--text-dim);
+  font-size: .85rem;
+}
+footer .logo-footer {
+  font-size: 1.25rem; font-weight: 700;
+  background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: .5rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  .problem-grid, .tech-grid, .blog-grid, .quality-grid { grid-template-columns: 1fr; }
+  .features-grid { grid-template-columns: 1fr; }
+  .arch-diagram { grid-template-columns: 1fr; }
+  .arch-arrow { transform: rotate(90deg); }
+  nav .links { display: none; }
+}
+
+/* ── Animations ── */
+.fade-in {
+  opacity: 0; transform: translateY(30px);
+  transition: opacity .6s, transform .6s;
+}
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav id="navbar">
+  <div class="container">
+    <div class="logo">YM TestCase</div>
+    <ul class="links">
+      <li><a href="#features">기능</a></li>
+      <li><a href="#screenshots">스크린샷</a></li>
+      <li><a href="#tech">기술 스택</a></li>
+      <li><a href="#quality">품질</a></li>
+      <li><a href="#versions">버전</a></li>
+      <li><a href="#blog">블로그</a></li>
+      <li><a href="https://github.com/sym804/ym-testcase" target="_blank">GitHub ↗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container hero-content">
+    <div class="hero-badge">
+      <span>●</span> AGPL-3.0 오픈소스
+    </div>
+    <h1>
+      테스트를 <span class="gradient">체계적으로</span><br>
+      관리하는 가장 빠른 방법
+    </h1>
+    <p class="subtitle">
+      YM TestCase는 QA 팀과 개발팀을 위한 셀프 호스팅형 테스트케이스 관리 도구입니다.
+      스프레드시트처럼 빠르게 작성하고, 대시보드로 진행률을 한눈에 파악하세요.
+    </p>
+    <div class="hero-btns">
+      <a href="https://github.com/sym804/ym-testcase" target="_blank" class="btn btn-primary">
+        ◆ GitHub에서 보기
+      </a>
+      <a href="#features" class="btn btn-outline">
+        ▼ 자세히 보기
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Stats -->
+<section style="padding: 0;">
+  <div class="container">
+    <div class="stats-bar">
+      <div class="stat-card">
+        <span class="stat-number">567</span>
+        <span class="stat-label">자동화 테스트</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number">100%</span>
+        <span class="stat-label">테스트 통과율</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number">21K+</span>
+        <span class="stat-label">Lines of Code</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number">11</span>
+        <span class="stat-label">핵심 기능</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Problem / Solution -->
+<section id="problem">
+  <div class="container">
+    <span class="section-label">Why</span>
+    <h2 class="section-title">왜 만들었는가</h2>
+    <p class="section-desc">
+      기존 도구들의 한계를 직접 경험하고, 진짜 필요한 것만 담았습니다.
+    </p>
+    <div class="problem-grid fade-in">
+      <div class="problem-card">
+        <h3>기존의 문제</h3>
+        <ul>
+          <li>TestRail — 높은 라이선스 비용, SaaS 종속</li>
+          <li>Excel — 협업 불가, 버전 관리 지옥</li>
+          <li>Kiwi TCMS — 설치 복잡, 느린 UI</li>
+          <li>자체 개발 — 수개월의 개발 기간</li>
+        </ul>
+      </div>
+      <div class="solution-card">
+        <h3>YM TestCase의 해결</h3>
+        <ul>
+          <li>무료 오픈소스 (AGPL-3.0)</li>
+          <li>스프레드시트 스타일 즉시 편집</li>
+          <li>5분 설치, 즉시 사용 가능</li>
+          <li>셀프 호스팅으로 데이터 주권 확보</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <span class="section-label">Features</span>
+    <h2 class="section-title">핵심 기능</h2>
+    <p class="section-desc">
+      테스트케이스 작성부터 실행, 분석, 리포트까지 — 전체 QA 워크플로우를 하나의 도구에서.
+    </p>
+    <div class="features-grid">
+      <div class="feature-card fade-in">
+        <div class="feature-icon">📋</div>
+        <h3>스프레드시트 편집</h3>
+        <p>AG Grid 기반 인라인 편집. 멀티 행 추가, 벌크 삭제, Undo/Redo, 찾기/바꾸기(정규식) 지원.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🗂️</div>
+        <h3>시트 트리 구조</h3>
+        <p>N-depth 계층형 시트로 테스트 스위트를 폴더처럼 관리. 엑셀 스타일 탭 인터페이스.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">⚙️</div>
+        <h3>커스텀 필드</h3>
+        <p>6가지 필드 타입(텍스트, 숫자, 셀렉트, 멀티셀렉트, 체크박스, 날짜). 프로젝트별 동적 추가.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">▶️</div>
+        <h3>테스트 실행</h3>
+        <p>테스트 런에서 P/F/B/N 키보드 단축키로 빠르게 결과 기록. 타이머, 첨부파일 지원.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">📊</div>
+        <h3>대시보드 & 리포트</h3>
+        <p>Chart.js 기반 진행률 시각화. 라운드별 비교, 회귀 감지. PDF/Excel 리포트 생성.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🔍</div>
+        <h3>고급 필터</h3>
+        <p>AND/OR 다중 조건 필터. 6가지 연산자(=, !=, 포함, 미포함, >, <). 필터 뷰 저장/로드.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">📥</div>
+        <h3>Import / Export</h3>
+        <p>Excel 멀티시트 임포트. Jira CSV(35+ 헤더 매핑, CP949/UTF-8 BOM 자동 감지). 벌크 Upsert.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🎯</div>
+        <h3>테스트 플랜</h3>
+        <p>마일스톤 기반 테스트 계획. 릴리즈별 실행 추적과 커버리지 시각화.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🔐</div>
+        <h3>인증 & 권한</h3>
+        <p>JWT + httpOnly 쿠키. 시스템 역할(Admin/QA Manager/User)과 프로젝트 역할(Admin/Tester) 이중 RBAC.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Screenshots -->
+<section id="screenshots" class="screenshots-section">
+  <div class="container">
+    <span class="section-label">Screenshots</span>
+    <h2 class="section-title">화면 미리보기</h2>
+    <p class="section-desc">
+      실제 동작하는 화면입니다. 다크 모드를 포함한 전체 UI를 확인하세요.
+    </p>
+    <div class="screenshot-tabs" id="screenshotTabs">
+      <button class="screenshot-tab active" data-img="../docs/screenshots/dashboard.png" data-cap="대시보드 — 테스트 진행률, 결과 분포, 라운드별 비교 차트를 한 화면에서 확인">대시보드</button>
+      <button class="screenshot-tab" data-img="../docs/screenshots/tc_grid.png" data-cap="TC 관리 — AG Grid 기반 스프레드시트 편집. 인라인 수정, 시트 트리, 커스텀 필드 지원">TC 관리</button>
+      <button class="screenshot-tab" data-img="../docs/screenshots/testrun.png" data-cap="테스트 수행 — 테스트 런 목록과 실행 결과를 한눈에. P/F/B/N 단축키로 빠른 기록">테스트 수행</button>
+      <button class="screenshot-tab" data-img="../docs/screenshots/project_list.png" data-cap="프로젝트 현황 — 전체 프로젝트 목록, TC 수, 진행률, 최근 활동을 요약 표시">프로젝트 현황</button>
+      <button class="screenshot-tab" data-img="../docs/screenshots/sheet_tree.png" data-cap="시트 트리 — N-depth 계층형 시트로 테스트 스위트를 폴더처럼 관리">시트 트리</button>
+      <button class="screenshot-tab" data-img="../docs/screenshots/filter.png" data-cap="고급 필터 — AND/OR 조합, 6가지 연산자로 필요한 TC만 정확하게 검색">고급 필터</button>
+      <button class="screenshot-tab" data-img="../docs/screenshots/dark_mode.png" data-cap="다크 모드 — 눈이 편안한 다크 테마. 모든 화면에서 일관된 디자인">다크 모드</button>
+    </div>
+    <div class="screenshot-display">
+      <img id="screenshotImg" src="../docs/screenshots/dashboard.png" alt="Screenshot">
+      <div class="screenshot-caption" id="screenshotCap">
+        대시보드 — 테스트 진행률, 결과 분포, 라운드별 비교 차트를 한 화면에서 확인
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section id="tech">
+  <div class="container">
+    <span class="section-label">Tech Stack</span>
+    <h2 class="section-title">기술 스택</h2>
+    <p class="section-desc">
+      검증된 오픈소스 기술만으로 구성. 복잡한 인프라 없이도 강력한 기능을 제공합니다.
+    </p>
+    <div class="tech-grid fade-in">
+      <div class="tech-group">
+        <h3>🖥️ Frontend</h3>
+        <div class="tech-list">
+          <span class="tech-tag"><span class="dot dot-blue"></span>React 19</span>
+          <span class="tech-tag"><span class="dot dot-blue"></span>TypeScript 5.9</span>
+          <span class="tech-tag"><span class="dot dot-purple"></span>Vite 7</span>
+          <span class="tech-tag"><span class="dot dot-green"></span>AG Grid</span>
+          <span class="tech-tag"><span class="dot dot-yellow"></span>Chart.js</span>
+          <span class="tech-tag"><span class="dot dot-blue"></span>React Router 7</span>
+          <span class="tech-tag"><span class="dot dot-red"></span>Axios</span>
+        </div>
+      </div>
+      <div class="tech-group">
+        <h3>⚡ Backend</h3>
+        <div class="tech-list">
+          <span class="tech-tag"><span class="dot dot-green"></span>Python 3.12</span>
+          <span class="tech-tag"><span class="dot dot-green"></span>FastAPI</span>
+          <span class="tech-tag"><span class="dot dot-red"></span>SQLAlchemy 2</span>
+          <span class="tech-tag"><span class="dot dot-blue"></span>SQLite</span>
+          <span class="tech-tag"><span class="dot dot-yellow"></span>Alembic</span>
+          <span class="tech-tag"><span class="dot dot-purple"></span>Pydantic 2</span>
+          <span class="tech-tag"><span class="dot dot-green"></span>JWT + bcrypt</span>
+        </div>
+      </div>
+      <div class="tech-group">
+        <h3>🧪 Testing</h3>
+        <div class="tech-list">
+          <span class="tech-tag"><span class="dot dot-green"></span>Vitest (358 unit)</span>
+          <span class="tech-tag"><span class="dot dot-purple"></span>Playwright (93 E2E)</span>
+          <span class="tech-tag"><span class="dot dot-yellow"></span>pytest (116 API)</span>
+          <span class="tech-tag"><span class="dot dot-blue"></span>ESLint</span>
+        </div>
+      </div>
+      <div class="tech-group">
+        <h3>🛠️ DevOps & Tools</h3>
+        <div class="tech-list">
+          <span class="tech-tag"><span class="dot dot-red"></span>Git / GitHub</span>
+          <span class="tech-tag"><span class="dot dot-green"></span>AGPL-3.0</span>
+          <span class="tech-tag"><span class="dot dot-blue"></span>openpyxl</span>
+          <span class="tech-tag"><span class="dot dot-yellow"></span>fpdf2</span>
+          <span class="tech-tag"><span class="dot dot-purple"></span>DOMPurify</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section style="padding-top: 0;">
+  <div class="container">
+    <span class="section-label">Architecture</span>
+    <h2 class="section-title">시스템 아키텍처</h2>
+    <div class="arch-diagram fade-in">
+      <div class="arch-box">
+        <h4>Frontend</h4>
+        <p>React 19 + TypeScript<br>AG Grid + Chart.js<br>Vite Dev Server<br>:5173</p>
+      </div>
+      <div class="arch-arrow">→<br><span style="font-size:.75rem;color:var(--text-dim)">REST API<br>Axios</span></div>
+      <div class="arch-box">
+        <h4>Backend</h4>
+        <p>FastAPI + Uvicorn<br>15 Route Modules<br>JWT Auth + RBAC<br>:8008</p>
+      </div>
+      <div class="arch-arrow">→<br><span style="font-size:.75rem;color:var(--text-dim)">SQLAlchemy<br>ORM</span></div>
+      <div class="arch-box">
+        <h4>Database</h4>
+        <p>SQLite (default)<br>13 Tables<br>Alembic Migrations<br>Zero Config</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Quality -->
+<section id="quality">
+  <div class="container">
+    <span class="section-label">Quality</span>
+    <h2 class="section-title">품질 지표</h2>
+    <p class="section-desc">
+      567개 자동화 테스트가 전체 기능을 검증합니다. 빌드, 린트, 테스트 — 모든 품질 게이트 통과.
+    </p>
+    <div class="quality-grid fade-in">
+      <div class="quality-card">
+        <div class="quality-ring" style="--pct: 100%;" data-label="358"></div>
+        <h4>Frontend Unit</h4>
+        <p>Vitest · 23개 테스트 파일<br>컴포넌트, API, 유틸리티</p>
+      </div>
+      <div class="quality-card">
+        <div class="quality-ring" style="--pct: 100%;" data-label="93"></div>
+        <h4>E2E Tests</h4>
+        <p>Playwright · 9개 스펙 파일<br>인증, TC, 시트, 커스텀 필드</p>
+      </div>
+      <div class="quality-card">
+        <div class="quality-ring" style="--pct: 100%;" data-label="116"></div>
+        <h4>Backend API</h4>
+        <p>pytest · 보안, 기능, 엣지 케이스<br>통합 테스트</p>
+      </div>
+    </div>
+    <div style="text-align: center; margin-top: 2rem;">
+      <div style="display: inline-flex; align-items: center; gap: .75rem; padding: .75rem 2rem; border-radius: var(--radius); background: var(--accent-glow); border: 1px solid rgba(34,197,94,.3);">
+        <span style="font-size: 1.5rem; font-weight: 800; color: var(--accent);">567 / 567</span>
+        <span style="color: var(--text-dim);">ALL PASS</span>
+        <span style="color: var(--accent);">✓</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Versions -->
+<section id="versions">
+  <div class="container">
+    <span class="section-label">History</span>
+    <h2 class="section-title">버전 히스토리</h2>
+    <p class="section-desc">
+      v0.1부터 v0.7.1까지, 단계적으로 기능을 확장해 온 개발 여정.
+    </p>
+    <div class="timeline fade-in">
+      <div class="timeline-item">
+        <span class="timeline-version">v0.7.1.0</span>
+        <span class="timeline-date">2026-03-23</span>
+        <div class="timeline-desc">품질 게이트 올 그린 · AGPL-3.0 라이선스 · 567 ALL PASS</div>
+      </div>
+      <div class="timeline-item">
+        <span class="timeline-version">v0.7.0.0</span>
+        <span class="timeline-date">2026-03-21</span>
+        <div class="timeline-desc">오픈소스 준비 · GitHub 레포 · YM TestCase 브랜딩</div>
+      </div>
+      <div class="timeline-item">
+        <span class="timeline-version">v0.6.0.0</span>
+        <span class="timeline-date">2026-03-20</span>
+        <div class="timeline-desc">시트 트리 · 커스텀 필드 · 테스트 플랜 · Jira CSV · 고급 필터</div>
+      </div>
+      <div class="timeline-item">
+        <span class="timeline-version">v0.5.0.0</span>
+        <span class="timeline-date">2026-03-19</span>
+        <div class="timeline-desc">시트 관리 · 자동 저장 · Excel Upsert · 벌크 삭제 · 312 테스트</div>
+      </div>
+      <div class="timeline-item dim">
+        <span class="timeline-version">v0.1~0.4</span>
+        <span class="timeline-date">~2026-03-18</span>
+        <div class="timeline-desc">핵심 TC 관리 · 인증/RBAC · 보안 강화 · 대시보드 · 리포트</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Blog -->
+<section id="blog" style="background: var(--surface);">
+  <div class="container">
+    <span class="section-label">Blog Series</span>
+    <h2 class="section-title">개발 블로그 10편</h2>
+    <p class="section-desc">
+      설계 결정, 기술 선택, 보안 강화, 오픈소스 공개까지 — 전 과정을 기록한 기술 블로그.
+    </p>
+    <div class="blog-grid fade-in">
+      <div class="blog-card">
+        <span class="blog-num">01</span>
+        <div>
+          <h4>왜 직접 만들었나</h4>
+          <p>Excel과 TestRail의 한계, 직접 만들기로 한 이유</p>
+        </div>
+      </div>
+      <div class="blog-card">
+        <span class="blog-num">02</span>
+        <div>
+          <h4>기술 스택 선택기</h4>
+          <p>FastAPI + React + AG Grid + SQLite 조합의 이유</p>
+        </div>
+      </div>
+      <div class="blog-card">
+        <span class="blog-num">03</span>
+        <div>
+          <h4>TC 관리 핵심 기능</h4>
+          <p>스프레드시트 편집과 Excel Import/Export</p>
+        </div>
+      </div>
+      <div class="blog-card">
+        <span class="blog-num">04</span>
+        <div>
+          <h4>테스트 실행 & 대시보드</h4>
+          <p>테스트 런, 키보드 단축키, 리포트 생성</p>
+        </div>
+      </div>
+      <div class="blog-card">
+        <span class="blog-num">05</span>
+        <div>
+          <h4>인증 & RBAC</h4>
+          <p>JWT 인증과 이중 역할 기반 접근 제어</p>
+        </div>
+      </div>
+      <div class="blog-card">
+        <span class="blog-num">06</span>
+        <div>
+          <h4>보안 강화</h4>
+          <p>비밀번호 정책, Rate Limiting, 파일 보안</p>
+        </div>
+      </div>
+      <div class="blog-card">
+        <span class="blog-num">07</span>
+        <div>
+          <h4>UI/UX 자동화</h4>
+          <p>Playwright 스크린샷, 사용자 매뉴얼 자동화</p>
+        </div>
+      </div>
+      <div class="blog-card">
+        <span class="blog-num">08</span>
+        <div>
+          <h4>고급 기능 (v0.6)</h4>
+          <p>시트 트리, 커스텀 필드, 테스트 플랜, Jira CSV</p>
+        </div>
+      </div>
+      <div class="blog-card">
+        <span class="blog-num">09</span>
+        <div>
+          <h4>오픈소스 공개기</h4>
+          <p>브랜딩, AGPL-3.0, 567 테스트의 의미</p>
+        </div>
+      </div>
+      <div class="blog-card">
+        <span class="blog-num">10</span>
+        <div>
+          <h4>회고 & 교훈</h4>
+          <p>1인 개발의 현실, Best Practices, 미래 계획</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <div class="logo-footer">YM TestCase</div>
+    <p>Your Method, Your Test Case Manager</p>
+    <p style="margin-top: .5rem;">
+      Made by <strong>sym804</strong> ·
+      <a href="https://github.com/sym804/ym-testcase" target="_blank">GitHub</a> ·
+      AGPL-3.0 License
+    </p>
+  </div>
+</footer>
+
+<script>
+// Navbar scroll effect
+const navbar = document.getElementById('navbar');
+window.addEventListener('scroll', () => {
+  navbar.classList.toggle('scrolled', window.scrollY > 50);
+});
+
+// Screenshot tabs
+const tabs = document.querySelectorAll('.screenshot-tab');
+const img = document.getElementById('screenshotImg');
+const cap = document.getElementById('screenshotCap');
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    img.style.opacity = '0';
+    setTimeout(() => {
+      img.src = tab.dataset.img;
+      cap.textContent = tab.dataset.cap;
+      img.style.opacity = '1';
+    }, 150);
+  });
+});
+
+// Fade-in on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
