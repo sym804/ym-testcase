@@ -464,6 +464,20 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
           </tbody>
         </table>
       )}
+
+      {/* 시스템 정보 */}
+      <div style={{ marginTop: 48, paddingTop: 24, borderTop: "1px solid var(--border-color)" }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>시스템 정보</h3>
+        <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.8 }}>
+          <div>YM TestCase v1.0.0.0</div>
+          <div>License: AGPL-3.0</div>
+          <div>
+            <a href="https://github.com/sym804/ym-testcase" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
+              GitHub
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
