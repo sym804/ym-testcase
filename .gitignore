@@ -83,3 +83,7 @@ ui_design/
 CLAUDE.md
 LICENSE_AGPL
 docker-compose.yml
+.env.example
+TC_Manager_Regression_Checklist_v2_merged.xlsx
+TC_Manager_Full_Regression_Checklist.xlsx
+Issue_list.xlsx
