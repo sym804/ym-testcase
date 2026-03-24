@@ -109,6 +109,7 @@ export default function Header() {
         >
           YM TestCase
         </span>
+        <span style={{ fontSize: 10, color: "var(--text-secondary, #94A3B8)", marginLeft: 6, fontWeight: 400 }}>v1.0.0.0</span>
       </div>
 
       <div style={styles.center}>

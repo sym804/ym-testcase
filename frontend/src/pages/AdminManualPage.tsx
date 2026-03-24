@@ -51,7 +51,7 @@ export default function AdminManualPage() {
           {/* 1. 시스템 구성 */}
           <section id="architecture" style={s.section}>
             <h1 style={s.h1}>YM TestCase 운영 매뉴얼</h1>
-            <p style={s.updatedAt}>최종 업데이트: 2026-03-24 | v0.7.1.0 | Admin 전용 문서</p>
+            <p style={s.updatedAt}>최종 업데이트: 2026-03-24 | v1.0.0.0 | Admin 전용 문서</p>
 
             <h2 style={s.h2}>1. 시스템 구성</h2>
             <div style={s.archGrid}>

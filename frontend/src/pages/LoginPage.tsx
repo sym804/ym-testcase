@@ -77,6 +77,9 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+      <div style={{ position: "absolute", bottom: 16, width: "100%", textAlign: "center", fontSize: 11, color: "var(--text-secondary, #94A3B8)" }}>
+        YM TestCase v1.0.0.0 | AGPL-3.0
+      </div>
     </div>
   );
 }

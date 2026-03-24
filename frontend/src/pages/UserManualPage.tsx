@@ -885,7 +885,7 @@ export default function UserManualPage() {
           )}
 
           <div style={s.footer}>
-            <p>YM TestCase v0.7.1 | 사용자 매뉴얼</p>
+            <p>YM TestCase v1.0.0.0 | 사용자 매뉴얼</p>
           </div>
         </main>
       </div>
