@@ -1,5 +1,5 @@
-name: 보안 이슈
-description: 보안 취약점, 인증/권한 문제, 데이터 노출 등을 보고합니다.
+name: "보안 이슈"
+description: "보안 취약점, 인증/권한 문제, 데이터 노출 등을 보고합니다."
 title: "[SEC] "
 labels: ["security"]
 body:
@@ -7,17 +7,12 @@ body:
     attributes:
       value: |
         **주의:** 심각한 보안 취약점은 공개 이슈 대신 비공개로 보고해주세요.
-        이메일 또는 Security Advisory 기능을 사용해주세요.
 
   - type: dropdown
     id: severity
     attributes:
-      label: 심각도
-      description: |
-        Block: 서비스 전체 장애
-        Critical: 인증 우회, 데이터 유출 가능
-        Major: 권한 누락, 설정 오류
-        Minor: 경미한 보안 설정 문제 (보안은 최소 Minor 이상)
+      label: "심각도"
+      description: "Block=서비스 전체 장애 / Critical=인증 우회, 데이터 유출 / Major=권한 누락 / Minor=경미한 보안 설정 (최소 Minor)"
       options:
         - Block
         - Critical
@@ -29,7 +24,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: 발생 버전
+      label: "발생 버전"
       placeholder: "0.7.1.0"
     validations:
       required: true
@@ -37,8 +32,8 @@ body:
   - type: textarea
     id: reproduction
     attributes:
-      label: 재현 방법
-      description: 취약점 재현 스텝을 기술합니다.
+      label: "재현 방법"
+      description: "취약점 재현 스텝을 기술합니다."
       placeholder: |
         1. 일반 사용자로 로그인
         2. API 직접 호출
@@ -49,15 +44,15 @@ body:
   - type: textarea
     id: cause-and-fix
     attributes:
-      label: 발생 원인 및 수정사항
-      placeholder: "원인: 권한 검증 누락 → 수정: check_project_access 미들웨어 적용"
+      label: "발생 원인 및 수정사항"
+      placeholder: "권한 검증 누락 → check_project_access 적용"
     validations:
       required: false
 
   - type: textarea
     id: impact
     attributes:
-      label: 영향 범위
+      label: "영향 범위"
       placeholder: "API 엔드포인트 전체"
     validations:
       required: false
