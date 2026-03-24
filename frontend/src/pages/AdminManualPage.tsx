@@ -51,17 +51,17 @@ export default function AdminManualPage() {
           {/* 1. 시스템 구성 */}
           <section id="architecture" style={s.section}>
             <h1 style={s.h1}>YM TestCase 운영 매뉴얼</h1>
-            <p style={s.updatedAt}>최종 업데이트: 2026-03-20 | v0.6.0.0 | Admin 전용 문서</p>
+            <p style={s.updatedAt}>최종 업데이트: 2026-03-24 | v0.7.1.0 | Admin 전용 문서</p>
 
             <h2 style={s.h2}>1. 시스템 구성</h2>
             <div style={s.archGrid}>
               <div style={s.archCard}>
                 <div style={s.archTitle}>Backend</div>
                 <ul style={s.archList}>
-                  <li>FastAPI (Python 3.10+)</li>
-                  <li>SQLAlchemy ORM</li>
+                  <li>FastAPI (Python 3.12)</li>
+                  <li>SQLAlchemy 2 ORM</li>
                   <li>SQLite (기본) / PostgreSQL</li>
-                  <li>JWT 인증 (HS256)</li>
+                  <li>JWT 인증 (httpOnly 쿠키 + CSRF 토큰)</li>
                   <li>bcrypt 비밀번호 해싱</li>
                   <li>Uvicorn ASGI 서버</li>
                 </ul>
@@ -69,22 +69,22 @@ export default function AdminManualPage() {
               <div style={s.archCard}>
                 <div style={s.archTitle}>Frontend</div>
                 <ul style={s.archList}>
-                  <li>React 18 + TypeScript</li>
-                  <li>Vite (빌드 도구)</li>
+                  <li>React 19 + TypeScript 5.9</li>
+                  <li>Vite 7 (빌드 도구)</li>
                   <li>AG Grid Community (데이터 그리드)</li>
                   <li>Chart.js (차트)</li>
                   <li>Axios (HTTP 클라이언트)</li>
-                  <li>React Router v6</li>
+                  <li>React Router v7</li>
                 </ul>
               </div>
               <div style={s.archCard}>
                 <div style={s.archTitle}>인프라</div>
                 <ul style={s.archList}>
-                  <li>Docker / Docker Compose 지원</li>
                   <li>Backend: 포트 8008</li>
-                  <li>Frontend: 포트 5173 (개발) / 80 (프로덕션)</li>
+                  <li>Frontend: 포트 5173 (개발)</li>
                   <li>CORS 설정 필요</li>
                   <li>파일 저장: UPLOAD_DIR</li>
+                  <li>라이선스: AGPL-3.0</li>
                 </ul>
               </div>
             </div>
@@ -108,16 +108,14 @@ npm install
 npm run dev`}</pre>
             </div>
 
-            <h3 style={s.h3}>2-2. Docker Compose 실행</h3>
+            <h3 style={s.h3}>2-2. Mac/Linux 실행</h3>
             <div style={s.codeBlock}>
-              <div style={s.codeTitle}>docker-compose.yml</div>
-              <pre style={s.code}>{`docker-compose up -d
+              <div style={s.codeTitle}>run_dev.sh</div>
+              <pre style={s.code}>{`bash run_dev.sh
 
-# 상태 확인
-docker-compose ps
-
-# 로그 확인
-docker-compose logs -f backend`}</pre>
+# 또는 수동 실행
+cd backend && python -m uvicorn main:app --reload --port 8008 &
+cd frontend && npm run dev &`}</pre>
             </div>
 
             <h3 style={s.h3}>2-3. 프로덕션 빌드</h3>
@@ -337,7 +335,8 @@ npx tsc --noEmit`}</pre>
                 <tr><td style={s.td}>비밀번호 정책</td><td style={s.td}>최소 8자, 동일 비밀번호 재사용 불가</td><td style={s.td}>자동 적용</td></tr>
                 <tr><td style={s.td}>비밀번호 저장</td><td style={s.td}>bcrypt 해싱</td><td style={s.td}>자동 적용</td></tr>
                 <tr><td style={s.td}>비밀번호 초기화</td><td style={s.td}>Admin이 임시 비밀번호 발급, 강제 변경</td><td style={s.td}>Admin 페이지</td></tr>
-                <tr><td style={s.td}>인증 토큰</td><td style={s.td}>JWT (HS256)</td><td style={s.td}>TOKEN_EXPIRE_HOURS (기본 2시간)</td></tr>
+                <tr><td style={s.td}>인증 토큰</td><td style={s.td}>JWT (HS256) + httpOnly 쿠키</td><td style={s.td}>TOKEN_EXPIRE_HOURS (기본 2시간)</td></tr>
+                <tr><td style={s.td}>CSRF 방어</td><td style={s.td}>csrf_token 쿠키 + X-CSRF-Token 헤더 검증</td><td style={s.td}>상태 변경 요청 시 자동 적용</td></tr>
                 <tr><td style={s.td}>로그인 제한</td><td style={s.td}>Rate Limiting</td><td style={s.td}>IP+사용자당 5분간 10회 (초과 시 잠금)</td></tr>
                 <tr><td style={s.td}>CORS</td><td style={s.td}>오리진 화이트리스트</td><td style={s.td}>CORS_ORIGINS (와일드카드 금지)</td></tr>
                 <tr><td style={s.td}>파일 업로드</td><td style={s.td}>확장자 화이트리스트 + 경로 탐색 방지</td><td style={s.td}>허용 확장자 고정</td></tr>
@@ -386,7 +385,7 @@ npx tsc --noEmit`}</pre>
                 ["PUT", "/api/projects/{id}/testcases/sheets/{sheet_id}/rename", "시트 이름 변경"],
                 ["PUT", "/api/projects/{id}/testcases/sheets/{sheet_id}/move", "시트 이동 (부모 변경)"],
                 ["POST", "/api/projects/{id}/testcases/import/preview", "Import 미리보기"],
-                ["POST", "/api/projects/{id}/testcases/import", "Excel/CSV Import (Jira/Xray/Zephyr 호환)"],
+                ["POST", "/api/projects/{id}/testcases/import", "Excel/CSV/Markdown Import (Jira/Xray/Zephyr 호환)"],
                 ["GET", "/api/projects/{id}/testcases/export", "Excel Export"],
               ]},
               { title: "테스트 런", endpoints: [

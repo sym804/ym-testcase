@@ -140,6 +140,10 @@ ym-testcase/
 └── README.md
 ```
 
+## 기여하기
+
+기여를 환영합니다! [CONTRIBUTING.md](CONTRIBUTING.md)를 읽어주세요.
+
 ## 라이선스
 
 AGPL-3.0 — [GNU Affero General Public License v3.0](LICENSE)
