@@ -34,6 +34,7 @@ export interface Project {
   description: string;
   jira_base_url: string | null;
   is_private: boolean;
+  field_config?: Record<string, { display_name?: string; visible?: boolean }> | null;
   created_by: number;
   created_at: string;
   updated_at: string;

@@ -392,76 +392,66 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     return () => document.removeEventListener("keydown", handler);
   }, [handleUndo, handleRedo]);
 
+  // 기본 필드 설정 헬퍼
+  const fc = project.field_config;
+  const fieldDisplay = (key: string, defaultName: string) => ({
+    name: fc?.[key]?.display_name || defaultName,
+    visible: fc?.[key]?.visible !== false,
+  });
+
   const columnDefs = useMemo<ColDef[]>(
-    () => [
-      { field: "no", headerName: "No", width: 55, editable: canEditTC, type: "numericColumn", wrapText: false, autoHeight: false },
-      { field: "tc_id", headerName: "TC ID", width: 110, editable: canEditTC, cellRenderer: HighlightCell },
-      {
-        field: "type",
-        headerName: "Type",
-        width: 80,
-        editable: canEditTC,
-        cellEditor: "agSelectCellEditor",
-        cellEditorParams: { values: TYPE_OPTIONS },
-        cellRenderer: HighlightCell,
-      },
-      { field: "category", headerName: "Category", width: 140, editable: canEditTC, wrapText: true, autoHeight: true, cellRenderer: HighlightCell },
-      { field: "depth1", headerName: "Depth 1", width: 150, editable: canEditTC, wrapText: true, autoHeight: true, cellRenderer: HighlightCell },
-      { field: "depth2", headerName: "Depth 2", width: 150, editable: canEditTC, wrapText: true, autoHeight: true, cellRenderer: HighlightCell },
-      {
-        field: "priority",
-        headerName: "Priority",
-        width: 90,
-        editable: canEditTC,
-        cellEditor: "agSelectCellEditor",
-        cellEditorParams: { values: PRIORITY_OPTIONS },
-        cellStyle: priorityCellStyle,
-      },
-      {
-        field: "test_type",
-        headerName: "Platform",
-        width: 85,
-        editable: canEditTC,
-        cellEditor: "agSelectCellEditor",
-        cellEditorParams: { values: PLATFORM_OPTIONS },
-      },
-      {
-        field: "precondition",
-        headerName: "Precondition",
-        width: 200,
-        editable: canEditTC,
-        wrapText: true,
-        autoHeight: true,
-        cellEditor: "agLargeTextCellEditor",
-        cellEditorPopup: true,
-        cellClass: "ag-cell-left",
-        cellRenderer: MarkdownCell,
-      },
-      {
-        field: "test_steps",
-        headerName: "Test Steps",
-        width: 300,
-        editable: canEditTC,
-        wrapText: true,
-        autoHeight: true,
-        cellEditor: "agLargeTextCellEditor",
-        cellEditorPopup: true,
-        cellClass: "ag-cell-left",
-        cellRenderer: MarkdownCell,
-      },
-      {
-        field: "expected_result",
-        headerName: "Expected Result",
-        width: 260,
-        editable: canEditTC,
-        wrapText: true,
-        autoHeight: true,
-        cellEditor: "agLargeTextCellEditor",
-        cellEditorPopup: true,
-        cellClass: "ag-cell-left",
-        cellRenderer: MarkdownCell,
-      },
-      { field: "remarks", headerName: "Remarks", minWidth: 180, flex: 1, editable: canEditTC, wrapText: true, autoHeight: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell },
+    () => {
+      const builtIn: (ColDef & { _key?: string })[] = [
+        { _key: "no", field: "no", headerName: "No", width: 55, editable: canEditTC, type: "numericColumn", wrapText: false, autoHeight: false },
+        { _key: "tc_id", field: "tc_id", headerName: fieldDisplay("tc_id", "TC ID").name, width: 110, editable: canEditTC, cellRenderer: HighlightCell },
+        {
+          _key: "type", field: "type",
+          headerName: fieldDisplay("type", "Type").name,
+          width: 80, editable: canEditTC,
+          cellEditor: "agSelectCellEditor", cellEditorParams: { values: TYPE_OPTIONS }, cellRenderer: HighlightCell,
+        },
+        { _key: "category", field: "category", headerName: fieldDisplay("category", "Category").name, width: 140, editable: canEditTC, wrapText: true, autoHeight: true, cellRenderer: HighlightCell },
+        { _key: "depth1", field: "depth1", headerName: fieldDisplay("depth1", "Depth 1").name, width: 150, editable: canEditTC, wrapText: true, autoHeight: true, cellRenderer: HighlightCell },
+        { _key: "depth2", field: "depth2", headerName: fieldDisplay("depth2", "Depth 2").name, width: 150, editable: canEditTC, wrapText: true, autoHeight: true, cellRenderer: HighlightCell },
+        {
+          _key: "priority", field: "priority",
+          headerName: fieldDisplay("priority", "Priority").name,
+          width: 90, editable: canEditTC,
+          cellEditor: "agSelectCellEditor", cellEditorParams: { values: PRIORITY_OPTIONS }, cellStyle: priorityCellStyle,
+        },
+        {
+          _key: "test_type", field: "test_type",
+          headerName: fieldDisplay("test_type", "Platform").name,
+          width: 85, editable: canEditTC,
+          cellEditor: "agSelectCellEditor", cellEditorParams: { values: PLATFORM_OPTIONS },
+        },
+        {
+          _key: "precondition", field: "precondition",
+          headerName: fieldDisplay("precondition", "Precondition").name,
+          width: 200, editable: canEditTC, wrapText: true, autoHeight: true,
+          cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
+        },
+        {
+          _key: "test_steps", field: "test_steps",
+          headerName: fieldDisplay("test_steps", "Test Steps").name,
+          width: 300, editable: canEditTC, wrapText: true, autoHeight: true,
+          cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
+        },
+        {
+          _key: "expected_result", field: "expected_result",
+          headerName: fieldDisplay("expected_result", "Expected Result").name,
+          width: 260, editable: canEditTC, wrapText: true, autoHeight: true,
+          cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
+        },
+        { _key: "issue_link", field: "issue_link", headerName: fieldDisplay("issue_link", "Issue Link").name, width: 120, editable: canEditTC, cellRenderer: HighlightCell },
+        { _key: "assignee", field: "assignee", headerName: fieldDisplay("assignee", "Assignee").name, width: 100, editable: canEditTC, cellRenderer: HighlightCell },
+        { _key: "remarks", field: "remarks", headerName: fieldDisplay("remarks", "Remarks").name, minWidth: 180, flex: 1, editable: canEditTC, wrapText: true, autoHeight: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell },
+      ];
+      // No는 항상 표시, 나머지는 visible 체크
+      const filtered = builtIn.filter(col => col._key === "no" || fieldDisplay(col._key!, "").visible);
+      // _key 제거 (AG Grid에 불필요)
+      return [
+        ...filtered.map(({ _key, ...rest }) => rest),
       // 커스텀 필드 동적 컬럼
       ...customFields.map((cf): ColDef => {
         const base: ColDef = {
@@ -489,8 +479,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         }
         return base;
       }),
-    ],
-    [canEditTC, customFields]
+    ];
+    },
+    [canEditTC, customFields, fc]
   );
 
   const defaultColDef = useMemo<ColDef>(

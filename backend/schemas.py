@@ -57,6 +57,7 @@ class ProjectUpdate(BaseModel):
     description: Optional[str] = None
     jira_base_url: Optional[str] = None
     is_private: Optional[bool] = None
+    field_config: Optional[dict] = None
 
 
 class ProjectResponse(BaseModel):
@@ -65,6 +66,7 @@ class ProjectResponse(BaseModel):
     description: Optional[str] = None
     jira_base_url: Optional[str] = None
     is_private: bool = False
+    field_config: Optional[dict] = None
     created_by: int
     created_at: datetime
     updated_at: datetime

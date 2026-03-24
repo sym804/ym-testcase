@@ -107,6 +107,9 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
         myRole={project.my_role}
       />
 
+      {/* 기본 필드 설정 (admin만) */}
+      {isAdmin && <BuiltInFieldSettings project={project} onUpdate={onUpdate} />}
+
       {/* 커스텀 필드 관리 (admin만) */}
       {isAdmin && <CustomFieldManager projectId={project.id} />}
 
@@ -303,6 +306,126 @@ const s: Record<string, React.CSSProperties> = {
     cursor: "pointer",
   },
 };
+
+// ── 기본 필드 설정 컴포넌트 ──
+const BUILTIN_FIELDS = [
+  { key: "tc_id", defaultName: "TC ID", canHide: false },
+  { key: "type", defaultName: "Type", canHide: true },
+  { key: "category", defaultName: "Category", canHide: true },
+  { key: "depth1", defaultName: "Depth 1", canHide: true },
+  { key: "depth2", defaultName: "Depth 2", canHide: true },
+  { key: "priority", defaultName: "Priority", canHide: true },
+  { key: "test_type", defaultName: "Platform", canHide: true },
+  { key: "precondition", defaultName: "Precondition", canHide: true },
+  { key: "test_steps", defaultName: "Test Steps", canHide: false },
+  { key: "expected_result", defaultName: "Expected Result", canHide: false },
+  { key: "issue_link", defaultName: "Issue Link", canHide: true },
+  { key: "assignee", defaultName: "Assignee", canHide: true },
+  { key: "remarks", defaultName: "Remarks", canHide: true },
+];
+
+function BuiltInFieldSettings({ project, onUpdate }: { project: Project; onUpdate: (p: Project) => void }) {
+  const [config, setConfig] = useState<Record<string, { display_name: string; visible: boolean }>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const merged: Record<string, { display_name: string; visible: boolean }> = {};
+    for (const f of BUILTIN_FIELDS) {
+      const saved = project.field_config?.[f.key];
+      merged[f.key] = {
+        display_name: saved?.display_name ?? f.defaultName,
+        visible: saved?.visible !== false,
+      };
+    }
+    setConfig(merged);
+  }, [project.field_config]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      // 기본값과 다른 것만 저장
+      const diff: Record<string, { display_name?: string; visible?: boolean }> = {};
+      for (const f of BUILTIN_FIELDS) {
+        const c = config[f.key];
+        if (!c) continue;
+        const changed: { display_name?: string; visible?: boolean } = {};
+        if (c.display_name !== f.defaultName) changed.display_name = c.display_name;
+        if (c.visible === false) changed.visible = false;
+        if (Object.keys(changed).length > 0) diff[f.key] = changed;
+      }
+      const updated = await projectsApi.update(project.id, { field_config: Object.keys(diff).length > 0 ? diff : null });
+      onUpdate(updated);
+      toast.success("필드 설정이 저장되었습니다.");
+    } catch {
+      toast.error("필드 설정 저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    const merged: Record<string, { display_name: string; visible: boolean }> = {};
+    for (const f of BUILTIN_FIELDS) {
+      merged[f.key] = { display_name: f.defaultName, visible: true };
+    }
+    setConfig(merged);
+  };
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700 }}>기본 필드 설정</h3>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={handleReset} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border-color)", background: "transparent", fontSize: 12, cursor: "pointer", color: "var(--text-secondary)" }}>
+            초기화
+          </button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "4px 12px", borderRadius: 6, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>
+            {saving ? "저장 중..." : "저장"}
+          </button>
+        </div>
+      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ borderBottom: "2px solid var(--border-color)" }}>
+            <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600 }}>필드 키</th>
+            <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600 }}>표시 이름</th>
+            <th style={{ textAlign: "center", padding: "8px 10px", fontWeight: 600, width: 60 }}>표시</th>
+          </tr>
+        </thead>
+        <tbody>
+          {BUILTIN_FIELDS.map((f) => {
+            const c = config[f.key];
+            if (!c) return null;
+            return (
+              <tr key={f.key} style={{ borderBottom: "1px solid var(--border-color)", opacity: c.visible ? 1 : 0.5 }}>
+                <td style={{ padding: "6px 10px", fontFamily: "monospace", fontSize: 12, color: "var(--text-secondary)" }}>{f.key}</td>
+                <td style={{ padding: "6px 10px" }}>
+                  <input
+                    type="text"
+                    value={c.display_name}
+                    onChange={(e) => setConfig({ ...config, [f.key]: { ...c, display_name: e.target.value } })}
+                    style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border-color)", background: "var(--bg-primary)", color: "var(--text-primary)", fontSize: 13 }}
+                  />
+                </td>
+                <td style={{ padding: "6px 10px", textAlign: "center" }}>
+                  {f.canHide ? (
+                    <input
+                      type="checkbox"
+                      checked={c.visible}
+                      onChange={(e) => setConfig({ ...config, [f.key]: { ...c, visible: e.target.checked } })}
+                    />
+                  ) : (
+                    <input type="checkbox" checked disabled title="필수 필드" />
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 // ── 커스텀 필드 관리 컴포넌트 ──
 const FIELD_TYPES = [

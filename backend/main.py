@@ -33,6 +33,7 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     _migrate_roles()
     _migrate_sheet_parent_id()
+    _migrate_field_config()
     _purge_old_deleted_testcases()
     yield
 
@@ -140,6 +141,25 @@ def _migrate_sheet_parent_id():
         db.rollback()
 
     db.close()
+
+
+def _migrate_field_config():
+    """v1.0.0 마이그레이션: projects 테이블에 field_config 컬럼 추가"""
+    from database import SessionLocal
+    import sqlalchemy as sa
+    db = SessionLocal()
+    try:
+        result = db.execute(sa.text("PRAGMA table_info(projects)"))
+        columns = [row[1] for row in result]
+        if "field_config" not in columns:
+            db.execute(sa.text("ALTER TABLE projects ADD COLUMN field_config TEXT"))
+            db.commit()
+            logger.info("Migration: added field_config column to projects")
+    except Exception:
+        logger.warning("field_config migration failed", exc_info=True)
+        db.rollback()
+    finally:
+        db.close()
 
 
 def _purge_old_deleted_testcases():

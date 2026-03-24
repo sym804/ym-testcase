@@ -11,6 +11,20 @@ from auth import get_current_user, role_required, get_project_role, check_projec
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
+def _get_field_config(project_id: int, db: Session):
+    """field_config를 raw SQL로 직접 읽는다 (SQLAlchemy JSON 캐시 우회)."""
+    import json as _json
+    import sqlalchemy as _sa
+    result = db.execute(_sa.text("SELECT field_config FROM projects WHERE id = :pid"), {"pid": project_id})
+    row = result.fetchone()
+    if row and row[0]:
+        try:
+            return _json.loads(row[0])
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
 def _project_response(project: Project, user: User, db: Session) -> dict:
     """ProjectResponse에 my_role 포함"""
     proj_role = get_project_role(project.id, user, db)
@@ -20,6 +34,7 @@ def _project_response(project: Project, user: User, db: Session) -> dict:
         "description": project.description,
         "jira_base_url": project.jira_base_url,
         "is_private": project.is_private,
+        "field_config": _get_field_config(project.id, db),
         "created_by": project.created_by,
         "created_at": project.created_at,
         "updated_at": project.updated_at,
@@ -133,6 +148,13 @@ def update_project(
         raise HTTPException(status_code=404, detail="Project not found")
 
     update_data = payload.model_dump(exclude_unset=True)
+
+    # field_config는 JSON 문자열로 저장 (SQLite TEXT 컬럼)
+    if "field_config" in update_data:
+        import json as _json
+        fc_val = update_data.pop("field_config")
+        project.field_config = _json.dumps(fc_val, ensure_ascii=False) if fc_val else None
+
     for key, value in update_data.items():
         setattr(project, key, value)
 

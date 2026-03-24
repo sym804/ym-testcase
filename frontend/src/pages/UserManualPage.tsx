@@ -718,7 +718,17 @@ export default function UserManualPage() {
               <li><strong>공개/비공개:</strong> 공개 프로젝트는 모든 로그인 사용자가 조회할 수 있습니다 (수정은 멤버만 가능). 비공개 프로젝트는 프로젝트 멤버와 생성자만 접근할 수 있습니다. 기본값은 <strong>공개</strong>입니다.</li>
             </ul>
 
-            <h3 style={s.h3}>14-2. 멤버 관리</h3>
+            <h3 style={s.h3}>14-2. 기본 필드 설정</h3>
+            <p style={s.p}>프로젝트의 기본 TC 필드(TC ID, Type, Category 등)의 <strong>표시 이름 변경</strong>과 <strong>숨김 설정</strong>이 가능합니다.</p>
+            <ul style={s.ul}>
+              <li><strong>표시 이름:</strong> 기본 영문 헤더를 한글이나 팀 용어로 변경할 수 있습니다 (예: Category → 모듈, Depth 1 → 대분류).</li>
+              <li><strong>표시 체크박스:</strong> 사용하지 않는 필드를 그리드에서 숨길 수 있습니다.</li>
+              <li><strong>필수 필드:</strong> TC ID, Test Steps, Expected Result은 숨길 수 없습니다.</li>
+              <li><strong>저장 버튼</strong>을 클릭해야 반영됩니다. 초기화 버튼으로 기본값으로 되돌릴 수 있습니다.</li>
+              <li>설정은 프로젝트별로 독립 관리됩니다. Import/Export는 내부 필드명(영문)을 사용하므로 영향 없습니다.</li>
+            </ul>
+
+            <h3 style={s.h3}>14-3. 멤버 관리</h3>
             <img src="/manual-images/18_settings_members.png" alt="멤버 관리" style={s.img} />
             <ul style={s.ul}>
               <li>프로젝트에 사용자를 추가하고 프로젝트 역할을 부여합니다.</li>

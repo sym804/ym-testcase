@@ -68,6 +68,7 @@ class Project(Base):
     description = Column(Text, nullable=True)
     jira_base_url = Column(String(500), nullable=True)
     is_private = Column(Boolean, default=False, nullable=False)
+    field_config = Column(Text, nullable=True, default=None)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=now_kst)
     updated_at = Column(DateTime, default=now_kst, onupdate=now_kst)
