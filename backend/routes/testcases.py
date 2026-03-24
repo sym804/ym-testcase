@@ -220,9 +220,9 @@ def create_sheet(
         ).first()
         if not parent:
             raise HTTPException(status_code=400, detail="부모 시트를 찾을 수 없습니다.")
-        # 시트는 폴더 아래에만 생성 가능
-        if not payload.is_folder and not parent.is_folder:
-            raise HTTPException(status_code=400, detail="시트 아래에는 하위 항목을 추가할 수 없습니다. 폴더를 사용하세요.")
+        # 부모가 일반 시트면 자동으로 폴더로 승격
+        if not parent.is_folder:
+            parent.is_folder = True
 
     # 같은 부모 아래에서 최대 sort_order
     sibling_q = db.query(TestCaseSheet.sort_order).filter(

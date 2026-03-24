@@ -451,6 +451,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       const filtered = builtIn.filter(col => col._key === "no" || fieldDisplay(col._key!, "").visible);
       // _key 제거 (AG Grid에 불필요)
       return [
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         ...filtered.map(({ _key, ...rest }) => rest),
       // 커스텀 필드 동적 컬럼
       ...customFields.map((cf): ColDef => {
@@ -481,7 +482,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       }),
     ];
     },
-    [canEditTC, customFields, fc]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [canEditTC, customFields, project.field_config]
   );
 
   const defaultColDef = useMemo<ColDef>(
