@@ -34,19 +34,18 @@ export default function UserManualPage() {
           <a href="#project-detail" style={s.tocItem}>3. 프로젝트 상세</a>
           <a href="#tc-manage" style={s.tocItem}>4. TC 관리</a>
           <a href="#sheet-tree" style={s.tocItem}>5. 폴더 / 시트 트리</a>
-          <a href="#custom-fields" style={s.tocItem}>6. 커스텀 필드</a>
-          <a href="#import" style={s.tocItem}>7. Import (Excel / CSV / Markdown)</a>
-          <a href="#advanced-filter" style={s.tocItem}>8. 고급 필터</a>
-          <a href="#testrun" style={s.tocItem}>9. 테스트 수행</a>
-          <a href="#test-plans" style={s.tocItem}>10. 테스트 플랜</a>
-          <a href="#compare" style={s.tocItem}>11. 비교</a>
-          <a href="#dashboard" style={s.tocItem}>12. 대시보드</a>
-          <a href="#report" style={s.tocItem}>13. 리포트</a>
-          <a href="#settings" style={s.tocItem}>14. 설정</a>
-          <a href="#roles" style={s.tocItem}>15. 역할별 권한</a>
-          <a href="#header" style={s.tocItem}>16. 헤더 / 네비게이션</a>
-          <a href="#theme" style={s.tocItem}>17. 테마 (다크모드)</a>
-          <a href="#shortcuts" style={s.tocItem}>18. 단축키 모음</a>
+          <a href="#import" style={s.tocItem}>6. Import (Excel / CSV / Markdown)</a>
+          <a href="#advanced-filter" style={s.tocItem}>7. 고급 필터</a>
+          <a href="#testrun" style={s.tocItem}>8. 테스트 수행</a>
+          <a href="#test-plans" style={s.tocItem}>9. 테스트 플랜</a>
+          <a href="#compare" style={s.tocItem}>10. 비교</a>
+          <a href="#dashboard" style={s.tocItem}>11. 대시보드</a>
+          <a href="#report" style={s.tocItem}>12. 리포트</a>
+          <a href="#settings" style={s.tocItem}>13. 설정</a>
+          <a href="#roles" style={s.tocItem}>14. 역할별 권한</a>
+          <a href="#header" style={s.tocItem}>15. 헤더 / 네비게이션</a>
+          <a href="#theme" style={s.tocItem}>16. 테마 (다크모드)</a>
+          <a href="#shortcuts" style={s.tocItem}>17. 단축키 모음</a>
         </nav>
 
         {/* 본문 */}
@@ -339,58 +338,22 @@ export default function UserManualPage() {
             </div>
           </section>
 
-          {/* 16. 커스텀 필드 */}
-          {/* 16. 커스텀 필드 */}
-          <section id="custom-fields" style={s.section}>
-            <h2 style={s.h2}>6. 커스텀 필드</h2>
-            <img src="/manual-images/32_custom_fields_grid.png" alt="커스텀 필드 그리드" style={s.img} />
-            <p style={s.p}>프로젝트별로 TC에 사용자 정의 컬럼을 추가할 수 있습니다.</p>
-
-            <h3 style={s.h3}>6-1. 필드 타입</h3>
-            <table style={s.table}>
-              <thead>
-                <tr><th style={s.th}>타입</th><th style={s.th}>설명</th><th style={s.th}>예시</th></tr>
-              </thead>
-              <tbody>
-                <tr><td style={s.td}>text</td><td style={s.td}>자유 텍스트 입력. 셀 더블클릭으로 편집</td><td style={s.td}>메모, 참고사항</td></tr>
-                <tr><td style={s.td}>number</td><td style={s.td}>숫자만 입력 가능. 문자 입력 시 무시됨</td><td style={s.td}>예상 시간(분), 점수</td></tr>
-                <tr><td style={s.td}>select</td><td style={s.td}>단일 선택 드롭다운. 설정에서 정의한 옵션 중 하나를 선택</td><td style={s.td}>환경: Dev/QA/Prod</td></tr>
-                <tr><td style={s.td}>multiselect</td><td style={s.td}>복수 선택 드롭다운. 여러 옵션을 체크하여 선택 가능</td><td style={s.td}>태그: Smoke, Regression</td></tr>
-                <tr><td style={s.td}>checkbox</td><td style={s.td}>체크박스 토글. 클릭으로 참/거짓 전환</td><td style={s.td}>자동화 여부</td></tr>
-                <tr><td style={s.td}>date</td><td style={s.td}>날짜 선택기(캘린더 팝업)로 날짜 입력</td><td style={s.td}>마감일</td></tr>
-              </tbody>
-            </table>
-
-            <h3 style={s.h3}>6-2. 필드 관리 (설정 탭)</h3>
-            <img src="/manual-images/32_custom_fields_grid.png" alt="커스텀 필드 설정 UI" style={s.img} />
-            <ul style={s.ul}>
-              <li>프로젝트 <strong>설정</strong> 탭에서 커스텀 필드를 관리할 수 있습니다.</li>
-              <li><strong>필드 추가:</strong> 필드 이름과 타입(6종)을 선택하고, select/multiselect 타입은 옵션을 입력하여 추가합니다.</li>
-              <li>추가된 필드는 목록 테이블에 표시되며, <strong>삭제</strong> 버튼으로 제거할 수 있습니다.</li>
-              <li>생성된 필드는 TC 관리 그리드에 자동으로 컬럼이 추가됩니다.</li>
-              <li>select 타입은 드롭다운 에디터가 자동 적용됩니다.</li>
-            </ul>
-
-            <div style={s.tipBox}>
-              <strong>TIP:</strong> 커스텀 필드 값은 TC의 <code>custom_fields</code> JSON 필드에 저장됩니다. Import/Export 시에도 유지됩니다.
-            </div>
-          </section>
 
           {/* 18. 테스트 플랜 */}
           {/* 17. CSV Import */}
           <section id="import" style={s.section}>
-            <h2 style={s.h2}>7. Import (Excel / CSV / Markdown)</h2>
+            <h2 style={s.h2}>6. Import (Excel / CSV / Markdown)</h2>
             <img src="/manual-images/34_tc_toolbar_with_filter.png" alt="TC 툴바 (CSV 지원)" style={s.img} />
             <p style={s.p}>Excel 외에 CSV 파일로도 TC를 가져올 수 있습니다. Jira, Xray, Zephyr Scale에서 내보낸 CSV를 바로 import할 수 있습니다.</p>
 
-            <h3 style={s.h3}>7-1. 사용 방법</h3>
+            <h3 style={s.h3}>6-1. 사용 방법</h3>
             <ol style={s.ol}>
               <li>TC 관리 툴바에서 <strong>Import</strong> 버튼을 클릭합니다.</li>
               <li>파일 선택 대화상자에서 <strong>.csv</strong>, <strong>.xlsx</strong>, 또는 <strong>.md</strong> 파일을 선택합니다.</li>
               <li>CSV 파일의 경우 자동으로 헤더를 분석하여 TC 필드에 매핑합니다.</li>
             </ol>
 
-            <h3 style={s.h3}>7-2. Jira 헤더 매핑</h3>
+            <h3 style={s.h3}>6-2. Jira 헤더 매핑</h3>
             <table style={s.table}>
               <thead>
                 <tr><th style={s.th}>Jira 헤더</th><th style={s.th}>TC 필드</th></tr>
@@ -407,7 +370,7 @@ export default function UserManualPage() {
               </tbody>
             </table>
 
-            <h3 style={s.h3}>7-3. 인코딩 지원</h3>
+            <h3 style={s.h3}>6-3. 인코딩 지원</h3>
             <ul style={s.ul}>
               <li>UTF-8, UTF-8 BOM, CP949(EUC-KR) 인코딩을 자동 감지합니다.</li>
               <li>한글 헤더(<code>대분류</code>, <code>우선순위</code>, <code>테스트 절차</code> 등)도 자동 매핑됩니다.</li>
@@ -422,10 +385,10 @@ export default function UserManualPage() {
           {/* 7-1. Markdown Import */}
           {/* 7-1. Markdown Import */}
           <section id="md-import" style={s.section}>
-            <h2 style={s.h2}>7-1. Markdown Import</h2>
+            <h2 style={s.h2}>6-1. Markdown Import</h2>
             <p style={s.p}>Markdown(.md) 파일에 작성한 테이블을 TC로 가져올 수 있습니다. 문서 기반 TC 관리나 GitHub/Wiki에서 작성한 TC를 바로 import할 때 유용합니다.</p>
 
-            <h3 style={s.h3}>7-4. 사용 방법</h3>
+            <h3 style={s.h3}>6-4. 사용 방법</h3>
             <ol style={s.ol}>
               <li>TC 관리 툴바에서 <strong>Import</strong> 버튼을 클릭합니다.</li>
               <li>파일 선택 대화상자에서 <strong>.md</strong> 파일을 선택합니다.</li>
@@ -433,7 +396,7 @@ export default function UserManualPage() {
               <li>테이블이 여러 개면 시트 선택 모달이 표시됩니다.</li>
             </ol>
 
-            <h3 style={s.h3}>7-5. 지원 형식</h3>
+            <h3 style={s.h3}>6-5. 지원 형식</h3>
             <p style={s.p}>표준 Markdown 테이블 문법을 사용합니다. 첫 번째 행은 헤더, 두 번째 행은 구분자(<code>|---|</code>), 그 이후가 데이터입니다.</p>
             <pre style={{...s.p, backgroundColor: "var(--bg-secondary)", padding: "16px", borderRadius: "8px", fontFamily: "monospace", fontSize: "13px", whiteSpace: "pre", overflowX: "auto"}}>{`# 로그인 테스트
 
@@ -448,7 +411,7 @@ export default function UserManualPage() {
 |--------|----------|----------|--------------------|--------------------|
 | TC-003 | 검색     | High     | 키워드 입력 후 검색 | 검색 결과 표시      |`}</pre>
 
-            <h3 style={s.h3}>7-6. 시트 이름 규칙</h3>
+            <h3 style={s.h3}>6-6. 시트 이름 규칙</h3>
             <ul style={s.ul}>
               <li>테이블 위의 <code>#</code> 또는 <code>##</code> 제목이 <strong>시트 이름</strong>이 됩니다.</li>
               <li>위 예시에서 "로그인 테스트"와 "검색 기능"이 각각 시트 이름이 됩니다.</li>
@@ -456,7 +419,7 @@ export default function UserManualPage() {
               <li>하나의 .md 파일에 여러 테이블을 넣으면 각각 다른 시트로 import됩니다.</li>
             </ul>
 
-            <h3 style={s.h3}>7-7. 헤더 매핑</h3>
+            <h3 style={s.h3}>6-7. 헤더 매핑</h3>
             <table style={s.table}>
               <thead>
                 <tr><th style={s.th}>Markdown 헤더</th><th style={s.th}>TC 필드</th></tr>
@@ -475,7 +438,7 @@ export default function UserManualPage() {
             </table>
             <p style={s.p}>Excel/CSV Import와 동일한 헤더 매핑 규칙을 사용합니다. 한글/영문 헤더 모두 지원됩니다.</p>
 
-            <h3 style={s.h3}>7-8. 주의사항</h3>
+            <h3 style={s.h3}>6-8. 주의사항</h3>
             <ul style={s.ul}>
               <li>셀 안에 파이프(<code>|</code>)를 사용하려면 <code>\|</code>로 이스케이프하세요.</li>
               <li>TC ID가 기존 TC와 동일하면 해당 TC가 덮어쓰기됩니다.</li>
@@ -492,18 +455,18 @@ export default function UserManualPage() {
           {/* 15. 고급 필터 */}
           {/* 15. 고급 필터 */}
           <section id="advanced-filter" style={s.section}>
-            <h2 style={s.h2}>8. 고급 필터 + 저장된 뷰</h2>
+            <h2 style={s.h2}>7. 고급 필터 + 저장된 뷰</h2>
             <img src="/manual-images/33_advanced_filter_panel.png" alt="고급 필터 패널" style={s.img} />
             <p style={s.p}>다중 조건으로 TC를 필터링하고, 자주 쓰는 필터를 저장하여 재사용할 수 있습니다.</p>
 
-            <h3 style={s.h3}>8-1. 필터 패널 열기</h3>
+            <h3 style={s.h3}>7-1. 필터 패널 열기</h3>
             <ol style={s.ol}>
               <li>TC 관리 툴바 우측의 <strong>필터</strong> 버튼을 클릭합니다.</li>
               <li>필터 패널이 그리드 위에 표시됩니다.</li>
               <li><strong>+ 조건 추가</strong> 버튼으로 필터 조건을 추가합니다.</li>
             </ol>
 
-            <h3 style={s.h3}>8-2. 조건 설정</h3>
+            <h3 style={s.h3}>7-2. 조건 설정</h3>
             <table style={s.table}>
               <thead>
                 <tr><th style={s.th}>항목</th><th style={s.th}>설명</th></tr>
@@ -516,7 +479,7 @@ export default function UserManualPage() {
               </tbody>
             </table>
 
-            <h3 style={s.h3}>8-3. 필터 저장/불러오기</h3>
+            <h3 style={s.h3}>7-3. 필터 저장/불러오기</h3>
             <ul style={s.ul}>
               <li><strong>저장</strong> 버튼: 현재 필터 조건을 이름을 지정하여 저장합니다.</li>
               <li><strong>불러오기</strong> 버튼: 저장된 필터 목록에서 선택하여 복원합니다.</li>
@@ -529,24 +492,24 @@ export default function UserManualPage() {
           </section>
           {/* 17. 테스트 수행 */}
           <section id="testrun" style={s.section}>
-            <h2 style={s.h2}>9. 테스트 수행</h2>
+            <h2 style={s.h2}>8. 테스트 수행</h2>
             <img src="/manual-images/09_testrun_tab.png" alt="테스트 수행 탭" style={s.img} />
 
-            <h3 style={s.h3}>9-1. 테스트 런 생성</h3>
+            <h3 style={s.h3}>8-1. 테스트 런 생성</h3>
             <ol style={s.ol}>
               <li>좌측 패널 하단의 <strong>"+ New Test Run"</strong> 버튼을 클릭합니다.</li>
               <li>런 이름, 라운드(R1/R2/...), 버전, 환경을 입력합니다.</li>
               <li>생성 시 프로젝트의 모든 TC가 <strong>NS(미실행)</strong> 상태로 포함됩니다.</li>
             </ol>
 
-            <h3 style={s.h3}>9-2. 테스트 런 목록</h3>
+            <h3 style={s.h3}>8-2. 테스트 런 목록</h3>
             <ul style={s.ul}>
               <li>좌측 패널에 프로젝트의 모든 테스트 런이 표시됩니다.</li>
               <li>런 이름, 라운드, 버전, 상태(진행 중/완료)가 표시됩니다.</li>
               <li>런을 클릭하면 우측에 결과 그리드가 표시됩니다.</li>
             </ul>
 
-            <h3 style={s.h3}>9-3. 결과 입력</h3>
+            <h3 style={s.h3}>8-3. 결과 입력</h3>
             <div style={s.featureGrid}>
               <div style={s.featureCard}>
                 <div style={s.featureIcon}>🖱️</div>
@@ -578,7 +541,7 @@ export default function UserManualPage() {
               </div>
             </div>
 
-            <h3 style={s.h3}>9-4. 첨부파일</h3>
+            <h3 style={s.h3}>8-4. 첨부파일</h3>
             <ul style={s.ul}>
               <li>결과 행에 이미지/문서 파일을 첨부할 수 있습니다.</li>
               <li>지원 형식: 이미지(PNG, JPEG, GIF, BMP, WebP), 문서(PDF, DOC, XLSX, PPTX), 아카이브(ZIP), 텍스트(TXT, CSV, LOG)</li>
@@ -586,7 +549,7 @@ export default function UserManualPage() {
               <li>이미지 파일은 미리보기가 제공됩니다.</li>
             </ul>
 
-            <h3 style={s.h3}>9-5. 런 관리</h3>
+            <h3 style={s.h3}>8-5. 런 관리</h3>
             <table style={s.table}>
               <thead>
                 <tr><th style={s.th}>기능</th><th style={s.th}>설명</th></tr>
@@ -599,7 +562,7 @@ export default function UserManualPage() {
                 <tr><td style={s.td}>내보내기</td><td style={s.td}>런 결과를 Excel(.xlsx) 파일로 다운로드합니다. TC ID, 제목, 결과, 코멘트 등 전체 필드가 포함됩니다.</td></tr>
               </tbody>
             </table>
-            <h3 style={s.h3}>9-6. 타이머 기능</h3>
+            <h3 style={s.h3}>8-6. 타이머 기능</h3>
             <ul style={s.ul}>
               <li>런 결과 그리드 상단의 <strong>타이머 토글</strong>을 켜면 각 TC 행에 타이머가 표시됩니다.</li>
               <li>TC 수행 시작 시 타이머가 자동으로 시작되고, 결과 입력 시 경과 시간이 기록됩니다.</li>
@@ -613,23 +576,23 @@ export default function UserManualPage() {
           {/* 15. 비교 */}
           {/* 18. 테스트 플랜 */}
           <section id="test-plans" style={s.section}>
-            <h2 style={s.h2}>10. 테스트 플랜 / 마일스톤</h2>
+            <h2 style={s.h2}>9. 테스트 플랜 / 마일스톤</h2>
             <img src="/manual-images/35_dashboard_with_plan.png" alt="테스트 플랜 대시보드" style={s.img} />
             <p style={s.p}>릴리즈 단위로 테스트를 계획하고 진행률을 관리할 수 있습니다.</p>
 
-            <h3 style={s.h3}>10-1. 플랜 생성</h3>
+            <h3 style={s.h3}>9-1. 플랜 생성</h3>
             <ul style={s.ul}>
               <li>API를 통해 테스트 플랜을 생성합니다: <code>POST /api/projects/:id/testplans</code></li>
               <li>플랜에는 이름, 마일스톤, 설명, 시작일/종료일을 설정할 수 있습니다.</li>
             </ul>
 
-            <h3 style={s.h3}>10-2. TestRun 연결</h3>
+            <h3 style={s.h3}>9-2. TestRun 연결</h3>
             <ul style={s.ul}>
               <li>TestRun 생성 시 <code>test_plan_id</code>를 지정하여 플랜에 연결합니다.</li>
               <li>하나의 플랜에 여러 TestRun을 연결할 수 있습니다.</li>
             </ul>
 
-            <h3 style={s.h3}>10-3. 진행률 확인</h3>
+            <h3 style={s.h3}>9-3. 진행률 확인</h3>
             <ul style={s.ul}>
               <li>플랜 조회 시 연결된 모든 TestRun의 결과가 합산되어 <strong>pass_rate</strong>가 계산됩니다.</li>
               <li>총 TC 수, PASS/FAIL/BLOCK/NA/NS 건수를 한 번에 확인할 수 있습니다.</li>
@@ -643,7 +606,7 @@ export default function UserManualPage() {
           {/* 17. CSV Import */}
           {/* 15. 비교 */}
           <section id="compare" style={s.section}>
-            <h2 style={s.h2}>11. 비교</h2>
+            <h2 style={s.h2}>10. 비교</h2>
             <img src="/manual-images/12_compare_tab.png" alt="비교 탭" style={s.img} />
             <p style={s.p}>두 개의 테스트 런을 선택하여 결과를 나란히 비교할 수 있습니다.</p>
             <ol style={s.ol}>
@@ -659,11 +622,11 @@ export default function UserManualPage() {
           {/* 17. 대시보드 */}
           {/* 17. 대시보드 */}
           <section id="dashboard" style={s.section}>
-            <h2 style={s.h2}>12. 대시보드</h2>
+            <h2 style={s.h2}>11. 대시보드</h2>
             <img src="/manual-images/13_dashboard_top.png" alt="대시보드 상단" style={s.img} />
             <p style={s.p}>선택한 테스트 런의 결과를 다양한 차트와 통계로 분석합니다.</p>
 
-            <h3 style={s.h3}>12-1. 요약 카드</h3>
+            <h3 style={s.h3}>11-1. 요약 카드</h3>
             <ul style={s.ul}>
               <li><strong>전체 TC</strong>: 테스트 케이스 총 개수와 실행률</li>
               <li><strong>PASS</strong>: 통과 건수 및 비율</li>
@@ -673,7 +636,7 @@ export default function UserManualPage() {
               <li><strong>미수행</strong>: 미실행 건수 및 비율</li>
             </ul>
 
-            <h3 style={s.h3}>12-2. 차트</h3>
+            <h3 style={s.h3}>11-2. 차트</h3>
             <img src="/manual-images/14_dashboard_charts.png" alt="대시보드 차트" style={s.img} />
             <table style={s.table}>
               <thead>
@@ -693,7 +656,7 @@ export default function UserManualPage() {
           {/* 18. 리포트 */}
           {/* 18. 리포트 */}
           <section id="report" style={s.section}>
-            <h2 style={s.h2}>13. 리포트</h2>
+            <h2 style={s.h2}>12. 리포트</h2>
             <img src="/manual-images/16_report_tab.png" alt="리포트 탭" style={s.img} />
             <p style={s.p}>테스트 런 결과를 요약 리포트로 확인하고, PDF/Excel로 다운로드할 수 있습니다.</p>
             <ol style={s.ol}>
@@ -708,17 +671,17 @@ export default function UserManualPage() {
           {/* 15. 설정 */}
           {/* 15. 설정 */}
           <section id="settings" style={s.section}>
-            <h2 style={s.h2}>14. 설정</h2>
+            <h2 style={s.h2}>13. 설정</h2>
             <img src="/manual-images/17_settings_tab.png" alt="설정 탭" style={s.img} />
 
-            <h3 style={s.h3}>14-1. 프로젝트 정보</h3>
+            <h3 style={s.h3}>13-1. 프로젝트 정보</h3>
             <ul style={s.ul}>
               <li>프로젝트명, 설명을 수정할 수 있습니다.</li>
               <li><strong>Jira Base URL:</strong> Jira 서버 주소를 입력합니다 (예: <code>https://jira.example.com</code>). 설정하면 TC의 Issue Link 필드에 입력한 이슈 키(예: PROJ-123)를 클릭할 때 <code>Jira Base URL/browse/PROJ-123</code>으로 이동합니다.</li>
               <li><strong>공개/비공개:</strong> 공개 프로젝트는 모든 로그인 사용자가 조회할 수 있습니다 (수정은 멤버만 가능). 비공개 프로젝트는 프로젝트 멤버와 생성자만 접근할 수 있습니다. 기본값은 <strong>공개</strong>입니다.</li>
             </ul>
 
-            <h3 style={s.h3}>14-2. 기본 필드 설정</h3>
+            <h3 style={s.h3}>13-2. 기본 필드 설정</h3>
             <p style={s.p}>프로젝트의 기본 TC 필드(TC ID, Type, Category 등)의 <strong>표시 이름 변경</strong>과 <strong>숨김 설정</strong>이 가능합니다.</p>
             <ul style={s.ul}>
               <li><strong>표시 이름:</strong> 기본 영문 헤더를 한글이나 팀 용어로 변경할 수 있습니다 (예: Category → 모듈, Depth 1 → 대분류).</li>
@@ -728,7 +691,45 @@ export default function UserManualPage() {
               <li>설정은 프로젝트별로 독립 관리됩니다. Import/Export는 내부 필드명(영문)을 사용하므로 영향 없습니다.</li>
             </ul>
 
-            <h3 style={s.h3}>14-3. 멤버 관리</h3>
+          {/* 16. 커스텀 필드 */}
+          {/* 16. 커스텀 필드 */}
+          <div id="custom-fields">
+            <h3 style={s.h3}>13-3. 커스텀 필드</h3>
+            <img src="/manual-images/32_custom_fields_grid.png" alt="커스텀 필드 그리드" style={s.img} />
+            <p style={s.p}>프로젝트별로 TC에 사용자 정의 컬럼을 추가할 수 있습니다.</p>
+
+            <p style={{...s.p, fontWeight: 700, marginTop: 16}}>필드 타입</p>
+            <table style={s.table}>
+              <thead>
+                <tr><th style={s.th}>타입</th><th style={s.th}>설명</th><th style={s.th}>예시</th></tr>
+              </thead>
+              <tbody>
+                <tr><td style={s.td}>text</td><td style={s.td}>자유 텍스트 입력. 셀 더블클릭으로 편집</td><td style={s.td}>메모, 참고사항</td></tr>
+                <tr><td style={s.td}>number</td><td style={s.td}>숫자만 입력 가능. 문자 입력 시 무시됨</td><td style={s.td}>예상 시간(분), 점수</td></tr>
+                <tr><td style={s.td}>select</td><td style={s.td}>단일 선택 드롭다운. 설정에서 정의한 옵션 중 하나를 선택</td><td style={s.td}>환경: Dev/QA/Prod</td></tr>
+                <tr><td style={s.td}>multiselect</td><td style={s.td}>복수 선택 드롭다운. 여러 옵션을 체크하여 선택 가능</td><td style={s.td}>태그: Smoke, Regression</td></tr>
+                <tr><td style={s.td}>checkbox</td><td style={s.td}>체크박스 토글. 클릭으로 참/거짓 전환</td><td style={s.td}>자동화 여부</td></tr>
+                <tr><td style={s.td}>date</td><td style={s.td}>날짜 선택기(캘린더 팝업)로 날짜 입력</td><td style={s.td}>마감일</td></tr>
+              </tbody>
+            </table>
+
+            <p style={{...s.p, fontWeight: 700, marginTop: 16}}>필드 관리</p>
+            <img src="/manual-images/32_custom_fields_grid.png" alt="커스텀 필드 설정 UI" style={s.img} />
+            <ul style={s.ul}>
+              <li>프로젝트 <strong>설정</strong> 탭에서 커스텀 필드를 관리할 수 있습니다.</li>
+              <li><strong>필드 추가:</strong> 필드 이름과 타입(6종)을 선택하고, select/multiselect 타입은 옵션을 입력하여 추가합니다.</li>
+              <li>추가된 필드는 목록 테이블에 표시되며, <strong>삭제</strong> 버튼으로 제거할 수 있습니다.</li>
+              <li>생성된 필드는 TC 관리 그리드에 자동으로 컬럼이 추가됩니다.</li>
+              <li>select 타입은 드롭다운 에디터가 자동 적용됩니다.</li>
+            </ul>
+
+            <div style={s.tipBox}>
+              <strong>TIP:</strong> 커스텀 필드 값은 TC의 <code>custom_fields</code> JSON 필드에 저장됩니다. Import/Export 시에도 유지됩니다.
+            </div>
+          </div>
+
+
+            <h3 style={s.h3}>13-4. 멤버 관리</h3>
             <img src="/manual-images/18_settings_members.png" alt="멤버 관리" style={s.img} />
             <ul style={s.ul}>
               <li>프로젝트에 사용자를 추가하고 프로젝트 역할을 부여합니다.</li>
@@ -740,9 +741,9 @@ export default function UserManualPage() {
           {/* 17. 테마 */}
           {/* 5. 역할별 권한 */}
           <section id="roles" style={s.section}>
-            <h2 style={s.h2}>15. 역할별 권한</h2>
+            <h2 style={s.h2}>14. 역할별 권한</h2>
 
-            <h3 style={s.h3}>15-1. 시스템 역할</h3>
+            <h3 style={s.h3}>14-1. 시스템 역할</h3>
             <table style={s.table}>
               <thead>
                 <tr>
@@ -764,7 +765,7 @@ export default function UserManualPage() {
               </tbody>
             </table>
 
-            <h3 style={s.h3}>15-2. 프로젝트 접근 규칙</h3>
+            <h3 style={s.h3}>14-2. 프로젝트 접근 규칙</h3>
             <table style={s.table}>
               <thead>
                 <tr><th style={s.th}>프로젝트 유형</th><th style={s.th}>접근 조건</th></tr>
@@ -776,7 +777,7 @@ export default function UserManualPage() {
               </tbody>
             </table>
 
-            <h3 style={s.h3}>15-3. 시스템 역할과 프로젝트 역할의 관계</h3>
+            <h3 style={s.h3}>14-3. 시스템 역할과 프로젝트 역할의 관계</h3>
             <div style={s.infoBox}>
               <strong>이중 역할 구조:</strong> 시스템 역할(Admin/QA Manager/User)은 전역 권한을 결정하고, 프로젝트 역할(Project Admin/Project Tester)은 해당 프로젝트 내 권한을 결정합니다.
               <ul style={{ margin: "8px 0 0 20px", lineHeight: 1.8 }}>
@@ -792,7 +793,7 @@ export default function UserManualPage() {
           {/* 5. 폴더/시트 트리 구조 (VS Code 스타일 사이드바) */}
           {/* 16. 헤더 */}
           <section id="header" style={s.section}>
-            <h2 style={s.h2}>16. 헤더 / 네비게이션</h2>
+            <h2 style={s.h2}>15. 헤더 / 네비게이션</h2>
             <img src="/manual-images/19_global_search.png" alt="헤더 - 글로벌 검색" style={s.img} />
 
             <table style={s.table}>
@@ -846,7 +847,7 @@ export default function UserManualPage() {
           {/* 2. 프로젝트 상세 */}
           {/* 17. 테마 */}
           <section id="theme" style={s.section}>
-            <h2 style={s.h2}>17. 테마 (다크모드)</h2>
+            <h2 style={s.h2}>16. 테마 (다크모드)</h2>
             <img src="/manual-images/20_dark_mode_project.png" alt="다크모드 - 프로젝트" style={s.img} />
             <p style={s.p}>헤더의 🌙 아이콘을 클릭하여 라이트/다크 테마를 전환할 수 있습니다.</p>
             <img src="/manual-images/21_dark_mode_dashboard.png" alt="다크모드 - 대시보드" style={s.img} />
@@ -859,7 +860,7 @@ export default function UserManualPage() {
           {/* 18. 단축키 */}
           {/* 18. 단축키 */}
           <section id="shortcuts" style={s.section}>
-            <h2 style={s.h2}>18. 단축키 모음</h2>
+            <h2 style={s.h2}>17. 단축키 모음</h2>
             <table style={s.table}>
               <thead>
                 <tr><th style={s.th}>단축키</th><th style={s.th}>기능</th><th style={s.th}>사용 위치</th></tr>
