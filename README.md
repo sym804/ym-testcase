@@ -147,3 +147,10 @@ ym-testcase/
 ## 라이선스
 
 AGPL-3.0 — [GNU Affero General Public License v3.0](LICENSE)
+
+## 만든 사람
+
+| 역할 | 담당 |
+|------|------|
+| 제품 기획 및 UI 테스트 | **sym804** |
+| 풀스택 구현 및 자동화 테스트 | **Claude Code** |
