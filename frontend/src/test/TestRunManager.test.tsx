@@ -185,7 +185,7 @@ describe("TestRunManager", () => {
       vi.mocked(testRunsApi.list).mockResolvedValue([]);
       renderComponent();
       await waitFor(() => {
-        expect(screen.getByText("등록된 수행이 없습니다.")).toBeInTheDocument();
+        expect(screen.getByText("등록된 테스트 수행이 없습니다.")).toBeInTheDocument();
       });
     });
 
@@ -220,10 +220,10 @@ describe("TestRunManager", () => {
       });
     });
 
-    it("+ New Test Run 버튼이 표시된다", async () => {
+    it("+ 새 테스트 수행 만들기 버튼이 표시된다", async () => {
       renderComponent();
       await waitFor(() => {
-        expect(screen.getByText("+ New Test Run")).toBeInTheDocument();
+        expect(screen.getByText("+ 새 테스트 수행 만들기")).toBeInTheDocument();
       });
     });
   });
@@ -279,15 +279,15 @@ describe("TestRunManager", () => {
   });
 
   describe("새 수행 생성", () => {
-    it("+ New Test Run 클릭 시 모달을 표시한다", async () => {
+    it("+ 새 테스트 수행 만들기 클릭 시 모달을 표시한다", async () => {
       const user = userEvent.setup();
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText("+ New Test Run")).toBeInTheDocument();
+        expect(screen.getByText("+ 새 테스트 수행 만들기")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText("+ New Test Run"));
+      await user.click(screen.getByText("+ 새 테스트 수행 만들기"));
 
       expect(screen.getByText("새 테스트 수행")).toBeInTheDocument();
       expect(screen.getByPlaceholderText("예: Sprint 5 기능 테스트")).toBeInTheDocument();
@@ -300,10 +300,10 @@ describe("TestRunManager", () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText("+ New Test Run")).toBeInTheDocument();
+        expect(screen.getByText("+ 새 테스트 수행 만들기")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText("+ New Test Run"));
+      await user.click(screen.getByText("+ 새 테스트 수행 만들기"));
       await user.click(screen.getByText("생성"));
 
       expect(toast.error).toHaveBeenCalledWith("수행 이름을 입력해 주세요.");
@@ -315,10 +315,10 @@ describe("TestRunManager", () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText("+ New Test Run")).toBeInTheDocument();
+        expect(screen.getByText("+ 새 테스트 수행 만들기")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText("+ New Test Run"));
+      await user.click(screen.getByText("+ 새 테스트 수행 만들기"));
       await user.type(screen.getByPlaceholderText("예: Sprint 5 기능 테스트"), "새 수행");
       await user.type(screen.getByPlaceholderText("예: v1.2.0"), "v3.0");
       await user.click(screen.getByText("생성"));
@@ -338,10 +338,10 @@ describe("TestRunManager", () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText("+ New Test Run")).toBeInTheDocument();
+        expect(screen.getByText("+ 새 테스트 수행 만들기")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText("+ New Test Run"));
+      await user.click(screen.getByText("+ 새 테스트 수행 만들기"));
       await user.type(screen.getByPlaceholderText("예: Sprint 5 기능 테스트"), "새 수행");
       await user.click(screen.getByText("생성"));
 
@@ -355,10 +355,10 @@ describe("TestRunManager", () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText("+ New Test Run")).toBeInTheDocument();
+        expect(screen.getByText("+ 새 테스트 수행 만들기")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText("+ New Test Run"));
+      await user.click(screen.getByText("+ 새 테스트 수행 만들기"));
       expect(screen.getByText("새 테스트 수행")).toBeInTheDocument();
 
       await user.click(screen.getByText("취소"));
@@ -374,10 +374,10 @@ describe("TestRunManager", () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText("+ New Test Run")).toBeInTheDocument();
+        expect(screen.getByText("+ 새 테스트 수행 만들기")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText("+ New Test Run"));
+      await user.click(screen.getByText("+ 새 테스트 수행 만들기"));
       await user.type(screen.getByPlaceholderText("예: Sprint 5 기능 테스트"), "새 수행");
       await user.click(screen.getByText("생성"));
 
