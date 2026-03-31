@@ -866,7 +866,7 @@ export default function TestRunManager({ projectId, project }: Props) {
             {loadingRuns ? (
               <div style={styles.loadingText}>불러오는 중...</div>
             ) : runs.length === 0 ? (
-              <div style={styles.emptyText}>등록된 수행이 없습니다.</div>
+              <div style={styles.emptyText}>등록된 테스트 수행이 없습니다.</div>
             ) : (() => {
               const inProgress = runs.filter(r => r.status !== TestRunStatus.COMPLETED);
               const completed = runs.filter(r => r.status === TestRunStatus.COMPLETED);
@@ -922,7 +922,7 @@ export default function TestRunManager({ projectId, project }: Props) {
             })()}
           </div>
           <button style={styles.newRunBtn} onClick={() => setShowModal(true)}>
-            + New Test Run
+            + 새 테스트 수행 만들기
           </button>
         </div>
       )}
@@ -940,7 +940,31 @@ export default function TestRunManager({ projectId, project }: Props) {
                 ▶
               </button>
             )}
-            왼쪽에서 테스트 수행을 선택하세요.
+            {runs.length === 0 ? (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📋</div>
+                <div style={{ fontSize: 16, color: "var(--text-secondary)", marginBottom: 20 }}>
+                  등록된 테스트 수행이 없습니다.
+                </div>
+                <button
+                  style={{
+                    padding: "10px 24px",
+                    fontSize: 15,
+                    fontWeight: 600,
+                    backgroundColor: "var(--accent)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setShowModal(true)}
+                >
+                  + 새 테스트 수행 만들기
+                </button>
+              </div>
+            ) : (
+              "왼쪽에서 테스트 수행을 선택하세요."
+            )}
           </div>
         ) : (
           <>
@@ -1440,9 +1464,9 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 8,
     padding: "8px 0",
     borderRadius: 6,
-    border: "1px dashed var(--text-secondary)",
-    backgroundColor: "transparent",
-    color: "var(--text-secondary)",
+    border: "none",
+    backgroundColor: "var(--accent)",
+    color: "#fff",
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
