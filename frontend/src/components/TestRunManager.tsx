@@ -561,14 +561,6 @@ export default function TestRunManager({ projectId, project }: Props) {
   const columnDefs = useMemo<ColDef[]>(
     () => [
       {
-        headerCheckboxSelection: true,
-        checkboxSelection: true,
-        width: 40,
-        pinned: "left",
-        suppressHeaderMenuButton: true,
-        resizable: false,
-      },
-      {
         field: "test_case.no",
         headerName: "No",
         width: 60,
@@ -1168,7 +1160,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                   columnDefs={columnDefs}
                   defaultColDef={defaultColDef}
                   localeText={AG_GRID_LOCALE_KO}
-                  rowSelection={{ mode: "multiRow", checkboxes: false, headerCheckbox: false }}
+                  rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true }}
                   onGridReady={(params: GridReadyEvent) => {
                     gridApiRef.current = params.api;
                   }}
@@ -1184,6 +1176,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                   context={{ searchKeyword: filterText }}
                   singleClickEdit={true}
                   stopEditingWhenCellsLoseFocus={true}
+                  suppressRowClickSelection={true}
                   getRowId={(params) => String(params.data.id)}
                   isExternalFilterPresent={isExternalFilterPresent}
                   doesExternalFilterPass={doesExternalFilterPass}
