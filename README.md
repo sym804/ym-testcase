@@ -85,6 +85,17 @@ npm run dev
 
 브라우저에서 http://localhost:5173 접속 → 첫 번째로 가입하는 사용자가 자동으로 **admin** 권한을 받습니다.
 
+### 5. 업데이트
+
+```bash
+cd ym-testcase
+git pull origin master
+pip install -r backend/requirements.txt   # 백엔드 의존성 변경 시
+cd frontend && npm install                # 프론트엔드 의존성 변경 시
+```
+
+이후 서버를 재시작하면 최신 버전이 적용됩니다.
+
 ## 주요 기능
 
 | 기능 | 설명 |
