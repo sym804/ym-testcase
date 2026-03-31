@@ -69,6 +69,7 @@ YM TestCase System  v1.0.0.1  (2026-03-31)
 - **README 설치 가이드 재구성**: 단계별(1~4) 구성, SECRET_KEY 변경 전/후 예시 추가
 - **Python 요구사항 수정**: 3.12+ → 3.11+ (실제 테스트 환경 기준)
 - **.env.example 상세화**: 전체 환경변수 5개 + 한글 설명/예시 추가
+- **AI Agent 설치 팁 추가**: README에 AI Agent 활용 안내 문구 추가
 
 ---
 
