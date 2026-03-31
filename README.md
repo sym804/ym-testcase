@@ -28,35 +28,60 @@ TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트
 </tbody>
 </table>
 
-## 환경설정 방법
+## 설치 및 실행
 
-**사전 요구사항**:
-- [Python 3.12+](https://www.python.org/downloads/)
+### 1. 사전 요구사항
+
+- [Python 3.11+](https://www.python.org/downloads/)
 - [Node.js 18+](https://nodejs.org/)
 - [Git](https://git-scm.com/)
+
+### 2. 소스 코드 다운로드
 
 ```bash
 git clone https://github.com/sym804/ym-testcase.git
 cd ym-testcase
+```
+
+### 3. 환경변수 설정
+
+```bash
 cp backend/.env.example backend/.env
 ```
 
-> **SECRET_KEY 설정**: `backend/.env` 파일 안의 `SECRET_KEY` 값을 변경하세요.
-> 이 키는 JWT 인증 토큰 서명에 사용됩니다. 미설정 시 서버 시작마다 랜덤 키가 생성되어
-> **재시작할 때 기존 로그인이 모두 풀립니다.** 운영 환경에서는 반드시 고정 값을 설정하세요.
+복사한 `backend/.env` 파일을 열어서 **SECRET_KEY를 반드시 변경**하세요:
 
-**서버 실행**:
-```bash
-# 백엔드
-cd backend && pip install -r requirements.txt
-uvicorn main:app --reload --port 8008
+```dotenv
+# 변경 전 (기본값 — 이대로 쓰면 안 됩니다)
+SECRET_KEY=change-me-to-a-random-string
 
-# 프론트엔드 (새 터미널)
-cd frontend && npm install && npm run dev
-# → http://localhost:5173
+# 변경 후 (아무 랜덤 문자열로 교체)
+SECRET_KEY=my-super-secret-key-abc123xyz
 ```
 
-> 첫 번째로 가입하는 사용자가 자동으로 **admin** 권한을 받습니다.
+> **왜 바꿔야 하나요?** 이 키는 로그인 토큰 암호화에 사용됩니다.
+> 기본값 그대로 두면 서버를 재시작할 때마다 **로그인이 풀립니다.**
+
+나머지 설정은 기본값으로 동작하므로 로컬 개발 시 수정할 필요 없습니다.
+상세한 설정 항목은 `backend/.env.example` 파일의 주석을 참고하세요.
+
+### 4. 서버 실행
+
+**백엔드** (터미널 1):
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8008
+```
+
+**프론트엔드** (터미널 2):
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+브라우저에서 http://localhost:5173 접속 → 첫 번째로 가입하는 사용자가 자동으로 **admin** 권한을 받습니다.
 
 ## 주요 기능
 
