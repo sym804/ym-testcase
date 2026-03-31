@@ -30,6 +30,8 @@ TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트
 
 ## 설치 및 실행
 
+> **Tip**: AI Agent에게 이 레포지토리 주소를 알려주고 README 문서대로 설치할 것을 요청하면 더 쉽게 설치가 가능합니다.
+
 ### 1. 사전 요구사항
 
 - [Python 3.11+](https://www.python.org/downloads/)
