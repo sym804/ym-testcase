@@ -3,6 +3,7 @@ import secrets
 import string
 import time
 from collections import defaultdict
+from datetime import timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -13,7 +14,7 @@ from models import User, UserRole
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
 from auth import (
     hash_password, verify_password, create_access_token, get_current_user, role_required,
-    COOKIE_SECURE, COOKIE_SAMESITE, COOKIE_MAX_AGE,
+    COOKIE_SECURE, COOKIE_SAMESITE, COOKIE_MAX_AGE, ACCESS_TOKEN_EXPIRE_HOURS,
 )
 
 logger = logging.getLogger(__name__)
@@ -131,8 +132,17 @@ def login(payload: UserLogin, request: Request, response: Response, db: Session 
 
     # 성공 시 실패 카운트 초기화
     _clear_failures(request, payload.username)
-    logger.info("User logged in: %s", user.username)
-    token = create_access_token(data={"sub": str(user.id), "role": user.role.value})
+    logger.info("User logged in: %s (remember_me=%s)", user.username, payload.remember_me)
+
+    # remember_me: 10년(실질적 무기한), 일반: 기본 만료
+    if payload.remember_me:
+        expire_delta = timedelta(days=3650)
+        cookie_max_age = 3650 * 24 * 3600
+    else:
+        expire_delta = timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+        cookie_max_age = COOKIE_MAX_AGE
+
+    token = create_access_token(data={"sub": str(user.id), "role": user.role.value}, expires_delta=expire_delta)
 
     # httpOnly 쿠키에 JWT 설정
     response.set_cookie(
@@ -141,7 +151,7 @@ def login(payload: UserLogin, request: Request, response: Response, db: Session 
         httponly=True,
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
-        max_age=COOKIE_MAX_AGE,
+        max_age=cookie_max_age,
         path="/",
     )
     # CSRF 토큰 (JS에서 읽을 수 있도록 httpOnly=False)
@@ -152,7 +162,7 @@ def login(payload: UserLogin, request: Request, response: Response, db: Session 
         httponly=False,
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
-        max_age=COOKIE_MAX_AGE,
+        max_age=cookie_max_age,
         path="/",
     )
 

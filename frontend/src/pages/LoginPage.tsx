@@ -8,6 +8,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,7 +21,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      await login({ username, password });
+      await login({ username, password, remember_me: rememberMe });
       navigate("/projects");
     } catch (err: unknown) {
       const msg =
@@ -57,6 +58,14 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="비밀번호를 입력하세요"
             />
+            <label style={styles.rememberMe}>
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              로그인 유지
+            </label>
             {error && <div style={styles.errorMsg}>{error}</div>}
             <button
               type="submit"
@@ -170,6 +179,15 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--color-link)",
     fontWeight: 600,
     textDecoration: "none",
+  },
+  rememberMe: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 14,
+    color: "var(--text-secondary)",
+    marginTop: 8,
+    cursor: "pointer",
   },
   hint: {
     marginTop: 8,

@@ -90,6 +90,9 @@ export default function UserManualPage() {
             <div style={s.tipBox}>
               <strong>TIP:</strong> 로그인 실패 시 5분간 최대 10회까지 시도할 수 있습니다. 초과 시 일시적으로 잠깁니다.
             </div>
+            <div style={s.infoBox}>
+              <strong>로그인 유지:</strong> "로그인 유지" 체크박스를 선택하면 서버가 재시작되기 전까지 로그인이 유지됩니다. 체크하지 않으면 기본 72시간(3일) 후 자동 로그아웃됩니다.
+            </div>
 
             <h3 style={s.h3}>1-2. 회원가입</h3>
             <img src="/manual-images/02_register_page.png" alt="회원가입 페이지" style={s.img} />

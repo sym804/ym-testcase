@@ -200,6 +200,7 @@ export interface AssigneeSummary {
 export interface LoginForm {
   username: string;
   password: string;
+  remember_me?: boolean;
 }
 
 export interface RegisterForm {

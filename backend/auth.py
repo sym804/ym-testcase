@@ -25,7 +25,7 @@ if not SECRET_KEY:
     SECRET_KEY = secrets.token_urlsafe(64)
     logger.warning("SECRET_KEY not set – using random key (dev only)")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("TOKEN_EXPIRE_HOURS", "2"))
+ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("TOKEN_EXPIRE_HOURS", "72"))
 
 # Cookie 설정
 COOKIE_SECURE = _ENV == "production"
