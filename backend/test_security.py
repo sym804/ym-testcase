@@ -68,8 +68,11 @@ def project_pair():
     pub_id = r1.json()["id"]
     priv_id = r2.json()["id"]
     yield pub_id, priv_id
-    requests.delete(f"{BASE}/api/projects/{pub_id}", headers=h)
-    requests.delete(f"{BASE}/api/projects/{priv_id}", headers=h)
+    try:
+        requests.delete(f"{BASE}/api/projects/{pub_id}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{priv_id}", headers=h)
+    except Exception:
+        pass  # 서버 종료 후 teardown 시 연결 실패 무시
 
 
 # ── 1. 인증 ──────────────────────────────────────────────────
@@ -1438,3 +1441,510 @@ class TestEdgeCases:
         h = auth(store.admin)
         r = requests.get(f"{BASE}/api/projects/999999", headers=h)
         assert r.status_code == 404
+
+
+# ── 15. 보안 수정 검증 ─────────────────────────────────────────
+
+
+class TestHistoryAccessControl:
+    """TC 이력 API 프로젝트 접근권한 검증 (4개)."""
+
+    def test_nonmember_cannot_read_private_tc_history(self, project_pair):
+        """비멤버 viewer는 비공개 프로젝트 TC 이력 조회 불가 → 403"""
+        _, priv_id = project_pair
+        h_admin = auth(store.admin)
+        # 비공개 프로젝트에 TC 생성
+        r = requests.post(f"{BASE}/api/projects/{priv_id}/testcases", headers=h_admin, json={
+            "no": 15001, "tc_id": "TC-HIST-PRIV-001"
+        })
+        tc_id = r.json()["id"]
+        # viewer(비멤버)로 TC 이력 조회 시도
+        r2 = requests.get(f"{BASE}/api/history/testcase/{tc_id}", headers=auth(store.viewer))
+        assert r2.status_code == 403
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{priv_id}/testcases/{tc_id}", headers=h_admin)
+
+    def test_member_can_read_private_tc_history(self, project_pair):
+        """멤버는 비공개 프로젝트 TC 이력 조회 가능 → 200"""
+        _, priv_id = project_pair
+        h_admin = auth(store.admin)
+        r = requests.get(f"{BASE}/api/history/project/{priv_id}", headers=h_admin)
+        assert r.status_code == 200
+
+    def test_nonexistent_tc_history_returns_404(self):
+        """존재하지 않는 TC ID로 이력 조회 시 404"""
+        h = auth(store.admin)
+        r = requests.get(f"{BASE}/api/history/testcase/999999", headers=h)
+        assert r.status_code == 404
+
+    def test_public_project_tc_history_allowed(self, project_pair):
+        """공개 프로젝트 TC 이력은 인증만 되면 조회 가능"""
+        pub_id, _ = project_pair
+        h_admin = auth(store.admin)
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h_admin, json={
+            "no": 15002, "tc_id": "TC-HIST-PUB-001"
+        })
+        tc_id = r.json()["id"]
+        # viewer로 공개 프로젝트 TC 이력 조회
+        r2 = requests.get(f"{BASE}/api/history/testcase/{tc_id}", headers=auth(store.viewer))
+        assert r2.status_code == 200
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc_id}", headers=h_admin)
+
+
+class TestProjectDeleteAttachments:
+    """프로젝트 삭제 시 첨부파일 정리 검증 (2개)."""
+
+    def test_project_delete_cleans_attachments(self):
+        """프로젝트 삭제 시 첨부파일 실파일도 삭제되어야 함"""
+        h = auth(store.admin)
+        # 프로젝트 생성
+        r = requests.post(f"{BASE}/api/projects", headers=h, json={
+            "name": "__sec_att_del__", "is_private": False
+        })
+        pid = r.json()["id"]
+        # TC 생성 → TestRun 생성
+        requests.post(f"{BASE}/api/projects/{pid}/testcases", headers=h, json={
+            "no": 1, "tc_id": "TC-ATT-DEL-001"
+        })
+        r_run = requests.post(f"{BASE}/api/projects/{pid}/testruns", headers=h, json={
+            "name": "att-del-run", "version": "1.0", "environment": "test", "round": 1
+        })
+        run_id = r_run.json()["id"]
+        # GET /{run_id}로 결과 조회 (results는 run 응답 내 배열)
+        r_run_detail = requests.get(f"{BASE}/api/projects/{pid}/testruns/{run_id}", headers=h)
+        assert r_run_detail.status_code == 200
+        results = r_run_detail.json().get("results", [])
+        if results:
+            tr_id = results[0]["id"]
+            # 첨부파일 업로드
+            files = {"file": ("test.txt", b"delete test content", "text/plain")}
+            r_att = requests.post(f"{BASE}/api/attachments/{tr_id}", headers=h, files=files)
+            assert r_att.status_code in (200, 201)
+            att_filepath = r_att.json().get("filepath")
+
+            # 프로젝트 삭제
+            r_del = requests.delete(f"{BASE}/api/projects/{pid}", headers=h)
+            assert r_del.status_code == 204
+
+            # 실파일 확인 (삭제 후 파일이 남아있으면 안 됨)
+            if att_filepath:
+                import os
+                upload_dir = os.path.join(os.path.dirname(__file__), "uploads")
+                full_path = os.path.join(upload_dir, att_filepath)
+                assert not os.path.exists(full_path), f"Orphan file remains: {full_path}"
+        else:
+            # 결과 없으면 프로젝트만 삭제
+            requests.delete(f"{BASE}/api/projects/{pid}", headers=h)
+
+    def test_project_delete_without_attachments(self):
+        """첨부파일 없는 프로젝트 삭제도 정상 동작"""
+        h = auth(store.admin)
+        r = requests.post(f"{BASE}/api/projects", headers=h, json={
+            "name": "__sec_no_att__", "is_private": False
+        })
+        pid = r.json()["id"]
+        r_del = requests.delete(f"{BASE}/api/projects/{pid}", headers=h)
+        assert r_del.status_code == 204
+
+
+class TestAttachmentPermissionFallback:
+    """첨부파일 권한 fallback 시 시스템 역할 매핑 검증 (2개)."""
+
+    def test_user_role_no_500_on_public_project(self, project_pair):
+        """공개 프로젝트 비멤버 일반 사용자가 첨부파일 조회 시 500이 아닌 정상 응답"""
+        pub_id, _ = project_pair
+        h_admin = auth(store.admin)
+        # TC + TestRun 생성
+        requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h_admin, json={
+            "no": 15010, "tc_id": "TC-ATT-FB-001"
+        })
+        r_run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h_admin, json={
+            "name": "att-fb-run", "version": "1.0", "environment": "test", "round": 1
+        })
+        run_id = r_run.json()["id"]
+        r_results = requests.get(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}", headers=h_admin)
+        results = r_results.json().get("results", [])
+        if results:
+            tr_id = results[0]["id"]
+            # viewer(시스템 역할 user)로 첨부 목록 조회 → 200 (500 아님)
+            r2 = requests.get(f"{BASE}/api/attachments/{tr_id}/list", headers=auth(store.viewer))
+            assert r2.status_code != 500, "시스템 역할 user fallback에서 500 발생"
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}", headers=h_admin)
+
+    def test_viewer_upload_rejected_not_500(self, project_pair):
+        """공개 프로젝트 viewer의 업로드 시도 → 403 (500 아님)"""
+        pub_id, _ = project_pair
+        h_admin = auth(store.admin)
+        r_run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h_admin, json={
+            "name": "att-fb-run2", "version": "1.0", "environment": "test", "round": 1
+        })
+        run_id = r_run.json()["id"]
+        r_results = requests.get(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}", headers=h_admin)
+        results = r_results.json().get("results", [])
+        if results:
+            tr_id = results[0]["id"]
+            files = {"file": ("test.txt", b"should fail", "text/plain")}
+            r2 = requests.post(f"{BASE}/api/attachments/{tr_id}", headers=auth(store.viewer), files=files)
+            assert r2.status_code != 500, "시스템 역할 user fallback에서 500 발생"
+            assert r2.status_code == 403
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}", headers=h_admin)
+
+
+class TestTestPlanIdValidation:
+    """테스트런 생성 시 test_plan_id 검증 (3개)."""
+
+    def test_cross_project_plan_rejected(self, project_pair):
+        """프로젝트 A의 런에 프로젝트 B의 플랜 연결 시 400"""
+        pub_id, priv_id = project_pair
+        h = auth(store.admin)
+        # 프로젝트 A에 플랜 생성
+        r_plan = requests.post(f"{BASE}/api/projects/{pub_id}/testplans", headers=h, json={
+            "name": "plan-cross-test"
+        })
+        plan_id = r_plan.json()["id"]
+        # 프로젝트 B에서 프로젝트 A의 플랜으로 런 생성 시도
+        r = requests.post(f"{BASE}/api/projects/{priv_id}/testruns", headers=h, json={
+            "name": "cross-plan-run", "version": "1.0", "environment": "test",
+            "round": 1, "test_plan_id": plan_id
+        })
+        assert r.status_code == 400
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testplans/{plan_id}", headers=h)
+
+    def test_nonexistent_plan_rejected(self, project_pair):
+        """존재하지 않는 플랜 ID로 런 생성 시 400"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h, json={
+            "name": "ghost-plan-run", "version": "1.0", "environment": "test",
+            "round": 1, "test_plan_id": 999999
+        })
+        assert r.status_code == 400
+
+    def test_valid_plan_accepted(self, project_pair):
+        """같은 프로젝트의 플랜으로 런 생성 → 201"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        r_plan = requests.post(f"{BASE}/api/projects/{pub_id}/testplans", headers=h, json={
+            "name": "plan-valid-test"
+        })
+        plan_id = r_plan.json()["id"]
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h, json={
+            "name": "valid-plan-run", "version": "1.0", "environment": "test",
+            "round": 1, "test_plan_id": plan_id
+        })
+        assert r.status_code == 201
+        run_id = r.json()["id"]
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testplans/{plan_id}", headers=h)
+
+
+class TestSheetValidationOnUpdate:
+    """TC 수정/벌크수정 시 시트 무결성 검증 (4개)."""
+
+    def test_update_to_nonexistent_sheet_rejected(self, project_pair):
+        """존재하지 않는 시트로 TC 수정 시 400"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h, json={
+            "no": 15020, "tc_id": "TC-SH-UPD-001"
+        })
+        tc_id = r.json()["id"]
+        r2 = requests.put(f"{BASE}/api/projects/{pub_id}/testcases/{tc_id}", headers=h, json={
+            "sheet_name": "없는시트"
+        })
+        assert r2.status_code == 400
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc_id}", headers=h)
+
+    def test_update_to_folder_rejected(self, project_pair):
+        """폴더 시트로 TC 이동 시 400"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        # 폴더 생성
+        r_folder = requests.post(f"{BASE}/api/projects/{pub_id}/testcases/sheets", headers=h, json={
+            "name": "__sh_val_folder__", "is_folder": True
+        })
+        assert r_folder.status_code in (200, 201)
+        # TC 생성
+        r_tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h, json={
+            "no": 15021, "tc_id": "TC-SH-UPD-002"
+        })
+        tc_id = r_tc.json()["id"]
+        # 폴더로 이동 시도
+        r2 = requests.put(f"{BASE}/api/projects/{pub_id}/testcases/{tc_id}", headers=h, json={
+            "sheet_name": "__sh_val_folder__"
+        })
+        assert r2.status_code == 400
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc_id}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/sheets/__sh_val_folder__", headers=h)
+
+    def test_bulk_update_to_nonexistent_sheet_rejected(self, project_pair):
+        """벌크 수정 시 존재하지 않는 시트로 이동 → 400"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h, json={
+            "no": 15022, "tc_id": "TC-SH-BULK-001"
+        })
+        tc_id = r.json()["id"]
+        r2 = requests.put(f"{BASE}/api/projects/{pub_id}/testcases/bulk", headers=h, json={
+            "items": [{"id": tc_id, "sheet_name": "허공시트"}]
+        })
+        assert r2.status_code == 400
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc_id}", headers=h)
+
+    def test_new_project_first_tc_creates_default_sheet(self):
+        """신규 프로젝트에서 첫 TC 생성 시 '기본' 시트 자동 생성"""
+        h = auth(store.admin)
+        r = requests.post(f"{BASE}/api/projects", headers=h, json={
+            "name": "__sec_first_tc__", "is_private": False
+        })
+        pid = r.json()["id"]
+        # 시트 없는 상태에서 TC 생성 (sheet_name 기본값 "기본")
+        r_tc = requests.post(f"{BASE}/api/projects/{pid}/testcases", headers=h, json={
+            "no": 1, "tc_id": "TC-FIRST-001"
+        })
+        assert r_tc.status_code == 201, f"첫 TC 생성 실패: {r_tc.status_code} {r_tc.text}"
+        # 시트 목록에 "기본"이 생겼는지 확인
+        r_sheets = requests.get(f"{BASE}/api/projects/{pid}/testcases/sheets?flat=true", headers=h)
+        assert r_sheets.status_code == 200
+        sheet_names = [s["name"] for s in r_sheets.json()]
+        assert "기본" in sheet_names
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pid}", headers=h)
+
+
+class TestAvailableUsersEndpoint:
+    """프로젝트 admin용 사용자 목록 API 검증 (3개)."""
+
+    def test_project_admin_can_list_users(self, project_pair):
+        """프로젝트 admin이 available-users 조회 가능"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/members/available-users", headers=h)
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+        assert len(r.json()) >= 1
+
+    def test_viewer_cannot_list_users(self, project_pair):
+        """viewer는 available-users 조회 불가 → 403"""
+        pub_id, _ = project_pair
+        h = auth(store.viewer)
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/members/available-users", headers=h)
+        assert r.status_code == 403
+
+    def test_no_auth_cannot_list_users(self, project_pair):
+        """인증 없이 available-users 조회 → 401"""
+        pub_id, _ = project_pair
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/members/available-users")
+        assert r.status_code == 401
+
+
+class TestHeatmapLatestRunOnly:
+    """대시보드 heatmap 전체 모드 최신 결과 기준 검증 (2개)."""
+
+    def test_heatmap_returns_data(self, project_pair):
+        """heatmap API 정상 응답 확인"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/dashboard/heatmap", headers=h)
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    def test_heatmap_latest_only(self, project_pair):
+        """전체 모드 heatmap: 최신 런 결과만 반영되는지 확인"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        # TC 생성
+        r_tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h, json={
+            "no": 15030, "tc_id": "TC-HEATMAP-001", "category": "__heat_cat__", "priority": "높음"
+        })
+        tc_db_id = r_tc.json()["id"]
+        # Run1 생성 → FAIL로 기록
+        r_run1 = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h, json={
+            "name": "heat-run1", "version": "1.0", "environment": "test", "round": 1
+        })
+        run1_id = r_run1.json()["id"]
+        # submit_results로 FAIL 기록
+        requests.post(f"{BASE}/api/projects/{pub_id}/testruns/{run1_id}/results", headers=h, json=[
+            {"test_case_id": tc_db_id, "result": "FAIL"}
+        ])
+        # Run2 생성 → PASS로 기록 (최신)
+        r_run2 = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h, json={
+            "name": "heat-run2", "version": "1.0", "environment": "test", "round": 2
+        })
+        run2_id = r_run2.json()["id"]
+        requests.post(f"{BASE}/api/projects/{pub_id}/testruns/{run2_id}/results", headers=h, json=[
+            {"test_case_id": tc_db_id, "result": "PASS"}
+        ])
+        # 전체 모드 heatmap 조회 → __heat_cat__에 FAIL이 0이어야 함
+        r_heat = requests.get(f"{BASE}/api/projects/{pub_id}/dashboard/heatmap", headers=h)
+        heat_data = r_heat.json()
+        heat_cat = [e for e in heat_data if e.get("category") == "__heat_cat__"]
+        # 최신 런이 PASS이므로 FAIL count가 없어야 함
+        total_fail = sum(e.get("fail_count", 0) for e in heat_cat)
+        assert total_fail == 0, f"최신 런 PASS인데 heatmap에 FAIL {total_fail}건 표시됨"
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run2_id}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run1_id}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc_db_id}", headers=h)
+
+
+class TestReportCategoryNaNs:
+    """리포트 카테고리 요약 NA/NS 집계 검증 (2개)."""
+
+    def test_report_includes_na_ns(self, project_pair):
+        """리포트 카테고리 요약에 na, not_started 필드가 있어야 함"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        # TC + TestRun 생성
+        r_tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h, json={
+            "no": 15040, "tc_id": "TC-RPT-NANS-001", "category": "__rpt_cat__"
+        })
+        tc_db_id = r_tc.json()["id"]
+        r_run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h, json={
+            "name": "rpt-nans-run", "version": "1.0", "environment": "test", "round": 1
+        })
+        run_id = r_run.json()["id"]
+        # 결과를 NA로 기록
+        requests.post(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}/results", headers=h, json=[
+            {"test_case_id": tc_db_id, "result": "NA"}
+        ])
+        # 리포트 조회
+        r_rpt = requests.get(f"{BASE}/api/projects/{pub_id}/reports?run_id={run_id}&format=json", headers=h)
+        assert r_rpt.status_code == 200
+        report = r_rpt.json()
+        cat_summary = report.get("category_summary", [])
+        rpt_cat = [c for c in cat_summary if c["category"] == "__rpt_cat__"]
+        if rpt_cat:
+            assert "na" in rpt_cat[0], "카테고리 요약에 na 필드 없음"
+            assert "not_started" in rpt_cat[0], "카테고리 요약에 not_started 필드 없음"
+            assert rpt_cat[0]["na"] >= 1, "NA 결과가 집계되지 않음"
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc_db_id}", headers=h)
+
+    def test_report_ns_counted(self, project_pair):
+        """NS(미실행) 결과도 카테고리 요약에 집계되어야 함"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        r_tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h, json={
+            "no": 15041, "tc_id": "TC-RPT-NS-001", "category": "__rpt_ns__"
+        })
+        tc_db_id = r_tc.json()["id"]
+        r_run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h, json={
+            "name": "rpt-ns-run", "version": "1.0", "environment": "test", "round": 1
+        })
+        run_id = r_run.json()["id"]
+        # 결과 수정 없이 (기본 NS) 리포트 조회
+        r_rpt = requests.get(f"{BASE}/api/projects/{pub_id}/reports?run_id={run_id}&format=json", headers=h)
+        assert r_rpt.status_code == 200
+        report = r_rpt.json()
+        cat_summary = report.get("category_summary", [])
+        rpt_cat = [c for c in cat_summary if c["category"] == "__rpt_ns__"]
+        if rpt_cat:
+            assert rpt_cat[0]["not_started"] >= 1, "NS 결과가 집계되지 않음"
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc_db_id}", headers=h)
+
+
+class TestTestRunPermissions:
+    """테스트런 권한 모델 검증 - tester/viewer/admin 분리 (5개)."""
+
+    @pytest.fixture(autouse=True)
+    def _setup_tester(self, project_pair):
+        """테스터 역할 멤버 설정"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        # viewer를 tester로 추가
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/members", headers=h, json={
+            "user_id": store.viewer_uid, "role": "tester"
+        })
+        self.tester_member_id = r.json()["id"] if r.status_code == 201 else None
+        self.pub_id = pub_id
+        yield
+        # cleanup: 멤버 제거
+        if self.tester_member_id:
+            requests.delete(f"{BASE}/api/projects/{pub_id}/members/{self.tester_member_id}", headers=h)
+
+    def test_tester_can_create_run(self):
+        """tester 역할은 테스트런 생성 가능 → 201"""
+        h = auth(store.viewer)  # viewer 계정이지만 프로젝트에서 tester 역할
+        r = requests.post(f"{BASE}/api/projects/{self.pub_id}/testruns", headers=h, json={
+            "name": "tester-run", "version": "1.0", "environment": "test", "round": 1
+        })
+        assert r.status_code == 201
+        run_id = r.json()["id"]
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{self.pub_id}/testruns/{run_id}", headers=auth(store.admin))
+
+    def test_tester_can_clone_run(self):
+        """tester는 런 복제 가능"""
+        h_admin = auth(store.admin)
+        r_run = requests.post(f"{BASE}/api/projects/{self.pub_id}/testruns", headers=h_admin, json={
+            "name": "clone-src", "version": "1.0", "environment": "test", "round": 1
+        })
+        run_id = r_run.json()["id"]
+        h = auth(store.viewer)
+        r = requests.post(f"{BASE}/api/projects/{self.pub_id}/testruns/{run_id}/clone", headers=h)
+        assert r.status_code == 201
+        cloned_id = r.json()["id"]
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{self.pub_id}/testruns/{cloned_id}", headers=h_admin)
+        requests.delete(f"{BASE}/api/projects/{self.pub_id}/testruns/{run_id}", headers=h_admin)
+
+    def test_tester_cannot_delete_run(self):
+        """tester는 런 삭제 불가 → 403"""
+        h_admin = auth(store.admin)
+        r_run = requests.post(f"{BASE}/api/projects/{self.pub_id}/testruns", headers=h_admin, json={
+            "name": "no-del-run", "version": "1.0", "environment": "test", "round": 1
+        })
+        run_id = r_run.json()["id"]
+        h = auth(store.viewer)
+        r = requests.delete(f"{BASE}/api/projects/{self.pub_id}/testruns/{run_id}", headers=h)
+        assert r.status_code == 403
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{self.pub_id}/testruns/{run_id}", headers=h_admin)
+
+    def test_tester_can_complete_run(self):
+        """tester는 런 완료 가능"""
+        h_admin = auth(store.admin)
+        r_run = requests.post(f"{BASE}/api/projects/{self.pub_id}/testruns", headers=h_admin, json={
+            "name": "complete-run", "version": "1.0", "environment": "test", "round": 1
+        })
+        run_id = r_run.json()["id"]
+        h = auth(store.viewer)
+        r = requests.put(f"{BASE}/api/projects/{self.pub_id}/testruns/{run_id}/complete", headers=h)
+        assert r.status_code == 200
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{self.pub_id}/testruns/{run_id}", headers=h_admin)
+
+    def test_viewer_cannot_create_run(self, project_pair):
+        """viewer 역할(멤버 아닌 상태)은 런 생성 불가"""
+        _, priv_id = project_pair
+        h = auth(store.viewer)
+        r = requests.post(f"{BASE}/api/projects/{priv_id}/testruns", headers=h, json={
+            "name": "viewer-run", "version": "1.0", "environment": "test", "round": 1
+        })
+        assert r.status_code == 403
+
+
+class TestMemberRoleReset:
+    """멤버 추가 후 역할 리셋값 검증 (1개)."""
+
+    def test_add_member_with_valid_roles_only(self, project_pair):
+        """tester/admin만 유효한 역할, viewer는 400"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        # viewer 역할로 추가 시도 → 400
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/members", headers=h, json={
+            "user_id": store.viewer_uid, "role": "viewer"
+        })
+        assert r.status_code == 400, f"viewer 역할이 허용됨: {r.status_code}"

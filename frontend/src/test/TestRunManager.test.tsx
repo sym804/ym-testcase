@@ -403,7 +403,7 @@ describe("TestRunManager", () => {
       });
     });
 
-    it("viewer 역할일 때 삭제 버튼이 표시되지 않는다", async () => {
+    it("viewer 역할일 때 삭제/복제/완료 버튼이 표시되지 않는다", async () => {
       const user = userEvent.setup();
       renderComponent(viewerProject);
 
@@ -414,9 +414,11 @@ describe("TestRunManager", () => {
       await user.click(screen.getByText("Sprint 1 테스트"));
 
       await waitFor(() => {
-        expect(screen.getByText("복제")).toBeInTheDocument();
+        expect(screen.getByText("Excel")).toBeInTheDocument();
       });
       expect(screen.queryByText("삭제")).not.toBeInTheDocument();
+      expect(screen.queryByText("복제")).not.toBeInTheDocument();
+      expect(screen.queryByText("수행 완료")).not.toBeInTheDocument();
     });
 
     it("진행 중인 수행에 '수행 완료' 버튼이 표시된다", async () => {

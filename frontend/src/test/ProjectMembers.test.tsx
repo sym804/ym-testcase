@@ -13,13 +13,11 @@ vi.mock("../api", () => ({
     add: vi.fn(),
     updateRole: vi.fn(),
     remove: vi.fn(),
-  },
-  usersApi: {
-    list: vi.fn(),
+    availableUsers: vi.fn(),
   },
 }));
 
-import { membersApi, usersApi } from "../api";
+import { membersApi } from "../api";
 import toast from "react-hot-toast";
 import { UserRole } from "../types";
 
@@ -40,7 +38,7 @@ beforeEach(() => {
   vi.mocked(membersApi.add).mockResolvedValue({} as any);
   vi.mocked(membersApi.updateRole).mockResolvedValue({} as any);
   vi.mocked(membersApi.remove).mockResolvedValue(undefined);
-  vi.mocked(usersApi.list).mockResolvedValue(mockUsers);
+  vi.mocked(membersApi.availableUsers).mockResolvedValue(mockUsers);
 });
 
 describe("ProjectMembers", () => {

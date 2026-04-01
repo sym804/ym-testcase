@@ -239,13 +239,13 @@ export default function UserManualPage() {
               </ul>
             </div>
             <ul style={s.ul}>
-              <li><strong>빈 프로젝트</strong>에서는 화면 중앙에 "폴더 추가", "시트 추가", "Excel Import" 버튼이 표시됩니다.</li>
+              <li><strong>빈 프로젝트</strong>에서는 화면 중앙에 "폴더 추가", "시트 추가", "Import" 버튼이 표시됩니다.</li>
               <li><strong>폴더 추가:</strong> 사이드바 상단의 <strong>📁+</strong> 버튼으로 루트 폴더를 추가합니다. 폴더 노드의 <strong>📁+</strong> 버튼으로 하위 폴더를 추가할 수 있습니다.</li>
               <li><strong>시트 추가:</strong> 사이드바 상단의 <strong>📄+</strong> 버튼으로 루트 시트를 추가합니다. 폴더 노드의 <strong>📄+</strong> 버튼으로 폴더 안에 시트를 추가할 수 있습니다.</li>
               <li><strong>시트 전환:</strong> 사이드바에서 시트(📄)를 클릭하면 해당 시트의 TC만 표시됩니다.</li>
               <li><strong>전체 보기:</strong> 시트가 2개 이상일 때 사이드바 상단에 "전체" 항목이 나타나며, 모든 시트의 TC를 한 번에 볼 수 있습니다.</li>
               <li><strong>삭제:</strong> 폴더/시트의 인라인 <strong>×</strong> 버튼으로 삭제합니다. 폴더 삭제 시 하위 항목과 TC가 모두 함께 삭제됩니다.</li>
-              <li><strong>Excel Import 시</strong> 엑셀 파일의 시트 이름이 그대로 사이드바 트리에 시트로 생성됩니다.</li>
+              <li><strong>Import 시</strong> 엑셀 파일의 시트 이름이 그대로 사이드바 트리에 시트로 생성됩니다.</li>
               <li><strong>사이드바 접기/펼치기:</strong> ◀/▶ 토글 버튼으로 사이드바를 접거나 펼칠 수 있습니다.</li>
             </ul>
 

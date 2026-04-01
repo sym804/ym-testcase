@@ -54,7 +54,7 @@ test.describe("TC 관리", () => {
     await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
   });
 
-  test("Excel Import 버튼이 빈 프로젝트에 표시됨", async ({ page }) => {
+  test("Import 버튼이 빈 프로젝트에 표시됨", async ({ page }) => {
     await login(page);
     const projectName = `E2E_Imp_${Date.now()}`;
 
@@ -67,8 +67,8 @@ test.describe("TC 관리", () => {
     await expect(card).toBeVisible({ timeout: 10000 });
     await card.click();
 
-    // Excel Import 버튼 확인
-    await expect(page.getByText("Excel Import")).toBeVisible({ timeout: 10000 });
+    // Import 버튼 확인
+    await expect(page.getByText("Import")).toBeVisible({ timeout: 10000 });
 
     // 정리
     await page.getByRole("button", { name: "설정" }).click();
