@@ -112,10 +112,12 @@ def _check_attachment_access(
         if ROLE_HIERARCHY.index(proj_role) >= min_idx:
             return
 
-    # 시스템 역할 폴백
+    # 시스템 역할 폴백: 시스템 역할 → 프로젝트 역할로 매핑
     from models import UserRole
+    SYS_TO_PROJ_ROLE = {"user": "viewer", "qa_manager": "admin", "admin": "admin"}
     sys_role = user.role.value if isinstance(user.role, UserRole) else user.role
-    if ROLE_HIERARCHY.index(sys_role) >= min_idx:
+    mapped_role = SYS_TO_PROJ_ROLE.get(sys_role, "viewer")
+    if ROLE_HIERARCHY.index(mapped_role) >= min_idx:
         return
 
     raise HTTPException(status_code=403, detail="Insufficient project permissions")

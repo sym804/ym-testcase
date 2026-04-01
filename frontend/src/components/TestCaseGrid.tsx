@@ -344,10 +344,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           if (!sheetOrder.includes(name)) sorted.push(...tcs.sort((a, b) => a.no - b.no));
         }
         let seq = 1;
-        for (const tc of sorted) {
-          tc.no = seq++;
-        }
-        setRowData(sorted);
+        const withSeq = sorted.map((tc) => ({ ...tc, _originalNo: tc.no, no: seq++ }));
+        setRowData(withSeq);
       } else {
         setRowData(data);
       }
@@ -520,7 +518,13 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     if (autoSaveTimerRef.current[key]) clearTimeout(autoSaveTimerRef.current[key]);
     autoSaveTimerRef.current[key] = setTimeout(async () => {
       try {
-        await testCasesApi.update(projectId, data.id, data);
+        // 전체 보기에서 화면용 연속 번호가 DB에 저장되지 않도록 원본 no 복원
+        const saveData = { ...data };
+        if ("_originalNo" in saveData) {
+          saveData.no = (saveData as Record<string, unknown>)._originalNo as number;
+          delete (saveData as Record<string, unknown>)._originalNo;
+        }
+        await testCasesApi.update(projectId, data.id, saveData);
       } catch {
         toast.error("자동 저장 실패");
       }

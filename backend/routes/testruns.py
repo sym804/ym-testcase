@@ -57,6 +57,15 @@ def create_testrun(
 ):
     _get_project_or_404(project_id, db)
 
+    # test_plan_id가 지정된 경우 같은 프로젝트의 플랜인지 검증
+    if payload.test_plan_id is not None:
+        from models import TestPlan
+        plan = db.query(TestPlan).filter(TestPlan.id == payload.test_plan_id).first()
+        if not plan:
+            raise HTTPException(status_code=400, detail="존재하지 않는 테스트 플랜입니다.")
+        if plan.project_id != project_id:
+            raise HTTPException(status_code=400, detail="다른 프로젝트의 테스트 플랜은 연결할 수 없습니다.")
+
     run = TestRun(
         project_id=project_id,
         name=payload.name,

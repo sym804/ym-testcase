@@ -6,6 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -378,6 +379,34 @@ def delete_sheet(
     return {"deleted": count, "sheet": sheet_name}
 
 
+# ── 시트 무결성 검증 ─────────────────────────────────────────────────────────
+
+def _validate_sheet_name(project_id: int, sheet_name: str | None, db: Session, *, auto_create_default: bool = False):
+    """시트 이름 유효성 검증: 폴더 직접 추가 금지, 존재하지 않는 시트 금지.
+    auto_create_default=True이면 "기본" 시트가 없을 때 자동 생성."""
+    if not sheet_name:
+        return
+    from models import TestCaseSheet
+    sheet = db.query(TestCaseSheet).filter(
+        TestCaseSheet.project_id == project_id,
+        TestCaseSheet.name == sheet_name,
+    ).first()
+    if not sheet:
+        if auto_create_default and sheet_name == "기본":
+            max_order = db.query(func.max(TestCaseSheet.sort_order)).filter(
+                TestCaseSheet.project_id == project_id
+            ).scalar() or 0
+            new_sheet = TestCaseSheet(
+                project_id=project_id, name="기본", sort_order=max_order + 1,
+            )
+            db.add(new_sheet)
+            db.flush()
+            return
+        raise HTTPException(status_code=400, detail=f"존재하지 않는 시트입니다: {sheet_name}")
+    if sheet.is_folder:
+        raise HTTPException(status_code=400, detail="폴더에는 TC를 직접 추가할 수 없습니다. 하위 시트를 사용하세요.")
+
+
 # ── Create ────────────────────────────────────────────────────────────────────
 
 @router.post("", response_model=TestCaseResponse, status_code=status.HTTP_201_CREATED)
@@ -388,17 +417,7 @@ def create_testcase(
     current_user: User = Depends(check_project_access("admin")),
 ):
     _get_project_or_404(project_id, db)
-
-    # 폴더에는 TC를 직접 추가할 수 없음
-    if payload.sheet_name:
-        from models import TestCaseSheet
-        folder = db.query(TestCaseSheet).filter(
-            TestCaseSheet.project_id == project_id,
-            TestCaseSheet.name == payload.sheet_name,
-            TestCaseSheet.is_folder == True,
-        ).first()
-        if folder:
-            raise HTTPException(status_code=400, detail="폴더에는 TC를 직접 추가할 수 없습니다. 하위 시트를 사용하세요.")
+    _validate_sheet_name(project_id, payload.sheet_name, db, auto_create_default=True)
 
     tc = TestCase(
         project_id=project_id,
@@ -431,8 +450,11 @@ def bulk_update_testcases(
         ).first()
         if not tc:
             continue
+        item_data = item.model_dump(exclude_unset=True, exclude={"id"})
+        if "sheet_name" in item_data:
+            _validate_sheet_name(project_id, item_data["sheet_name"], db)
         changes = {}
-        for key, value in item.model_dump(exclude_unset=True, exclude={"id"}).items():
+        for key, value in item_data.items():
             old_val = getattr(tc, key)
             if str(old_val) != str(value):
                 changes[key] = (old_val, value)
@@ -465,8 +487,12 @@ def update_testcase(
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found")
 
+    update_data = payload.model_dump(exclude_unset=True)
+    if "sheet_name" in update_data:
+        _validate_sheet_name(project_id, update_data["sheet_name"], db)
+
     changes = {}
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    for key, value in update_data.items():
         old_val = getattr(tc, key)
         if str(old_val) != str(value):
             changes[key] = (old_val, value)

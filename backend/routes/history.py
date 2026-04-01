@@ -62,6 +62,12 @@ def get_testcase_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # TC가 속한 프로젝트의 접근 권한 확인
+    tc = db.query(TestCase).filter(TestCase.id == test_case_id).first()
+    if not tc:
+        raise HTTPException(status_code=404, detail="테스트 케이스를 찾을 수 없습니다.")
+    _check_project_member(tc.project_id, current_user, db)
+
     rows = (
         db.query(TestCaseHistory)
         .options(joinedload(TestCaseHistory.changer))

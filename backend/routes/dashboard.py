@@ -357,7 +357,17 @@ def get_heatmap(
             for r in query
         ]
 
-    # 전체 모드: 모든 run의 FAIL 결과를 합산
+    # 전체 모드: TC별 최신 런 결과 기준 FAIL만 집계 (다른 위젯과 동일 기준)
+    latest_run_per_tc = (
+        db.query(
+            TestResult.test_case_id,
+            func.max(TestResult.test_run_id).label("max_run_id"),
+        )
+        .join(TestRun, TestResult.test_run_id == TestRun.id)
+        .filter(TestRun.project_id == project_id)
+        .group_by(TestResult.test_case_id)
+        .subquery()
+    )
     query = (
         db.query(
             TestCase.category,
@@ -365,6 +375,13 @@ def get_heatmap(
             func.count().label("fail_count"),
         )
         .join(TestResult, TestResult.test_case_id == TestCase.id)
+        .join(
+            latest_run_per_tc,
+            and_(
+                TestResult.test_case_id == latest_run_per_tc.c.test_case_id,
+                TestResult.test_run_id == latest_run_per_tc.c.max_run_id,
+            ),
+        )
         .filter(
             TestCase.project_id == project_id,
             TestCase.deleted_at.is_(None),

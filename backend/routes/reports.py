@@ -64,7 +64,7 @@ def _build_report_data(run: TestRun, db: Session) -> dict:
     for r in results:
         cat = r.test_case.category or "Uncategorized"
         if cat not in category_map:
-            category_map[cat] = {"total": 0, "passed": 0, "failed": 0, "blocked": 0}
+            category_map[cat] = {"total": 0, "passed": 0, "failed": 0, "blocked": 0, "na": 0, "not_started": 0}
         category_map[cat]["total"] += 1
         val = r.result.value if hasattr(r.result, "value") else r.result
         if val == "PASS":
@@ -73,6 +73,12 @@ def _build_report_data(run: TestRun, db: Session) -> dict:
             category_map[cat]["failed"] += 1
         elif val == "BLOCK":
             category_map[cat]["blocked"] += 1
+        elif val in ("NA", "N/A"):
+            category_map[cat]["na"] += 1
+        elif val == "NS":
+            category_map[cat]["not_started"] += 1
+        else:
+            category_map[cat]["not_started"] += 1
 
     # Failed items detail
     failed_items = []
@@ -179,8 +185,8 @@ def report_json(
                 "pass": c["passed"],
                 "fail": c["failed"],
                 "block": c["blocked"],
-                "na": 0,
-                "not_started": 0,
+                "na": c.get("na", 0),
+                "not_started": c.get("not_started", 0),
             }
             for c in raw["categories"]
         ],

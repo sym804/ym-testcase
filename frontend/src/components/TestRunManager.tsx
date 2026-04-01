@@ -45,7 +45,8 @@ function resultCellStyle(params: CellClassParams) {
 }
 
 export default function TestRunManager({ projectId, project }: Props) {
-  const canManageRun = project.my_role === "admin";
+  const canManageRun = project.my_role === "admin" || project.my_role === "tester";
+  const canDeleteRun = project.my_role === "admin";
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [selectedRun, setSelectedRun] = useState<TestRun | null>(null);
   const [results, setResults] = useState<TestResult[]>([]);
@@ -921,9 +922,11 @@ export default function TestRunManager({ projectId, project }: Props) {
               </>;
             })()}
           </div>
-          <button style={styles.newRunBtn} onClick={() => setShowModal(true)}>
-            + 새 테스트 수행 만들기
-          </button>
+          {canManageRun && (
+            <button style={styles.newRunBtn} onClick={() => setShowModal(true)}>
+              + 새 테스트 수행 만들기
+            </button>
+          )}
         </div>
       )}
 
@@ -946,21 +949,23 @@ export default function TestRunManager({ projectId, project }: Props) {
                 <div style={{ fontSize: 16, color: "var(--text-secondary)", marginBottom: 20 }}>
                   등록된 테스트 수행이 없습니다.
                 </div>
-                <button
-                  style={{
-                    padding: "10px 24px",
-                    fontSize: 15,
-                    fontWeight: 600,
-                    backgroundColor: "var(--accent)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                  }}
-                  onClick={() => setShowModal(true)}
-                >
-                  + 새 테스트 수행 만들기
-                </button>
+                {canManageRun && (
+                  <button
+                    style={{
+                      padding: "10px 24px",
+                      fontSize: 15,
+                      fontWeight: 600,
+                      backgroundColor: "var(--accent)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                    }}
+                    onClick={() => setShowModal(true)}
+                  >
+                    + 새 테스트 수행 만들기
+                  </button>
+                )}
               </div>
             ) : (
               "왼쪽에서 테스트 수행을 선택하세요."
@@ -986,14 +991,16 @@ export default function TestRunManager({ projectId, project }: Props) {
                 </div>
               </div>
               <div style={styles.runActions}>
-                {canManageRun && (
+                {canDeleteRun && (
                   <button style={styles.btnDanger} onClick={handleDelete}>
                     삭제
                   </button>
                 )}
-                <button style={styles.btnGhost} onClick={handleClone}>
-                  복제
-                </button>
+                {canManageRun && (
+                  <button style={styles.btnGhost} onClick={handleClone}>
+                    복제
+                  </button>
+                )}
                 <button style={styles.btnGhost} onClick={async () => {
                   if (!selectedRun) return;
                   try {
@@ -1009,7 +1016,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 }}>
                   Excel
                 </button>
-                {selectedRun.status !== TestRunStatus.COMPLETED ? (
+                {canManageRun && (selectedRun.status !== TestRunStatus.COMPLETED ? (
                   <button style={styles.btnComplete} onClick={handleComplete}>
                     수행 완료
                   </button>
@@ -1027,7 +1034,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                   }}>
                     다시 수행
                   </button>
-                )}
+                ))}
               </div>
             </div>
 

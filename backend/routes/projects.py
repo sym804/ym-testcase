@@ -1,12 +1,17 @@
+import os
+import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User, Project, ProjectMember, ProjectRole
+from models import User, Project, ProjectMember, ProjectRole, TestRun, TestResult, Attachment
 from schemas import ProjectCreate, ProjectUpdate, ProjectResponse
 from auth import get_current_user, role_required, get_project_role, check_project_access
+
+logger = logging.getLogger(__name__)
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -172,6 +177,21 @@ def delete_project(
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    # 프로젝트에 속한 첨부파일 실파일 삭제
+    run_ids = [r.id for r in db.query(TestRun.id).filter(TestRun.project_id == project_id).all()]
+    if run_ids:
+        result_ids = [r.id for r in db.query(TestResult.id).filter(TestResult.test_run_id.in_(run_ids)).all()]
+        if result_ids:
+            attachments = db.query(Attachment).filter(Attachment.test_result_id.in_(result_ids)).all()
+            for att in attachments:
+                if att.filepath:
+                    full_path = os.path.join(UPLOAD_DIR, att.filepath)
+                    if os.path.isfile(full_path):
+                        try:
+                            os.remove(full_path)
+                        except OSError:
+                            logger.warning("Failed to delete file: %s", full_path)
 
     db.delete(project)
     db.commit()

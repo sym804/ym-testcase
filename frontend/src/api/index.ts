@@ -430,6 +430,13 @@ export const membersApi = {
   remove: async (projectId: number, memberId: number) => {
     await client.delete(`/api/projects/${projectId}/members/${memberId}`);
   },
+
+  availableUsers: async (projectId: number) => {
+    const res = await client.get<User[]>(
+      `/api/projects/${projectId}/members/available-users`
+    );
+    return res.data;
+  },
 };
 
 // ─── History ──────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { membersApi, usersApi } from "../api";
+import { membersApi } from "../api";
 import type { ProjectMember, User } from "../types";
 import toast from "react-hot-toast";
 
@@ -29,7 +29,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
       const m = await membersApi.list(projectId);
       setMembers(m);
       if (isAdmin) {
-        const users = await usersApi.list();
+        const users = await membersApi.availableUsers(projectId);
         setAllUsers(users);
       }
     } catch {
@@ -50,7 +50,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
       await membersApi.add(projectId, Number(addUserId), addRole);
       toast.success("멤버가 추가되었습니다.");
       setAddUserId("");
-      setAddRole("viewer");
+      setAddRole("tester");
       load();
     } catch (err: unknown) {
       const msg =

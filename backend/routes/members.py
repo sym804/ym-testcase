@@ -46,6 +46,18 @@ def list_members(
     return result
 
 
+@router.get("/available-users")
+def list_available_users(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(check_project_access("admin")),
+):
+    """멤버 추가용 사용자 목록 (프로젝트 admin이면 조회 가능)"""
+    from schemas import UserResponse
+    users = db.query(User).order_by(User.id).all()
+    return [UserResponse.model_validate(u) for u in users]
+
+
 @router.post("", response_model=ProjectMemberResponse, status_code=status.HTTP_201_CREATED)
 def add_member(
     project_id: int,
