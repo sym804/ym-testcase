@@ -157,6 +157,7 @@ test.describe("2. 프로젝트 목록", () => {
   });
 
   test("TC-PL-004: 프로젝트 카드 정보", async ({ page }) => {
+    test.skip(!!process.env.CI, "CI 환경에서는 기존 프로젝트 필요");
     // 카드에 프로젝트 이름이 h3로 표시
     await page.waitForTimeout(2000);
     const cards = page.locator("h3");
@@ -164,6 +165,7 @@ test.describe("2. 프로젝트 목록", () => {
   });
 
   test("TC-PL-005: 프로젝트 카드 → 상세 이동", async ({ page }) => {
+    test.skip(!!process.env.CI, "CI 환경에서는 기존 프로젝트 필요");
     await page.waitForTimeout(2000);
     const firstCard = page.locator("h3").first();
     const name = await firstCard.textContent();

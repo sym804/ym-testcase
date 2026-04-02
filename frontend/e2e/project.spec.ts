@@ -47,6 +47,7 @@ test.describe("프로젝트 관리", () => {
   });
 
   test("프로젝트 상세 탭 전환", async ({ page }) => {
+    test.skip(!!process.env.CI, "CI 환경에서는 기존 프로젝트 필요");
     // 테이블 첫 행 클릭으로 프로젝트 진입
     await page.waitForTimeout(2000);
     const firstRow = page.locator("tr[style*='cursor']").first();
