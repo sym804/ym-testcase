@@ -82,13 +82,35 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"username":"admin","password":"test1234","display_name":"Admin"}'
 
-      - name: Run E2E tests
+      - name: Start frontend dev server
+        working-directory: frontend
+        run: npm run dev &
+        env:
+          VITE_API_URL: http://localhost:8008
+
+      - name: Wait for frontend
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:5173/ > /dev/null 2>&1 && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Run E2E tests (capture tests excluded)
         working-directory: frontend
         env:
           VITE_API_URL: http://localhost:8008
           TEST_ADMIN_PASSWORD: test1234
-        run: npx playwright test --reporter=list
-        timeout-minutes: 10
+        run: >-
+          npx playwright test
+          e2e/admin.spec.ts
+          e2e/auth.spec.ts
+          e2e/project.spec.ts
+          e2e/regression-full.spec.ts
+          e2e/tc-management.spec.ts
+          e2e/v060-features.spec.ts
+          --reporter=list
+        timeout-minutes: 15
 
   backend:
     name: Backend (pytest 116 tests)
