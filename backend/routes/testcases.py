@@ -50,6 +50,9 @@ def _get_project_or_404(project_id: int, db: Session) -> Project:
 
 # ── List ──────────────────────────────────────────────────────────────────────
 
+MAX_LIST_LIMIT = 5000  # 단일 요청 최대 반환 건수
+
+
 @router.get("", response_model=List[TestCaseResponse])
 def list_testcases(
     project_id: int,
@@ -57,6 +60,8 @@ def list_testcases(
     priority: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     sheet_name: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None, ge=1, le=MAX_LIST_LIMIT),
+    offset: Optional[int] = Query(None, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -80,7 +85,15 @@ def list_testcases(
             | (TestCase.expected_result.ilike(like))
         )
 
-    return q.order_by(TestCase.no).all()
+    q = q.order_by(TestCase.no)
+    if offset is not None:
+        q = q.offset(offset)
+    if limit is not None:
+        q = q.limit(limit)
+    else:
+        q = q.limit(MAX_LIST_LIMIT)
+
+    return q.all()
 
 
 def _build_sheet_tree(sheets, tc_counts):

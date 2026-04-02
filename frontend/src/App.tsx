@@ -1,15 +1,17 @@
-import {} from "react";
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import ProjectListPage from "./pages/ProjectListPage";
-import ProjectPage from "./pages/ProjectPage";
-import AdminPage from "./pages/AdminPage";
-import UserManualPage from "./pages/UserManualPage";
-import AdminManualPage from "./pages/AdminManualPage";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 import type { ReactNode } from "react";
+
+// Lazy-loaded pages
+const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+const ProjectListPage = lazy(() => import("./pages/ProjectListPage"));
+const ProjectPage = lazy(() => import("./pages/ProjectPage"));
+const AdminPage = lazy(() => import("./pages/AdminPage"));
+const UserManualPage = lazy(() => import("./pages/UserManualPage"));
+const AdminManualPage = lazy(() => import("./pages/AdminManualPage"));
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading, mustChangePassword } = useAuth();
@@ -42,8 +44,17 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function PageLoader() {
+  return (
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", color: "#64748B", fontSize: 16 }}>
+      로딩 중...
+    </div>
+  );
+}
+
 export default function App() {
   return (
+    <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -90,5 +101,6 @@ export default function App() {
       />
       <Route path="*" element={<Navigate to="/projects" replace />} />
     </Routes>
+    </Suspense>
   );
 }

@@ -8,7 +8,7 @@ def now_kst():
     return datetime.now(KST).replace(tzinfo=None)
 
 from sqlalchemy import (
-    Boolean, Column, Integer, String, Text, DateTime, Float, ForeignKey, Enum as SAEnum, JSON
+    Boolean, Column, Integer, String, Text, DateTime, Float, ForeignKey, Enum as SAEnum, JSON, Index
 )
 from sqlalchemy.orm import relationship
 
@@ -95,6 +95,11 @@ class TestCaseSheet(Base):
     project = relationship("Project")
     parent = relationship("TestCaseSheet", remote_side="TestCaseSheet.id", backref="children")
 
+    __table_args__ = (
+        Index("ix_test_case_sheets_project_id", "project_id"),
+        Index("ix_test_case_sheets_parent_id", "parent_id"),
+    )
+
 
 # ── TestCase ──────────────────────────────────────────────────────────────────
 
@@ -131,6 +136,11 @@ class TestCase(Base):
     creator = relationship("User", back_populates="test_cases")
     test_results = relationship("TestResult", back_populates="test_case", cascade="all, delete-orphan")
 
+    __table_args__ = (
+        Index("ix_test_cases_project_id_deleted", "project_id", "deleted_at"),
+        Index("ix_test_cases_sheet_name", "project_id", "sheet_name"),
+    )
+
 
 # ── TestRun ───────────────────────────────────────────────────────────────────
 
@@ -153,6 +163,11 @@ class TestRun(Base):
     creator = relationship("User", back_populates="test_runs")
     test_plan = relationship("TestPlan", back_populates="test_runs")
     results = relationship("TestResult", back_populates="test_run", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_test_runs_project_id", "project_id"),
+        Index("ix_test_runs_status", "project_id", "status"),
+    )
 
 
 # ── TestResult ────────────────────────────────────────────────────────────────
@@ -177,6 +192,12 @@ class TestResult(Base):
     test_case = relationship("TestCase", back_populates="test_results")
     executor = relationship("User", back_populates="test_results")
     attachments = relationship("Attachment", back_populates="test_result", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_test_results_run_id", "test_run_id"),
+        Index("ix_test_results_run_result", "test_run_id", "result"),
+        Index("ix_test_results_case_id", "test_case_id"),
+    )
 
 
 # ── Attachment ───────────────────────────────────────────────────────────────
@@ -210,6 +231,10 @@ class ProjectMember(Base):
 
     project = relationship("Project", back_populates="members")
     user = relationship("User")
+
+    __table_args__ = (
+        Index("ix_project_members_project_user", "project_id", "user_id"),
+    )
 
 
 # ── CustomFieldDef ───────────────────────────────────────────────────────────
@@ -282,3 +307,7 @@ class TestCaseHistory(Base):
 
     test_case = relationship("TestCase")
     changer = relationship("User")
+
+    __table_args__ = (
+        Index("ix_test_case_history_tc_id", "test_case_id"),
+    )

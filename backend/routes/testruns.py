@@ -4,7 +4,7 @@ from datetime import datetime
 from models import now_kst
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from openpyxl import Workbook
@@ -36,6 +36,8 @@ def _get_project_or_404(project_id: int, db: Session) -> Project:
 @router.get("", response_model=List[TestRunListResponse])
 def list_testruns(
     project_id: int,
+    limit: int = Query(500, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -44,6 +46,8 @@ def list_testruns(
         db.query(TestRun)
         .filter(TestRun.project_id == project_id)
         .order_by(TestRun.created_at.desc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )
 

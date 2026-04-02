@@ -18,6 +18,7 @@ import {
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import App from "./App";
+import ErrorBoundary from "./components/ErrorBoundary";
 import "./index.css";
 
 // Register Chart.js components
@@ -39,6 +40,7 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <ThemeProvider>
       <AuthProvider>
+        <ErrorBoundary>
         <App />
         <Toaster
           position="top-center"
@@ -50,6 +52,7 @@ createRoot(document.getElementById("root")!).render(
             },
           }}
         />
+      </ErrorBoundary>
       </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

@@ -4,8 +4,9 @@ from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from database import engine, Base
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
     _migrate_roles()
     _migrate_sheet_parent_id()
     _migrate_field_config()
+    _migrate_indexes()
     _purge_old_deleted_testcases()
     yield
 
@@ -54,6 +56,38 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
 )
+
+# ── Security headers middleware ──────────────────────────────────────────────
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'"
+    )
+    if os.getenv("ENV") == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
+# ── Global exception handler ─────────────────────────────────────────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled error on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
 
 # Include routers
 app.include_router(auth_routes.router)
@@ -160,6 +194,35 @@ def _migrate_field_config():
         db.rollback()
     finally:
         db.close()
+
+
+def _migrate_indexes():
+    """v1.0.3 마이그레이션: 성능 개선을 위한 인덱스 추가"""
+    from database import SessionLocal
+    import sqlalchemy as sa
+    db = SessionLocal()
+
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS ix_test_case_sheets_project_id ON test_case_sheets(project_id)",
+        "CREATE INDEX IF NOT EXISTS ix_test_case_sheets_parent_id ON test_case_sheets(parent_id)",
+        "CREATE INDEX IF NOT EXISTS ix_test_cases_project_id_deleted ON test_cases(project_id, deleted_at)",
+        "CREATE INDEX IF NOT EXISTS ix_test_cases_sheet_name ON test_cases(project_id, sheet_name)",
+        "CREATE INDEX IF NOT EXISTS ix_test_runs_project_id ON test_runs(project_id)",
+        "CREATE INDEX IF NOT EXISTS ix_test_runs_status ON test_runs(project_id, status)",
+        "CREATE INDEX IF NOT EXISTS ix_test_results_run_id ON test_results(test_run_id)",
+        "CREATE INDEX IF NOT EXISTS ix_test_results_run_result ON test_results(test_run_id, result)",
+        "CREATE INDEX IF NOT EXISTS ix_test_results_case_id ON test_results(test_case_id)",
+        "CREATE INDEX IF NOT EXISTS ix_project_members_project_user ON project_members(project_id, user_id)",
+        "CREATE INDEX IF NOT EXISTS ix_test_case_history_tc_id ON test_case_history(test_case_id)",
+    ]
+    for sql in indexes:
+        try:
+            db.execute(sa.text(sql))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+    db.close()
 
 
 def _purge_old_deleted_testcases():
