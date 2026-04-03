@@ -273,6 +273,15 @@ export interface SavedFilter {
   created_at: string;
 }
 
+// Notification
+export interface AppNotification {
+  id: number;
+  message: string;
+  link: string | null;
+  is_read: boolean;
+  created_at: string | null;
+}
+
 // TC Result History
 export interface TCResultHistory {
   result_id: number;

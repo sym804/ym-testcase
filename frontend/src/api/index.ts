@@ -22,6 +22,7 @@ import type {
   SavedFilter,
   FilterCondition,
   TCResultHistory,
+  AppNotification,
 } from "../types";
 
 // ─── Auth ────────────────────────────────────────────
@@ -666,5 +667,26 @@ export const filtersApi = {
       { params: sheetName ? { sheet_name: sheetName } : undefined }
     );
     return res.data;
+  },
+};
+
+// ─── Notifications ──────────────────────────────────────
+export const notificationsApi = {
+  list: async () => {
+    const res = await client.get<AppNotification[]>("/api/notifications");
+    return res.data;
+  },
+
+  unreadCount: async () => {
+    const res = await client.get<{ count: number }>("/api/notifications/unread-count");
+    return res.data;
+  },
+
+  markAsRead: async (id: number) => {
+    await client.put(`/api/notifications/${id}/read`);
+  },
+
+  markAllAsRead: async () => {
+    await client.put("/api/notifications/read-all");
   },
 };

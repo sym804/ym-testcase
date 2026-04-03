@@ -2,9 +2,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { useEffect, useRef, useState } from "react";
-import { projectsApi, searchApi, authApi } from "../api";
+import { projectsApi, searchApi, authApi, notificationsApi } from "../api";
 import PasswordInput from "./PasswordInput";
-import type { Project, TestCase } from "../types";
+import type { Project, TestCase, AppNotification } from "../types";
 import { UserRole } from "../types";
 import toast from "react-hot-toast";
 
@@ -36,6 +36,11 @@ export default function Header() {
   const [showSearch, setShowSearch] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Notifications
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notiOpen, setNotiOpen] = useState(false);
 
   // User menu dropdown
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -74,6 +79,63 @@ export default function Header() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Notification polling
+  useEffect(() => {
+    if (!user) return;
+    const fetchUnread = async () => {
+      try {
+        const { count } = await notificationsApi.unreadCount();
+        setUnreadCount(count);
+      } catch { /* ignore */ }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // Notification outside click
+  useEffect(() => {
+    if (!notiOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-noti-dropdown]")) {
+        setNotiOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notiOpen]);
+
+  const handleOpenNotifications = async () => {
+    if (notiOpen) {
+      setNotiOpen(false);
+      return;
+    }
+    try {
+      const data = await notificationsApi.list();
+      setNotifications(data);
+    } catch { /* ignore */ }
+    setNotiOpen(true);
+  };
+
+  const handleReadNotification = async (noti: AppNotification) => {
+    if (!noti.is_read) {
+      await notificationsApi.markAsRead(noti.id);
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      setNotifications(prev => prev.map(n => n.id === noti.id ? { ...n, is_read: true } : n));
+    }
+    if (noti.link) {
+      navigate(noti.link);
+      setNotiOpen(false);
+    }
+  };
+
+  const handleReadAll = async () => {
+    await notificationsApi.markAllAsRead();
+    setUnreadCount(0);
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+  };
 
   const highlight = (text: string, query: string) => {
     if (!query || query.length < 2) return text;
@@ -165,6 +227,66 @@ export default function Header() {
       </div>
 
       <div style={styles.right}>
+        <div style={{ position: "relative" }} data-noti-dropdown>
+          <button onClick={handleOpenNotifications}
+            style={{ ...styles.themeBtn, position: "relative" }}
+            title="알림">
+            🔔
+            {unreadCount > 0 && (
+              <span style={{
+                position: "absolute", top: -4, right: -4,
+                backgroundColor: "#cf222e", color: "#fff",
+                borderRadius: "50%", width: 18, height: 18,
+                fontSize: 11, fontWeight: 700,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>{unreadCount > 9 ? "9+" : unreadCount}</span>
+            )}
+          </button>
+
+          {notiOpen && (
+            <div style={{
+              position: "absolute", top: "100%", right: 0, marginTop: 8,
+              width: 360, maxHeight: 400, overflowY: "auto",
+              backgroundColor: "var(--bg-primary)",
+              border: "1px solid var(--border-color)",
+              borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+              zIndex: 1000,
+            }}>
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "12px 16px", borderBottom: "1px solid var(--border-color)",
+              }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>알림</span>
+                {unreadCount > 0 && (
+                  <button onClick={handleReadAll}
+                    style={{ fontSize: 12, color: "var(--primary-color)", background: "none", border: "none", cursor: "pointer" }}>
+                    모두 읽음
+                  </button>
+                )}
+              </div>
+
+              {notifications.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--text-secondary)", fontSize: 13 }}>
+                  알림이 없습니다.
+                </div>
+              ) : (
+                notifications.map(noti => (
+                  <div key={noti.id} onClick={() => handleReadNotification(noti)}
+                    style={{
+                      padding: "10px 16px", cursor: "pointer",
+                      backgroundColor: noti.is_read ? "transparent" : "rgba(59,130,246,0.05)",
+                      borderBottom: "1px solid var(--border-color)",
+                    }}>
+                    <div style={{ fontSize: 13, lineHeight: 1.4 }}>{noti.message}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
+                      {noti.created_at ? new Date(noti.created_at).toLocaleString("ko-KR") : ""}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
         <button style={styles.themeBtn} onClick={toggleTheme} title={theme === "light" ? "다크 모드" : "라이트 모드"}>
           {theme === "light" ? "\u{1F319}" : "\u{2600}\u{FE0F}"}
         </button>
