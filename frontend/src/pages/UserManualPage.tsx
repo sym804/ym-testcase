@@ -216,13 +216,14 @@ export default function UserManualPage() {
               <tbody>
                 <tr><td style={s.td}>+ 행 추가</td><td style={s.td}>TC 생성</td><td style={s.td}>새 TC를 즉시 생성하여 그리드에 추가 (자동 저장)</td></tr>
                 <tr><td style={s.td}>다중 추가 (▼)</td><td style={s.td}>다중 행 추가</td><td style={s.td}>드롭다운에서 1/3/5/10/20/30행을 선택하여 한 번에 여러 TC를 추가</td></tr>
-                <tr><td style={s.td}>선택 복사</td><td style={s.td}>행 복사</td><td style={s.td}>선택한 TC 행을 복사하여 새 행으로 추가</td></tr>
+                <tr><td style={s.td}>선택 복제</td><td style={s.td}>TC 복제</td><td style={s.td}>선택한 TC를 서버에 복제하여 새 TC로 추가. TC ID에 -copy 접미사가 붙음. 여러 TC를 선택하여 한 번에 벌크 복제 가능</td></tr>
                 <tr><td style={s.td}>선택 삭제</td><td style={s.td}>TC 삭제</td><td style={s.td}>선택한 TC를 소프트 삭제. 삭제된 TC는 7일간 복원 가능하며, 7일 후 자동 영구삭제됨</td></tr>
                 <tr><td style={s.td}>Undo / Redo</td><td style={s.td}>실행 취소/재실행</td><td style={s.td}>그리드 편집 작업을 취소(Ctrl+Z)하거나 재실행(Ctrl+Shift+Z). 최대 200단계까지 지원. 페이지 이동 시 히스토리는 초기화됨</td></tr>
                 <tr><td style={s.td}>TC ID 자동채우기</td><td style={s.td}>ID 자동 생성</td><td style={s.td}>비어있는 TC ID를 <code>TC-001, TC-002...</code> 형식으로 자동 채움. 기존 ID의 최대 번호 다음부터 순차 부여</td></tr>
                 <tr><td style={s.td}>일괄 변경</td><td style={s.td}>벌크 수정</td><td style={s.td}>선택한 TC의 특정 필드를 일괄 변경</td></tr>
                 <tr><td style={s.td}>Excel Import</td><td style={s.td}>엑셀 가져오기</td><td style={s.td}>엑셀 파일에서 TC 가져오기. 여러 시트가 있으면 선택 가능. 동일 TC ID는 덮어쓰기</td></tr>
                 <tr><td style={s.td}>Excel Export</td><td style={s.td}>엑셀 내보내기</td><td style={s.td}>현재 TC 목록을 서식이 적용된 엑셀 파일로 다운로드</td></tr>
+                <tr><td style={s.td}>📊 결과이력</td><td style={s.td}>수행 결과 히스토리</td><td style={s.td}>TC 1건 선택 후 클릭하면 해당 TC의 모든 테스트 수행 결과를 런별 타임라인으로 표시. 각 런의 결과(PASS/FAIL/BLOCK 등), 버전, 라운드, 수행일을 확인 가능</td></tr>
                 <tr><td style={s.td}>변경이력</td><td style={s.td}>수정 내역 확인</td><td style={s.td}>변경이력 패널이 열리며, 각 TC의 필드별 변경 전/후 값, 변경자, 변경 시각을 시간순으로 확인. 프로젝트 전체 이력 또는 특정 TC 이력 조회 가능</td></tr>
                 <tr><td style={s.td}>바꾸기</td><td style={s.td}>찾기/바꾸기</td><td style={s.td}>찾을 텍스트와 바꿀 텍스트를 입력 → 대상 필드를 선택 → "바꾸기" 클릭으로 일괄 치환. 선택한 행만 또는 전체 행 대상 선택 가능</td></tr>
                 <tr><td style={s.td}>검색...</td><td style={s.td}>TC 검색</td><td style={s.td}>TC ID, 제목, 카테고리 등으로 필터링</td></tr>
@@ -257,6 +258,7 @@ export default function UserManualPage() {
               <li>컬럼 헤더 클릭으로 정렬할 수 있습니다.</li>
               <li>셀 편집 내용은 <strong>자동 저장</strong>됩니다. 별도의 저장 버튼이 없습니다.</li>
               <li>행 추가 시에도 즉시 서버에 저장되며, Undo(Ctrl+Z)로 되돌릴 수 있습니다.</li>
+              <li><strong>드래그 앤 드롭 정렬:</strong> No 컬럼의 드래그 핸들(≡)을 잡고 행을 위/아래로 드래그하면 TC 순서를 변경할 수 있습니다. 변경된 순서는 자동으로 서버에 저장됩니다. (편집 권한 필요)</li>
             </ul>
 
             <h3 style={s.h3}>4-4. TC 삭제 및 복원</h3>
@@ -654,6 +656,15 @@ export default function UserManualPage() {
                 <tr><td style={s.td}>실패 히트맵</td><td style={s.td}>카테고리 × 우선순위 매트릭스의 실패 건수를 색상 강도로 표시</td></tr>
               </tbody>
             </table>
+
+            <h3 style={s.h3}>11-3. 날짜 필터</h3>
+            <p style={s.p}>대시보드 상단에서 날짜 범위를 지정하여 특정 기간의 테스트 결과만 분석할 수 있습니다.</p>
+            <ul style={s.ul}>
+              <li><strong>프리셋 버튼:</strong> "전체", "7일", "30일", "90일" 버튼을 클릭하면 해당 기간의 데이터로 즉시 필터링됩니다.</li>
+              <li><strong>커스텀 범위:</strong> 시작일~종료일을 직접 입력하여 원하는 기간을 지정할 수 있습니다.</li>
+              <li>날짜 필터는 모든 차트와 통계(요약, 우선순위, 카테고리, 라운드, 담당자, 히트맵)에 일괄 적용됩니다.</li>
+              <li>런 선택 드롭다운과 함께 사용할 수 있습니다.</li>
+            </ul>
           </section>
 
           {/* 18. 리포트 */}
@@ -822,6 +833,11 @@ export default function UserManualPage() {
                   <td style={s.td}>TC 검색</td>
                   <td style={s.td}>글로벌 검색</td>
                   <td style={s.td}>2자 이상 입력 시 전체 프로젝트에서 TC를 검색. 결과 클릭 시 해당 TC로 이동 및 하이라이트</td>
+                </tr>
+                <tr>
+                  <td style={s.td}>🔔 알림</td>
+                  <td style={s.td}>인앱 알림</td>
+                  <td style={s.td}>테스트 런 완료 시 자동으로 알림이 생성됩니다. 벨 아이콘에 미읽은 알림 수가 빨간 뱃지로 표시되며, 클릭하면 알림 목록이 열립니다. 알림을 클릭하면 해당 테스트 런으로 이동하고 읽음 처리됩니다. "모두 읽음" 버튼으로 전체 읽음 처리 가능. FAIL이 있는 런은 FAIL 건수가 표시됩니다.</td>
                 </tr>
                 <tr>
                   <td style={s.td}>테마 토글</td>
