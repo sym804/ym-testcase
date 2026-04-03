@@ -45,6 +45,7 @@ print("=" * 70)
 
 # TC 생성
 tc_data = {
+    "no": 1,
     "tc_id": "TC-CLONE-001",
     "category": "로그인",
     "priority": "High",

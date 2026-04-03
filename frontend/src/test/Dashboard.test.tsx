@@ -168,7 +168,7 @@ describe("Dashboard", () => {
     await user.selectOptions(select, "1");
 
     await waitFor(() => {
-      expect(dashboardApi.summary).toHaveBeenCalledWith(1, 1);
+      expect(dashboardApi.summary).toHaveBeenCalledWith(1, 1, undefined, undefined);
     });
   });
 

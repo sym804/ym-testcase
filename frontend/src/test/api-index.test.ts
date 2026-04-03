@@ -435,7 +435,9 @@ describe("dashboardApi", () => {
     const data = [{ round: 1, pass: 10 }];
     mockGet.mockResolvedValueOnce({ data });
     const result = await dashboardApi.rounds(1);
-    expect(mockGet).toHaveBeenCalledWith("/api/projects/1/dashboard/rounds");
+    expect(mockGet).toHaveBeenCalledWith("/api/projects/1/dashboard/rounds", {
+      params: undefined,
+    });
     expect(result).toEqual(data);
   });
 

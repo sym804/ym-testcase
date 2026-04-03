@@ -482,6 +482,42 @@ def bulk_update_testcases(
     return updated
 
 
+# ── Reorder (drag & drop) ─────────────────────────────────────────────────
+# NOTE: /reorder must be defined BEFORE /{tc_id} so FastAPI doesn't try to parse
+# "reorder" as an integer tc_id.
+
+class ReorderItem(BaseModel):
+    id: int
+    no: int
+
+
+class ReorderRequest(BaseModel):
+    items: List[ReorderItem]
+
+
+@router.put("/reorder")
+def reorder_testcases(
+    project_id: int,
+    payload: ReorderRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(check_project_access("admin")),
+):
+    """TC 순서(no)를 일괄 변경한다."""
+    _get_project_or_404(project_id, db)
+
+    count = 0
+    for item in payload.items:
+        updated = (
+            db.query(TestCase)
+            .filter(TestCase.id == item.id, TestCase.project_id == project_id)
+            .update({TestCase.no: item.no}, synchronize_session="fetch")
+        )
+        count += updated
+
+    db.commit()
+    return {"updated": count}
+
+
 # ── Update ────────────────────────────────────────────────────────────────────
 
 @router.put("/{tc_id}", response_model=TestCaseResponse)
@@ -643,40 +679,6 @@ def bulk_clone_testcases(
     for tc in cloned:
         db.refresh(tc)
     return cloned
-
-
-# ── Reorder (drag & drop) ─────────────────────────────────────────────────
-
-class ReorderItem(BaseModel):
-    id: int
-    no: int
-
-
-class ReorderRequest(BaseModel):
-    items: List[ReorderItem]
-
-
-@router.put("/reorder")
-def reorder_testcases(
-    project_id: int,
-    payload: ReorderRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(check_project_access("admin")),
-):
-    """TC 순서(no)를 일괄 변경한다."""
-    _get_project_or_404(project_id, db)
-
-    count = 0
-    for item in payload.items:
-        updated = (
-            db.query(TestCase)
-            .filter(TestCase.id == item.id, TestCase.project_id == project_id)
-            .update({TestCase.no: item.no}, synchronize_session="fetch")
-        )
-        count += updated
-
-    db.commit()
-    return {"updated": count}
 
 
 @router.post("/{tc_id}/clone", response_model=TestCaseResponse, status_code=201)
