@@ -405,7 +405,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const columnDefs = useMemo<ColDef[]>(
     () => {
       const builtIn: (ColDef & { _key?: string })[] = [
-        { _key: "no", field: "no", headerName: "No", width: 55, editable: canEditTC, type: "numericColumn", wrapText: false, autoHeight: false },
+        { _key: "no", field: "no", headerName: "No", width: 55, rowDrag: canEditTC, editable: canEditTC, type: "numericColumn", wrapText: false, autoHeight: false },
         { _key: "tc_id", field: "tc_id", headerName: fieldDisplay("tc_id", "TC ID").name, width: 110, editable: canEditTC, cellRenderer: HighlightCell },
         {
           _key: "type", field: "type",
@@ -537,6 +537,34 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     }, 300);
   }, [projectId]);
   autoSaveRowRef.current = autoSaveRow;
+
+  const handleRowDragEnd = useCallback(async () => {
+    const gridApi = gridApiRef.current;
+    if (!gridApi) return;
+
+    const items: { id: number; no: number }[] = [];
+    let index = 0;
+    gridApi.forEachNodeAfterFilterAndSort((node) => {
+      index++;
+      const data = node.data as TestCase;
+      if (data && data.id > 0) {
+        items.push({ id: data.id, no: index });
+      }
+      if (data) {
+        data.no = index;
+      }
+    });
+
+    gridApi.refreshCells({ columns: ["no"] });
+
+    if (items.length > 0) {
+      try {
+        await testCasesApi.reorder(projectId, items);
+      } catch {
+        toast.error("순서 저장 실패");
+      }
+    }
+  }, [projectId]);
 
   const onCellValueChanged = useCallback(
     (event: CellValueChangedEvent) => {
@@ -1627,6 +1655,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             onSelectionChanged={() => setSelectedCount(gridApiRef.current?.getSelectedRows().length || 0)}
             context={{ jiraBaseUrl: project.jira_base_url, searchKeyword: searchText }}
             animateRows={true}
+            rowDragManaged={true}
+            onRowDragEnd={handleRowDragEnd}
             singleClickEdit={true}
             stopEditingWhenCellsLoseFocus={true}
             getRowId={(params) =>

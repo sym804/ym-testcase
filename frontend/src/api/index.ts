@@ -234,6 +234,14 @@ export const testCasesApi = {
     );
     return res.data;
   },
+
+  reorder: async (projectId: number, items: { id: number; no: number }[]) => {
+    const res = await client.put(
+      `/api/projects/${projectId}/testcases/reorder`,
+      { items }
+    );
+    return res.data;
+  },
 };
 
 // ─── Test Runs ───────────────────────────────────────
