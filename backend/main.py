@@ -24,6 +24,7 @@ from routes import members as member_routes
 from routes import custom_fields as custom_fields_routes
 from routes import testplans as testplan_routes
 from routes import filters as filter_routes
+from routes import tc_result_history as tc_result_history_routes
 
 # Import models so Base.metadata knows about all tables
 import models  # noqa: F401
@@ -105,6 +106,7 @@ app.include_router(member_routes.assign_all_router)
 app.include_router(custom_fields_routes.router)
 app.include_router(testplan_routes.router)
 app.include_router(filter_routes.router)
+app.include_router(tc_result_history_routes.router)
 
 
 
