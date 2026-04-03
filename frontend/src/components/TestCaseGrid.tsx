@@ -900,7 +900,31 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     }
   }, [pushUndo, autoSaveRow]);
 
-  // ── TC 복사 ──
+  // ── TC 복제 (서버) ──
+  const handleCloneSelected = useCallback(async () => {
+    const selected = gridApiRef.current?.getSelectedRows() as TestCase[];
+    if (!selected?.length) {
+      toast.error("복제할 행을 선택하세요.");
+      return;
+    }
+    const savedIds = selected.filter(r => r.id > 0).map(r => r.id);
+    if (savedIds.length === 0) {
+      toast.error("저장되지 않은 행은 복제할 수 없습니다.");
+      return;
+    }
+    try {
+      const cloned = await testCasesApi.bulkClone(projectId, savedIds);
+      setRowData(prev => [...prev, ...cloned]);
+      toast.success(`${cloned.length}건 복제 완료`);
+      setTimeout(() => {
+        gridApiRef.current?.ensureIndexVisible(rowData.length + cloned.length - 1);
+      }, 100);
+    } catch {
+      toast.error("복제 실패");
+    }
+  }, [projectId, rowData.length]);
+
+  // ── TC 복사 (로컬) ──
   const handleCopySelected = () => {
     const api = gridApiRef.current;
     if (!api) return;
@@ -1273,8 +1297,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 <option value="20">20행</option>
                 <option value="30">30행</option>
               </select>
-              <button style={styles.btnGhost} onClick={handleCopySelected}>
-                선택 복사
+              <button onClick={handleCloneSelected} disabled={!canEditTC || selectedCount === 0}
+                style={styles.toolBtn ?? styles.btnGhost} title="선택한 행을 서버에 복제">
+                📋 선택 복제
               </button>
               <button style={styles.btnDanger} onClick={handleDeleteSelected}>
                 선택 삭제

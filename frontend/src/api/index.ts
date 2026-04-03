@@ -136,6 +136,21 @@ export const testCasesApi = {
     return res.data;
   },
 
+  clone: async (projectId: number, tcId: number) => {
+    const res = await client.post<TestCase>(
+      `/api/projects/${projectId}/testcases/${tcId}/clone`
+    );
+    return res.data;
+  },
+
+  bulkClone: async (projectId: number, ids: number[]) => {
+    const res = await client.post<TestCase[]>(
+      `/api/projects/${projectId}/testcases/bulk-clone`,
+      { ids }
+    );
+    return res.data;
+  },
+
   restore: async (projectId: number, tcId: number) => {
     const res = await client.post<TestCase>(
       `/api/projects/${projectId}/testcases/${tcId}/restore`
