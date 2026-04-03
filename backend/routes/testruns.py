@@ -158,6 +158,9 @@ def submit_results(
     if not run:
         raise HTTPException(status_code=404, detail="Test run not found")
 
+    if run.status == TestRunStatus.completed:
+        raise HTTPException(status_code=400, detail="완료된 테스트 런은 수정할 수 없습니다. 재오픈 후 수정하세요.")
+
     # Validate all test_case_ids belong to this project
     tc_ids = [r.test_case_id for r in results]
     valid_tc_ids = set(
@@ -274,7 +277,7 @@ def complete_testrun(
     else:
         msg = f"[{run.name}] 완료 - PASS {pass_count}/{total_count}건"
 
-    link = f"/projects/{project_id}?tab=testrun&run={run_id}"
+    link = f"/projects/{project_id}?tab=run&run={run_id}"
 
     member_user_ids = {m.user_id for m in db.query(ProjectMember).filter(
         ProjectMember.project_id == project_id
