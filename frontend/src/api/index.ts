@@ -316,49 +316,73 @@ export const testRunsApi = {
 
 // ─── Dashboard ───────────────────────────────────────
 export const dashboardApi = {
-  summary: async (projectId: number, runId?: number) => {
+  summary: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string) => {
+    const params: Record<string, string | number> = {};
+    if (runId) params.run_id = runId;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
     const res = await client.get<DashboardSummary>(
       `/api/projects/${projectId}/dashboard/summary`,
-      { params: runId ? { run_id: runId } : undefined }
+      { params: Object.keys(params).length ? params : undefined }
     );
     return res.data;
   },
 
-  priority: async (projectId: number, runId?: number) => {
+  priority: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string) => {
+    const params: Record<string, string | number> = {};
+    if (runId) params.run_id = runId;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
     const res = await client.get<PriorityDistribution[]>(
       `/api/projects/${projectId}/dashboard/priority`,
-      { params: runId ? { run_id: runId } : undefined }
+      { params: Object.keys(params).length ? params : undefined }
     );
     return res.data;
   },
 
-  category: async (projectId: number, runId?: number) => {
+  category: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string) => {
+    const params: Record<string, string | number> = {};
+    if (runId) params.run_id = runId;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
     const res = await client.get<CategoryBreakdown[]>(
       `/api/projects/${projectId}/dashboard/category`,
-      { params: runId ? { run_id: runId } : undefined }
+      { params: Object.keys(params).length ? params : undefined }
     );
     return res.data;
   },
 
-  rounds: async (projectId: number) => {
+  rounds: async (projectId: number, dateFrom?: string, dateTo?: string) => {
+    const params: Record<string, string | number> = {};
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
     const res = await client.get<RoundComparison[]>(
-      `/api/projects/${projectId}/dashboard/rounds`
+      `/api/projects/${projectId}/dashboard/rounds`,
+      { params: Object.keys(params).length ? params : undefined }
     );
     return res.data;
   },
 
-  assignee: async (projectId: number, runId?: number) => {
+  assignee: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string) => {
+    const params: Record<string, string | number> = {};
+    if (runId) params.run_id = runId;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
     const res = await client.get<AssigneeSummary[]>(
       `/api/projects/${projectId}/dashboard/assignee`,
-      { params: runId ? { run_id: runId } : undefined }
+      { params: Object.keys(params).length ? params : undefined }
     );
     return res.data;
   },
 
-  heatmap: async (projectId: number, runId?: number) => {
+  heatmap: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string) => {
+    const params: Record<string, string | number> = {};
+    if (runId) params.run_id = runId;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
     const res = await client.get<{ category: string; priority: string; fail_count: number }[]>(
       `/api/projects/${projectId}/dashboard/heatmap`,
-      { params: runId ? { run_id: runId } : undefined }
+      { params: Object.keys(params).length ? params : undefined }
     );
     return res.data;
   },

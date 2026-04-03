@@ -49,17 +49,19 @@ export default function Dashboard({ projectId }: Props) {
   const [assignee, setAssignee] = useState<AssigneeSummary[]>([]);
   const [heatmap, setHeatmap] = useState<{ category: string; priority: string; fail_count: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [s, p, c, r, a, h, runList] = await Promise.all([
-        dashboardApi.summary(projectId, selectedRunId),
-        dashboardApi.priority(projectId, selectedRunId),
-        dashboardApi.category(projectId, selectedRunId),
-        dashboardApi.rounds(projectId),
-        dashboardApi.assignee(projectId, selectedRunId),
-        dashboardApi.heatmap(projectId, selectedRunId),
+        dashboardApi.summary(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
+        dashboardApi.priority(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
+        dashboardApi.category(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
+        dashboardApi.rounds(projectId, dateFrom || undefined, dateTo || undefined),
+        dashboardApi.assignee(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
+        dashboardApi.heatmap(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
         testRunsApi.list(projectId),
       ]);
       setSummary(s);
@@ -75,7 +77,7 @@ export default function Dashboard({ projectId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [projectId, selectedRunId]);
+  }, [projectId, selectedRunId, dateFrom, dateTo]);
 
   useEffect(() => {
     loadData();
@@ -198,6 +200,53 @@ export default function Dashboard({ projectId }: Props) {
             </option>
           ))}
         </select>
+
+        {/* 날짜 필터 */}
+        <div style={{ display: "flex", gap: 4, marginLeft: 12, alignItems: "center" }}>
+          {[
+            { label: "전체", from: "", to: "" },
+            { label: "7일", from: new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0], to: "" },
+            { label: "30일", from: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0], to: "" },
+            { label: "90일", from: new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0], to: "" },
+          ].map((p) => (
+            <button
+              key={p.label}
+              onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
+              style={{
+                padding: "4px 10px",
+                fontSize: 12,
+                borderRadius: 4,
+                border: "1px solid var(--border-color)",
+                backgroundColor: dateFrom === p.from && dateTo === p.to ? "var(--primary-color)" : "var(--bg-secondary)",
+                color: dateFrom === p.from && dateTo === p.to ? "#fff" : "var(--text-primary)",
+                cursor: "pointer",
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          style={{
+            padding: "4px 8px", fontSize: 12,
+            border: "1px solid var(--border-color)", borderRadius: 4,
+            backgroundColor: "var(--bg-primary)", color: "var(--text-primary)", marginLeft: 8,
+          }}
+        />
+        <span style={{ color: "var(--text-secondary)", margin: "0 4px" }}>~</span>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          style={{
+            padding: "4px 8px", fontSize: 12,
+            border: "1px solid var(--border-color)", borderRadius: 4,
+            backgroundColor: "var(--bg-primary)", color: "var(--text-primary)",
+          }}
+        />
       </div>
 
       {/* Summary cards */}
