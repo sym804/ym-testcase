@@ -21,6 +21,7 @@ import type {
   TestPlan,
   SavedFilter,
   FilterCondition,
+  TCResultHistory,
 } from "../types";
 
 // ─── Auth ────────────────────────────────────────────
@@ -223,6 +224,13 @@ export const testCasesApi = {
     const res = await client.get(
       `/api/projects/${projectId}/testcases/export`,
       { responseType: "blob" }
+    );
+    return res.data;
+  },
+
+  resultHistory: async (projectId: number, tcId: number) => {
+    const res = await client.get<TCResultHistory[]>(
+      `/api/projects/${projectId}/testcases/${tcId}/result-history`
     );
     return res.data;
   },

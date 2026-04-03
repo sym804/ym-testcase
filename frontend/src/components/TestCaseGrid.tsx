@@ -12,7 +12,7 @@ import {
   type CellKeyDownEvent,
 } from "ag-grid-community";
 import { testCasesApi, historyApi, customFieldsApi, filtersApi } from "../api";
-import type { TestCase, TestCaseHistory, Project, SheetNode, CustomFieldDef, FilterCondition } from "../types";
+import type { TestCase, TestCaseHistory, Project, SheetNode, CustomFieldDef, FilterCondition, TCResultHistory } from "../types";
 import { AG_GRID_LOCALE_KO } from "../agGridLocaleKo";
 import toast from "react-hot-toast";
 import MarkdownCell from "./MarkdownCell";
@@ -258,6 +258,11 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const [historyMode, setHistoryMode] = useState<"tc" | "project">("tc");
   const [historyData, setHistoryData] = useState<TestCaseHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // ── 결과 히스토리 패널 ──
+  const [resultHistory, setResultHistory] = useState<TCResultHistory[]>([]);
+  const [resultHistoryTcId, setResultHistoryTcId] = useState<string>("");
+  const [resultHistoryOpen, setResultHistoryOpen] = useState(false);
 
   const openHistory = useCallback(async (tc: TestCase) => {
     if (!tc.id) return;
@@ -944,6 +949,28 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     toast.success(`${copies.length}개 TC 복사됨 (하단에 추가)`);
   };
 
+  // ── 결과 히스토리 조회 ──
+  const handleResultHistory = useCallback(async () => {
+    const selected = gridApiRef.current?.getSelectedRows() as TestCase[];
+    if (!selected?.length || selected.length !== 1) {
+      toast.error("결과 히스토리를 볼 TC를 1건 선택하세요.");
+      return;
+    }
+    const tc = selected[0];
+    if (tc.id === 0) {
+      toast.error("저장되지 않은 TC입니다.");
+      return;
+    }
+    try {
+      const data = await testCasesApi.resultHistory(projectId, tc.id);
+      setResultHistory(data);
+      setResultHistoryTcId(tc.tc_id);
+      setResultHistoryOpen(true);
+    } catch {
+      toast.error("결과 히스토리 조회 실패");
+    }
+  }, [projectId]);
+
   // 시트가 없고 "기본"도 없으면 시트 추가 화면 표시
   const hasSheet = sheets.length > 0;
 
@@ -1346,6 +1373,10 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             Excel Export
           </button>
           <div style={styles.separator} />
+          <button onClick={handleResultHistory} disabled={selectedCount !== 1}
+            style={styles.btnGhost} title="선택한 TC의 수행 결과 이력">
+            📊 결과이력
+          </button>
           <button
             style={styles.btnGhost}
             onClick={() => {
@@ -1799,6 +1830,67 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                         <td style={historyStyles.tdField}>{h.field_name}</td>
                         <td style={historyStyles.tdOld}>{h.old_value || "-"}</td>
                         <td style={historyStyles.tdNew}>{h.new_value || "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 결과 히스토리 모달 ── */}
+      {resultHistoryOpen && (
+        <div style={historyStyles.overlay} onClick={() => setResultHistoryOpen(false)}>
+          <div style={historyStyles.panel} onClick={e => e.stopPropagation()}>
+            <div style={historyStyles.header}>
+              <h3 style={historyStyles.title}>📊 {resultHistoryTcId} 결과 히스토리</h3>
+              <button onClick={() => setResultHistoryOpen(false)} style={historyStyles.closeBtn}>✕</button>
+            </div>
+            <div style={historyStyles.body}>
+              {resultHistory.length === 0 ? (
+                <p style={{ color: "var(--text-secondary)", textAlign: "center", padding: 20 }}>수행 이력이 없습니다.</p>
+              ) : (
+                <table style={historyStyles.table}>
+                  <thead>
+                    <tr>
+                      <th style={historyStyles.th}>런</th>
+                      <th style={historyStyles.th}>버전</th>
+                      <th style={{ ...historyStyles.th, textAlign: "center" }}>라운드</th>
+                      <th style={{ ...historyStyles.th, textAlign: "center" }}>결과</th>
+                      <th style={historyStyles.th}>실제 결과</th>
+                      <th style={historyStyles.th}>수행일</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultHistory.map((h, i) => (
+                      <tr key={h.result_id} style={{
+                        borderBottom: "1px solid var(--border-color)",
+                        backgroundColor: i % 2 === 0 ? "var(--bg-secondary)" : "transparent",
+                      }}>
+                        <td style={historyStyles.td}>{h.run_name}</td>
+                        <td style={historyStyles.td}>{h.version || "-"}</td>
+                        <td style={{ ...historyStyles.td, textAlign: "center" }}>R{h.round}</td>
+                        <td style={{ ...historyStyles.td, textAlign: "center" }}>
+                          <span style={{
+                            padding: "2px 8px", borderRadius: 4, fontWeight: 600, fontSize: 12,
+                            backgroundColor:
+                              h.result === "PASS" ? "rgba(26,127,55,0.15)" :
+                              h.result === "FAIL" ? "rgba(207,34,46,0.15)" :
+                              h.result === "BLOCK" ? "rgba(191,135,0,0.15)" : "rgba(128,128,128,0.15)",
+                            color:
+                              h.result === "PASS" ? "#1a7f37" :
+                              h.result === "FAIL" ? "#cf222e" :
+                              h.result === "BLOCK" ? "#bf8700" : "#666",
+                          }}>{h.result}</span>
+                        </td>
+                        <td style={{ ...historyStyles.td, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {h.actual_result || "-"}
+                        </td>
+                        <td style={{ ...historyStyles.td, fontSize: 12, color: "var(--text-secondary)" }}>
+                          {h.run_created_at ? new Date(h.run_created_at).toLocaleDateString("ko-KR") : "-"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

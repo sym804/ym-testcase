@@ -272,3 +272,21 @@ export interface SavedFilter {
   created_by: number;
   created_at: string;
 }
+
+// TC Result History
+export interface TCResultHistory {
+  result_id: number;
+  result: string;
+  actual_result: string | null;
+  issue_link: string | null;
+  remarks: string | null;
+  executed_at: string | null;
+  duration_sec: number | null;
+  run_id: number;
+  run_name: string;
+  version: string | null;
+  environment: string | null;
+  round: number;
+  run_status: string;
+  run_created_at: string | null;
+}
