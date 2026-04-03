@@ -311,3 +311,18 @@ class TestCaseHistory(Base):
     __table_args__ = (
         Index("ix_test_case_history_tc_id", "test_case_id"),
     )
+
+
+# ── Notification ─────────────────────────────────────────────────────────────
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    message = Column(String(500), nullable=False)
+    link = Column(String(500), nullable=True)
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=now_kst)
+
+    user = relationship("User")

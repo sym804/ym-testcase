@@ -25,6 +25,7 @@ from routes import custom_fields as custom_fields_routes
 from routes import testplans as testplan_routes
 from routes import filters as filter_routes
 from routes import tc_result_history as tc_result_history_routes
+from routes import notifications as notification_routes
 
 # Import models so Base.metadata knows about all tables
 import models  # noqa: F401
@@ -37,6 +38,7 @@ async def lifespan(app: FastAPI):
     _migrate_sheet_parent_id()
     _migrate_field_config()
     _migrate_indexes()
+    _migrate_notifications(engine)
     _purge_old_deleted_testcases()
     yield
 
@@ -107,6 +109,7 @@ app.include_router(custom_fields_routes.router)
 app.include_router(testplan_routes.router)
 app.include_router(filter_routes.router)
 app.include_router(tc_result_history_routes.router)
+app.include_router(notification_routes.router)
 
 
 
@@ -225,6 +228,12 @@ def _migrate_indexes():
             db.rollback()
 
     db.close()
+
+
+def _migrate_notifications(engine):
+    """notifications 테이블 생성."""
+    from models import Notification
+    Notification.__table__.create(bind=engine, checkfirst=True)
 
 
 def _purge_old_deleted_testcases():
