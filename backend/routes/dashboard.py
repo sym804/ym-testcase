@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query
@@ -34,12 +35,19 @@ def _count_from_results(results: list) -> dict:
     return counts
 
 
-def _get_all_results(project_id: int, db: Session) -> list:
+def _get_all_results(project_id: int, db: Session, date_from: str = None, date_to: str = None) -> list:
     """전체(run_id 미지정) 시: TC별 최신 런의 결과만 반환.
 
     DB 서브쿼리로 TC별 가장 최신 런의 result_id를 구하고,
     해당 결과만 조회한다. 런이 많아도 성능 OK.
     """
+    # 날짜 필터 조건 구성
+    run_filter = [TestRun.project_id == project_id]
+    if date_from:
+        run_filter.append(TestRun.created_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        run_filter.append(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+
     # 서브쿼리: TC별 최신 런의 test_run_id
     latest_run_per_tc = (
         db.query(
@@ -47,7 +55,7 @@ def _get_all_results(project_id: int, db: Session) -> list:
             func.max(TestResult.test_run_id).label("max_run_id"),
         )
         .join(TestRun, TestResult.test_run_id == TestRun.id)
-        .filter(TestRun.project_id == project_id)
+        .filter(*run_filter)
         .group_by(TestResult.test_case_id)
         .subquery()
     )
@@ -79,6 +87,8 @@ def _rates(counts: dict, total: int) -> dict:
 def dashboard_summary(
     project_id: int,
     run_id: Optional[int] = Query(None),
+    date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -97,7 +107,7 @@ def dashboard_summary(
         return {"total": total, **c, **_rates(c, total)}
 
     # 전체 모드: TC별 최신 결과 기준
-    results = _get_all_results(project_id, db)
+    results = _get_all_results(project_id, db, date_from, date_to)
     if results:
         c = _count_from_results(results)
     else:
@@ -112,12 +122,14 @@ def dashboard_summary(
 def priority_distribution(
     project_id: int,
     run_id: Optional[int] = Query(None),
+    date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
     # 전체 모드: 모든 run 결과를 미리 조회
     if not run_id:
-        all_results = _get_all_results(project_id, db)
+        all_results = _get_all_results(project_id, db, date_from, date_to)
         results_by_tc: dict[int, list] = {}
         for r in all_results:
             results_by_tc.setdefault(r.test_case_id, []).append(r)
@@ -167,11 +179,13 @@ def priority_distribution(
 def category_breakdown(
     project_id: int,
     run_id: Optional[int] = Query(None),
+    date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
     if not run_id:
-        all_results = _get_all_results(project_id, db)
+        all_results = _get_all_results(project_id, db, date_from, date_to)
         results_by_tc: dict[int, list] = {}
         for r in all_results:
             results_by_tc.setdefault(r.test_case_id, []).append(r)
@@ -219,18 +233,20 @@ def category_breakdown(
 @router.get("/rounds")
 def round_comparison(
     project_id: int,
+    date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
     total_tc = db.query(TestCase).filter(TestCase.project_id == project_id, TestCase.deleted_at.is_(None)).count()
 
     # Group TestRuns by round number
-    runs = (
-        db.query(TestRun)
-        .filter(TestRun.project_id == project_id)
-        .order_by(TestRun.round, TestRun.created_at.desc())
-        .all()
-    )
+    run_q = db.query(TestRun).filter(TestRun.project_id == project_id)
+    if date_from:
+        run_q = run_q.filter(TestRun.created_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        run_q = run_q.filter(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+    runs = run_q.order_by(TestRun.round, TestRun.created_at.desc()).all()
 
     # Use the latest run per round
     seen_rounds = {}
@@ -271,11 +287,13 @@ def round_comparison(
 def assignee_summary(
     project_id: int,
     run_id: Optional[int] = Query(None),
+    date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
     if not run_id:
-        all_results = _get_all_results(project_id, db)
+        all_results = _get_all_results(project_id, db, date_from, date_to)
         results_by_tc: dict[int, list] = {}
         for r in all_results:
             results_by_tc.setdefault(r.test_case_id, []).append(r)
@@ -330,6 +348,8 @@ def assignee_summary(
 def get_heatmap(
     project_id: int,
     run_id: Optional[int] = Query(None),
+    date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -358,13 +378,19 @@ def get_heatmap(
         ]
 
     # 전체 모드: TC별 최신 런 결과 기준 FAIL만 집계 (다른 위젯과 동일 기준)
+    run_filter = [TestRun.project_id == project_id]
+    if date_from:
+        run_filter.append(TestRun.created_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        run_filter.append(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+
     latest_run_per_tc = (
         db.query(
             TestResult.test_case_id,
             func.max(TestResult.test_run_id).label("max_run_id"),
         )
         .join(TestRun, TestResult.test_run_id == TestRun.id)
-        .filter(TestRun.project_id == project_id)
+        .filter(*run_filter)
         .group_by(TestResult.test_case_id)
         .subquery()
     )

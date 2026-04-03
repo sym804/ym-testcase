@@ -161,6 +161,40 @@ r = requests.get(
 check("없는 TC 히스토리 조회 시 404", r.status_code == 404)
 
 # ============================================================================
+print("\n" + "=" * 70)
+print("5. 대시보드 날짜 필터")
+print("=" * 70)
+
+# 기본 조회 (날짜 없이)
+r = requests.get(f"{BASE}/api/projects/{PID}/dashboard/summary", headers=H)
+check("대시보드 summary 기본 조회", r.status_code == 200)
+
+# 날짜 범위로 조회
+r = requests.get(f"{BASE}/api/projects/{PID}/dashboard/summary",
+    params={"date_from": "2020-01-01", "date_to": "2099-12-31"}, headers=H)
+check("대시보드 summary 날짜 필터", r.status_code == 200)
+
+r = requests.get(f"{BASE}/api/projects/{PID}/dashboard/priority",
+    params={"date_from": "2020-01-01", "date_to": "2099-12-31"}, headers=H)
+check("대시보드 priority 날짜 필터", r.status_code == 200)
+
+r = requests.get(f"{BASE}/api/projects/{PID}/dashboard/category",
+    params={"date_from": "2020-01-01"}, headers=H)
+check("대시보드 category date_from만", r.status_code == 200)
+
+r = requests.get(f"{BASE}/api/projects/{PID}/dashboard/rounds",
+    params={"date_from": "2020-01-01", "date_to": "2099-12-31"}, headers=H)
+check("대시보드 rounds 날짜 필터", r.status_code == 200)
+
+r = requests.get(f"{BASE}/api/projects/{PID}/dashboard/assignee",
+    params={"date_to": "2099-12-31"}, headers=H)
+check("대시보드 assignee date_to만", r.status_code == 200)
+
+r = requests.get(f"{BASE}/api/projects/{PID}/dashboard/heatmap",
+    params={"date_from": "2020-01-01", "date_to": "2099-12-31"}, headers=H)
+check("대시보드 heatmap 날짜 필터", r.status_code == 200)
+
+# ============================================================================
 # 정리: 테스트 프로젝트 삭제
 print("\n" + "-" * 70)
 r = requests.delete(f"{BASE}/api/projects/{PID}", headers=H)
