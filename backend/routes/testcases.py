@@ -586,6 +586,135 @@ def restore_testcase(
     return tc
 
 
+# ── Clone ───────────────────────────────────────────────────────────────────
+
+class BulkCloneRequest(BaseModel):
+    ids: List[int]
+
+
+_CLONE_FIELDS = [
+    "type", "category", "depth1", "depth2", "priority", "test_type",
+    "precondition", "test_steps", "expected_result", "r1", "r2", "r3",
+    "issue_link", "assignee", "remarks", "sheet_name", "custom_fields",
+]
+
+
+@router.post("/bulk-clone", response_model=List[TestCaseResponse], status_code=201)
+def bulk_clone_testcases(
+    project_id: int,
+    body: BulkCloneRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(check_project_access("admin")),
+):
+    _get_project_or_404(project_id, db)
+
+    originals = (
+        db.query(TestCase)
+        .filter(
+            TestCase.id.in_(body.ids),
+            TestCase.project_id == project_id,
+            TestCase.deleted_at.is_(None),
+        )
+        .order_by(TestCase.no)
+        .all()
+    )
+    if not originals:
+        raise HTTPException(status_code=404, detail="No test cases found")
+
+    max_no = db.query(func.max(TestCase.no)).filter(
+        TestCase.project_id == project_id,
+        TestCase.deleted_at.is_(None),
+    ).scalar() or 0
+
+    cloned = []
+    for i, orig in enumerate(originals):
+        data = {f: getattr(orig, f) for f in _CLONE_FIELDS}
+        new_tc = TestCase(
+            project_id=project_id,
+            no=max_no + 1 + i,
+            tc_id=f"{orig.tc_id}-copy",
+            created_by=current_user.id,
+            **data,
+        )
+        db.add(new_tc)
+        cloned.append(new_tc)
+
+    db.commit()
+    for tc in cloned:
+        db.refresh(tc)
+    return cloned
+
+
+# ── Reorder (drag & drop) ─────────────────────────────────────────────────
+
+class ReorderItem(BaseModel):
+    id: int
+    no: int
+
+
+class ReorderRequest(BaseModel):
+    items: List[ReorderItem]
+
+
+@router.put("/reorder")
+def reorder_testcases(
+    project_id: int,
+    payload: ReorderRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(check_project_access("admin")),
+):
+    """TC 순서(no)를 일괄 변경한다."""
+    _get_project_or_404(project_id, db)
+
+    count = 0
+    for item in payload.items:
+        updated = (
+            db.query(TestCase)
+            .filter(TestCase.id == item.id, TestCase.project_id == project_id)
+            .update({TestCase.no: item.no}, synchronize_session="fetch")
+        )
+        count += updated
+
+    db.commit()
+    return {"updated": count}
+
+
+@router.post("/{tc_id}/clone", response_model=TestCaseResponse, status_code=201)
+def clone_testcase(
+    project_id: int,
+    tc_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(check_project_access("admin")),
+):
+    _get_project_or_404(project_id, db)
+
+    original = db.query(TestCase).filter(
+        TestCase.id == tc_id,
+        TestCase.project_id == project_id,
+        TestCase.deleted_at.is_(None),
+    ).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Test case not found")
+
+    max_no = db.query(func.max(TestCase.no)).filter(
+        TestCase.project_id == project_id,
+        TestCase.deleted_at.is_(None),
+    ).scalar() or 0
+
+    data = {f: getattr(original, f) for f in _CLONE_FIELDS}
+    new_tc = TestCase(
+        project_id=project_id,
+        no=max_no + 1,
+        tc_id=f"{original.tc_id}-copy",
+        created_by=current_user.id,
+        **data,
+    )
+    db.add(new_tc)
+    db.commit()
+    db.refresh(new_tc)
+    return new_tc
+
+
 # ── Import Excel ──────────────────────────────────────────────────────────────
 
 # Expected header mapping (column letter -> field name). The template uses

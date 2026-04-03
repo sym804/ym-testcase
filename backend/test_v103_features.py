@@ -195,6 +195,39 @@ r = requests.get(f"{BASE}/api/projects/{PID}/dashboard/heatmap",
 check("대시보드 heatmap 날짜 필터", r.status_code == 200)
 
 # ============================================================================
+print("\n" + "=" * 70)
+print("6. TC 드래그 앤 드롭 정렬")
+print("=" * 70)
+
+# TC 3개 생성
+tc_ids_for_reorder = []
+for i in range(1, 4):
+    r = requests.post(f"{BASE}/api/projects/{PID}/testcases", json={
+        "no": 100 + i, "tc_id": f"DND-{i:03d}", "category": "정렬테스트",
+        "priority": "보통", "sheet_name": "기본"
+    }, headers=H)
+    tc_ids_for_reorder.append(r.json()["id"])
+
+# 순서 변경: 3→1→2
+new_order = [
+    {"id": tc_ids_for_reorder[2], "no": 1},
+    {"id": tc_ids_for_reorder[0], "no": 2},
+    {"id": tc_ids_for_reorder[1], "no": 3},
+]
+r = requests.put(f"{BASE}/api/projects/{PID}/testcases/reorder",
+    json={"items": new_order}, headers=H)
+check("reorder 성공", r.status_code == 200, f"status={r.status_code}")
+check("reorder 3건 반환", r.json().get("updated") == 3, str(r.json()))
+
+# 순서 확인
+r = requests.get(f"{BASE}/api/projects/{PID}/testcases", headers=H)
+tcs = [tc for tc in r.json() if tc["category"] == "정렬테스트"]
+tcs.sort(key=lambda x: x["no"])
+check("첫 번째 TC는 DND-003", tcs[0]["tc_id"] == "DND-003", tcs[0]["tc_id"])
+check("두 번째 TC는 DND-001", tcs[1]["tc_id"] == "DND-001", tcs[1]["tc_id"])
+check("세 번째 TC는 DND-002", tcs[2]["tc_id"] == "DND-002", tcs[2]["tc_id"])
+
+# ============================================================================
 # 정리: 테스트 프로젝트 삭제
 print("\n" + "-" * 70)
 r = requests.delete(f"{BASE}/api/projects/{PID}", headers=H)
