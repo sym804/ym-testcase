@@ -1,0 +1,23 @@
+{
+  "title": "Sign Up",
+  "username": "Username",
+  "displayName": "Display Name",
+  "password": "Password",
+  "confirmPassword": "Confirm Password",
+  "usernamePlaceholder": "Enter your username",
+  "displayNamePlaceholder": "Enter your display name",
+  "passwordPlaceholder": "Enter your password",
+  "confirmPasswordPlaceholder": "Re-enter your password",
+  "submit": "Sign Up",
+  "submitting": "Processing...",
+  "allFieldsRequired": "Please fill in all fields.",
+  "usernameTaken": "This username is already taken.",
+  "passwordMinLength": "Password must be at least 8 characters.",
+  "passwordMismatch": "Passwords do not match.",
+  "registerSuccess": "Registration complete. Please log in.",
+  "registerFailed": "Registration failed.",
+  "checking": "Checking...",
+  "usernameAvailable": "This username is available.",
+  "hasAccount": "Already have an account?",
+  "login": "Login"
+}

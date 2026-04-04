@@ -1,0 +1,17 @@
+{
+  "baseRun": "기준 수행 (Left)",
+  "compareRun": "비교 수행 (Right)",
+  "selectPlaceholder": "선택...",
+  "selectBothRuns": "두 개의 테스트 수행을 선택하면 비교 결과가 표시됩니다.",
+  "loadingCompare": "비교 데이터를 불러오는 중...",
+  "runLoadFailed": "수행 목록 로드 실패",
+  "resultLoadFailed": "결과 로드 실패",
+  "total": "전체 {{count}}",
+  "changed": "변경 {{count}}",
+  "regression": "퇴보 {{count}}",
+  "improved": "개선 {{count}}",
+  "filterAll": "전체",
+  "filterChanged": "변경만",
+  "filterRegression": "퇴보만",
+  "change": "변경"
+}

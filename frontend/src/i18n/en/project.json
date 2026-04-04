@@ -1,0 +1,43 @@
+{
+  "overview": "Overview",
+  "totalProjects": "Total Projects",
+  "totalTC": "Total TC",
+  "progress": "Progress",
+  "passRate": "Pass Rate",
+  "notStarted": "Not Started",
+  "noTC": "No TC",
+  "noDescription": "No description",
+  "projects": "Projects",
+  "newProject": "+ New Project",
+  "deleteCount": "Delete {{count}}",
+  "loadFailed": "Failed to load data.",
+  "projectLoadFailed": "Failed to load project.",
+  "projectNotFound": "Project not found.",
+  "createProject": "New Project",
+  "projectName": "Project Name *",
+  "projectNamePlaceholder": "Project name",
+  "description": "Description",
+  "descriptionPlaceholder": "Project description",
+  "jiraBaseUrl": "Jira Base URL",
+  "jiraBaseUrlPlaceholder": "https://your-domain.atlassian.net",
+  "privateProject": "Private project (members only)",
+  "nameRequired": "Please enter a project name.",
+  "nameMaxLength": "Project name must be 100 characters or less.",
+  "createSuccess": "Project has been created.",
+  "createFailed": "Failed to create project.",
+  "deleteConfirm": "Delete {{count}} project(s)?\n\n{{names}}\n\nThis action cannot be undone.",
+  "deleteSuccess": "{{count}} project(s) deleted.",
+  "noProjects": "No projects registered.",
+  "tabs": {
+    "tc": "TC Management",
+    "run": "Test Execution",
+    "compare": "Compare",
+    "dashboard": "Dashboard",
+    "report": "Report",
+    "settings": "Settings"
+  },
+  "table": {
+    "project": "Project",
+    "progress": "Progress"
+  }
+}

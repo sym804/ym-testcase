@@ -1,0 +1,49 @@
+{
+  "title": "사용자 관리",
+  "permissionRequired": "관리자 권한이 필요합니다.",
+  "loadFailed": "사용자 목록을 불러오지 못했습니다.",
+  "columns": {
+    "id": "ID",
+    "username": "사용자명",
+    "displayName": "표시명",
+    "systemRole": "시스템 역할",
+    "projectAssignment": "프로젝트 배정",
+    "joinDate": "가입일",
+    "password": "비밀번호"
+  },
+  "systemRole": {
+    "user": "일반 사용자",
+    "qaManager": "QA 관리자",
+    "admin": "시스템 관리자"
+  },
+  "projectRole": {
+    "tester": "테스터",
+    "admin": "관리자"
+  },
+  "roleChanged": "역할이 변경되었습니다.",
+  "roleChangeFailed": "역할 변경에 실패했습니다.",
+  "fullAccess": "전체 접근",
+  "unassigned": "미배정",
+  "manage": "관리",
+  "adminTag": "관리",
+  "testerTag": "테스트",
+  "resetPassword": "초기화",
+  "resetPasswordConfirm": "{{name}}({{username}})의 비밀번호를 초기화하시겠습니까?",
+  "resetPasswordFailed": "비밀번호 초기화에 실패했습니다.",
+  "resetPasswordDone": "비밀번호 초기화 완료",
+  "resetPasswordDesc": "<0>{{username}}</0>의 임시 비밀번호가 발급되었습니다.<br/>사용자에게 전달해 주세요. 로그인 시 비밀번호 변경이 강제됩니다.",
+  "assignTitle": "{{name}} 프로젝트 배정",
+  "noAssignedProjects": "배정된 프로젝트가 없습니다.",
+  "selectProject": "-- 프로젝트 선택 --",
+  "assignSuccess": "프로젝트에 배정되었습니다.",
+  "assignFailed": "배정에 실패했습니다.",
+  "assignAllConfirm": "{{name}}을(를) 모든 프로젝트에 \"{{role}}\" 역할로 배정하시겠습니까?",
+  "assignAllSuccess": "{{count}}개 프로젝트에 배정되었습니다.",
+  "assignAllFailed": "일괄 배정에 실패했습니다.",
+  "assignAllBtn": "전체 프로젝트 일괄 배정 ({{role}})",
+  "removeFromProject": "제거",
+  "removeSuccess": "프로젝트에서 제거되었습니다.",
+  "removeFailed": "제거에 실패했습니다.",
+  "projectRoleChanged": "프로젝트 역할이 변경되었습니다.",
+  "projectRoleChangeFailed": "역할 변경에 실패했습니다."
+}
