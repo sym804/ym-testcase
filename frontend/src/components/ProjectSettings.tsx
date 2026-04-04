@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { projectsApi, customFieldsApi } from "../api";
 import type { Project, CustomFieldDef } from "../types";
 import ProjectMembers from "./ProjectMembers";
 import toast from "react-hot-toast";
+import { translateError } from "../utils/errorMessage";
 
 interface Props {
   project: Project;
@@ -12,6 +14,7 @@ interface Props {
 
 export default function ProjectSettings({ project, onUpdate }: Props) {
   const navigate = useNavigate();
+  const { t } = useTranslation("settings");
   const isAdmin = project.my_role === "admin";
   const [isPrivate, setIsPrivate] = useState(project.is_private);
   const [saving, setSaving] = useState(false);
@@ -24,10 +27,10 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
     setDeleting(true);
     try {
       await projectsApi.delete(project.id);
-      toast.success("프로젝트가 삭제되었습니다.");
+      toast.success(t("deleteSuccess"));
       navigate("/projects");
     } catch {
-      toast.error("프로젝트 삭제에 실패했습니다.");
+      toast.error(t("deleteFailed"));
     } finally {
       setDeleting(false);
     }
@@ -43,11 +46,11 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
       onUpdate(updated);
       toast.success(
         updated.is_private
-          ? "비공개 프로젝트로 변경되었습니다."
-          : "공개 프로젝트로 변경되었습니다."
+          ? t("changedToPrivate")
+          : t("changedToPublic")
       );
     } catch {
-      toast.error("설정 변경에 실패했습니다.");
+      toast.error(t("settingChangeFailed"));
     } finally {
       setSaving(false);
     }
@@ -57,14 +60,14 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
     <div style={s.container}>
       {/* 접근 제한 설정 */}
       <div style={s.card}>
-        <h3 style={s.title}>접근 설정</h3>
+        <h3 style={s.title}>{t("accessSettings")}</h3>
         <div style={s.row}>
           <div style={s.info}>
-            <div style={s.label}>프로젝트 공개 범위</div>
+            <div style={s.label}>{t("projectVisibility")}</div>
             <div style={s.desc}>
               {isPrivate
-                ? "비공개 — 멤버로 등록된 사용자만 접근할 수 있습니다."
-                : "공개 — 모든 인증된 사용자가 조회할 수 있습니다. 수정은 역할에 따라 제한됩니다."}
+                ? t("privateDesc")
+                : t("publicDesc")}
             </div>
           </div>
           {isAdmin ? (
@@ -76,7 +79,7 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
               onClick={handleTogglePrivate}
               disabled={saving}
             >
-              {isPrivate ? "비공개" : "공개"}
+              {isPrivate ? t("private") : t("public")}
             </button>
           ) : (
             <span
@@ -86,7 +89,7 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
                 color: isPrivate ? "var(--color-fail)" : "var(--color-pass)",
               }}
             >
-              {isPrivate ? "비공개" : "공개"}
+              {isPrivate ? t("private") : t("public")}
             </span>
           )}
         </div>
@@ -94,9 +97,9 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
         {/* 내 역할 표시 */}
         <div style={{ ...s.row, marginTop: 12 }}>
           <div style={s.info}>
-            <div style={s.label}>내 프로젝트 역할</div>
+            <div style={s.label}>{t("myProjectRole")}</div>
           </div>
-          <span style={s.myRole}>{project.my_role || "없음"}</span>
+          <span style={s.myRole}>{project.my_role || t("noRole")}</span>
         </div>
       </div>
 
@@ -116,26 +119,26 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
       {/* 프로젝트 삭제 (admin만) */}
       {isAdmin && (
         <div style={s.dangerCard}>
-          <h3 style={s.dangerTitle}>위험 영역</h3>
+          <h3 style={s.dangerTitle}>{t("dangerZone")}</h3>
           <div style={s.row}>
             <div style={s.info}>
-              <div style={s.label}>프로젝트 삭제</div>
+              <div style={s.label}>{t("deleteProject")}</div>
               <div style={s.desc}>
-                프로젝트와 모든 TC, 테스트 수행 기록, 첨부파일이 영구 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+                {t("deleteProjectDesc")}
               </div>
             </div>
             <button
               style={s.deleteBtn}
               onClick={() => setShowDeleteConfirm(true)}
             >
-              프로젝트 삭제
+              {t("deleteProject")}
             </button>
           </div>
 
           {showDeleteConfirm && (
             <div style={s.confirmBox}>
               <div style={s.confirmText}>
-                삭제를 확인하려면 프로젝트 이름을 입력하세요: <strong>{project.name}</strong>
+                {t("deleteConfirmPrompt")} <strong>{project.name}</strong>
               </div>
               <input
                 style={s.confirmInput}
@@ -149,7 +152,7 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
                   style={s.cancelBtn}
                   onClick={() => { setShowDeleteConfirm(false); setDeleteInput(""); }}
                 >
-                  취소
+                  {t("common:cancel")}
                 </button>
                 <button
                   style={{
@@ -159,7 +162,7 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
                   onClick={handleDelete}
                   disabled={deleteInput !== project.name || deleting}
                 >
-                  {deleting ? "삭제 중..." : "영구 삭제"}
+                  {deleting ? t("common:deleting") : t("permanentDelete")}
                 </button>
               </div>
             </div>
@@ -325,6 +328,7 @@ const BUILTIN_FIELDS = [
 ];
 
 function BuiltInFieldSettings({ project, onUpdate }: { project: Project; onUpdate: (p: Project) => void }) {
+  const { t } = useTranslation("settings");
   const [config, setConfig] = useState<Record<string, { display_name: string; visible: boolean }>>({});
   const [saving, setSaving] = useState(false);
 
@@ -355,9 +359,9 @@ function BuiltInFieldSettings({ project, onUpdate }: { project: Project; onUpdat
       }
       const updated = await projectsApi.update(project.id, { field_config: Object.keys(diff).length > 0 ? diff : null });
       onUpdate(updated);
-      toast.success("필드 설정이 저장되었습니다.");
+      toast.success(t("fieldSaveSuccess"));
     } catch {
-      toast.error("필드 설정 저장에 실패했습니다.");
+      toast.error(t("fieldSaveFailed"));
     } finally {
       setSaving(false);
     }
@@ -374,22 +378,22 @@ function BuiltInFieldSettings({ project, onUpdate }: { project: Project; onUpdat
   return (
     <div style={{ marginTop: 32 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700 }}>기본 필드 설정</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 700 }}>{t("builtInFields")}</h3>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={handleReset} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border-color)", background: "transparent", fontSize: 12, cursor: "pointer", color: "var(--text-secondary)" }}>
-            초기화
+            {t("common:reset")}
           </button>
           <button onClick={handleSave} disabled={saving} style={{ padding: "4px 12px", borderRadius: 6, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>
-            {saving ? "저장 중..." : "저장"}
+            {saving ? t("common:saving") : t("common:save")}
           </button>
         </div>
       </div>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
           <tr style={{ borderBottom: "2px solid var(--border-color)" }}>
-            <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600 }}>필드 키</th>
-            <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600 }}>표시 이름</th>
-            <th style={{ textAlign: "center", padding: "8px 10px", fontWeight: 600, width: 60 }}>표시</th>
+            <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600 }}>{t("fieldKey")}</th>
+            <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600 }}>{t("displayName")}</th>
+            <th style={{ textAlign: "center", padding: "8px 10px", fontWeight: 600, width: 60 }}>{t("visible")}</th>
           </tr>
         </thead>
         <tbody>
@@ -415,7 +419,7 @@ function BuiltInFieldSettings({ project, onUpdate }: { project: Project; onUpdat
                       onChange={(e) => setConfig({ ...config, [f.key]: { ...c, visible: e.target.checked } })}
                     />
                   ) : (
-                    <input type="checkbox" checked disabled title="필수 필드" />
+                    <input type="checkbox" checked disabled title={t("requiredField")} />
                   )}
                 </td>
               </tr>
@@ -428,16 +432,10 @@ function BuiltInFieldSettings({ project, onUpdate }: { project: Project; onUpdat
 }
 
 // ── 커스텀 필드 관리 컴포넌트 ──
-const FIELD_TYPES = [
-  { value: "text", label: "텍스트" },
-  { value: "number", label: "숫자" },
-  { value: "select", label: "단일 선택" },
-  { value: "multiselect", label: "복수 선택" },
-  { value: "checkbox", label: "체크박스" },
-  { value: "date", label: "날짜" },
-];
+const FIELD_TYPE_KEYS = ["text", "number", "select", "multiselect", "checkbox", "date"];
 
 function CustomFieldManager({ projectId }: { projectId: number }) {
+  const { t } = useTranslation("settings");
   const [fields, setFields] = useState<CustomFieldDef[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
@@ -460,7 +458,7 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
 
   const handleAdd = async () => {
     const name = newName.trim();
-    if (!name) { toast.error("필드 이름을 입력해 주세요."); return; }
+    if (!name) { toast.error(t("fieldNameRequired")); return; }
     setLoading(true);
     try {
       const opts = (newType === "select" || newType === "multiselect")
@@ -471,39 +469,39 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
         field_type: newType as CustomFieldDef["field_type"],
         options: opts,
       });
-      toast.success(`"${name}" 필드가 추가되었습니다.`);
+      toast.success(t("fieldAdded", { name }));
       setNewName("");
       setNewOptions("");
       setShowAdd(false);
       loadFields();
     } catch (err) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "필드 추가에 실패했습니다.";
-      toast.error(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t("fieldAddFailed"));
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (field: CustomFieldDef) => {
-    if (!confirm(`"${field.field_name}" 필드를 삭제하시겠습니까?`)) return;
+    if (!confirm(t("fieldDeleteConfirm", { name: field.field_name }))) return;
     try {
       await customFieldsApi.delete(projectId, field.id);
-      toast.success(`"${field.field_name}" 필드가 삭제되었습니다.`);
+      toast.success(t("fieldDeleted", { name: field.field_name }));
       loadFields();
     } catch {
-      toast.error("필드 삭제에 실패했습니다.");
+      toast.error(t("fieldDeleteFailed"));
     }
   };
 
   return (
     <div style={s.card}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h3 style={s.title}>커스텀 필드</h3>
+        <h3 style={s.title}>{t("customFields")}</h3>
         <button
           style={{ padding: "6px 14px", borderRadius: 6, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
           onClick={() => setShowAdd(!showAdd)}
         >
-          {showAdd ? "취소" : "+ 필드 추가"}
+          {showAdd ? t("common:cancel") : t("addField")}
         </button>
       </div>
 
@@ -511,31 +509,31 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
         <div style={{ padding: 12, backgroundColor: "var(--bg-page)", borderRadius: 8, marginBottom: 12 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>필드 이름</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>{t("fieldName")}</div>
               <input
                 style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border-input)", fontSize: 13, backgroundColor: "var(--bg-input)", color: "var(--text-primary)", outline: "none", width: 150 }}
-                placeholder="예: 환경"
+                placeholder={t("fieldNamePlaceholder")}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAdd()}
               />
             </div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>타입</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>{t("fieldType")}</div>
               <select
                 style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border-input)", fontSize: 13, backgroundColor: "var(--bg-input)", color: "var(--text-primary)", outline: "none" }}
                 value={newType}
                 onChange={(e) => setNewType(e.target.value)}
               >
-                {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {FIELD_TYPE_KEYS.map(k => <option key={k} value={k}>{t(`fieldType_${k}`)}</option>)}
               </select>
             </div>
             {(newType === "select" || newType === "multiselect") && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>옵션 (쉼표 구분)</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>{t("optionsLabel")}</div>
                 <input
                   style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border-input)", fontSize: 13, backgroundColor: "var(--bg-input)", color: "var(--text-primary)", outline: "none", width: 200 }}
-                  placeholder="예: Dev, QA, Prod"
+                  placeholder={t("optionsPlaceholder")}
                   value={newOptions}
                   onChange={(e) => setNewOptions(e.target.value)}
                 />
@@ -546,7 +544,7 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
               onClick={handleAdd}
               disabled={loading}
             >
-              {loading ? "추가 중..." : "추가"}
+              {loading ? t("common:processing") : t("common:add")}
             </button>
           </div>
         </div>
@@ -554,16 +552,16 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
 
       {fields.length === 0 ? (
         <div style={{ color: "var(--text-secondary)", fontSize: 13, padding: "12px 0" }}>
-          등록된 커스텀 필드가 없습니다.
+          {t("noCustomFields")}
         </div>
       ) : (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "2px solid var(--border-color)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600 }}>필드명</th>
-              <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "2px solid var(--border-color)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600 }}>타입</th>
-              <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "2px solid var(--border-color)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600 }}>옵션</th>
-              <th style={{ textAlign: "center", padding: "8px 10px", borderBottom: "2px solid var(--border-color)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600, width: 60 }}>삭제</th>
+              <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "2px solid var(--border-color)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600 }}>{t("fieldName")}</th>
+              <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "2px solid var(--border-color)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600 }}>{t("fieldType")}</th>
+              <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "2px solid var(--border-color)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600 }}>{t("optionsLabel")}</th>
+              <th style={{ textAlign: "center", padding: "8px 10px", borderBottom: "2px solid var(--border-color)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600, width: 60 }}>{t("common:delete")}</th>
             </tr>
           </thead>
           <tbody>
@@ -571,7 +569,7 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
               <tr key={f.id}>
                 <td style={{ padding: "8px 10px", borderBottom: "1px solid var(--border-color)", fontWeight: 600 }}>{f.field_name}</td>
                 <td style={{ padding: "8px 10px", borderBottom: "1px solid var(--border-color)" }}>
-                  {FIELD_TYPES.find(t => t.value === f.field_type)?.label || f.field_type}
+                  {t(`fieldType_${f.field_type}`)}
                 </td>
                 <td style={{ padding: "8px 10px", borderBottom: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
                   {f.options?.join(", ") || "-"}
@@ -590,7 +588,7 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
 
       {/* 시스템 정보 */}
       <div style={{ marginTop: 48, paddingTop: 24, borderTop: "1px solid var(--border-color)" }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>시스템 정보</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>{t("systemInfo")}</h3>
         <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.8 }}>
           <div>YM TestCase v1.0.0.0</div>
           <div>License: AGPL-3.0</div>

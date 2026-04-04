@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "./contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import ChangePasswordModal from "./components/ChangePasswordModal";
@@ -15,6 +16,7 @@ const AdminManualPage = lazy(() => import("./pages/AdminManualPage"));
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading, mustChangePassword } = useAuth();
+  const { t } = useTranslation("common");
 
   if (loading) {
     return (
@@ -28,7 +30,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
           fontSize: 16,
         }}
       >
-        로딩 중...
+        {t("loading")}
       </div>
     );
   }
@@ -45,9 +47,10 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 }
 
 function PageLoader() {
+  const { t } = useTranslation("common");
   return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", color: "#64748B", fontSize: 16 }}>
-      로딩 중...
+      {t("loading")}
     </div>
   );
 }

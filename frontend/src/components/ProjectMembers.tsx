@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { membersApi } from "../api";
 import type { ProjectMember, User } from "../types";
 import toast from "react-hot-toast";
+import { translateError } from "../utils/errorMessage";
 
 interface Props {
   projectId: number;
@@ -10,12 +12,13 @@ interface Props {
 }
 
 const ROLES = ["tester", "admin"];
-const ROLE_LABELS: Record<string, string> = {
-  tester: "테스터",
-  admin: "관리자",
-};
 
 export default function ProjectMembers({ projectId, createdBy, myRole }: Props) {
+  const { t, i18n } = useTranslation("settings");
+  const ROLE_LABELS: Record<string, string> = {
+    tester: t("members.tester"),
+    admin: t("members.admin"),
+  };
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +36,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
         setAllUsers(users);
       }
     } catch {
-      toast.error("멤버 목록을 불러오지 못했습니다.");
+      toast.error(t("members.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -48,52 +51,52 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
     if (!addUserId) return;
     try {
       await membersApi.add(projectId, Number(addUserId), addRole);
-      toast.success("멤버가 추가되었습니다.");
+      toast.success(t("members.addSuccess"));
       setAddUserId("");
       setAddRole("tester");
       load();
     } catch (err: unknown) {
-      const msg =
+      const detail =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      toast.error(msg || "멤버 추가에 실패했습니다.");
+      toast.error(detail ? translateError(detail) : t("members.addFailed"));
     }
   };
 
   const handleRoleChange = async (memberId: number, role: string) => {
     try {
       await membersApi.updateRole(projectId, memberId, role);
-      toast.success("역할이 변경되었습니다.");
+      toast.success(t("members.roleChanged"));
       load();
     } catch {
-      toast.error("역할 변경에 실패했습니다.");
+      toast.error(t("members.roleChangeFailed"));
     }
   };
 
   const handleRemove = async (memberId: number) => {
-    if (!confirm("이 멤버를 제거하시겠습니까?")) return;
+    if (!confirm(t("members.removeConfirm"))) return;
     try {
       await membersApi.remove(projectId, memberId);
-      toast.success("멤버가 제거되었습니다.");
+      toast.success(t("members.removeSuccess"));
       load();
     } catch (err: unknown) {
-      const msg =
+      const detail =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      toast.error(msg || "멤버 제거에 실패했습니다.");
+      toast.error(detail ? translateError(detail) : t("members.removeFailed"));
     }
   };
 
   const memberUserIds = new Set(members.map((m) => m.user_id));
   const availableUsers = allUsers.filter((u) => !memberUserIds.has(u.id));
 
-  if (loading) return <div style={s.loading}>불러오는 중...</div>;
+  if (loading) return <div style={s.loading}>{t("common:loadingData")}</div>;
 
   return (
     <div style={s.wrap}>
-      <h3 style={s.title}>프로젝트 멤버</h3>
+      <h3 style={s.title}>{t("members.title")}</h3>
 
       {/* 멤버 추가 (admin만) */}
       {isAdmin && availableUsers.length > 0 && (
@@ -103,7 +106,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
             value={addUserId}
             onChange={(e) => setAddUserId(e.target.value ? Number(e.target.value) : "")}
           >
-            <option value="">사용자 선택...</option>
+            <option value="">{t("members.selectUser")}</option>
             {availableUsers.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.display_name} ({u.username})
@@ -122,7 +125,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
             ))}
           </select>
           <button style={s.addBtn} onClick={handleAdd} disabled={!addUserId}>
-            추가
+            {t("common:add")}
           </button>
         </div>
       )}
@@ -131,10 +134,10 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
       <table style={s.table}>
         <thead>
           <tr>
-            <th style={s.th}>사용자</th>
-            <th style={s.th}>아이디</th>
-            <th style={{ ...s.th, width: 140 }}>역할</th>
-            <th style={{ ...s.th, width: 100 }}>추가일</th>
+            <th style={s.th}>{t("members.user")}</th>
+            <th style={s.th}>{t("members.userId")}</th>
+            <th style={{ ...s.th, width: 140 }}>{t("members.role")}</th>
+            <th style={{ ...s.th, width: 100 }}>{t("members.addedDate")}</th>
             {isAdmin && <th style={{ ...s.th, width: 60 }}></th>}
           </tr>
         </thead>
@@ -145,7 +148,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
               <tr key={m.id}>
                 <td style={s.td}>
                   {m.display_name || "-"}
-                  {isCreator && <span style={s.badge}>생성자</span>}
+                  {isCreator && <span style={s.badge}>{t("members.creator")}</span>}
                 </td>
                 <td style={s.td}>{m.username || "-"}</td>
                 <td style={s.td}>
@@ -166,7 +169,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
                   )}
                 </td>
                 <td style={s.td}>
-                  {new Date(m.added_at).toLocaleDateString("ko-KR")}
+                  {new Date(m.added_at).toLocaleDateString(i18n.language === "ko" ? "ko-KR" : "en-US")}
                 </td>
                 {isAdmin && (
                   <td style={s.td}>
@@ -174,7 +177,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
                       <button
                         style={s.removeBtn}
                         onClick={() => handleRemove(m.id)}
-                        title="멤버 제거"
+                        title={t("members.removeMember")}
                       >
                         X
                       </button>
@@ -187,7 +190,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
           {members.length === 0 && (
             <tr>
               <td style={s.td} colSpan={isAdmin ? 5 : 4}>
-                등록된 멤버가 없습니다.
+                {t("members.noMembers")}
               </td>
             </tr>
           )}

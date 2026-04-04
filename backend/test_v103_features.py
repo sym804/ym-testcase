@@ -229,60 +229,6 @@ check("두 번째 TC는 DND-001", tcs[1]["tc_id"] == "DND-001", tcs[1]["tc_id"])
 check("세 번째 TC는 DND-002", tcs[2]["tc_id"] == "DND-002", tcs[2]["tc_id"])
 
 # ============================================================================
-print("\n" + "=" * 70)
-print("5. 인앱 알림")
-print("=" * 70)
-
-# 알림 목록 조회 (기존 상태)
-r = requests.get(f"{BASE}/api/notifications", headers=H)
-check("알림 목록 조회", r.status_code == 200)
-initial_count = len(r.json())
-
-# TC + 테스트 런 생성
-r = requests.post(f"{BASE}/api/projects/{PID}/testcases", json={
-    "no": 200, "tc_id": "NOTI-001", "category": "알림",
-    "priority": "보통", "sheet_name": "기본"
-}, headers=H)
-noti_tc_id = r.json()["id"]
-
-r = requests.post(f"{BASE}/api/projects/{PID}/testruns", json={
-    "name": "알림테스트런", "version": "v1", "round": 1
-}, headers=H)
-noti_run_id = r.json()["id"]
-
-# FAIL 결과 제출
-requests.post(f"{BASE}/api/projects/{PID}/testruns/{noti_run_id}/results", json=[
-    {"test_case_id": noti_tc_id, "result": "FAIL", "actual_result": "실패함"}
-], headers=H)
-
-# 런 완료 → 알림 자동 생성
-requests.put(f"{BASE}/api/projects/{PID}/testruns/{noti_run_id}/complete", headers=H)
-
-# 알림 확인
-r = requests.get(f"{BASE}/api/notifications", headers=H)
-check("알림 생성됨", len(r.json()) > initial_count, f"before={initial_count}, after={len(r.json())}")
-notifications = r.json()
-if notifications:
-    latest = notifications[0]
-    check("알림에 message 필드", "message" in latest)
-    check("알림에 is_read 필드", "is_read" in latest)
-    check("알림 미읽음 상태", latest["is_read"] == False)
-
-    # 읽음 처리
-    noti_id = latest["id"]
-    r = requests.put(f"{BASE}/api/notifications/{noti_id}/read", headers=H)
-    check("읽음 처리 성공", r.status_code == 200)
-
-    # 전체 읽음 처리
-    r = requests.put(f"{BASE}/api/notifications/read-all", headers=H)
-    check("전체 읽음 처리", r.status_code == 200)
-
-# 미읽음 개수
-r = requests.get(f"{BASE}/api/notifications/unread-count", headers=H)
-check("미읽음 개수 조회", r.status_code == 200)
-check("미읽음 0건", r.json().get("count") == 0, str(r.json()))
-
-# ============================================================================
 # 정리: 테스트 프로젝트 삭제
 print("\n" + "-" * 70)
 r = requests.delete(f"{BASE}/api/projects/{PID}", headers=H)

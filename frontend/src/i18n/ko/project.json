@@ -1,0 +1,43 @@
+{
+  "overview": "전체 현황",
+  "totalProjects": "전체 프로젝트",
+  "totalTC": "전체 TC",
+  "progress": "진행률",
+  "passRate": "Pass Rate",
+  "notStarted": "미수행",
+  "noTC": "TC 없음",
+  "noDescription": "설명 없음",
+  "projects": "프로젝트",
+  "newProject": "+ 새 프로젝트",
+  "deleteCount": "{{count}}개 삭제",
+  "loadFailed": "데이터를 불러오지 못했습니다.",
+  "projectLoadFailed": "프로젝트를 불러오지 못했습니다.",
+  "projectNotFound": "프로젝트를 찾을 수 없습니다.",
+  "createProject": "새 프로젝트",
+  "projectName": "프로젝트 이름 *",
+  "projectNamePlaceholder": "프로젝트 이름",
+  "description": "설명",
+  "descriptionPlaceholder": "프로젝트 설명",
+  "jiraBaseUrl": "Jira Base URL",
+  "jiraBaseUrlPlaceholder": "https://your-domain.atlassian.net",
+  "privateProject": "비공개 프로젝트 (멤버만 접근 가능)",
+  "nameRequired": "프로젝트 이름을 입력해 주세요.",
+  "nameMaxLength": "프로젝트 이름은 100자 이내로 입력해 주세요.",
+  "createSuccess": "프로젝트가 생성되었습니다.",
+  "createFailed": "프로젝트 생성에 실패했습니다.",
+  "deleteConfirm": "{{count}}개 프로젝트를 삭제하시겠습니까?\n\n{{names}}\n\n이 작업은 되돌릴 수 없습니다.",
+  "deleteSuccess": "{{count}}개 프로젝트가 삭제되었습니다.",
+  "noProjects": "등록된 프로젝트가 없습니다.",
+  "tabs": {
+    "tc": "TC 관리",
+    "run": "테스트 수행",
+    "compare": "비교",
+    "dashboard": "대시보드",
+    "report": "리포트",
+    "settings": "설정"
+  },
+  "table": {
+    "project": "프로젝트",
+    "progress": "진행"
+  }
+}

@@ -1,24 +1,27 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { usersApi, projectsApi, membersApi } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import type { User, Project, ProjectMember } from "../types";
 import { UserRole } from "../types";
 import Header from "../components/Header";
 import toast from "react-hot-toast";
-
-const SYSTEM_ROLES: { value: string; label: string }[] = [
-  { value: "user", label: "일반 사용자" },
-  { value: "qa_manager", label: "QA 관리자" },
-  { value: "admin", label: "시스템 관리자" },
-];
-
-const PROJECT_ROLES: { value: string; label: string }[] = [
-  { value: "tester", label: "테스터" },
-  { value: "admin", label: "관리자" },
-];
+import { translateError } from "../utils/errorMessage";
 
 export default function AdminPage() {
   const { user: currentUser } = useAuth();
+  const { t, i18n } = useTranslation("admin");
+
+  const SYSTEM_ROLES: { value: string; label: string }[] = [
+    { value: "user", label: t("systemRole.user") },
+    { value: "qa_manager", label: t("systemRole.qaManager") },
+    { value: "admin", label: t("systemRole.admin") },
+  ];
+
+  const PROJECT_ROLES: { value: string; label: string }[] = [
+    { value: "tester", label: t("projectRole.tester") },
+    { value: "admin", label: t("projectRole.admin") },
+  ];
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +43,7 @@ export default function AdminPage() {
       setUsers(data);
     } catch (err) {
       console.error(err);
-      toast.error("사용자 목록을 불러오지 못했습니다.");
+      toast.error(t("loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -78,22 +81,22 @@ export default function AdminPage() {
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
       await usersApi.updateRole(userId, newRole);
-      toast.success("역할이 변경되었습니다.");
+      toast.success(t("roleChanged"));
       loadUsers();
     } catch (err) {
       console.error(err);
-      toast.error("역할 변경에 실패했습니다.");
+      toast.error(t("roleChangeFailed"));
     }
   };
 
   const handleResetPassword = async (user: User) => {
-    if (!confirm(`${user.display_name}(${user.username})의 비밀번호를 초기화하시겠습니까?`)) return;
+    if (!confirm(t("resetPasswordConfirm", { name: user.display_name, username: user.username }))) return;
     try {
       const { temp_password } = await usersApi.resetPassword(user.id);
       setTempPwInfo({ username: user.username, password: temp_password });
     } catch (err) {
       console.error(err);
-      toast.error("비밀번호 초기화에 실패했습니다.");
+      toast.error(t("resetPasswordFailed"));
     }
   };
 
@@ -120,12 +123,12 @@ export default function AdminPage() {
     setAssignLoading(true);
     try {
       await membersApi.add(Number(assignProjectId), assignTarget.id, assignRole);
-      toast.success("프로젝트에 배정되었습니다.");
+      toast.success(t("assignSuccess"));
       await openAssignModal(assignTarget);
       loadAllAssignments();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "배정에 실패했습니다.";
-      toast.error(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t("assignFailed"));
     } finally {
       setAssignLoading(false);
     }
@@ -133,16 +136,16 @@ export default function AdminPage() {
 
   const handleAssignAll = async () => {
     if (!assignTarget) return;
-    if (!confirm(`${assignTarget.display_name}을(를) 모든 프로젝트에 "${PROJECT_ROLES.find(r => r.value === assignRole)?.label}" 역할로 배정하시겠습니까?`)) return;
+    if (!confirm(t("assignAllConfirm", { name: assignTarget.display_name, role: PROJECT_ROLES.find(r => r.value === assignRole)?.label }))) return;
     setAssignLoading(true);
     try {
       const result = await usersApi.assignToAllProjects(assignTarget.id, assignRole);
-      toast.success(`${result.assigned}개 프로젝트에 배정되었습니다.`);
+      toast.success(t("assignAllSuccess", { count: result.assigned }));
       await openAssignModal(assignTarget);
       loadAllAssignments();
     } catch (err) {
       console.error(err);
-      toast.error("일괄 배정에 실패했습니다.");
+      toast.error(t("assignAllFailed"));
     } finally {
       setAssignLoading(false);
     }
@@ -152,24 +155,24 @@ export default function AdminPage() {
     if (!assignTarget) return;
     try {
       await membersApi.remove(member.project_id, member.id);
-      toast.success("프로젝트에서 제거되었습니다.");
+      toast.success(t("removeSuccess"));
       await openAssignModal(assignTarget);
       loadAllAssignments();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "제거에 실패했습니다.";
-      toast.error(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t("removeFailed"));
     }
   };
 
   const handleChangeProjectRole = async (member: ProjectMember, newRole: string) => {
     try {
       await membersApi.updateRole(member.project_id, member.id, newRole);
-      toast.success("프로젝트 역할이 변경되었습니다.");
+      toast.success(t("projectRoleChanged"));
       if (assignTarget) await openAssignModal(assignTarget);
       loadAllAssignments();
     } catch (err) {
       console.error(err);
-      toast.error("역할 변경에 실패했습니다.");
+      toast.error(t("projectRoleChangeFailed"));
     }
   };
 
@@ -178,7 +181,7 @@ export default function AdminPage() {
       <div style={{ minHeight: "100vh", backgroundColor: "var(--bg-page)" }}>
         <Header />
         <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>
-          관리자 권한이 필요합니다.
+          {t("permissionRequired")}
         </div>
       </div>
     );
@@ -191,21 +194,21 @@ export default function AdminPage() {
     <div style={{ minHeight: "100vh", backgroundColor: "var(--bg-page)" }}>
       <Header />
       <div style={s.container}>
-        <h2 style={s.title}>사용자 관리</h2>
+        <h2 style={s.title}>{t("title")}</h2>
         {loading ? (
-          <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>불러오는 중...</div>
+          <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>{t("common:loadingData")}</div>
         ) : (
           <div style={s.tableWrap}>
             <table style={s.table}>
               <thead>
                 <tr>
-                  <th style={s.th}>ID</th>
-                  <th style={s.th}>사용자명</th>
-                  <th style={s.th}>표시명</th>
-                  <th style={s.th}>시스템 역할</th>
-                  <th style={s.th}>프로젝트 배정</th>
-                  <th style={s.th}>가입일</th>
-                  <th style={s.th}>비밀번호</th>
+                  <th style={s.th}>{t("columns.id")}</th>
+                  <th style={s.th}>{t("columns.username")}</th>
+                  <th style={s.th}>{t("columns.displayName")}</th>
+                  <th style={s.th}>{t("columns.systemRole")}</th>
+                  <th style={s.th}>{t("columns.projectAssignment")}</th>
+                  <th style={s.th}>{t("columns.joinDate")}</th>
+                  <th style={s.th}>{t("columns.password")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -240,31 +243,31 @@ export default function AdminPage() {
                                     color: a.role === "admin" ? "var(--text-info)" : "var(--text-badge-gray)",
                                     borderColor: a.role === "admin" ? "#93C5FD" : "#D1D5DB",
                                   }}
-                                  title={`${a.project_name} (${a.role === "admin" ? "관리자" : "테스터"})`}
+                                  title={`${a.project_name} (${a.role === "admin" ? t("projectRole.admin") : t("projectRole.tester")})`}
                                 >
                                   {a.project_name}
                                   <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 2 }}>
-                                    {a.role === "admin" ? "관리" : "테스트"}
+                                    {a.role === "admin" ? t("adminTag") : t("testerTag")}
                                   </span>
                                 </span>
                               ))
                             ) : (
-                              <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>미배정</span>
+                              <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("unassigned")}</span>
                             )}
                           </div>
                           <button style={s.assignBtn} onClick={() => openAssignModal(u)}>
-                            관리
+                            {t("manage")}
                           </button>
                         </div>
                       ) : (
-                        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>전체 접근</span>
+                        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{t("fullAccess")}</span>
                       )}
                     </td>
-                    <td style={s.td}>{new Date(u.created_at).toLocaleDateString("ko-KR")}</td>
+                    <td style={s.td}>{new Date(u.created_at).toLocaleDateString(i18n.language === "ko" ? "ko-KR" : "en-US")}</td>
                     <td style={s.td}>
                       {u.id !== currentUser?.id && (
                         <button style={s.resetBtn} onClick={() => handleResetPassword(u)}>
-                          초기화
+                          {t("resetPassword")}
                         </button>
                       )}
                     </td>
@@ -279,22 +282,20 @@ export default function AdminPage() {
         {tempPwInfo && (
           <div style={s.overlay} onClick={() => setTempPwInfo(null)}>
             <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-              <h3 style={s.modalTitle}>비밀번호 초기화 완료</h3>
-              <p style={s.modalDesc}>
-                <strong>{tempPwInfo.username}</strong>의 임시 비밀번호가 발급되었습니다.<br />
-                사용자에게 전달해 주세요. 로그인 시 비밀번호 변경이 강제됩니다.
-              </p>
+              <h3 style={s.modalTitle}>{t("resetPasswordDone")}</h3>
+              <p style={s.modalDesc} dangerouslySetInnerHTML={{ __html: t("resetPasswordDesc", { username: tempPwInfo.username }).replace("<0>", "<strong>").replace("</0>", "</strong>").replace("<br/>", "<br />") }} />
+
               <div style={s.tempPwBox}>{tempPwInfo.password}</div>
               <button
                 style={s.copyBtn}
                 onClick={() => {
                   navigator.clipboard.writeText(tempPwInfo.password);
-                  toast.success("클립보드에 복사되었습니다.");
+                  toast.success(t("common:copiedToClipboard"));
                 }}
               >
-                복사
+                {t("common:copy")}
               </button>
-              <button style={s.closeBtn} onClick={() => setTempPwInfo(null)}>닫기</button>
+              <button style={s.closeBtn} onClick={() => setTempPwInfo(null)}>{t("common:close")}</button>
             </div>
           </div>
         )}
@@ -304,7 +305,7 @@ export default function AdminPage() {
           <div style={s.overlay} onClick={() => setAssignTarget(null)}>
             <div style={{ ...s.modal, width: 520, textAlign: "left" as const }} onClick={(e) => e.stopPropagation()}>
               <h3 style={s.modalTitle}>
-                {assignTarget.display_name} 프로젝트 배정
+                {t("assignTitle", { name: assignTarget.display_name })}
               </h3>
 
               {/* 현재 배정된 프로젝트 */}
@@ -312,8 +313,8 @@ export default function AdminPage() {
                 <table style={{ ...s.table, marginBottom: 16 }}>
                   <thead>
                     <tr>
-                      <th style={s.th}>프로젝트</th>
-                      <th style={s.th}>역할</th>
+                      <th style={s.th}>{t("columns.projectAssignment")}</th>
+                      <th style={s.th}>{t("columns.systemRole")}</th>
                       <th style={s.th}></th>
                     </tr>
                   </thead>
@@ -337,7 +338,7 @@ export default function AdminPage() {
                             style={{ ...s.resetBtn, fontSize: 11, padding: "2px 8px" }}
                             onClick={() => handleRemoveProject(m)}
                           >
-                            제거
+                            {t("removeFromProject")}
                           </button>
                         </td>
                       </tr>
@@ -346,7 +347,7 @@ export default function AdminPage() {
                 </table>
               ) : (
                 <div style={{ padding: "12px 0", fontSize: 13, color: "var(--text-secondary)" }}>
-                  배정된 프로젝트가 없습니다.
+                  {t("noAssignedProjects")}
                 </div>
               )}
 
@@ -357,7 +358,7 @@ export default function AdminPage() {
                   value={assignProjectId}
                   onChange={(e) => setAssignProjectId(e.target.value ? Number(e.target.value) : "")}
                 >
-                  <option value="">-- 프로젝트 선택 --</option>
+                  <option value="">{t("selectProject")}</option>
                   {unassignedProjects.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
@@ -372,7 +373,7 @@ export default function AdminPage() {
                   disabled={!assignProjectId || assignLoading}
                   onClick={handleAddProject}
                 >
-                  추가
+                  {t("common:add")}
                 </button>
               </div>
 
@@ -383,12 +384,12 @@ export default function AdminPage() {
                   disabled={assignLoading}
                   onClick={handleAssignAll}
                 >
-                  전체 프로젝트 일괄 배정 ({assignRole === "tester" ? "테스터" : "관리자"})
+                  {t("assignAllBtn", { role: assignRole === "tester" ? t("projectRole.tester") : t("projectRole.admin") })}
                 </button>
               </div>
 
               <div style={{ textAlign: "right" as const }}>
-                <button style={s.closeBtn} onClick={() => setAssignTarget(null)}>닫기</button>
+                <button style={s.closeBtn} onClick={() => setAssignTarget(null)}>{t("common:close")}</button>
               </div>
             </div>
           </div>

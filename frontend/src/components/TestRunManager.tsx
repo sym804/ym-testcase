@@ -12,10 +12,12 @@ import {
   type CellClickedEvent,
   type CellValueChangedEvent,
 } from "ag-grid-community";
+import { useTranslation } from "react-i18next";
 import { testRunsApi, testCasesApi, attachmentsApi } from "../api";
 import type { TestRun, TestResult, Attachment } from "../types";
 import { TestRunStatus } from "../types";
 import { AG_GRID_LOCALE_KO } from "../agGridLocaleKo";
+import { AG_GRID_LOCALE_EN } from "../agGridLocaleEn";
 import toast from "react-hot-toast";
 import MarkdownCell from "./MarkdownCell";
 import HighlightCell from "./HighlightCell";
@@ -45,6 +47,8 @@ function resultCellStyle(params: CellClassParams) {
 }
 
 export default function TestRunManager({ projectId, project }: Props) {
+  const { t, i18n } = useTranslation("testrun");
+  const gridLocale = i18n.language === "ko" ? AG_GRID_LOCALE_KO : AG_GRID_LOCALE_EN;
   const canManageRun = project.my_role === "admin" || project.my_role === "tester";
   const canDeleteRun = project.my_role === "admin";
   const [runs, setRuns] = useState<TestRun[]>([]);
@@ -104,7 +108,7 @@ export default function TestRunManager({ projectId, project }: Props) {
     const file = e.target.files?.[0];
     if (!file || !uploadTargetResultId) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("이미지 파일만 업로드 가능합니다.");
+      toast.error(t("imageOnly"));
       return;
     }
     try {
@@ -114,9 +118,9 @@ export default function TestRunManager({ projectId, project }: Props) {
         [uploadTargetResultId]: [...(prev[uploadTargetResultId] || []), att],
       }));
       gridApiRef.current?.refreshCells({ force: true });
-      toast.success("이미지 첨부 완료");
+      toast.success(t("imageAttached"));
     } catch {
-      toast.error("업로드 실패");
+      toast.error(t("uploadFailed"));
     }
     e.target.value = "";
     setUploadTargetResultId(null);
@@ -124,7 +128,7 @@ export default function TestRunManager({ projectId, project }: Props) {
 
   // ── 첨부파일 삭제 ──
   const handleDeleteAttachment = useCallback(async (attachmentId: number, resultId: number) => {
-    if (!confirm("이 첨부파일을 삭제하시겠습니까?")) return;
+    if (!confirm(t("deleteAttachmentConfirm"))) return;
     try {
       await attachmentsApi.delete(attachmentId);
       setAttachmentsMap((prev) => ({
@@ -132,9 +136,9 @@ export default function TestRunManager({ projectId, project }: Props) {
         [resultId]: (prev[resultId] || []).filter((a) => a.id !== attachmentId),
       }));
       gridApiRef.current?.refreshCells({ force: true });
-      toast.success("삭제 완료");
+      toast.success(t("attachDeleteDone"));
     } catch {
-      toast.error("삭제 실패");
+      toast.error(t("attachDeleteFailed"));
     }
   }, []);
 
@@ -151,7 +155,7 @@ export default function TestRunManager({ projectId, project }: Props) {
     try {
       await testRunsApi.submitResults(projectId, selectedRun.id, payload);
     } catch {
-      toast.error("저장 실패");
+      toast.error(t("saveFailed"));
     }
   }, [projectId, selectedRun]);
 
@@ -183,7 +187,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       if (changed.length > 0) {
         api.refreshCells({ force: true });
         setCountTick((t) => t + 1);
-        toast.success(`${changed.length}개 행에 "${anchor.value}" 채움`);
+        toast.success(t("fillResult", { count: changed.length, value: anchor.value }));
         saveManyResults(changed);
       }
       fillAnchorRef.current = null;
@@ -203,7 +207,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       const data = await testRunsApi.list(projectId);
       setRuns(data);
     } catch {
-      toast.error("테스트 수행 목록을 불러오지 못했습니다.");
+      toast.error(t("loadFailed"));
     } finally {
       setLoadingRuns(false);
     }
@@ -263,7 +267,7 @@ export default function TestRunManager({ projectId, project }: Props) {
           setResults(mapped);
         }
       } catch {
-        toast.error("테스트 결과를 불러오지 못했습니다.");
+        toast.error(t("resultLoadFailed"));
       } finally {
         setLoadingResults(false);
       }
@@ -357,7 +361,7 @@ export default function TestRunManager({ projectId, project }: Props) {
     try {
       await testRunsApi.submitResults(projectId, selectedRun.id, [mapped]);
     } catch {
-      toast.error("저장 실패");
+      toast.error(t("saveFailed"));
     }
   }, [projectId, selectedRun]);
 
@@ -421,7 +425,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       if (changed.length > 0) {
         api.refreshCells({ force: true });
         setCountTick((t) => t + 1);
-        toast.success(`${changed.length}개 행에 "${sourceValue}" 채움`);
+        toast.success(t("fillResult", { count: changed.length, value: sourceValue }));
         saveManyResults(changed);
       }
     }
@@ -430,7 +434,7 @@ export default function TestRunManager({ projectId, project }: Props) {
     if (e.key === "z" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
       e.preventDefault();
       const entry = undoStackRef.current.pop();
-      if (!entry) { toast("되돌릴 항목이 없습니다."); return; }
+      if (!entry) { toast(t("undoEmpty")); return; }
       api.forEachNode((node) => {
         if (node.data?.id === entry.rowId) {
           node.data[entry.field] = entry.oldValue;
@@ -439,7 +443,7 @@ export default function TestRunManager({ projectId, project }: Props) {
           saveOneResult(node.data);
         }
       });
-      toast.success("되돌리기 완료");
+      toast.success(t("undoDone"));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveManyResults, saveOneResult]);
@@ -450,7 +454,7 @@ export default function TestRunManager({ projectId, project }: Props) {
     if (!api) return;
     const selectedNodes = api.getSelectedNodes();
     if (selectedNodes.length === 0) {
-      toast.error("행을 먼저 선택해 주세요.");
+      toast.error(t("selectRowsFirst"));
       return;
     }
     const changed: TestResult[] = [];
@@ -462,7 +466,7 @@ export default function TestRunManager({ projectId, project }: Props) {
     });
     api.refreshCells({ force: true });
     setCountTick((t) => t + 1);
-    toast.success(`${selectedNodes.length}개 행 → ${value || "(빈값)"}`);
+    toast.success(t("bulkResultApplied", { count: selectedNodes.length, value: value || t("bulkResultEmpty") }));
     saveManyResults(changed);
   };
 
@@ -484,14 +488,15 @@ export default function TestRunManager({ projectId, project }: Props) {
   const resultCounts = useMemo(() => {
     void countTick;
     const rows = getGridRows();
-    const counts: Record<string, number> = { PASS: 0, FAIL: 0, BLOCK: 0, "N/A": 0, "미입력": 0 };
+    const notEnteredLabel = t("notEntered");
+    const counts: Record<string, number> = { PASS: 0, FAIL: 0, BLOCK: 0, "N/A": 0, [notEnteredLabel]: 0 };
     rows.forEach((r) => {
       const val = (r.result as string) || "";
       if (val === "PASS") counts["PASS"]++;
       else if (val === "FAIL") counts["FAIL"]++;
       else if (val === "BLOCK") counts["BLOCK"]++;
       else if (val === "N/A") counts["N/A"]++;
-      else counts["미입력"]++;
+      else counts[notEnteredLabel]++;
     });
     return counts;
   }, [countTick, getGridRows]);
@@ -521,7 +526,7 @@ export default function TestRunManager({ projectId, project }: Props) {
     // Result 필터
     if (filterResult) {
       const val = (row.result as string) || "";
-      if (filterResult === "미입력") {
+      if (filterResult === t("notEntered")) {
         if (val !== "") return false;
       } else {
         if (val !== filterResult) return false;
@@ -650,7 +655,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       },
       ...(timerEnabled ? [{
         field: "duration_sec",
-        headerName: "소요(초)",
+        headerName: t("durationSec"),
         width: 80,
         valueFormatter: (params: { value: unknown }) => {
           const v = params.value as number;
@@ -660,7 +665,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       }] : []),
       {
         field: "attachments",
-        headerName: "첨부",
+        headerName: t("attachment"),
         width: 140,
         cellRenderer: (params: { data: TestResult }) => {
           const row = params.data;
@@ -695,14 +700,14 @@ export default function TestRunManager({ projectId, project }: Props) {
                         .then((blob) => {
                           setPreviewImage({ url: URL.createObjectURL(blob), filename: att.filename });
                         })
-                        .catch(() => toast.error("이미지를 불러올 수 없습니다."));
+                        .catch(() => toast.error(t("imageLoadFailed")));
                     }}
                   >
                     {att.filename}
                   </span>
                   <span
                     style={{ fontSize: 11, color: "var(--color-fail)", cursor: "pointer", fontWeight: 700 }}
-                    title="삭제"
+                    title={t("common:delete")}
                     onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(att.id, row.id); }}
                   >×</span>
                 </span>
@@ -718,7 +723,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                   padding: "0 5px",
                   lineHeight: "20px",
                 }}
-                title="이미지 첨부"
+                title={t("imageAttach")}
                 onClick={(e) => {
                   e.stopPropagation();
                   setUploadTargetResultId(row.id);
@@ -772,28 +777,28 @@ export default function TestRunManager({ projectId, project }: Props) {
 
   const handleDelete = async () => {
     if (!selectedRun) return;
-    if (!confirm(`"${selectedRun.name}"을 삭제하시겠습니까? 결과 데이터도 모두 삭제됩니다.`)) return;
+    if (!confirm(t("deleteConfirm", { name: selectedRun.name }))) return;
     try {
       await testRunsApi.delete(projectId, selectedRun.id);
-      toast.success("테스트 수행이 삭제되었습니다.");
+      toast.success(t("deleteSuccess"));
       setSelectedRun(null);
       setResults([]);
       loadRuns();
     } catch {
-      toast.error("삭제에 실패했습니다.");
+      toast.error(t("deleteFailed"));
     }
   };
 
   const handleClone = async () => {
     if (!selectedRun) return;
-    if (!confirm(`"${selectedRun.name}"을 복제하시겠습니까?`)) return;
+    if (!confirm(t("cloneConfirm", { name: selectedRun.name }))) return;
     try {
       const cloned = await testRunsApi.clone(projectId, selectedRun.id);
-      toast.success("테스트 수행이 복제되었습니다.");
+      toast.success(t("cloneSuccess"));
       loadRuns();
       loadRunDetail(cloned);
     } catch {
-      toast.error("복제에 실패했습니다.");
+      toast.error(t("cloneFailed"));
     }
   };
 
@@ -806,43 +811,43 @@ export default function TestRunManager({ projectId, project }: Props) {
       const nsCount = allResults.filter((r: TestResult) => !r.result || r.result === "NS").length;
       if (nsCount > 0) {
         const proceed = confirm(
-          `수행되지 않은 TC가 ${nsCount}개 있습니다.\n\n그래도 완료 처리하시겠습니까?`
+          t("completeConfirmWithNS", { count: nsCount })
         );
         if (!proceed) return;
       } else {
-        if (!confirm("이 테스트 수행을 완료 처리하시겠습니까?")) return;
+        if (!confirm(t("completeConfirm"))) return;
       }
     } catch {
-      if (!confirm("미수행 TC 확인에 실패했습니다. 그래도 완료 처리하시겠습니까?")) return;
+      if (!confirm(t("completeCheckFailed"))) return;
     }
     try {
       await testRunsApi.complete(projectId, selectedRun.id);
-      toast.success("테스트 수행이 완료되었습니다.");
+      toast.success(t("completeSuccess"));
       loadRuns();
       setSelectedRun((prev) =>
         prev ? { ...prev, status: TestRunStatus.COMPLETED } : null
       );
     } catch {
-      toast.error("완료 처리에 실패했습니다.");
+      toast.error(t("completeFailed"));
     }
   };
 
   const handleCreateRun = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      toast.error("수행 이름을 입력해 주세요.");
+      toast.error(t("nameRequired"));
       return;
     }
     setCreating(true);
     try {
       const newRun = await testRunsApi.create(projectId, form);
-      toast.success("테스트 수행이 생성되었습니다.");
+      toast.success(t("createSuccess"));
       setShowModal(false);
       setForm({ name: "", version: "", environment: "", round: 1 });
       loadRuns();
       loadRunDetail(newRun);
     } catch {
-      toast.error("생성에 실패했습니다.");
+      toast.error(t("createFailed"));
     } finally {
       setCreating(false);
     }
@@ -854,20 +859,20 @@ export default function TestRunManager({ projectId, project }: Props) {
       {!panelCollapsed && (
         <div style={styles.leftPanel}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)" }}>
-            <h3 style={{ ...styles.panelTitle, borderBottom: "none" }}>테스트 수행 목록</h3>
+            <h3 style={{ ...styles.panelTitle, borderBottom: "none" }}>{t("runList")}</h3>
             <button
               style={styles.collapseBtn}
               onClick={() => setPanelCollapsed(true)}
-              title="패널 숨기기"
+              title={t("hidePanel")}
             >
               ◀
             </button>
           </div>
           <div style={styles.runList}>
             {loadingRuns ? (
-              <div style={styles.loadingText}>불러오는 중...</div>
+              <div style={styles.loadingText}>{t("common:loadingData")}</div>
             ) : runs.length === 0 ? (
-              <div style={styles.emptyText}>등록된 테스트 수행이 없습니다.</div>
+              <div style={styles.emptyText}>{t("noRuns")}</div>
             ) : (() => {
               const inProgress = runs.filter(r => r.status !== TestRunStatus.COMPLETED);
               const completed = runs.filter(r => r.status === TestRunStatus.COMPLETED);
@@ -899,7 +904,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                           run.status === TestRunStatus.COMPLETED ? "var(--color-pass)" : "#60A5FA",
                       }}
                     >
-                      {run.status === TestRunStatus.COMPLETED ? "완료" : "진행 중"}
+                      {run.status === TestRunStatus.COMPLETED ? t("completed") : t("inProgress")}
                     </span>
                   </div>
                 ))}
@@ -908,7 +913,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                     style={{ padding: "8px 12px", textAlign: "center", cursor: "pointer", color: "var(--text-secondary)", fontSize: 12, borderBottom: "1px solid var(--border-color)" }}
                     onClick={() => setShowAllCompleted(true)}
                   >
-                    이전 런 {hiddenCount}개 더보기 ▼
+                    {t("showOlderRuns", { count: hiddenCount })}
                   </div>
                 )}
                 {showAllCompleted && hiddenCount > 0 && (
@@ -916,7 +921,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                     style={{ padding: "8px 12px", textAlign: "center", cursor: "pointer", color: "var(--text-secondary)", fontSize: 12, borderBottom: "1px solid var(--border-color)" }}
                     onClick={() => setShowAllCompleted(false)}
                   >
-                    접기 ▲
+                    {t("collapseRuns")}
                   </div>
                 )}
               </>;
@@ -924,7 +929,7 @@ export default function TestRunManager({ projectId, project }: Props) {
           </div>
           {canManageRun && (
             <button style={styles.newRunBtn} onClick={() => setShowModal(true)}>
-              + 새 테스트 수행 만들기
+              {t("newRun")}
             </button>
           )}
         </div>
@@ -938,7 +943,7 @@ export default function TestRunManager({ projectId, project }: Props) {
               <button
                 style={{ ...styles.collapseBtn, marginRight: 12 }}
                 onClick={() => setPanelCollapsed(false)}
-                title="목록 펼치기"
+                title={t("showPanel")}
               >
                 ▶
               </button>
@@ -947,7 +952,7 @@ export default function TestRunManager({ projectId, project }: Props) {
               <div style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📋</div>
                 <div style={{ fontSize: 16, color: "var(--text-secondary)", marginBottom: 20 }}>
-                  등록된 테스트 수행이 없습니다.
+                  {t("noRuns")}
                 </div>
                 {canManageRun && (
                   <button
@@ -963,12 +968,12 @@ export default function TestRunManager({ projectId, project }: Props) {
                     }}
                     onClick={() => setShowModal(true)}
                   >
-                    + 새 테스트 수행 만들기
+                    {t("newRun")}
                   </button>
                 )}
               </div>
             ) : (
-              "왼쪽에서 테스트 수행을 선택하세요."
+              t("selectRun")
             )}
           </div>
         ) : (
@@ -978,7 +983,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 <button
                   style={{ ...styles.collapseBtn, marginRight: 8 }}
                   onClick={() => setPanelCollapsed(false)}
-                  title="목록 펼치기"
+                  title={t("showPanel")}
                 >
                   ▶
                 </button>
@@ -986,19 +991,19 @@ export default function TestRunManager({ projectId, project }: Props) {
               <div>
                 <h3 style={styles.runHeaderTitle}>{selectedRun.name}</h3>
                 <div style={styles.runHeaderMeta}>
-                  버전: {selectedRun.version || "-"} | 환경:{" "}
-                  {selectedRun.environment || "-"} | 라운드: R{selectedRun.round}
+                  {t("version")}: {selectedRun.version || "-"} | {t("environment")}:{" "}
+                  {selectedRun.environment || "-"} | {t("round")}: R{selectedRun.round}
                 </div>
               </div>
               <div style={styles.runActions}>
                 {canDeleteRun && (
                   <button style={styles.btnDanger} onClick={handleDelete}>
-                    삭제
+                    {t("deleteRun")}
                   </button>
                 )}
                 {canManageRun && (
                   <button style={styles.btnGhost} onClick={handleClone}>
-                    복제
+                    {t("cloneRun")}
                   </button>
                 )}
                 <button style={styles.btnGhost} onClick={async () => {
@@ -1011,28 +1016,28 @@ export default function TestRunManager({ projectId, project }: Props) {
                     a.download = `${selectedRun.name}_results.xlsx`;
                     a.click();
                     URL.revokeObjectURL(url);
-                    toast.success("Excel 파일 다운로드");
-                  } catch { toast.error("Excel 내보내기 실패"); }
+                    toast.success(t("excelDownload"));
+                  } catch { toast.error(t("excelExportFailed")); }
                 }}>
                   Excel
                 </button>
                 {canManageRun && (selectedRun.status !== TestRunStatus.COMPLETED ? (
                   <button style={styles.btnComplete} onClick={handleComplete}>
-                    수행 완료
+                    {t("completeRun")}
                   </button>
                 ) : (
                   <button style={{ ...styles.btnComplete, backgroundColor: "#D97706" }} onClick={async () => {
-                    if (!confirm("이 테스트 수행을 다시 진행 중으로 변경하시겠습니까?")) return;
+                    if (!confirm(t("reopenConfirm"))) return;
                     try {
                       await testRunsApi.reopen(projectId, selectedRun.id);
-                      toast.success("테스트 수행이 다시 진행 중으로 변경되었습니다.");
+                      toast.success(t("reopenSuccess"));
                       loadRuns();
                       setSelectedRun((prev) => prev ? { ...prev, status: TestRunStatus.IN_PROGRESS, completed_at: undefined } : null);
                     } catch {
-                      toast.error("상태 변경에 실패했습니다.");
+                      toast.error(t("reopenFailed"));
                     }
                   }}>
-                    다시 수행
+                    {t("reopenRun")}
                   </button>
                 ))}
               </div>
@@ -1046,7 +1051,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                     style={styles.btnGhost}
                     onClick={() => setBulkMenuOpen((v) => !v)}
                   >
-                    결과 일괄입력 ▾
+                    {t("bulkResultInput")}
                   </button>
                   {bulkMenuOpen && (
                     <div style={styles.bulkMenu}>
@@ -1066,7 +1071,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                     </div>
                   )}
                 </div>
-                <span style={styles.hintText}>P/F/B/N: 빠른 결과 입력 | Ctrl+D: 선택 행 채우기 | Ctrl+Z: 되돌리기 | Shift+Click: 범위 채우기</span>
+                <span style={styles.hintText}>{t("shortcutHint")}</span>
                 <button
                   style={{
                     ...styles.timerToggleBtn,
@@ -1078,14 +1083,14 @@ export default function TestRunManager({ projectId, project }: Props) {
                     localStorage.setItem("tc_timer_enabled", String(next));
                     if (!next) stopTimer();
                   }}
-                  title={timerEnabled ? "타이머 끄기" : "타이머 켜기"}
+                  title={timerEnabled ? t("timerOff") : t("timerOn")}
                 >
                   ⏱
                 </button>
                 {timerEnabled && timerRowId && (
                   <span style={styles.timerBadge}>
                     {timerDisplay || "0:00"}
-                    <button style={styles.timerStopBtn} onClick={stopTimer} title="타이머 정지">■</button>
+                    <button style={styles.timerStopBtn} onClick={stopTimer} title={t("timerStop")}>■</button>
                   </span>
                 )}
               </div>
@@ -1096,15 +1101,15 @@ export default function TestRunManager({ projectId, project }: Props) {
                       key={key}
                       style={{
                         ...styles.countBadge,
-                        backgroundColor: resultColors[key]?.bg || (key === "미입력" ? "rgba(220, 38, 38, 0.1)" : "var(--bg-input)"),
-                        color: resultColors[key]?.fg || (key === "미입력" ? "var(--color-fail)" : "var(--text-secondary)"),
+                        backgroundColor: resultColors[key]?.bg || (key === t("notEntered") ? "rgba(220, 38, 38, 0.1)" : "var(--bg-input)"),
+                        color: resultColors[key]?.fg || (key === t("notEntered") ? "var(--color-fail)" : "var(--text-secondary)"),
                       }}
                     >
                       {key} {count}
                     </span>
                   ))}
                 </div>
-                <span style={styles.progressText}>진행률 {completionRate}%</span>
+                <span style={styles.progressText}>{t("progressRate", { rate: completionRate })}</span>
               </div>
             </div>
 
@@ -1125,24 +1130,24 @@ export default function TestRunManager({ projectId, project }: Props) {
               <input
                 style={styles.filterInput}
                 type="text"
-                placeholder="검색 (TC ID, Steps, Expected...)"
+                placeholder={t("searchPlaceholder")}
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
               />
               <select style={styles.filterSelect} value={filterResult} onChange={(e) => setFilterResult(e.target.value)}>
-                <option value="">Result: 전체</option>
-                {["PASS", "FAIL", "BLOCK", "N/A", "미입력"].map((v) => (
+                <option value="">{t("resultFilter")}</option>
+                {["PASS", "FAIL", "BLOCK", "N/A", t("notEntered")].map((v) => (
                   <option key={v} value={v}>{v}</option>
                 ))}
               </select>
               <select style={styles.filterSelect} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                <option value="">Category: 전체</option>
+                <option value="">{t("categoryFilter")}</option>
                 {categoryOptions.map((v) => (
                   <option key={v} value={v}>{v}</option>
                 ))}
               </select>
               <select style={styles.filterSelect} value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
-                <option value="">Priority: 전체</option>
+                <option value="">{t("priorityFilter")}</option>
                 {priorityOptions.map((v) => (
                   <option key={v} value={v}>{v}</option>
                 ))}
@@ -1152,7 +1157,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                   style={styles.filterClearBtn}
                   onClick={() => { setFilterText(""); setFilterResult(""); setFilterCategory(""); setFilterPriority(""); }}
                 >
-                  초기화
+                  {t("common:reset")}
                 </button>
               )}
             </div>
@@ -1165,9 +1170,9 @@ export default function TestRunManager({ projectId, project }: Props) {
               onDrop={(e) => {
                 e.preventDefault();
                 const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
-                if (files.length === 0) { toast.error("이미지 파일만 드롭할 수 있습니다."); return; }
+                if (files.length === 0) { toast.error(t("imageDropOnly")); return; }
                 const focused = gridApiRef.current?.getFocusedCell();
-                if (!focused) { toast.error("먼저 그리드 행을 선택해 주세요."); return; }
+                if (!focused) { toast.error(t("selectGridRow")); return; }
                 const node = gridApiRef.current?.getDisplayedRowAtIndex(focused.rowIndex);
                 const resultId = node?.data?.id;
                 if (!resultId) return;
@@ -1176,21 +1181,21 @@ export default function TestRunManager({ projectId, project }: Props) {
                     const att = await attachmentsApi.upload(resultId, file);
                     setAttachmentsMap((prev) => ({ ...prev, [resultId]: [...(prev[resultId] || []), att] }));
                     gridApiRef.current?.refreshCells({ force: true });
-                    toast.success(`"${file.name}" 첨부 완료`);
-                  } catch { toast.error(`"${file.name}" 업로드 실패`); }
+                    toast.success(t("fileAttached", { name: file.name }));
+                  } catch { toast.error(t("fileUploadFailed", { name: file.name })); }
                 });
               }}
             >
               {loadingResults ? (
                 <div style={{ textAlign: "center", padding: 40, color: "var(--text-secondary)" }}>
-                  불러오는 중...
+                  {t("common:loadingData")}
                 </div>
               ) : (
                 <AgGridReact
                   rowData={results}
                   columnDefs={columnDefs}
                   defaultColDef={defaultColDef}
-                  localeText={AG_GRID_LOCALE_KO}
+                  localeText={gridLocale}
                   rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true }}
                   onGridReady={(params: GridReadyEvent) => {
                     gridApiRef.current = params.api;
@@ -1240,7 +1245,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 }}
                 onClick={() => setActiveSheet(null)}
               >
-                전체
+                {t("common:all")}
                 <span style={sheetTabStyles.badge}>{sheets.reduce((a, s) => a + s.tc_count, 0)}</span>
               </div>
             )}
@@ -1310,7 +1315,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 objectFit: "contain",
                 borderRadius: 8,
               }}
-              onError={() => toast.error("이미지를 표시할 수 없습니다.")}
+              onError={() => toast.error(t("imageDisplayFailed"))}
             />
           </div>
         </div>
@@ -1320,33 +1325,33 @@ export default function TestRunManager({ projectId, project }: Props) {
       {showModal && (
         <div style={styles.overlay} onClick={() => setShowModal(false)}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>새 테스트 수행</h2>
+            <h2 style={styles.modalTitle}>{t("createTitle")}</h2>
             <form onSubmit={handleCreateRun} style={styles.modalForm}>
-              <label style={styles.label}>수행 이름 *</label>
+              <label style={styles.label}>{t("runName")}</label>
               <input
                 style={styles.input}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="예: Sprint 5 기능 테스트"
+                placeholder={t("runNamePlaceholder")}
                 autoFocus
               />
-              <label style={styles.label}>버전</label>
+              <label style={styles.label}>{t("version")}</label>
               <input
                 style={styles.input}
                 value={form.version}
                 onChange={(e) => setForm({ ...form, version: e.target.value })}
-                placeholder="예: v1.2.0"
+                placeholder={t("versionPlaceholder")}
               />
-              <label style={styles.label}>환경</label>
+              <label style={styles.label}>{t("environment")}</label>
               <input
                 style={styles.input}
                 value={form.environment}
                 onChange={(e) =>
                   setForm({ ...form, environment: e.target.value })
                 }
-                placeholder="예: Staging"
+                placeholder={t("environmentPlaceholder")}
               />
-              <label style={styles.label}>라운드</label>
+              <label style={styles.label}>{t("round")}</label>
               <select
                 style={styles.input}
                 value={form.round}
@@ -1364,14 +1369,14 @@ export default function TestRunManager({ projectId, project }: Props) {
                   style={styles.cancelBtn}
                   onClick={() => setShowModal(false)}
                 >
-                  취소
+                  {t("common:cancel")}
                 </button>
                 <button
                   type="submit"
                   style={styles.submitBtn}
                   disabled={creating}
                 >
-                  {creating ? "생성 중..." : "생성"}
+                  {creating ? t("common:creating") : t("common:create")}
                 </button>
               </div>
             </form>

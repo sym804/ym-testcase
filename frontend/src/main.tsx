@@ -19,6 +19,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
+import "./i18n";
 import "./index.css";
 
 // Register Chart.js components

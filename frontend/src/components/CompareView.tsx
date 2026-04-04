@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { testRunsApi } from "../api";
 import type { TestRun, TestResult } from "../types";
 import toast from "react-hot-toast";
@@ -21,6 +22,7 @@ function displayResult(val: string) {
 }
 
 export default function CompareView({ projectId }: Props) {
+  const { t } = useTranslation("compare");
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [leftRunId, setLeftRunId] = useState<number | null>(null);
   const [rightRunId, setRightRunId] = useState<number | null>(null);
@@ -30,7 +32,7 @@ export default function CompareView({ projectId }: Props) {
   const [filterMode, setFilterMode] = useState<"all" | "changed" | "regression">("all");
 
   useEffect(() => {
-    testRunsApi.list(projectId).then(setRuns).catch(() => toast.error("수행 목록 로드 실패"));
+    testRunsApi.list(projectId).then(setRuns).catch(() => toast.error(t("runLoadFailed")));
   }, [projectId]);
 
   const loadResults = useCallback(async () => {
@@ -49,7 +51,7 @@ export default function CompareView({ projectId }: Props) {
       setRightResults((rightDetail.results || []).map(mapResult));
     } catch (err) {
       console.error(err);
-      toast.error("결과 로드 실패");
+      toast.error(t("resultLoadFailed"));
     } finally {
       setLoading(false);
     }
@@ -102,13 +104,13 @@ export default function CompareView({ projectId }: Props) {
       {/* Run selectors */}
       <div style={styles.selectorBar}>
         <div style={styles.selectorGroup}>
-          <label style={styles.selectorLabel}>기준 수행 (Left)</label>
+          <label style={styles.selectorLabel}>{t("baseRun")}</label>
           <select
             style={styles.selector}
             value={leftRunId || ""}
             onChange={(e) => setLeftRunId(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">선택...</option>
+            <option value="">{t("selectPlaceholder")}</option>
             {runs.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name} (R{r.round})
@@ -118,13 +120,13 @@ export default function CompareView({ projectId }: Props) {
         </div>
         <span style={{ fontSize: 20, color: "#94A3B8", fontWeight: 700 }}>vs</span>
         <div style={styles.selectorGroup}>
-          <label style={styles.selectorLabel}>비교 수행 (Right)</label>
+          <label style={styles.selectorLabel}>{t("compareRun")}</label>
           <select
             style={styles.selector}
             value={rightRunId || ""}
             onChange={(e) => setRightRunId(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">선택...</option>
+            <option value="">{t("selectPlaceholder")}</option>
             {runs.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name} (R{r.round})
@@ -135,22 +137,22 @@ export default function CompareView({ projectId }: Props) {
       </div>
 
       {(!leftRunId || !rightRunId) && (
-        <div style={styles.placeholder}>두 개의 테스트 수행을 선택하면 비교 결과가 표시됩니다.</div>
+        <div style={styles.placeholder}>{t("selectBothRuns")}</div>
       )}
 
       {leftRunId && rightRunId && !loading && comparedRows.length > 0 && (
         <>
           {/* Stats */}
           <div style={styles.statsBar}>
-            <span style={styles.statBadge}>전체 {stats.total}</span>
+            <span style={styles.statBadge}>{t("total", { count: stats.total })}</span>
             <span style={{ ...styles.statBadge, backgroundColor: "var(--bg-warning-light)", color: "var(--text-warning)" }}>
-              변경 {stats.changed}
+              {t("changed", { count: stats.changed })}
             </span>
             <span style={{ ...styles.statBadge, backgroundColor: "var(--bg-danger-light)", color: "var(--text-danger)" }}>
-              퇴보 {stats.regression}
+              {t("regression", { count: stats.regression })}
             </span>
             <span style={{ ...styles.statBadge, backgroundColor: "var(--bg-success-light)", color: "var(--text-success)" }}>
-              개선 {stats.improved}
+              {t("improved", { count: stats.improved })}
             </span>
             <div style={{ flex: 1 }} />
             <div style={styles.filterGroup}>
@@ -163,7 +165,7 @@ export default function CompareView({ projectId }: Props) {
                   }}
                   onClick={() => setFilterMode(mode)}
                 >
-                  {mode === "all" ? "전체" : mode === "changed" ? "변경만" : "퇴보만"}
+                  {mode === "all" ? t("filterAll") : mode === "changed" ? t("filterChanged") : t("filterRegression")}
                 </button>
               ))}
             </div>
@@ -184,7 +186,7 @@ export default function CompareView({ projectId }: Props) {
                   <th style={{ ...styles.th, width: 110, textAlign: "center" }}>
                     {rightRun ? `${rightRun.name}` : "Right"}
                   </th>
-                  <th style={{ ...styles.th, width: 60, textAlign: "center" }}>변경</th>
+                  <th style={{ ...styles.th, width: 60, textAlign: "center" }}>{t("change")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -249,7 +251,7 @@ export default function CompareView({ projectId }: Props) {
       )}
 
       {loading && (
-        <div style={styles.placeholder}>비교 데이터를 불러오는 중...</div>
+        <div style={styles.placeholder}>{t("loadingCompare")}</div>
       )}
     </div>
   );

@@ -12,7 +12,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 from database import get_db
-from models import User, Project, TestCase, TestRun, TestResult, TestRunStatus, TestResultValue, Attachment, Notification, ProjectMember
+from models import User, Project, TestCase, TestRun, TestResult, TestRunStatus, TestResultValue, Attachment
 from schemas import (
     TestRunCreate, TestRunUpdate, TestRunResponse, TestRunListResponse,
     TestResultCreate, TestResultResponse,
@@ -256,36 +256,6 @@ def complete_testrun(
 
     run.status = TestRunStatus.completed
     run.completed_at = now_kst()
-
-    # 알림 생성
-    fail_count = db.query(TestResult).filter(
-        TestResult.test_run_id == run_id,
-        TestResult.result == TestResultValue.FAIL,
-    ).count()
-
-    total_count = db.query(TestResult).filter(
-        TestResult.test_run_id == run_id,
-    ).count()
-
-    pass_count = db.query(TestResult).filter(
-        TestResult.test_run_id == run_id,
-        TestResult.result == TestResultValue.PASS,
-    ).count()
-
-    if fail_count > 0:
-        msg = f"[{run.name}] 완료 - FAIL {fail_count}건 / 전체 {total_count}건"
-    else:
-        msg = f"[{run.name}] 완료 - PASS {pass_count}/{total_count}건"
-
-    link = f"/projects/{project_id}?tab=run&run={run_id}"
-
-    member_user_ids = {m.user_id for m in db.query(ProjectMember).filter(
-        ProjectMember.project_id == project_id
-    ).all()}
-    member_user_ids.add(run.created_by)
-
-    for uid in member_user_ids:
-        db.add(Notification(user_id=uid, message=msg, link=link))
 
     db.commit()
     db.refresh(run)

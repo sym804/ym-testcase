@@ -1,0 +1,17 @@
+{
+  "baseRun": "Base Run (Left)",
+  "compareRun": "Compare Run (Right)",
+  "selectPlaceholder": "Select...",
+  "selectBothRuns": "Select two test runs to compare results.",
+  "loadingCompare": "Loading comparison data...",
+  "runLoadFailed": "Failed to load run list",
+  "resultLoadFailed": "Failed to load results",
+  "total": "Total {{count}}",
+  "changed": "Changed {{count}}",
+  "regression": "Regression {{count}}",
+  "improved": "Improved {{count}}",
+  "filterAll": "All",
+  "filterChanged": "Changed Only",
+  "filterRegression": "Regression Only",
+  "change": "Change"
+}

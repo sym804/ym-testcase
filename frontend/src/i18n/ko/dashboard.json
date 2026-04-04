@@ -1,0 +1,20 @@
+{
+  "loadFailed": "대시보드 데이터를 불러오지 못했습니다.",
+  "testRun": "테스트 수행:",
+  "all": "전체",
+  "days7": "7일",
+  "days30": "30일",
+  "days90": "90일",
+  "totalTC": "전체 TC",
+  "notStarted": "미수행",
+  "resultDistribution": "결과 분포",
+  "roundComparison": "라운드별 비교",
+  "passFailTrend": "Pass/Fail Rate 추이",
+  "priorityDistribution": "우선순위별 분포",
+  "categoryDistribution": "카테고리별 분포",
+  "assigneeStatus": "담당자별 현황",
+  "assignee": "담당자",
+  "completionRate": "완료율",
+  "heatmapTitle": "결함 밀집 히트맵 (Category x Priority)",
+  "categoryPriority": "Category \\ Priority"
+}

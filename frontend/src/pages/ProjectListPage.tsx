@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { projectsApi, overviewApi } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import type { Project } from "../types";
@@ -43,8 +44,8 @@ const RESULT_COLORS = {
   not_started: "#D1D5DB",
 };
 
-function ProgressBar({ data }: { data: { pass: number; fail: number; block: number; na: number; not_started: number; total: number } }) {
-  if (data.total === 0) return <div style={s.barEmpty}>TC 없음</div>;
+function ProgressBar({ data, noTcLabel }: { data: { pass: number; fail: number; block: number; na: number; not_started: number; total: number }; noTcLabel?: string }) {
+  if (data.total === 0) return <div style={s.barEmpty}>{noTcLabel || "No TC"}</div>;
   const segments = [
     { key: "pass", val: data.pass, color: RESULT_COLORS.pass },
     { key: "fail", val: data.fail, color: RESULT_COLORS.fail },
@@ -74,6 +75,7 @@ function ProgressBar({ data }: { data: { pass: number; fail: number; block: numb
 
 export default function ProjectListPage() {
   const { user } = useAuth();
+  const { t, i18n } = useTranslation("project");
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [overview, setOverview] = useState<OverviewData | null>(null);
@@ -94,7 +96,7 @@ export default function ProjectListPage() {
       setOverview(ov);
     } catch (err) {
       console.error(err);
-      toast.error("데이터를 불러오지 못했습니다.");
+      toast.error(t("loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -107,23 +109,23 @@ export default function ProjectListPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      toast.error("프로젝트 이름을 입력해 주세요.");
+      toast.error(t("nameRequired"));
       return;
     }
     if (form.name.trim().length > 100) {
-      toast.error("프로젝트 이름은 100자 이내로 입력해 주세요.");
+      toast.error(t("nameMaxLength"));
       return;
     }
     setCreating(true);
     try {
       await projectsApi.create(form);
-      toast.success("프로젝트가 생성되었습니다.");
+      toast.success(t("createSuccess"));
       setShowModal(false);
       setForm({ name: "", description: "", jira_base_url: "", is_private: false });
       loadData();
     } catch (err) {
       console.error(err);
-      toast.error("프로젝트 생성에 실패했습니다.");
+      toast.error(t("createFailed"));
     } finally {
       setCreating(false);
     }
@@ -141,7 +143,7 @@ export default function ProjectListPage() {
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     const names = projects.filter((p) => selectedIds.has(p.id)).map((p) => p.name);
-    if (!confirm(`${names.length}개 프로젝트를 삭제하시겠습니까?\n\n${names.join("\n")}\n\n이 작업은 되돌릴 수 없습니다.`)) return;
+    if (!confirm(t("deleteConfirm", { count: names.length, names: names.join("\n") }))) return;
     setDeleting(true);
     let deleted = 0;
     for (const id of selectedIds) {
@@ -152,7 +154,7 @@ export default function ProjectListPage() {
         console.error(`Failed to delete project ${id}`, err);
       }
     }
-    toast.success(`${deleted}개 프로젝트가 삭제되었습니다.`);
+    toast.success(t("deleteSuccess", { count: deleted }));
     setSelectedIds(new Set());
     setDeleting(false);
     loadData();
@@ -169,24 +171,24 @@ export default function ProjectListPage() {
         {/* ── 전체 대시보드 ── */}
         {!loading && sm && (
           <section style={s.section}>
-            <h2 style={s.sectionTitle}>전체 현황</h2>
+            <h2 style={s.sectionTitle}>{t("overview")}</h2>
 
             {/* Summary cards */}
             <div style={s.summaryGrid}>
               <div style={s.summaryCard}>
-                <div style={s.summaryLabel}>전체 프로젝트</div>
+                <div style={s.summaryLabel}>{t("totalProjects")}</div>
                 <div style={s.summaryValue}>{sm.total_projects}</div>
               </div>
               <div style={s.summaryCard}>
-                <div style={s.summaryLabel}>전체 TC</div>
+                <div style={s.summaryLabel}>{t("totalTC")}</div>
                 <div style={s.summaryValue}>{sm.total_tc}</div>
               </div>
               <div style={s.summaryCard}>
-                <div style={s.summaryLabel}>진행률</div>
+                <div style={s.summaryLabel}>{t("progress")}</div>
                 <div style={{ ...s.summaryValue, color: "var(--accent)" }}>{sm.progress}%</div>
               </div>
               <div style={s.summaryCard}>
-                <div style={s.summaryLabel}>Pass Rate</div>
+                <div style={s.summaryLabel}>{t("passRate")}</div>
                 <div style={{ ...s.summaryValue, color: RESULT_COLORS.pass }}>{sm.pass_rate}%</div>
               </div>
             </div>
@@ -198,9 +200,9 @@ export default function ProjectListPage() {
                 <span style={{ ...s.legend, color: RESULT_COLORS.fail }}>FAIL {sm.fail}</span>
                 <span style={{ ...s.legend, color: RESULT_COLORS.block }}>BLOCK {sm.block}</span>
                 <span style={{ ...s.legend, color: RESULT_COLORS.na }}>N/A {sm.na}</span>
-                <span style={{ ...s.legend, color: "#94A3B8" }}>미수행 {sm.not_started}</span>
+                <span style={{ ...s.legend, color: "#94A3B8" }}>{t("notStarted")} {sm.not_started}</span>
               </div>
-              <ProgressBar data={{ ...sm, total: sm.total_tc }} />
+              <ProgressBar data={{ ...sm, total: sm.total_tc }} noTcLabel={t("noTC")} />
             </div>
 
             {/* 프로젝트 추가/삭제 버튼 */}
@@ -208,11 +210,11 @@ export default function ProjectListPage() {
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
                 {selectedIds.size > 0 && (
                   <button style={s.deleteBtn} onClick={handleBulkDelete} disabled={deleting}>
-                    {deleting ? "삭제 중..." : `${selectedIds.size}개 삭제`}
+                    {deleting ? t("common:deleting") : t("deleteCount", { count: selectedIds.size })}
                   </button>
                 )}
                 <button style={s.newBtn} onClick={() => setShowModal(true)}>
-                  + 새 프로젝트
+                  {t("newProject")}
                 </button>
               </div>
             )}
@@ -240,14 +242,14 @@ export default function ProjectListPage() {
                           />
                         </th>
                       )}
-                      <th style={s.th}>프로젝트</th>
+                      <th style={s.th}>{t("table.project")}</th>
                       <th style={{ ...s.th, ...s.thNum }}>TC</th>
                       <th style={{ ...s.th, ...s.thNum }}>PASS</th>
                       <th style={{ ...s.th, ...s.thNum }}>FAIL</th>
                       <th style={{ ...s.th, ...s.thNum }}>BLOCK</th>
                       <th style={{ ...s.th, ...s.thNum }}>N/A</th>
-                      <th style={{ ...s.th, ...s.thNum }}>미수행</th>
-                      <th style={{ ...s.th, width: 200 }}>진행</th>
+                      <th style={{ ...s.th, ...s.thNum }}>{t("notStarted")}</th>
+                      <th style={{ ...s.th, width: 200 }}>{t("table.progress")}</th>
                       <th style={{ ...s.th, ...s.thNum }}>Pass Rate</th>
                     </tr>
                   </thead>
@@ -280,7 +282,7 @@ export default function ProjectListPage() {
                         <td style={s.tdNum}>{p.not_started}</td>
                         <td style={s.td}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <ProgressBar data={p} />
+                            <ProgressBar data={p} noTcLabel={t("noTC")} />
                             <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{p.progress}%</span>
                           </div>
                         </td>
@@ -299,12 +301,12 @@ export default function ProjectListPage() {
 
         {/* ── 프로젝트 목록 ── */}
         <section style={s.section}>
-          <h2 style={{ ...s.sectionTitle, marginBottom: 16 }}>프로젝트</h2>
+          <h2 style={{ ...s.sectionTitle, marginBottom: 16 }}>{t("projects")}</h2>
 
           {loading ? (
-            <div style={s.loading}>불러오는 중...</div>
+            <div style={s.loading}>{t("common:loadingData")}</div>
           ) : projects.length === 0 ? (
-            <div style={s.empty}>등록된 프로젝트가 없습니다.</div>
+            <div style={s.empty}>{t("noProjects")}</div>
           ) : (
             <div style={s.grid}>
               {projects.map((p) => {
@@ -331,10 +333,10 @@ export default function ProjectListPage() {
                   >
                     <div style={s.cardAccent} />
                     <h3 style={s.cardTitle}>{p.name}</h3>
-                    <p style={s.cardDesc}>{p.description || "설명 없음"}</p>
+                    <p style={s.cardDesc}>{p.description || t("noDescription")}</p>
                     {ps && (
                       <div style={s.cardStats}>
-                        <ProgressBar data={ps} />
+                        <ProgressBar data={ps} noTcLabel={t("noTC")} />
                         <div style={s.cardStatRow}>
                           <span>TC {ps.total}</span>
                           <span style={{ color: RESULT_COLORS.pass }}>P {ps.pass}</span>
@@ -346,7 +348,7 @@ export default function ProjectListPage() {
                     <div style={s.cardDate}>
                       {(() => {
                         const d = new Date(p.created_at);
-                        return isNaN(d.getTime()) ? "-" : d.toLocaleDateString("ko-KR");
+                        return isNaN(d.getTime()) ? "-" : d.toLocaleDateString(i18n.language === "ko" ? "ko-KR" : "en-US");
                       })()}
                     </div>
                   </div>
@@ -361,29 +363,29 @@ export default function ProjectListPage() {
       {showModal && (
         <div style={s.overlay} onClick={() => setShowModal(false)}>
           <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 style={s.modalTitle}>새 프로젝트</h2>
+            <h2 style={s.modalTitle}>{t("createProject")}</h2>
             <form onSubmit={handleCreate} style={s.modalForm}>
-              <label style={s.label}>프로젝트 이름 *</label>
+              <label style={s.label}>{t("projectName")}</label>
               <input
                 style={s.input}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="프로젝트 이름"
+                placeholder={t("projectNamePlaceholder")}
                 autoFocus
               />
-              <label style={s.label}>설명</label>
+              <label style={s.label}>{t("description")}</label>
               <textarea
                 style={{ ...s.input, minHeight: 80, resize: "vertical" as const }}
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="프로젝트 설명"
+                placeholder={t("descriptionPlaceholder")}
               />
-              <label style={s.label}>Jira Base URL</label>
+              <label style={s.label}>{t("jiraBaseUrl")}</label>
               <input
                 style={s.input}
                 value={form.jira_base_url}
                 onChange={(e) => setForm({ ...form, jira_base_url: e.target.value })}
-                placeholder="https://your-domain.atlassian.net"
+                placeholder={t("jiraBaseUrlPlaceholder")}
               />
               <label style={{ ...s.label, display: "flex", alignItems: "center", gap: 8, marginTop: 16 }}>
                 <input
@@ -392,7 +394,7 @@ export default function ProjectListPage() {
                   onChange={(e) => setForm({ ...form, is_private: e.target.checked })}
                   style={{ width: 16, height: 16 }}
                 />
-                비공개 프로젝트 (멤버만 접근 가능)
+                {t("privateProject")}
               </label>
               <div style={s.modalActions}>
                 <button
@@ -400,10 +402,10 @@ export default function ProjectListPage() {
                   style={s.cancelBtn}
                   onClick={() => setShowModal(false)}
                 >
-                  취소
+                  {t("common:cancel")}
                 </button>
                 <button type="submit" style={s.submitBtn} disabled={creating}>
-                  {creating ? "생성 중..." : "생성"}
+                  {creating ? t("common:creating") : t("common:create")}
                 </button>
               </div>
             </form>

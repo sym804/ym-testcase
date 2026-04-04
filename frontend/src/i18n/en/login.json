@@ -1,0 +1,15 @@
+{
+  "title": "Login",
+  "username": "Username",
+  "password": "Password",
+  "usernamePlaceholder": "Enter your username",
+  "passwordPlaceholder": "Enter your password",
+  "rememberMe": "Remember me",
+  "submit": "Login",
+  "submitting": "Logging in...",
+  "emptyFields": "Please enter your username and password.",
+  "loginFailed": "Login failed.",
+  "noAccount": "Don't have an account?",
+  "register": "Sign up",
+  "forgotPassword": "If you forgot your password, please contact the administrator for a reset."
+}

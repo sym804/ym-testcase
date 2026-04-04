@@ -1,0 +1,23 @@
+{
+  "title": "회원가입",
+  "username": "아이디",
+  "displayName": "표시 이름",
+  "password": "비밀번호",
+  "confirmPassword": "비밀번호 확인",
+  "usernamePlaceholder": "아이디를 입력하세요",
+  "displayNamePlaceholder": "표시될 이름을 입력하세요",
+  "passwordPlaceholder": "비밀번호를 입력하세요",
+  "confirmPasswordPlaceholder": "비밀번호를 다시 입력하세요",
+  "submit": "회원가입",
+  "submitting": "처리 중...",
+  "allFieldsRequired": "모든 필드를 입력해 주세요.",
+  "usernameTaken": "이미 사용 중인 아이디입니다.",
+  "passwordMinLength": "비밀번호는 8자 이상이어야 합니다.",
+  "passwordMismatch": "비밀번호가 일치하지 않습니다.",
+  "registerSuccess": "회원가입이 완료되었습니다. 로그인해 주세요.",
+  "registerFailed": "회원가입에 실패했습니다.",
+  "checking": "확인 중...",
+  "usernameAvailable": "사용 가능한 아이디입니다.",
+  "hasAccount": "이미 계정이 있으신가요?",
+  "login": "로그인"
+}

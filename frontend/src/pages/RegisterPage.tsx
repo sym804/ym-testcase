@@ -1,12 +1,15 @@
 import { useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import { authApi } from "../api";
 import toast from "react-hot-toast";
 import PasswordInput from "../components/PasswordInput";
+import { translateError } from "../utils/errorMessage";
 
 export default function RegisterPage() {
   const { register } = useAuth();
+  const { t } = useTranslation("register");
   const navigate = useNavigate();
   const [form, setForm] = useState({
     username: "",
@@ -45,32 +48,29 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     if (!form.username || !form.password || !form.display_name) {
-      setError("모든 필드를 입력해 주세요.");
+      setError(t("allFieldsRequired"));
       return;
     }
     if (usernameStatus === "taken") {
-      setError("이미 사용 중인 아이디입니다.");
+      setError(t("usernameTaken"));
       return;
     }
     if (form.password.length < 8) {
-      setError("비밀번호는 8자 이상이어야 합니다.");
+      setError(t("passwordMinLength"));
       return;
     }
     if (form.password !== form.confirm_password) {
-      setError("비밀번호가 일치하지 않습니다.");
+      setError(t("passwordMismatch"));
       return;
     }
     setLoading(true);
     try {
       await register(form);
-      toast.success("회원가입이 완료되었습니다. 로그인해 주세요.");
+      toast.success(t("registerSuccess"));
       navigate("/login");
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ||
-        (err instanceof Error ? err.message : "회원가입에 실패했습니다.");
-      setError(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail ? translateError(detail) : (err instanceof Error ? err.message : t("registerFailed")));
     } finally {
       setLoading(false);
     }
@@ -79,69 +79,69 @@ export default function RegisterPage() {
   return (
     <div style={styles.wrapper}>
       <div style={styles.headerBar}>
-        <span style={styles.brand}>YM TestCase</span>
+        <span style={styles.brand}>{t("common:brandName")}</span>
       </div>
       <div style={styles.container}>
         <div style={styles.card}>
-          <h2 style={styles.heading}>회원가입</h2>
+          <h2 style={styles.heading}>{t("title")}</h2>
           <form onSubmit={handleSubmit} style={styles.form}>
-            <label style={styles.label}>아이디</label>
+            <label style={styles.label}>{t("username")}</label>
             <input
               style={styles.input}
               name="username"
               value={form.username}
               onChange={handleChange}
-              placeholder="아이디를 입력하세요"
+              placeholder={t("usernamePlaceholder")}
               autoFocus
             />
             {usernameStatus === "checking" && (
-              <div style={styles.checkingMsg}>확인 중...</div>
+              <div style={styles.checkingMsg}>{t("checking")}</div>
             )}
             {usernameStatus === "available" && (
-              <div style={styles.availableMsg}>사용 가능한 아이디입니다.</div>
+              <div style={styles.availableMsg}>{t("usernameAvailable")}</div>
             )}
             {usernameStatus === "taken" && (
-              <div style={styles.takenMsg}>이미 사용 중인 아이디입니다.</div>
+              <div style={styles.takenMsg}>{t("usernameTaken")}</div>
             )}
-            <label style={styles.label}>표시 이름</label>
+            <label style={styles.label}>{t("displayName")}</label>
             <input
               style={styles.input}
               name="display_name"
               value={form.display_name}
               onChange={handleChange}
-              placeholder="표시될 이름을 입력하세요"
+              placeholder={t("displayNamePlaceholder")}
             />
-            <label style={styles.label}>비밀번호</label>
+            <label style={styles.label}>{t("password")}</label>
             <PasswordInput
               style={styles.input}
               name="password"
               value={form.password}
               onChange={handleChange}
-              placeholder="비밀번호를 입력하세요"
+              placeholder={t("passwordPlaceholder")}
             />
-            <label style={styles.label}>비밀번호 확인</label>
+            <label style={styles.label}>{t("confirmPassword")}</label>
             <PasswordInput
               style={styles.input}
               name="confirm_password"
               value={form.confirm_password}
               onChange={handleChange}
-              placeholder="비밀번호를 다시 입력하세요"
+              placeholder={t("confirmPasswordPlaceholder")}
             />
             {form.password && form.password.length < 8 && (
-              <div style={styles.hintMsg}>비밀번호는 8자 이상이어야 합니다.</div>
+              <div style={styles.hintMsg}>{t("passwordMinLength")}</div>
             )}
             {form.password && form.confirm_password && form.password !== form.confirm_password && (
-              <div style={styles.hintMsg}>비밀번호가 일치하지 않습니다.</div>
+              <div style={styles.hintMsg}>{t("passwordMismatch")}</div>
             )}
             {error && <div style={styles.errorMsg}>{error}</div>}
             <button type="submit" style={styles.submitBtn} disabled={loading}>
-              {loading ? "처리 중..." : "회원가입"}
+              {loading ? t("submitting") : t("submit")}
             </button>
           </form>
           <div style={styles.footer}>
-            이미 계정이 있으신가요?{" "}
+            {t("hasAccount")}{" "}
             <Link to="/login" style={styles.link}>
-              로그인
+              {t("login")}
             </Link>
           </div>
         </div>

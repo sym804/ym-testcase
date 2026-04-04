@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import PasswordInput from "./PasswordInput";
+import { translateError } from "../utils/errorMessage";
 
 export default function ChangePasswordModal() {
   const { changePassword, logout } = useAuth();
+  const { t } = useTranslation("header");
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -19,10 +22,8 @@ export default function ChangePasswordModal() {
     try {
       await changePassword(currentPw, newPw);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || "비밀번호 변경에 실패했습니다.";
-      setError(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail ? translateError(detail) : t("passwordChangeFailed"));
     } finally {
       setLoading(false);
     }
@@ -31,45 +32,45 @@ export default function ChangePasswordModal() {
   return (
     <div style={s.wrapper}>
       <div style={s.headerBar}>
-        <span style={s.brand}>YM TestCase</span>
+        <span style={s.brand}>{t("common:brandName")}</span>
       </div>
       <div style={s.container}>
         <div style={s.card}>
           <div style={s.icon}>!</div>
-          <h2 style={s.heading}>비밀번호 변경 필요</h2>
+          <h2 style={s.heading}>{t("changePasswordRequired")}</h2>
           <p style={s.desc}>
-            보안을 위해 기본 비밀번호를 변경해야 합니다.
-            <br />
-            8자 이상의 새 비밀번호를 설정해 주세요.
+            {t("changePasswordRequiredDesc").split("\n").map((line: string, i: number) => (
+              <span key={i}>{line}{i === 0 && <br />}</span>
+            ))}
           </p>
           <form onSubmit={handleSubmit} style={s.form}>
-            <label style={s.label}>현재 비밀번호</label>
+            <label style={s.label}>{t("currentPassword")}</label>
             <PasswordInput
               style={s.input}
               value={currentPw}
               onChange={(e) => { setCurrentPw(e.target.value); setError(""); }}
-              placeholder="현재 비밀번호"
+              placeholder={t("currentPasswordPlaceholder")}
               autoFocus
             />
-            <label style={s.label}>새 비밀번호</label>
+            <label style={s.label}>{t("newPassword")}</label>
             <PasswordInput
               style={s.input}
               value={newPw}
               onChange={(e) => { setNewPw(e.target.value); setError(""); }}
-              placeholder="8자 이상"
+              placeholder={t("newPasswordPlaceholder")}
             />
-            <label style={s.label}>새 비밀번호 확인</label>
+            <label style={s.label}>{t("newPasswordConfirm")}</label>
             <PasswordInput
               style={s.input}
               value={confirmPw}
               onChange={(e) => { setConfirmPw(e.target.value); setError(""); }}
-              placeholder="새 비밀번호 재입력"
+              placeholder={t("newPasswordConfirmPlaceholder")}
             />
             {newPw && newPw.length < 8 && (
-              <div style={s.hintMsg}>8자 이상 입력해 주세요.</div>
+              <div style={s.hintMsg}>{t("minLengthHint")}</div>
             )}
             {newPw && confirmPw && newPw !== confirmPw && (
-              <div style={s.hintMsg}>비밀번호가 일치하지 않습니다.</div>
+              <div style={s.hintMsg}>{t("passwordMismatch")}</div>
             )}
             {error && <div style={s.errorMsg}>{error}</div>}
             <button
@@ -80,11 +81,11 @@ export default function ChangePasswordModal() {
               }}
               disabled={loading || !currentPw || newPw.length < 8 || newPw !== confirmPw}
             >
-              {loading ? "변경 중..." : "비밀번호 변경"}
+              {loading ? t("changing") : t("changePasswordSubmit")}
             </button>
           </form>
           <button style={s.logoutBtn} onClick={logout}>
-            로그아웃
+            {t("logout")}
           </button>
         </div>
       </div>

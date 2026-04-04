@@ -1,0 +1,49 @@
+{
+  "title": "User Management",
+  "permissionRequired": "Admin permission required.",
+  "loadFailed": "Failed to load user list.",
+  "columns": {
+    "id": "ID",
+    "username": "Username",
+    "displayName": "Display Name",
+    "systemRole": "System Role",
+    "projectAssignment": "Project Assignment",
+    "joinDate": "Joined",
+    "password": "Password"
+  },
+  "systemRole": {
+    "user": "User",
+    "qaManager": "QA Manager",
+    "admin": "System Admin"
+  },
+  "projectRole": {
+    "tester": "Tester",
+    "admin": "Admin"
+  },
+  "roleChanged": "Role has been changed.",
+  "roleChangeFailed": "Failed to change role.",
+  "fullAccess": "Full Access",
+  "unassigned": "Unassigned",
+  "manage": "Manage",
+  "adminTag": "Admin",
+  "testerTag": "Test",
+  "resetPassword": "Reset",
+  "resetPasswordConfirm": "Reset password for {{name}} ({{username}})?",
+  "resetPasswordFailed": "Failed to reset password.",
+  "resetPasswordDone": "Password Reset Complete",
+  "resetPasswordDesc": "A temporary password has been issued for <0>{{username}}</0>.<br/>Please share it with the user. Password change will be required on login.",
+  "assignTitle": "{{name}} Project Assignment",
+  "noAssignedProjects": "No assigned projects.",
+  "selectProject": "-- Select Project --",
+  "assignSuccess": "Assigned to project.",
+  "assignFailed": "Failed to assign.",
+  "assignAllConfirm": "Assign {{name}} to all projects as \"{{role}}\"?",
+  "assignAllSuccess": "Assigned to {{count}} project(s).",
+  "assignAllFailed": "Failed to bulk assign.",
+  "assignAllBtn": "Assign to All Projects ({{role}})",
+  "removeFromProject": "Remove",
+  "removeSuccess": "Removed from project.",
+  "removeFailed": "Failed to remove.",
+  "projectRoleChanged": "Project role has been changed.",
+  "projectRoleChangeFailed": "Failed to change role."
+}

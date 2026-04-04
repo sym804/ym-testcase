@@ -9,6 +9,7 @@ import {
 import type { User, LoginForm, RegisterForm } from "../types";
 import { authApi } from "../api";
 import toast from "react-hot-toast";
+import i18n from "../i18n";
 
 interface AuthContextType {
   user: User | null;
@@ -52,16 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (me.must_change_password) {
       setMustChangePassword(true);
     } else {
-      toast.success(`${me.display_name}님, 환영합니다!`);
+      toast.success(i18n.t("header:welcomeMessage", { name: me.display_name }));
     }
   };
 
   const register = async (form: RegisterForm) => {
     if (form.password !== form.confirm_password) {
-      throw new Error("비밀번호가 일치하지 않습니다.");
+      throw new Error(i18n.t("header:passwordMismatch"));
     }
     if (form.password.length < 8) {
-      throw new Error("비밀번호는 8자 이상이어야 합니다.");
+      throw new Error(i18n.t("header:passwordMinLength"));
     }
     await authApi.register({
       username: form.username,
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updated = await authApi.changePassword(currentPw, newPw);
     setUser(updated);
     setMustChangePassword(false);
-    toast.success("비밀번호가 변경되었습니다.");
+    toast.success(i18n.t("header:passwordChanged"));
   };
 
   const logout = async () => {
@@ -85,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     setMustChangePassword(false);
-    toast.success("로그아웃 되었습니다.");
+    toast.success(i18n.t("header:logoutSuccess"));
   };
 
   return (

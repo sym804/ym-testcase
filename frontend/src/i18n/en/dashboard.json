@@ -1,0 +1,20 @@
+{
+  "loadFailed": "Failed to load dashboard data.",
+  "testRun": "Test Run:",
+  "all": "All",
+  "days7": "7 days",
+  "days30": "30 days",
+  "days90": "90 days",
+  "totalTC": "Total TC",
+  "notStarted": "Not Started",
+  "resultDistribution": "Result Distribution",
+  "roundComparison": "Round Comparison",
+  "passFailTrend": "Pass/Fail Rate Trend",
+  "priorityDistribution": "Priority Distribution",
+  "categoryDistribution": "Category Distribution",
+  "assigneeStatus": "Assignee Status",
+  "assignee": "Assignee",
+  "completionRate": "Completion Rate",
+  "heatmapTitle": "Defect Density Heatmap (Category x Priority)",
+  "categoryPriority": "Category \\ Priority"
+}
