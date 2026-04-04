@@ -405,15 +405,15 @@ export default function UserManualPage() {
                 <tr><th style={s.th}>{t("mdImport.hm_th1")}</th><th style={s.th}>{t("mdImport.hm_th2")}</th></tr>
               </thead>
               <tbody>
-                <tr><td style={s.td}>TC ID / tc_id</td><td style={s.td}>TC ID</td></tr>
-                <tr><td style={s.td}>Category / 카테고리 / 대분류</td><td style={s.td}>Category</td></tr>
-                <tr><td style={s.td}>Priority / 우선순위</td><td style={s.td}>Priority</td></tr>
-                <tr><td style={s.td}>Test Steps / Steps / 테스트 절차</td><td style={s.td}>Test Steps</td></tr>
-                <tr><td style={s.td}>Expected Result / 기대 결과</td><td style={s.td}>Expected Result</td></tr>
-                <tr><td style={s.td}>Depth1 / Depth2</td><td style={s.td}>Depth 1 / Depth 2</td></tr>
-                <tr><td style={s.td}>Precondition / 사전조건</td><td style={s.td}>Precondition</td></tr>
-                <tr><td style={s.td}>Assignee / 담당자</td><td style={s.td}>Assignee</td></tr>
-                <tr><td style={s.td}>Remarks / 비고</td><td style={s.td}>Remarks</td></tr>
+                <tr><td style={s.td}>{t("mdImport.hm_r1_src")}</td><td style={s.td}>TC ID</td></tr>
+                <tr><td style={s.td}>{t("mdImport.hm_r2_src")}</td><td style={s.td}>Category</td></tr>
+                <tr><td style={s.td}>{t("mdImport.hm_r3_src")}</td><td style={s.td}>Priority</td></tr>
+                <tr><td style={s.td}>{t("mdImport.hm_r4_src")}</td><td style={s.td}>Test Steps</td></tr>
+                <tr><td style={s.td}>{t("mdImport.hm_r5_src")}</td><td style={s.td}>Expected Result</td></tr>
+                <tr><td style={s.td}>{t("mdImport.hm_r6_src")}</td><td style={s.td}>Depth 1 / Depth 2</td></tr>
+                <tr><td style={s.td}>{t("mdImport.hm_r7_src")}</td><td style={s.td}>Precondition</td></tr>
+                <tr><td style={s.td}>{t("mdImport.hm_r8_src")}</td><td style={s.td}>Assignee</td></tr>
+                <tr><td style={s.td}>{t("mdImport.hm_r9_src")}</td><td style={s.td}>Remarks</td></tr>
               </tbody>
             </table>
             <p style={s.p}>{t("mdImport.hm_p1")}</p>

@@ -177,7 +177,7 @@ export default function Header() {
         <button style={styles.themeBtn} onClick={toggleTheme} title={theme === "light" ? t("darkMode") : t("lightMode")}>
           {theme === "light" ? "\u{1F319}" : "\u{2600}\u{FE0F}"}
         </button>
-        <button onClick={toggleLang} title={i18n.language === "ko" ? "English" : "한국어"}
+        <button onClick={toggleLang} title={i18n.language === "ko" ? "Switch to English" : "Switch to Korean"}
           style={styles.adminBtn}>
           {i18n.language === "ko" ? "EN" : "KO"}
         </button>
