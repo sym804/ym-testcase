@@ -268,7 +268,7 @@
     "jira_th2": "TC Field",
     "h3_encoding": "6-3. Encoding Support",
     "enc_li1": "UTF-8, UTF-8 BOM, and CP949 (EUC-KR) encodings are auto-detected.",
-    "enc_li2": "Korean headers (<code>대분류</code>, <code>우선순위</code>, <code>테스트 절차</code>, etc.) are also auto-mapped.",
+    "enc_li2": "Korean headers (e.g. Category, Priority, Test Steps in Korean) are also auto-mapped.",
     "enc_li3": "<strong>Overwrite policy:</strong> If a TC ID in the import file matches an existing TC, all fields of that TC are updated with the file contents. Rows without a TC ID are added as new TCs.",
     "tip1": "<strong>TIP:</strong> Export issues from Jira as CSV: Issue search results → upper right \"Export\" → \"CSV (All fields)\""
   },
