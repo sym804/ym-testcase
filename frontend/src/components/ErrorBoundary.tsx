@@ -1,4 +1,5 @@
 import { Component, type ReactNode, type ErrorInfo } from "react";
+import i18n from "../i18n";
 
 interface Props {
   children: ReactNode;
@@ -46,9 +47,9 @@ export default class ErrorBoundary extends Component<Props, State> {
           color: "#334155",
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 22 }}>예기치 않은 오류가 발생했습니다</h2>
+        <h2 style={{ margin: 0, fontSize: 22 }}>{i18n.t("common:errorBoundary.title")}</h2>
         <p style={{ color: "#64748B", margin: 0, maxWidth: 480, textAlign: "center" }}>
-          {this.state.error?.message || "알 수 없는 오류"}
+          {this.state.error?.message || i18n.t("common:errorBoundary.unknownError")}
         </p>
         <div style={{ display: "flex", gap: 12 }}>
           <button
@@ -62,7 +63,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               fontSize: 14,
             }}
           >
-            새로고침
+            {i18n.t("common:errorBoundary.reload")}
           </button>
           <button
             onClick={this.handleGoHome}
@@ -76,7 +77,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               fontSize: 14,
             }}
           >
-            프로젝트 목록으로
+            {i18n.t("common:errorBoundary.goToProjects")}
           </button>
         </div>
       </div>

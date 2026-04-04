@@ -11,9 +11,11 @@ import {
   type CellValueChangedEvent,
   type CellKeyDownEvent,
 } from "ag-grid-community";
+import { useTranslation } from "react-i18next";
 import { testCasesApi, historyApi, customFieldsApi, filtersApi } from "../api";
 import type { TestCase, TestCaseHistory, Project, SheetNode, CustomFieldDef, FilterCondition, TCResultHistory } from "../types";
 import { AG_GRID_LOCALE_KO } from "../agGridLocaleKo";
+import { AG_GRID_LOCALE_EN } from "../agGridLocaleEn";
 import toast from "react-hot-toast";
 import MarkdownCell from "./MarkdownCell";
 import HighlightCell from "./HighlightCell";
@@ -57,6 +59,8 @@ type UndoGroup = UndoEntry[];
 
 // TODO: 접근성(#13) — 주요 버튼에 aria-label 추가, 키보드 네비게이션 개선 필요
 export default function TestCaseGrid({ projectId, project, highlightTcId }: Props) {
+  const { t, i18n } = useTranslation("testcase");
+  const gridLocale = i18n.language === "ko" ? AG_GRID_LOCALE_KO : AG_GRID_LOCALE_EN;
   const canEditTC = project.my_role === "admin";
   const gridRef = useRef<AgGridReact>(null);
   const [rowData, setRowData] = useState<TestCase[]>([]);
@@ -210,9 +214,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       pushUndo(undoGroup);
       api.refreshCells({ force: true });
       changedRows.forEach((r) => autoSaveRow(r));
-      toast.success(`${count}건 치환 완료`);
+      toast.success(t("replaceCount", { count }));
     } else {
-      toast("일치하는 항목이 없습니다.");
+      toast(t("replaceNoMatch"));
     }
   };
 
@@ -250,7 +254,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     api.refreshCells({ force: true });
     selected.forEach((r) => autoSaveRow(r));
     setBulkOpen(false);
-    toast.success(`${selected.length}개 행의 ${BULK_FIELDS.find(f => f.field === bulkField)?.label} 변경 완료`);
+    toast.success(t("bulkEditApplied", { count: selected.length, field: BULK_FIELDS.find(f => f.field === bulkField)?.label }));
   };
 
   // ── 히스토리 패널 ──
@@ -274,7 +278,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       setHistoryData(data);
     } catch (err) {
       console.error(err);
-      toast.error("변경 이력을 불러오지 못했습니다.");
+      toast.error(t("historyLoadFailed"));
       setHistoryData([]);
     } finally {
       setHistoryLoading(false);
@@ -290,7 +294,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       setHistoryData(data);
     } catch (err) {
       console.error(err);
-      toast.error("변경 이력을 불러오지 못했습니다.");
+      toast.error(t("historyLoadFailed"));
       setHistoryData([]);
     } finally {
       setHistoryLoading(false);
@@ -360,7 +364,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       setRedoCount(0);
     } catch (err) {
       console.error(err);
-      toast.error("테스트 케이스를 불러오지 못했습니다.");
+      toast.error(t("loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -531,7 +535,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         }
         await testCasesApi.update(projectId, data.id, saveData);
       } catch {
-        toast.error("자동 저장 실패");
+        toast.error(t("autoSaveFailed"));
       }
       delete autoSaveTimerRef.current[key];
     }, 300);
@@ -561,7 +565,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       try {
         await testCasesApi.reorder(projectId, items);
       } catch {
-        toast.error("순서 저장 실패");
+        toast.error(t("orderSaveFailed"));
       }
     }
   }, [projectId]);
@@ -600,7 +604,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       category: "",
       depth1: "",
       depth2: "",
-      priority: "보통",
+      priority: t("priority.normal"),
       test_type: "Web",
       precondition: "",
       test_steps: "",
@@ -624,7 +628,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         }
       }, 100);
     } catch {
-      toast.error("행 추가에 실패했습니다.");
+      toast.error(t("addRowFailed"));
     }
   };
 
@@ -633,7 +637,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     if (!api) return;
     const selected = api.getSelectedRows() as TestCase[];
     if (selected.length === 0) {
-      toast.error("TC ID를 채울 행을 선택해 주세요.");
+      toast.error(t("tcIdSelectFirst"));
       return;
     }
 
@@ -694,7 +698,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     api.applyTransaction({ update: allRows.filter((_, i) => selectedIndices.includes(i)) });
     api.refreshCells({ force: true });
     changedRows.forEach((r) => autoSaveRow(r));
-    toast.success("TC ID 자동 채우기 완료");
+    toast.success(t("tcIdAutoFillDone"));
   };
 
   const handleDeleteSelected = async () => {
@@ -702,7 +706,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     if (!api) return;
     const selected = api.getSelectedRows() as TestCase[];
     if (selected.length === 0) {
-      toast.error("삭제할 행을 선택해 주세요.");
+      toast.error(t("deleteSelectFirst"));
       return;
     }
 
@@ -715,7 +719,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     }
 
     if (saved.length === 0) {
-      toast.success(`${unsaved.length}개 행이 제거되었습니다.`);
+      toast.success(t("deleteSuccess", { count: unsaved.length }));
       return;
     }
 
@@ -725,21 +729,21 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       // 그리드에서 즉시 제거
       setRowData((prev) => prev.filter((r) => !saved.some((s) => s.id === r.id)));
       toast(
-        (t) => (
+        (toastInstance) => (
           <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {saved.length}개 TC 삭제됨
+            {t("tcDeleted", { count: saved.length })}
             <button
               onClick={async () => {
-                toast.dismiss(t.id);
+                toast.dismiss(toastInstance.id);
                 try {
                   for (const id of deletedIds) {
                     await testCasesApi.restore(projectId, id);
                   }
-                  toast.success("삭제가 취소되었습니다.");
+                  toast.success(t("restoreSuccess"));
                   loadData();
                 } catch (err) {
                   console.error(err);
-                  toast.error("되돌리기에 실패했습니다.");
+                  toast.error(t("restoreFailed"));
                 }
               }}
               style={{
@@ -762,7 +766,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       );
     } catch (err) {
       console.error(err);
-      toast.error("삭제에 실패했습니다.");
+      toast.error(t("deleteFailed"));
       loadData();
     }
   };
@@ -782,8 +786,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
 
   const handleAddSheet = async () => {
     const name = newSheetName.trim();
-    const label = addingFolder ? "폴더" : "시트";
-    if (!name) { toast.error(`${label} 이름을 입력해 주세요.`); return; }
+    const label = addingFolder ? t("folder") : t("sheet");
+    if (!name) { toast.error(t("nameRequired", { label })); return; }
     try {
       await testCasesApi.createSheet(projectId, name, addSheetParentId, addingFolder);
       setShowAddSheet(false);
@@ -796,9 +800,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         setExpandedSheets(prev => new Set([...prev, addSheetParentId!]));
       }
       loadSheets();
-      toast.success(`"${name}" ${label}가 추가되었습니다.`);
+      toast.success(t(label === "폴더" ? "folderAdded" : "sheetAdded", { name }));
     } catch (err) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || `${label} 추가에 실패했습니다.`;
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t(label === "폴더" ? "folderAddFailed" : "sheetAddFailed");
       toast.error(msg);
     }
   };
@@ -810,10 +814,10 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     if (emptyFileInputRef.current) emptyFileInputRef.current.value = "";
 
     try {
-      toast("파일 분석 중...", { duration: 1500 });
+      toast(t("analyzingFile"), { duration: 1500 });
       const preview = await testCasesApi.previewImport(projectId, file);
       if (preview.sheets.length === 0) {
-        toast.error("유효한 시트를 찾을 수 없습니다.");
+        toast.error(t("noValidSheets"));
         return;
       }
       if (preview.sheets.length === 1) {
@@ -822,7 +826,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         if (sheet.existing > 0) {
           if (!confirm(`"${sheet.name}" 시트에 이미 ${sheet.existing}개의 TC가 있습니다.\n동일한 TC ID는 덮어쓰기됩니다. 계속하시겠습니까?`)) return;
         }
-        toast("가져오는 중...", { duration: 2000 });
+        toast(t("importing"), { duration: 2000 });
         const result = await testCasesApi.importExcel(projectId, file, [sheet.name]);
         const created = result.created ?? 0;
         const updated = result.updated ?? 0;
@@ -872,7 +876,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       setImportSheets([]);
     } catch (err) {
       console.error(err);
-      toast.error("Excel 가져오기에 실패했습니다.");
+      toast.error(t("importFailed"));
     } finally {
       setImportLoading(false);
     }
@@ -887,10 +891,10 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       a.download = `testcases_${projectId}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("Excel 파일이 다운로드됩니다.");
+      toast.success(t("exportSuccess"));
     } catch (err) {
       console.error(err);
-      toast.error("Excel 내보내기에 실패했습니다.");
+      toast.error(t("exportFailed"));
     }
   };
 
@@ -928,7 +932,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         selectedNodes.forEach((node) => {
           if (node.data && node !== event.node) autoSaveRow(node.data);
         });
-        toast.success(`${filled}개 행에 "${sourceValue}" 채움`);
+        toast.success(t("fillCount", { count: filled, value: sourceValue }));
       }
     }
   }, [pushUndo, autoSaveRow]);
@@ -937,33 +941,34 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const handleCloneSelected = useCallback(async () => {
     const selected = gridApiRef.current?.getSelectedRows() as TestCase[];
     if (!selected?.length) {
-      toast.error("복제할 행을 선택하세요.");
+      toast.error(t("cloneSelectFirst"));
       return;
     }
     const savedIds = selected.filter(r => r.id > 0).map(r => r.id);
     if (savedIds.length === 0) {
-      toast.error("저장되지 않은 행은 복제할 수 없습니다.");
+      toast.error(t("cloneUnsavedError"));
       return;
     }
     try {
       const cloned = await testCasesApi.bulkClone(projectId, savedIds);
       setRowData(prev => [...prev, ...cloned]);
-      toast.success(`${cloned.length}건 복제 완료`);
+      toast.success(t("cloneSuccess", { count: cloned.length }));
       setTimeout(() => {
         gridApiRef.current?.ensureIndexVisible(rowData.length + cloned.length - 1);
       }, 100);
     } catch {
-      toast.error("복제 실패");
+      toast.error(t("cloneFailed"));
     }
   }, [projectId, rowData.length]);
 
   // ── TC 복사 (로컬) ──
-  const handleCopySelected = () => {
+  // @ts-ignore - kept for future use
+  const _handleCopySelected = () => {
     const api = gridApiRef.current;
     if (!api) return;
     const selected = api.getSelectedRows() as TestCase[];
     if (selected.length === 0) {
-      toast.error("복사할 행을 선택해 주세요.");
+      toast.error(t("copySelectFirst"));
       return;
     }
     const maxNo = Math.max(...rowData.map((r) => r.no || 0), 0);
@@ -974,19 +979,19 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       tc_id: `${row.tc_id}-copy`,
     }));
     setRowData((prev) => [...prev, ...copies as TestCase[]]);
-    toast.success(`${copies.length}개 TC 복사됨 (하단에 추가)`);
+    toast.success(t("copySuccess", { count: copies.length }));
   };
 
   // ── 결과 히스토리 조회 ──
   const handleResultHistory = useCallback(async () => {
     const selected = gridApiRef.current?.getSelectedRows() as TestCase[];
     if (!selected?.length || selected.length !== 1) {
-      toast.error("결과 히스토리를 볼 TC를 1건 선택하세요.");
+      toast.error(t("resultHistorySelectOne"));
       return;
     }
     const tc = selected[0];
     if (tc.id === 0) {
-      toast.error("저장되지 않은 TC입니다.");
+      toast.error(t("resultHistoryUnsaved"));
       return;
     }
     try {
@@ -995,7 +1000,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       setResultHistoryTcId(tc.tc_id);
       setResultHistoryOpen(true);
     } catch {
-      toast.error("결과 히스토리 조회 실패");
+      toast.error(t("resultHistoryFailed"));
     }
   }, [projectId]);
 
@@ -1015,7 +1020,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <input
                   style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-input)", fontSize: 14, outline: "none", width: 200, backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }}
-                  placeholder={addingFolder ? "폴더 이름" : "시트 이름"}
+                  placeholder={addingFolder ? t("folderName") : t("sheetName")}
                   value={newSheetName}
                   onChange={(e) => setNewSheetName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddSheet()}
@@ -1054,8 +1059,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               </div>
               <div style={sheetModalStyles.body}>
                 <div style={sheetModalStyles.actions}>
-                  <button style={sheetModalStyles.linkBtn} onClick={() => setSelectedSheets(new Set(importSheets.map((sh) => sh.name)))}>전체 선택</button>
-                  <button style={sheetModalStyles.linkBtn} onClick={() => setSelectedSheets(new Set())}>전체 해제</button>
+                  <button style={sheetModalStyles.linkBtn} onClick={() => setSelectedSheets(new Set(importSheets.map((sh) => sh.name)))}>{t("common:selectAll")}</button>
+                  <button style={sheetModalStyles.linkBtn} onClick={() => setSelectedSheets(new Set())}>{t("common:deselectAll")}</button>
                 </div>
                 {importSheets.map((sheet) => (
                   <label key={sheet.name} style={sheetModalStyles.sheetRow}>
@@ -1068,7 +1073,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               <div style={sheetModalStyles.footer}>
                 <span style={sheetModalStyles.summary}>{selectedSheets.size}개 시트 선택 ({importSheets.filter((sh) => selectedSheets.has(sh.name)).reduce((a, sh) => a + sh.tc_count, 0)}개 TC)</span>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button style={sheetModalStyles.cancelBtn} onClick={() => { setImportFile(null); setImportSheets([]); }}>취소</button>
+                  <button style={sheetModalStyles.cancelBtn} onClick={() => { setImportFile(null); setImportSheets([]); }}>{t("common:cancel")}</button>
                   <button style={{ ...sheetModalStyles.importBtn, opacity: selectedSheets.size === 0 || importLoading ? 0.5 : 1 }} disabled={selectedSheets.size === 0 || importLoading} onClick={handleImportConfirm}>
                     {importLoading ? "가져오는 중..." : "가져오기"}
                   </button>
@@ -1235,7 +1240,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           justifyContent: sidebarOpen ? "space-between" : "center",
           alignItems: "center",
         }}>
-          {sidebarOpen && <span>시트</span>}
+          {sidebarOpen && <span>{t("sheets")}</span>}
           <span
             style={{ cursor: "pointer", fontSize: 14, opacity: 0.6, padding: "0 2px" }}
             title={sidebarOpen ? "사이드바 접기" : "사이드바 펼치기"}
@@ -1272,7 +1277,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             <div style={{ display: "flex", gap: 4 }}>
               <input
                 style={{ flex: 1, padding: "4px 6px", fontSize: 12, borderRadius: 4, border: "1px solid var(--border-input)", backgroundColor: "var(--bg-input)", color: "var(--text-primary)", outline: "none" }}
-                placeholder={addingFolder ? "폴더 이름" : "시트 이름"}
+                placeholder={addingFolder ? t("folderName") : t("sheetName")}
                 value={newSheetName}
                 onChange={(e) => setNewSheetName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleAddSheet(); if (e.key === "Escape") { setShowAddSheet(false); setNewSheetName(""); setAddSheetParentId(null); setAddingFolder(false); } }}
@@ -1281,7 +1286,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               <button
                 style={{ padding: "4px 8px", fontSize: 11, borderRadius: 4, border: "none", backgroundColor: "var(--accent)", color: "#fff", cursor: "pointer" }}
                 onClick={handleAddSheet}
-              >추가</button>
+              >{t("common:add")}</button>
             </div>
           </div>
         )}
@@ -1307,7 +1312,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             >
               <span style={{ width: 16 }} />
               <span style={{ fontSize: 14 }}>📋</span>
-              <span style={{ flex: 1 }}>전체</span>
+              <span style={{ flex: 1 }}>{t("allSheets")}</span>
               <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>
                 {flatSheets.reduce((a, s) => a + s.tc_count, 0)}
               </span>
@@ -1342,7 +1347,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   const count = parseInt(e.target.value);
                   if (!count) return;
                   for (let i = 0; i < count; i++) await handleAddRow();
-                  toast.success(`${count}개 행 추가됨`);
+                  toast.success(t("rowsAdded", { count }));
                 }}
               >
                 <option value="1">1행</option>
@@ -1376,7 +1381,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   if (!api) return;
                   const selected = api.getSelectedRows() as TestCase[];
                   if (selected.length === 0) {
-                    toast.error("변경할 행을 선택해 주세요.");
+                    toast.error(t("selectRowsFirst"));
                     return;
                   }
                   setBulkOpen(true);
@@ -1413,7 +1418,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               const selected = api.getSelectedRows() as TestCase[];
               if (selected.length === 1) {
                 if (!selected[0].id) {
-                  toast.error("저장된 TC만 이력 조회가 가능합니다.");
+                  toast.error(t("savedTcOnly"));
                   return;
                 }
                 openHistory(selected[0]);
@@ -1430,7 +1435,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             <input
               style={styles.searchInput}
               type="text"
-              placeholder="검색..."
+              placeholder={t("searchPlaceholder")}
               value={searchText}
               onChange={onSearchChange}
             />
@@ -1452,7 +1457,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               <input
                 style={{ ...styles.searchInput, width: 140 }}
                 type="text"
-                placeholder="바꿀 내용..."
+                placeholder={t("replaceAllPlaceholder")}
                 value={replaceText}
                 onChange={(e) => setReplaceText(e.target.value)}
               />
@@ -1476,7 +1481,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             onClick={() => setShowFilterPanel(!showFilterPanel)}
             title="고급 필터"
           >
-            필터{filterConditions.length > 0 ? ` (${filterConditions.length})` : ""}
+            {filterConditions.length > 0 ? t("filterWithCount", { count: filterConditions.length }) : t("filter")}
           </button>
         </div>
       </div>
@@ -1491,8 +1496,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               value={filterLogic}
               onChange={(e) => setFilterLogic(e.target.value as "AND" | "OR")}
             >
-              <option value="AND">AND (모두 일치)</option>
-              <option value="OR">OR (하나라도 일치)</option>
+              <option value="AND">{t("filterLogicAnd")}</option>
+              <option value="OR">{t("filterLogicOr")}</option>
             </select>
             <button
               style={{ ...styles.btnGhost, fontSize: 11, padding: "2px 8px" }}
@@ -1510,9 +1515,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                     try {
                       const data = await filtersApi.apply(projectId, filterConditions, filterLogic, activeSheet || undefined);
                       setRowData(data);
-                      toast.success(`필터 적용: ${data.length}건`);
+                      toast.success(t("filterApplied", { count: data.length }));
                     } catch {
-                      toast.error("필터 적용 실패");
+                      toast.error(t("filterApplyFailed"));
                     }
                   }}
                 >
@@ -1532,14 +1537,14 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   <button
                     style={{ ...styles.btnGhost, fontSize: 11, padding: "2px 8px" }}
                     onClick={async () => {
-                      const name = prompt("필터 이름을 입력하세요:", activeFilterName || "");
+                      const name = prompt(t("filterSavePrompt"), activeFilterName || "");
                       if (!name) return;
                       try {
                         await filtersApi.create(projectId, { name, conditions: filterConditions, logic: filterLogic });
-                        toast.success(`"${name}" 필터 저장됨`);
+                        toast.success(t("filterSaved", { name }));
                         setActiveFilterName(name);
                       } catch {
-                        toast.error("필터 저장 실패");
+                        toast.error(t("filterSaveFailed"));
                       }
                     }}
                   >
@@ -1551,18 +1556,18 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   onClick={async () => {
                     try {
                       const saved = await filtersApi.list(projectId);
-                      if (saved.length === 0) { toast("저장된 필터가 없습니다."); return; }
+                      if (saved.length === 0) { toast(t("noSavedFilters")); return; }
                       const names = saved.map(f => f.name).join("\n");
                       const chosen = prompt(`불러올 필터:\n${names}\n\n이름 입력:`);
                       if (!chosen) return;
                       const found = saved.find(f => f.name === chosen);
-                      if (!found) { toast.error("필터를 찾을 수 없습니다."); return; }
+                      if (!found) { toast.error(t("filterNotFound")); return; }
                       setFilterConditions(found.conditions);
                       setFilterLogic(found.logic as "AND" | "OR");
                       setActiveFilterName(found.name);
-                      toast.success(`"${found.name}" 필터 불러옴`);
+                      toast.success(t("filterLoaded", { name: found.name }));
                     } catch {
-                      toast.error("필터 목록 로드 실패");
+                      toast.error(t("filterLoadFailed"));
                     }
                   }}
                 >
@@ -1599,17 +1604,17 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   setFilterConditions(next);
                 }}
               >
-                <option value="contains">포함</option>
-                <option value="not_contains">미포함</option>
-                <option value="eq">일치</option>
-                <option value="neq">불일치</option>
-                <option value="empty">비어있음</option>
-                <option value="not_empty">비어있지 않음</option>
+                <option value="contains">{t("operator.contains")}</option>
+                <option value="not_contains">{t("operator.notContains")}</option>
+                <option value="eq">{t("operator.eq")}</option>
+                <option value="neq">{t("operator.neq")}</option>
+                <option value="empty">{t("operator.empty")}</option>
+                <option value="not_empty">{t("operator.notEmpty")}</option>
               </select>
               {!["empty", "not_empty"].includes(cond.operator) && (
                 <input
                   style={{ fontSize: 11, padding: "3px 6px", borderRadius: 4, border: "1px solid var(--border-input)", backgroundColor: "var(--bg-input)", color: "var(--text-primary)", width: 150 }}
-                  placeholder="값..."
+                  placeholder={t("valuePlaceholder")}
                   value={(cond.value as string) || ""}
                   onChange={(e) => {
                     const next = [...filterConditions];
@@ -1639,7 +1644,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       >
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>
-            불러오는 중...
+            {t("common:loadingData")}
           </div>
         ) : (
           <AgGridReact
@@ -1647,7 +1652,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             rowData={rowData}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            localeText={AG_GRID_LOCALE_KO}
+            localeText={gridLocale}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, selectAll: "filtered" }}
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
@@ -1668,8 +1673,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       {/* 하단 상태바 */}
       {selectedCount > 0 && (
         <div style={{ padding: "4px 12px", fontSize: 12, color: "var(--text-secondary)", backgroundColor: "var(--bg-card)", borderTop: "1px solid var(--border-color)", display: "flex", gap: 12 }}>
-          <span><strong>{selectedCount}</strong>개 행 선택</span>
-          <span>전체 {rowData.length}개</span>
+          <span><strong>{selectedCount}</strong> {t("selectedRows", { count: selectedCount })}</span>
+          <span>{t("totalRows", { count: rowData.length })}</span>
         </div>
       )}
       {/* Bulk Edit Modal */}
@@ -1681,14 +1686,14 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           >
             <div style={historyStyles.header}>
               <h3 style={historyStyles.title}>
-                일괄 변경 ({gridApiRef.current?.getSelectedRows().length || 0}개 행)
+                {t("bulkEditTitle", { count: gridApiRef.current?.getSelectedRows().length || 0 })}
               </h3>
               <button style={historyStyles.closeBtn} onClick={() => setBulkOpen(false)}>✕</button>
             </div>
             <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4, display: "block" }}>
-                  변경할 컬럼
+                  {t("bulkEditColumn")}
                 </label>
                 <select
                   value={bulkField}
@@ -1706,7 +1711,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4, display: "block" }}>
-                  변경할 값
+                  {t("bulkEditValue")}
                 </label>
                 {BULK_FIELDS.find((f) => f.field === bulkField)?.options ? (
                   <select
@@ -1718,7 +1723,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                       color: "var(--text-primary)", fontSize: 13,
                     }}
                   >
-                    <option value="">-- 선택 --</option>
+                    <option value="">{t("selectOption")}</option>
                     {BULK_FIELDS.find((f) => f.field === bulkField)!.options!.map((o) => (
                       <option key={o} value={o}>{o}</option>
                     ))}
@@ -1728,7 +1733,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                     type="text"
                     value={bulkValue}
                     onChange={(e) => setBulkValue(e.target.value)}
-                    placeholder="값을 입력하세요"
+                    placeholder={t("bulkEditValuePlaceholder")}
                     style={{
                       width: "100%", padding: "8px 10px", borderRadius: 6,
                       border: "1px solid var(--border-color)", backgroundColor: "var(--bg-input)",
@@ -1757,8 +1762,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             <div style={historyStyles.header}>
               <h3 style={historyStyles.title}>
                 {historyMode === "project"
-                  ? "프로젝트 변경 이력"
-                  : `변경 이력 - ${historyTc.tc_id || `No.${historyTc.no}`}`}
+                  ? t("projectHistoryTitle")
+                  : t("historyTitle", { tcId: historyTc.tc_id || `No.${historyTc.no}` })}
               </h3>
               <button style={historyStyles.closeBtn} onClick={() => setHistoryTc(null)}>
                 ✕
@@ -1766,9 +1771,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             </div>
             <div style={historyStyles.body}>
               {historyLoading ? (
-                <div style={historyStyles.empty}>불러오는 중...</div>
+                <div style={historyStyles.empty}>{t("common:loadingData")}</div>
               ) : historyData.length === 0 ? (
-                <div style={historyStyles.empty}>변경 이력이 없습니다.</div>
+                <div style={historyStyles.empty}>{t("noHistory")}</div>
               ) : historyMode === "project" ? (
                 (() => {
                   // Group by tc_id → changer → date

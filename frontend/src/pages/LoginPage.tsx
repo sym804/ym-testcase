@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import PasswordInput from "../components/PasswordInput";
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const { t } = useTranslation("login");
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -16,7 +18,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     if (!username || !password) {
-      setError("아이디와 비밀번호를 입력해 주세요.");
+      setError(t("emptyFields"));
       return;
     }
     setLoading(true);
@@ -26,7 +28,7 @@ export default function LoginPage() {
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || "로그인에 실패했습니다.";
+          ?.detail || t("loginFailed");
       setError(msg);
     } finally {
       setLoading(false);
@@ -36,27 +38,27 @@ export default function LoginPage() {
   return (
     <div style={styles.wrapper}>
       <div style={styles.headerBar}>
-        <span style={styles.brand}>YM TestCase</span>
+        <span style={styles.brand}>{t("common:brandName")}</span>
       </div>
       <div style={styles.container}>
         <div style={styles.card}>
-          <h2 style={styles.heading}>로그인</h2>
+          <h2 style={styles.heading}>{t("title")}</h2>
           <form onSubmit={handleSubmit} style={styles.form}>
-            <label style={styles.label}>아이디</label>
+            <label style={styles.label}>{t("username")}</label>
             <input
               style={styles.input}
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="아이디를 입력하세요"
+              placeholder={t("usernamePlaceholder")}
               autoFocus
             />
-            <label style={styles.label}>비밀번호</label>
+            <label style={styles.label}>{t("password")}</label>
             <PasswordInput
               style={styles.input}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="비밀번호를 입력하세요"
+              placeholder={t("passwordPlaceholder")}
             />
             <label style={styles.rememberMe}>
               <input
@@ -64,7 +66,7 @@ export default function LoginPage() {
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
               />
-              로그인 유지
+              {t("rememberMe")}
             </label>
             {error && <div style={styles.errorMsg}>{error}</div>}
             <button
@@ -72,22 +74,22 @@ export default function LoginPage() {
               style={styles.submitBtn}
               disabled={loading}
             >
-              {loading ? "로그인 중..." : "로그인"}
+              {loading ? t("submitting") : t("submit")}
             </button>
           </form>
           <div style={styles.footer}>
-            계정이 없으신가요?{" "}
+            {t("noAccount")}{" "}
             <Link to="/register" style={styles.link}>
-              회원가입
+              {t("register")}
             </Link>
           </div>
           <div style={styles.hint}>
-            비밀번호를 잊으셨다면 관리자에게 초기화를 요청하세요.
+            {t("forgotPassword")}
           </div>
         </div>
       </div>
       <div style={{ position: "absolute", bottom: 16, width: "100%", textAlign: "center", fontSize: 11, color: "var(--text-secondary, #94A3B8)" }}>
-        YM TestCase v1.0.0.0 | AGPL-3.0
+        {t("common:version")}
       </div>
     </div>
   );

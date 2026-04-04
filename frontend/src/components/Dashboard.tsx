@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Doughnut, Bar, Line } from "react-chartjs-2";
 import { dashboardApi, testRunsApi } from "../api";
 import { useTheme } from "../contexts/ThemeContext";
@@ -35,6 +36,7 @@ const COLORS_DARK = {
 };
 
 export default function Dashboard({ projectId }: Props) {
+  const { t } = useTranslation("dashboard");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const CARD_COLORS = isDark ? COLORS_DARK : COLORS_LIGHT;
@@ -73,7 +75,7 @@ export default function Dashboard({ projectId }: Props) {
       setRuns(runList);
     } catch (err) {
       console.error(err);
-      toast.error("대시보드 데이터를 불러오지 못했습니다.");
+      toast.error(t("loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -86,13 +88,13 @@ export default function Dashboard({ projectId }: Props) {
   if (loading || !summary) {
     return (
       <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>
-        불러오는 중...
+        {t("common:loadingData")}
       </div>
     );
   }
 
   const doughnutData = {
-    labels: ["PASS", "FAIL", "BLOCK", "N/A", "미수행"],
+    labels: ["PASS", "FAIL", "BLOCK", "N/A", t("notStarted")],
     datasets: [
       {
         data: [summary.pass, summary.fail, summary.block, summary.na, summary.not_started],
@@ -168,13 +170,13 @@ export default function Dashboard({ projectId }: Props) {
   };
 
   const cards = [
-    { label: "전체 TC", value: summary.total, pct: 100, color: CARD_COLORS.total },
+    { label: t("totalTC"), value: summary.total, pct: 100, color: CARD_COLORS.total },
     { label: "PASS", value: summary.pass, pct: summary.pass_rate, color: CARD_COLORS.pass },
     { label: "FAIL", value: summary.fail, pct: summary.fail_rate, color: CARD_COLORS.fail },
     { label: "BLOCK", value: summary.block, pct: summary.block_rate, color: CARD_COLORS.block },
     { label: "N/A", value: summary.na, pct: summary.na_rate, color: CARD_COLORS.na },
     {
-      label: "미수행",
+      label: t("notStarted"),
       value: summary.not_started,
       pct: summary.not_started_rate,
       color: CARD_COLORS.not_started,
@@ -185,7 +187,7 @@ export default function Dashboard({ projectId }: Props) {
     <div>
       {/* Run selector */}
       <div style={styles.selectorRow}>
-        <label style={styles.selectorLabel}>테스트 수행:</label>
+        <label style={styles.selectorLabel}>{t("testRun")}</label>
         <select
           style={styles.select}
           value={selectedRunId ?? ""}
@@ -193,7 +195,7 @@ export default function Dashboard({ projectId }: Props) {
             setSelectedRunId(e.target.value ? Number(e.target.value) : undefined)
           }
         >
-          <option value="">전체</option>
+          <option value="">{t("all")}</option>
           {runs.map((r) => (
             <option key={r.id} value={r.id}>
               {r.name} (R{r.round})
@@ -204,10 +206,10 @@ export default function Dashboard({ projectId }: Props) {
         {/* 날짜 필터 */}
         <div style={{ display: "flex", gap: 4, marginLeft: 12, alignItems: "center" }}>
           {[
-            { label: "전체", from: "", to: "" },
-            { label: "7일", from: new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0], to: "" },
-            { label: "30일", from: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0], to: "" },
-            { label: "90일", from: new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0], to: "" },
+            { label: t("all"), from: "", to: "" },
+            { label: t("days7"), from: new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0], to: "" },
+            { label: t("days30"), from: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0], to: "" },
+            { label: t("days90"), from: new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0], to: "" },
           ].map((p) => (
             <button
               key={p.label}
@@ -264,7 +266,7 @@ export default function Dashboard({ projectId }: Props) {
       {/* Charts */}
       <div style={styles.chartsRow}>
         <div style={styles.chartCard}>
-          <h4 style={styles.chartTitle}>결과 분포</h4>
+          <h4 style={styles.chartTitle}>{t("resultDistribution")}</h4>
           <div style={{ maxWidth: 320, margin: "0 auto" }}>
             <Doughnut
               data={doughnutData}
@@ -273,7 +275,7 @@ export default function Dashboard({ projectId }: Props) {
           </div>
         </div>
         <div style={styles.chartCard}>
-          <h4 style={styles.chartTitle}>라운드별 비교</h4>
+          <h4 style={styles.chartTitle}>{t("roundComparison")}</h4>
           <Bar
             data={barData}
             options={{
@@ -291,7 +293,7 @@ export default function Dashboard({ projectId }: Props) {
       {/* Trend chart */}
       {rounds.length > 1 && (
         <div style={{ ...styles.chartCard, marginBottom: 28 }}>
-          <h4 style={styles.chartTitle}>Pass/Fail Rate 추이</h4>
+          <h4 style={styles.chartTitle}>{t("passFailTrend")}</h4>
           <Line
             data={trendData}
             options={{
@@ -310,7 +312,7 @@ export default function Dashboard({ projectId }: Props) {
       <div style={styles.tablesRow}>
         {/* Priority table */}
         <div style={styles.tableCard}>
-          <h4 style={styles.tableTitle}>우선순위별 분포</h4>
+          <h4 style={styles.tableTitle}>{t("priorityDistribution")}</h4>
           <table style={styles.table}>
             <thead>
               <tr>
@@ -320,7 +322,7 @@ export default function Dashboard({ projectId }: Props) {
                 <th style={styles.thNum}>FAIL</th>
                 <th style={styles.thNum}>BLOCK</th>
                 <th style={styles.thNum}>N/A</th>
-                <th style={styles.thNum}>미수행</th>
+                <th style={styles.thNum}>{t("notStarted")}</th>
               </tr>
             </thead>
             <tbody>
@@ -341,7 +343,7 @@ export default function Dashboard({ projectId }: Props) {
 
         {/* Category table */}
         <div style={styles.tableCard}>
-          <h4 style={styles.tableTitle}>카테고리별 분포</h4>
+          <h4 style={styles.tableTitle}>{t("categoryDistribution")}</h4>
           <table style={styles.table}>
             <thead>
               <tr>
@@ -351,7 +353,7 @@ export default function Dashboard({ projectId }: Props) {
                 <th style={styles.thNum}>FAIL</th>
                 <th style={styles.thNum}>BLOCK</th>
                 <th style={styles.thNum}>N/A</th>
-                <th style={styles.thNum}>미수행</th>
+                <th style={styles.thNum}>{t("notStarted")}</th>
               </tr>
             </thead>
             <tbody>
@@ -373,18 +375,18 @@ export default function Dashboard({ projectId }: Props) {
 
       {/* Assignee table */}
       <div style={{ ...styles.tableCard, marginTop: 20 }}>
-        <h4 style={styles.tableTitle}>담당자별 현황</h4>
+        <h4 style={styles.tableTitle}>{t("assigneeStatus")}</h4>
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>담당자</th>
+              <th style={styles.th}>{t("assignee")}</th>
               <th style={styles.thNum}>Total</th>
               <th style={styles.thNum}>PASS</th>
               <th style={styles.thNum}>FAIL</th>
               <th style={styles.thNum}>BLOCK</th>
               <th style={styles.thNum}>N/A</th>
               <th style={styles.thNum}>미수행</th>
-              <th style={styles.thNum}>완료율</th>
+              <th style={styles.thNum}>{t("completionRate")}</th>
             </tr>
           </thead>
           <tbody>
@@ -411,6 +413,7 @@ export default function Dashboard({ projectId }: Props) {
 }
 
 function HeatmapTable({ data }: { data: { category: string; priority: string; fail_count: number }[] }) {
+  const { t } = useTranslation("dashboard");
   const { categories, priorities, grid, maxVal } = useMemo(() => {
     const catSet = new Set<string>();
     const priSet = new Set<string>();
@@ -443,14 +446,14 @@ function HeatmapTable({ data }: { data: { category: string; priority: string; fa
   return (
     <div style={{ marginTop: 20, backgroundColor: "var(--bg-card)", borderRadius: 12, padding: 24, boxShadow: "var(--shadow)" }}>
       <h4 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
-        결함 밀집 히트맵 (Category x Priority)
+        {t("heatmapTitle")}
       </h4>
       <div style={{ overflow: "auto" }}>
         <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
           <thead>
             <tr>
               <th style={{ padding: "8px 10px", borderBottom: "2px solid var(--border-color)", textAlign: "left", color: "var(--text-secondary)", fontWeight: 600 }}>
-                Category \ Priority
+                {t("categoryPriority")}
               </th>
               {priorities.map((p) => (
                 <th key={p} style={{ padding: "8px 10px", borderBottom: "2px solid var(--border-color)", textAlign: "center", color: "var(--text-secondary)", fontWeight: 600 }}>

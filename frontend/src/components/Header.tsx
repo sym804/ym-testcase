@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { useEffect, useRef, useState } from "react";
@@ -10,8 +11,15 @@ import toast from "react-hot-toast";
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const { t, i18n } = useTranslation("header");
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+
+  const toggleLang = () => {
+    const next = i18n.language === "ko" ? "en" : "ko";
+    i18n.changeLanguage(next);
+    localStorage.setItem("lang", next);
+  };
   const location = useLocation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<number | null>(null);
@@ -157,9 +165,9 @@ export default function Header() {
   };
 
   const roleLabelMap: Record<string, string> = {
-    admin: "ADMIN",
-    qa_manager: "QA 관리자",
-    user: "USER",
+    admin: t("role.admin"),
+    qa_manager: t("role.qaManager"),
+    user: t("role.user"),
   };
 
   return (
@@ -183,7 +191,7 @@ export default function Header() {
               if (id) navigate(`/projects/${id}`);
             }}
           >
-            <option value="">-- 프로젝트 선택 --</option>
+            <option value="">{t("projectSelect")}</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -195,7 +203,7 @@ export default function Header() {
           <input
             style={styles.searchInput}
             type="text"
-            placeholder="TC 검색..."
+            placeholder={t("searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             onFocus={() => searchResults.length > 0 && setShowSearch(true)}
@@ -218,7 +226,7 @@ export default function Header() {
               ))}
               {searchResults.length > 15 && (
                 <div style={{ padding: "6px 12px", fontSize: 11, color: "#94A3B8" }}>
-                  +{searchResults.length - 15}건 더...
+                  {t("moreResults", { count: searchResults.length - 15 })}
                 </div>
               )}
             </div>
@@ -230,7 +238,7 @@ export default function Header() {
         <div style={{ position: "relative" }} data-noti-dropdown>
           <button onClick={handleOpenNotifications}
             style={{ ...styles.themeBtn, position: "relative" }}
-            title="알림">
+            title={t("notifications")}>
             🔔
             {unreadCount > 0 && (
               <span style={{
@@ -256,18 +264,18 @@ export default function Header() {
                 display: "flex", justifyContent: "space-between", alignItems: "center",
                 padding: "12px 16px", borderBottom: "1px solid var(--border-color)",
               }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>알림</span>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{t("notifications")}</span>
                 {unreadCount > 0 && (
                   <button onClick={handleReadAll}
                     style={{ fontSize: 12, color: "var(--primary-color)", background: "none", border: "none", cursor: "pointer" }}>
-                    모두 읽음
+                    {t("markAllRead")}
                   </button>
                 )}
               </div>
 
               {notifications.length === 0 ? (
                 <div style={{ padding: 24, textAlign: "center", color: "var(--text-secondary)", fontSize: 13 }}>
-                  알림이 없습니다.
+                  {t("noNotifications")}
                 </div>
               ) : (
                 notifications.map(noti => (
@@ -279,7 +287,7 @@ export default function Header() {
                     }}>
                     <div style={{ fontSize: 13, lineHeight: 1.4 }}>{noti.message}</div>
                     <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
-                      {noti.created_at ? new Date(noti.created_at).toLocaleString("ko-KR") : ""}
+                      {noti.created_at ? new Date(noti.created_at).toLocaleString(i18n.language === "ko" ? "ko-KR" : "en-US") : ""}
                     </div>
                   </div>
                 ))
@@ -287,20 +295,24 @@ export default function Header() {
             </div>
           )}
         </div>
-        <button style={styles.themeBtn} onClick={toggleTheme} title={theme === "light" ? "다크 모드" : "라이트 모드"}>
+        <button style={styles.themeBtn} onClick={toggleTheme} title={theme === "light" ? t("darkMode") : t("lightMode")}>
           {theme === "light" ? "\u{1F319}" : "\u{2600}\u{FE0F}"}
         </button>
+        <button onClick={toggleLang} title={i18n.language === "ko" ? "English" : "한국어"}
+          style={styles.themeBtn}>
+          {i18n.language === "ko" ? "EN" : "KO"}
+        </button>
         <button style={styles.adminBtn} onClick={() => navigate("/manual")}>
-          도움말
+          {t("help")}
         </button>
         {(user.role === UserRole.ADMIN || user.role === UserRole.QA_MANAGER) && (
           <button style={styles.adminBtn} onClick={() => navigate("/admin-manual")}>
-            운영 매뉴얼
+            {t("adminManual")}
           </button>
         )}
         {user.role === UserRole.ADMIN && (
           <button style={styles.adminBtn} onClick={() => navigate("/admin")}>
-            관리
+            {t("admin")}
           </button>
         )}
         <div style={{ position: "relative" }} ref={userMenuRef}>
@@ -325,13 +337,13 @@ export default function Header() {
                 style={styles.userMenuItem}
                 onClick={() => { setShowUserMenu(false); setShowChangePw(true); }}
               >
-                비밀번호 변경
+                {t("changePassword")}
               </button>
               <button
                 style={{ ...styles.userMenuItem, color: "var(--color-fail)" }}
                 onClick={() => { setShowUserMenu(false); logout(); }}
               >
-                로그아웃
+                {t("logout")}
               </button>
             </div>
           )}
@@ -345,6 +357,7 @@ export default function Header() {
 }
 
 function ChangePasswordInline({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation("header");
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -360,12 +373,12 @@ function ChangePasswordInline({ onClose }: { onClose: () => void }) {
     setLoading(true);
     try {
       await authApi.changePassword(currentPw, newPw);
-      toast.success("비밀번호가 변경되었습니다.");
+      toast.success(t("passwordChanged"));
       onClose();
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || "비밀번호 변경에 실패했습니다.";
+          ?.detail || t("passwordChangeFailed");
       setError(msg);
     } finally {
       setLoading(false);
@@ -375,21 +388,21 @@ function ChangePasswordInline({ onClose }: { onClose: () => void }) {
   return (
     <div style={modalStyles.overlay} onClick={onClose}>
       <div style={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
-        <h3 style={modalStyles.title}>비밀번호 변경</h3>
+        <h3 style={modalStyles.title}>{t("changePasswordTitle")}</h3>
         <form onSubmit={handleSubmit} style={modalStyles.form}>
-          <label style={modalStyles.label}>현재 비밀번호</label>
+          <label style={modalStyles.label}>{t("currentPassword")}</label>
           <PasswordInput style={modalStyles.input} value={currentPw} onChange={(e) => { setCurrentPw(e.target.value); setError(""); }} autoFocus />
-          <label style={modalStyles.label}>새 비밀번호</label>
-          <PasswordInput style={modalStyles.input} value={newPw} onChange={(e) => { setNewPw(e.target.value); setError(""); }} placeholder="8자 이상" />
-          <label style={modalStyles.label}>새 비밀번호 확인</label>
+          <label style={modalStyles.label}>{t("newPassword")}</label>
+          <PasswordInput style={modalStyles.input} value={newPw} onChange={(e) => { setNewPw(e.target.value); setError(""); }} placeholder={t("newPasswordPlaceholder")} />
+          <label style={modalStyles.label}>{t("newPasswordConfirm")}</label>
           <PasswordInput style={modalStyles.input} value={confirmPw} onChange={(e) => { setConfirmPw(e.target.value); setError(""); }} />
-          {newPw && newPw.length < 8 && <div style={modalStyles.hint}>8자 이상 입력해 주세요.</div>}
-          {newPw && confirmPw && newPw !== confirmPw && <div style={modalStyles.hint}>비밀번호가 일치하지 않습니다.</div>}
+          {newPw && newPw.length < 8 && <div style={modalStyles.hint}>{t("minLengthHint")}</div>}
+          {newPw && confirmPw && newPw !== confirmPw && <div style={modalStyles.hint}>{t("passwordMismatch")}</div>}
           {error && <div style={modalStyles.errorMsg}>{error}</div>}
           <div style={modalStyles.buttons}>
-            <button type="button" style={modalStyles.cancelBtn} onClick={onClose}>취소</button>
+            <button type="button" style={modalStyles.cancelBtn} onClick={onClose}>{t("common:cancel")}</button>
             <button type="submit" style={{ ...modalStyles.submitBtn, opacity: valid ? 1 : 0.4 }} disabled={!valid || loading}>
-              {loading ? "변경 중..." : "변경"}
+              {loading ? t("changing") : t("change")}
             </button>
           </div>
         </form>

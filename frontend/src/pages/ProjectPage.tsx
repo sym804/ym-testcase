@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { projectsApi } from "../api";
 import type { Project } from "../types";
 import Header from "../components/Header";
@@ -11,17 +12,11 @@ import CompareView from "../components/CompareView";
 import ProjectSettings from "../components/ProjectSettings";
 import toast from "react-hot-toast";
 
-const TABS = [
-  { key: "tc", label: "TC 관리" },
-  { key: "run", label: "테스트 수행" },
-  { key: "compare", label: "비교" },
-  { key: "dashboard", label: "대시보드" },
-  { key: "report", label: "리포트" },
-  { key: "settings", label: "설정" },
-];
+const TAB_KEYS = ["tc", "run", "compare", "dashboard", "report", "settings"];
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation("project");
   const [searchParams] = useSearchParams();
   const projectId = Number(id);
   const [project, setProject] = useState<Project | null>(null);
@@ -35,7 +30,7 @@ export default function ProjectPage() {
     projectsApi
       .getOne(projectId)
       .then((p) => { if (!cancelled) setProject(p); })
-      .catch(() => { if (!cancelled) toast.error("프로젝트를 불러오지 못했습니다."); })
+      .catch(() => { if (!cancelled) toast.error(t("projectLoadFailed")); })
       .finally(() => { if (!cancelled) setLoaded(true); });
     return () => { cancelled = true; };
   }, [projectId]);
@@ -45,7 +40,7 @@ export default function ProjectPage() {
       <div style={{ minHeight: "100vh", backgroundColor: "var(--bg-page)" }}>
         <Header />
         <div style={{ textAlign: "center", padding: 80, color: "var(--text-secondary)" }}>
-          불러오는 중...
+          {t("common:loadingData")}
         </div>
       </div>
     );
@@ -56,7 +51,7 @@ export default function ProjectPage() {
       <div style={{ minHeight: "100vh", backgroundColor: "var(--bg-page)" }}>
         <Header />
         <div style={{ textAlign: "center", padding: 80, color: "var(--text-secondary)" }}>
-          프로젝트를 찾을 수 없습니다.
+          {t("projectNotFound")}
         </div>
       </div>
     );
@@ -73,16 +68,16 @@ export default function ProjectPage() {
           )}
         </div>
         <div style={styles.tabArea}>
-          {TABS.map((tab) => (
+          {TAB_KEYS.map((key) => (
             <button
-              key={tab.key}
+              key={key}
               style={{
                 ...styles.tabBtn,
-                ...(activeTab === tab.key ? styles.tabActive : {}),
+                ...(activeTab === key ? styles.tabActive : {}),
               }}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => setActiveTab(key)}
             >
-              {tab.label}
+              {t(`tabs.${key}`)}
             </button>
           ))}
         </div>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { reportsApi, testRunsApi } from "../api";
 import type { ReportData, TestRun } from "../types";
 import toast from "react-hot-toast";
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function ReportView({ projectId }: Props) {
+  const { t, i18n } = useTranslation("report");
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [report, setReport] = useState<ReportData | null>(null);
@@ -20,7 +22,7 @@ export default function ReportView({ projectId }: Props) {
         setRuns(data);
         if (data.length > 0) setSelectedRunId(data[0].id);
       })
-      .catch(() => toast.error("테스트 수행 목록을 불러오지 못했습니다."));
+      .catch(() => toast.error(t("runLoadFailed")));
   }, [projectId]);
 
   const loadReport = useCallback(async () => {
@@ -31,7 +33,7 @@ export default function ReportView({ projectId }: Props) {
       setReport(data);
     } catch (err) {
       console.error(err);
-      toast.error("리포트 데이터를 불러오지 못했습니다.");
+      toast.error(t("loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -53,7 +55,7 @@ export default function ReportView({ projectId }: Props) {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
-      toast.error("PDF 다운로드에 실패했습니다.");
+      toast.error(t("pdfFailed"));
     }
   };
 
@@ -69,7 +71,7 @@ export default function ReportView({ projectId }: Props) {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
-      toast.error("Excel 다운로드에 실패했습니다.");
+      toast.error(t("excelFailed"));
     }
   };
 
@@ -78,7 +80,7 @@ export default function ReportView({ projectId }: Props) {
       {/* Selector & Actions */}
       <div style={styles.topRow}>
         <div style={styles.selectorRow}>
-          <label style={styles.selectorLabel}>테스트 수행:</label>
+          <label style={styles.selectorLabel}>{t("testRun")}</label>
           <select
             style={styles.select}
             value={selectedRunId ?? ""}
@@ -86,7 +88,7 @@ export default function ReportView({ projectId }: Props) {
               setSelectedRunId(e.target.value ? Number(e.target.value) : null)
             }
           >
-            <option value="">-- 선택 --</option>
+            <option value="">{t("selectOption")}</option>
             {runs.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name} (R{r.round})
@@ -96,50 +98,50 @@ export default function ReportView({ projectId }: Props) {
         </div>
         <div style={styles.downloadBtns}>
           <button style={styles.btnPdf} onClick={handleDownloadPdf} disabled={!selectedRunId}>
-            PDF 다운로드
+            {t("pdfDownload")}
           </button>
           <button style={styles.btnExcel} onClick={handleDownloadExcel} disabled={!selectedRunId}>
-            Excel 다운로드
+            {t("excelDownload")}
           </button>
         </div>
       </div>
 
       {loading ? (
         <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>
-          불러오는 중...
+          {t("common:loadingData")}
         </div>
       ) : !report ? (
         <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>
-          테스트 수행을 선택해 주세요.
+          {t("selectRun")}
         </div>
       ) : (
         <div style={styles.reportContent}>
           {/* Project Info */}
           <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>프로젝트 정보</h3>
+            <h3 style={styles.sectionTitle}>{t("projectInfo")}</h3>
             <div style={styles.infoGrid}>
               <div style={styles.infoItem}>
-                <span style={styles.infoLabel}>프로젝트</span>
+                <span style={styles.infoLabel}>{t("project")}</span>
                 <span style={styles.infoValue}>{report.project.name}</span>
               </div>
               <div style={styles.infoItem}>
-                <span style={styles.infoLabel}>버전</span>
+                <span style={styles.infoLabel}>{t("version")}</span>
                 <span style={styles.infoValue}>{report.test_run.version || "-"}</span>
               </div>
               <div style={styles.infoItem}>
-                <span style={styles.infoLabel}>환경</span>
+                <span style={styles.infoLabel}>{t("environment")}</span>
                 <span style={styles.infoValue}>
                   {report.test_run.environment || "-"}
                 </span>
               </div>
               <div style={styles.infoItem}>
-                <span style={styles.infoLabel}>라운드</span>
+                <span style={styles.infoLabel}>{t("round")}</span>
                 <span style={styles.infoValue}>R{report.test_run.round}</span>
               </div>
               <div style={styles.infoItem}>
-                <span style={styles.infoLabel}>수행일</span>
+                <span style={styles.infoLabel}>{t("executionDate")}</span>
                 <span style={styles.infoValue}>
-                  {new Date(report.test_run.created_at).toLocaleDateString("ko-KR")}
+                  {new Date(report.test_run.created_at).toLocaleDateString(i18n.language === "ko" ? "ko-KR" : "en-US")}
                 </span>
               </div>
             </div>
@@ -147,10 +149,10 @@ export default function ReportView({ projectId }: Props) {
 
           {/* Overall Stats */}
           <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>전체 현황</h3>
+            <h3 style={styles.sectionTitle}>{t("overallStatus")}</h3>
             <div style={styles.statsGrid}>
               <div style={{ ...styles.statCard, borderLeftColor: "var(--accent)" }}>
-                <div style={styles.statLabel}>전체 TC</div>
+                <div style={styles.statLabel}>{t("totalTC")}</div>
                 <div style={styles.statValue}>{report.summary.total}</div>
               </div>
               <div style={{ ...styles.statCard, borderLeftColor: "var(--color-pass)" }}>
@@ -170,16 +172,16 @@ export default function ReportView({ projectId }: Props) {
 
           {/* Top Failures */}
           <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>주요 실패 항목</h3>
+            <h3 style={styles.sectionTitle}>{t("topFailures")}</h3>
             {report.top_failures.length === 0 ? (
-              <div style={styles.emptyText}>실패 항목이 없습니다.</div>
+              <div style={styles.emptyText}>{t("noFailures")}</div>
             ) : (
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>TC ID</th>
-                    <th style={styles.th}>결과</th>
-                    <th style={styles.th}>실제 결과</th>
+                    <th style={styles.th}>{t("tcId")}</th>
+                    <th style={styles.th}>{t("result")}</th>
+                    <th style={styles.th}>{t("actualResult")}</th>
                     <th style={styles.th}>Issue Link</th>
                   </tr>
                 </thead>
@@ -218,9 +220,9 @@ export default function ReportView({ projectId }: Props) {
 
           {/* Jira Issues */}
           <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>연관 Jira 이슈</h3>
+            <h3 style={styles.sectionTitle}>{t("relatedJiraIssues")}</h3>
             {report.jira_issues.length === 0 ? (
-              <div style={styles.emptyText}>연관 이슈가 없습니다.</div>
+              <div style={styles.emptyText}>{t("noRelatedIssues")}</div>
             ) : (
               <div style={styles.issueList}>
                 {report.jira_issues.map((issue, i) => (
@@ -234,11 +236,11 @@ export default function ReportView({ projectId }: Props) {
 
           {/* Category Summary */}
           <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>카테고리별 요약</h3>
+            <h3 style={styles.sectionTitle}>{t("categorySummary")}</h3>
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>카테고리</th>
+                  <th style={styles.th}>{t("category")}</th>
                   <th style={styles.thNum}>Total</th>
                   <th style={styles.thNum}>PASS</th>
                   <th style={styles.thNum}>FAIL</th>
