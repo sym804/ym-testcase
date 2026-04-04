@@ -200,7 +200,7 @@ describe("SheetTabs", () => {
     });
 
     // 시트 추가 버튼 클릭
-    const addBtn = screen.getByTitle("시트 추가");
+    const addBtn = screen.getByTitle("+ 시트 추가");
     await user.click(addBtn);
 
     // 입력 UI 표시 확인
@@ -226,7 +226,7 @@ describe("SheetTabs", () => {
       expect(screen.getByText("기능")).toBeInTheDocument();
     });
 
-    const addBtn = screen.getByTitle("시트 추가");
+    const addBtn = screen.getByTitle("+ 시트 추가");
     await user.click(addBtn);
 
     expect(screen.getByPlaceholderText("시트 이름")).toBeInTheDocument();

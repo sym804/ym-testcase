@@ -6,6 +6,7 @@ import type { User, Project, ProjectMember } from "../types";
 import { UserRole } from "../types";
 import Header from "../components/Header";
 import toast from "react-hot-toast";
+import { translateError } from "../utils/errorMessage";
 
 export default function AdminPage() {
   const { user: currentUser } = useAuth();
@@ -126,8 +127,8 @@ export default function AdminPage() {
       await openAssignModal(assignTarget);
       loadAllAssignments();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t("assignFailed");
-      toast.error(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t("assignFailed"));
     } finally {
       setAssignLoading(false);
     }
@@ -158,8 +159,8 @@ export default function AdminPage() {
       await openAssignModal(assignTarget);
       loadAllAssignments();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t("removeFailed");
-      toast.error(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t("removeFailed"));
     }
   };
 

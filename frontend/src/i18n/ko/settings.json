@@ -63,6 +63,7 @@
     "removeConfirm": "이 멤버를 제거하시겠습니까?",
     "removeSuccess": "멤버가 제거되었습니다.",
     "removeFailed": "멤버 제거에 실패했습니다.",
-    "noMembers": "등록된 멤버가 없습니다."
+    "noMembers": "등록된 멤버가 없습니다.",
+    "removeMember": "멤버 제거"
   }
 }

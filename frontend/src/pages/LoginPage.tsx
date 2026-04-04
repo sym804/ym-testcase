@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import PasswordInput from "../components/PasswordInput";
+import { translateError } from "../utils/errorMessage";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -26,10 +27,8 @@ export default function LoginPage() {
       await login({ username, password, remember_me: rememberMe });
       navigate("/projects");
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || t("loginFailed");
-      setError(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail ? translateError(detail) : t("loginFailed"));
     } finally {
       setLoading(false);
     }

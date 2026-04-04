@@ -5,6 +5,7 @@ import { projectsApi, customFieldsApi } from "../api";
 import type { Project, CustomFieldDef } from "../types";
 import ProjectMembers from "./ProjectMembers";
 import toast from "react-hot-toast";
+import { translateError } from "../utils/errorMessage";
 
 interface Props {
   project: Project;
@@ -474,8 +475,8 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
       setShowAdd(false);
       loadFields();
     } catch (err) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t("fieldAddFailed");
-      toast.error(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t("fieldAddFailed"));
     } finally {
       setLoading(false);
     }

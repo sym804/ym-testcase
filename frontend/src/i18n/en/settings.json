@@ -63,6 +63,7 @@
     "removeConfirm": "Remove this member?",
     "removeSuccess": "Member has been removed.",
     "removeFailed": "Failed to remove member.",
-    "noMembers": "No members registered."
+    "noMembers": "No members registered.",
+    "removeMember": "Remove member"
   }
 }

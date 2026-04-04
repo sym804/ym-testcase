@@ -128,5 +128,37 @@
   "exportFailed": "Failed to export Excel.",
   "subOf": "Under {{name}}",
   "folderLabel": "Folder",
-  "sheetLabel": "Sheet"
+  "sheetLabel": "Sheet",
+  "defaultSheet": "Default",
+  "advancedFilter": "Advanced Filter",
+  "platformCommon": "Common",
+  "priorityDisplay": {
+    "매우 높음": "Critical",
+    "높음": "High",
+    "보통": "Normal",
+    "낮음": "Low",
+    "매우 낮음": "Minor"
+  },
+  "platformDisplay": {
+    "공통": "Common"
+  },
+  "historyLastModified": "Last Modified",
+  "historyChanger": "Changed By",
+  "historyChangeCount": "Changes",
+  "historyDatetime": "Date/Time",
+  "historyChangerName": "Changed By",
+  "historyField": "Field",
+  "historyOldValue": "Old Value",
+  "historyNewValue": "New Value",
+  "resultHistoryModalTitle": "📊 {{tcId}} Result History",
+  "noResultHistory": "No execution history.",
+  "resultRun": "Run",
+  "resultVersion": "Version",
+  "resultRound": "Round",
+  "resultResult": "Result",
+  "resultActual": "Actual Result",
+  "resultDate": "Executed",
+  "existingOverwrite": "(overwrite {{count}} existing)",
+  "addLabel": "Add",
+  "replaceAllBtn": "Replace All"
 }

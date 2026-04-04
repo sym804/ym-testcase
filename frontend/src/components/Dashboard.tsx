@@ -385,7 +385,7 @@ export default function Dashboard({ projectId }: Props) {
               <th style={styles.thNum}>FAIL</th>
               <th style={styles.thNum}>BLOCK</th>
               <th style={styles.thNum}>N/A</th>
-              <th style={styles.thNum}>미수행</th>
+              <th style={styles.thNum}>{t("notStarted")}</th>
               <th style={styles.thNum}>{t("completionRate")}</th>
             </tr>
           </thead>

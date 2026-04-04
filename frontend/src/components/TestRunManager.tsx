@@ -811,7 +811,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       const nsCount = allResults.filter((r: TestResult) => !r.result || r.result === "NS").length;
       if (nsCount > 0) {
         const proceed = confirm(
-          `수행되지 않은 TC가 ${nsCount}개 있습니다.\n\n그래도 완료 처리하시겠습니까?`
+          t("completeConfirmWithNS", { count: nsCount })
         );
         if (!proceed) return;
       } else {
@@ -863,7 +863,7 @@ export default function TestRunManager({ projectId, project }: Props) {
             <button
               style={styles.collapseBtn}
               onClick={() => setPanelCollapsed(true)}
-              title="패널 숨기기"
+              title={t("hidePanel")}
             >
               ◀
             </button>
@@ -904,7 +904,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                           run.status === TestRunStatus.COMPLETED ? "var(--color-pass)" : "#60A5FA",
                       }}
                     >
-                      {run.status === TestRunStatus.COMPLETED ? "완료" : "진행 중"}
+                      {run.status === TestRunStatus.COMPLETED ? t("completed") : t("inProgress")}
                     </span>
                   </div>
                 ))}
@@ -943,7 +943,7 @@ export default function TestRunManager({ projectId, project }: Props) {
               <button
                 style={{ ...styles.collapseBtn, marginRight: 12 }}
                 onClick={() => setPanelCollapsed(false)}
-                title="목록 펼치기"
+                title={t("showPanel")}
               >
                 ▶
               </button>
@@ -983,7 +983,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 <button
                   style={{ ...styles.collapseBtn, marginRight: 8 }}
                   onClick={() => setPanelCollapsed(false)}
-                  title="목록 펼치기"
+                  title={t("showPanel")}
                 >
                   ▶
                 </button>
@@ -998,12 +998,12 @@ export default function TestRunManager({ projectId, project }: Props) {
               <div style={styles.runActions}>
                 {canDeleteRun && (
                   <button style={styles.btnDanger} onClick={handleDelete}>
-                    삭제
+                    {t("deleteRun")}
                   </button>
                 )}
                 {canManageRun && (
                   <button style={styles.btnGhost} onClick={handleClone}>
-                    복제
+                    {t("cloneRun")}
                   </button>
                 )}
                 <button style={styles.btnGhost} onClick={async () => {
@@ -1023,7 +1023,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 </button>
                 {canManageRun && (selectedRun.status !== TestRunStatus.COMPLETED ? (
                   <button style={styles.btnComplete} onClick={handleComplete}>
-                    수행 완료
+                    {t("completeRun")}
                   </button>
                 ) : (
                   <button style={{ ...styles.btnComplete, backgroundColor: "#D97706" }} onClick={async () => {
@@ -1037,7 +1037,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                       toast.error(t("reopenFailed"));
                     }
                   }}>
-                    다시 수행
+                    {t("reopenRun")}
                   </button>
                 ))}
               </div>
@@ -1051,7 +1051,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                     style={styles.btnGhost}
                     onClick={() => setBulkMenuOpen((v) => !v)}
                   >
-                    결과 일괄입력 ▾
+                    {t("bulkResultInput")}
                   </button>
                   {bulkMenuOpen && (
                     <div style={styles.bulkMenu}>
@@ -1157,7 +1157,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                   style={styles.filterClearBtn}
                   onClick={() => { setFilterText(""); setFilterResult(""); setFilterCategory(""); setFilterPriority(""); }}
                 >
-                  초기화
+                  {t("common:reset")}
                 </button>
               )}
             </div>
@@ -1188,7 +1188,7 @@ export default function TestRunManager({ projectId, project }: Props) {
             >
               {loadingResults ? (
                 <div style={{ textAlign: "center", padding: 40, color: "var(--text-secondary)" }}>
-                  불러오는 중...
+                  {t("common:loadingData")}
                 </div>
               ) : (
                 <AgGridReact
@@ -1245,7 +1245,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 }}
                 onClick={() => setActiveSheet(null)}
               >
-                전체
+                {t("common:all")}
                 <span style={sheetTabStyles.badge}>{sheets.reduce((a, s) => a + s.tc_count, 0)}</span>
               </div>
             )}
@@ -1369,7 +1369,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                   style={styles.cancelBtn}
                   onClick={() => setShowModal(false)}
                 >
-                  취소
+                  {t("common:cancel")}
                 </button>
                 <button
                   type="submit"

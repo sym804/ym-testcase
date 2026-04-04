@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { membersApi } from "../api";
 import type { ProjectMember, User } from "../types";
 import toast from "react-hot-toast";
+import { translateError } from "../utils/errorMessage";
 
 interface Props {
   projectId: number;
@@ -55,11 +56,11 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
       setAddRole("tester");
       load();
     } catch (err: unknown) {
-      const msg =
+      const detail =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      toast.error(msg || t("members.addFailed"));
+      toast.error(detail ? translateError(detail) : t("members.addFailed"));
     }
   };
 
@@ -80,11 +81,11 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
       toast.success(t("members.removeSuccess"));
       load();
     } catch (err: unknown) {
-      const msg =
+      const detail =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      toast.error(msg || t("members.removeFailed"));
+      toast.error(detail ? translateError(detail) : t("members.removeFailed"));
     }
   };
 
@@ -176,7 +177,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
                       <button
                         style={s.removeBtn}
                         onClick={() => handleRemove(m.id)}
-                        title="멤버 제거"
+                        title={t("members.removeMember")}
                       >
                         X
                       </button>

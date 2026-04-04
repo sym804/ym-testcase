@@ -128,5 +128,37 @@
   "exportFailed": "Excel 내보내기에 실패했습니다.",
   "subOf": "{{name}} 하위",
   "folderLabel": "폴더",
-  "sheetLabel": "시트"
+  "sheetLabel": "시트",
+  "defaultSheet": "기본",
+  "advancedFilter": "고급 필터",
+  "platformCommon": "공통",
+  "priorityDisplay": {
+    "매우 높음": "매우 높음",
+    "높음": "높음",
+    "보통": "보통",
+    "낮음": "낮음",
+    "매우 낮음": "매우 낮음"
+  },
+  "platformDisplay": {
+    "공통": "공통"
+  },
+  "historyLastModified": "최근 수정일",
+  "historyChanger": "수정자",
+  "historyChangeCount": "변경 수",
+  "historyDatetime": "일시",
+  "historyChangerName": "변경자",
+  "historyField": "필드",
+  "historyOldValue": "이전 값",
+  "historyNewValue": "변경 값",
+  "resultHistoryModalTitle": "📊 {{tcId}} 결과 히스토리",
+  "noResultHistory": "수행 이력이 없습니다.",
+  "resultRun": "런",
+  "resultVersion": "버전",
+  "resultRound": "라운드",
+  "resultResult": "결과",
+  "resultActual": "실제 결과",
+  "resultDate": "수행일",
+  "existingOverwrite": "(기존 {{count}}개 덮어쓰기)",
+  "addLabel": "추가",
+  "replaceAllBtn": "모두 바꾸기"
 }

@@ -8,6 +8,7 @@ import PasswordInput from "./PasswordInput";
 import type { Project, TestCase } from "../types";
 import { UserRole } from "../types";
 import toast from "react-hot-toast";
+import { translateError } from "../utils/errorMessage";
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -254,10 +255,8 @@ function ChangePasswordInline({ onClose }: { onClose: () => void }) {
       toast.success(t("passwordChanged"));
       onClose();
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || t("passwordChangeFailed");
-      setError(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail ? translateError(detail) : t("passwordChangeFailed"));
     } finally {
       setLoading(false);
     }

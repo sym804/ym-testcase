@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import PasswordInput from "./PasswordInput";
+import { translateError } from "../utils/errorMessage";
 
 export default function ChangePasswordModal() {
   const { changePassword, logout } = useAuth();
@@ -21,10 +22,8 @@ export default function ChangePasswordModal() {
     try {
       await changePassword(currentPw, newPw);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || t("passwordChangeFailed");
-      setError(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail ? translateError(detail) : t("passwordChangeFailed"));
     } finally {
       setLoading(false);
     }

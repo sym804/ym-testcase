@@ -389,18 +389,7 @@ export default function UserManualPage() {
 
             <h3 style={s.h3}>{t("mdImport.h3_format")}</h3>
             <p style={s.p} dangerouslySetInnerHTML={{ __html: t("mdImport.format_p1") }} />
-            <pre style={{...s.p, backgroundColor: "var(--bg-secondary)", padding: "16px", borderRadius: "8px", fontFamily: "monospace", fontSize: "13px", whiteSpace: "pre", overflowX: "auto"}}>{`# 로그인 테스트
-
-| TC ID  | Category | Priority | Test Steps         | Expected Result    |
-|--------|----------|----------|--------------------|--------------------|
-| TC-001 | 로그인   | High     | 정상 로그인 시도    | 메인 화면 이동      |
-| TC-002 | 로그인   | Medium   | 잘못된 비번 입력    | 에러 메시지 표시    |
-
-## 검색 기능
-
-| TC ID  | Category | Priority | Test Steps         | Expected Result    |
-|--------|----------|----------|--------------------|--------------------|
-| TC-003 | 검색     | High     | 키워드 입력 후 검색 | 검색 결과 표시      |`}</pre>
+            <pre style={{...s.p, backgroundColor: "var(--bg-secondary)", padding: "16px", borderRadius: "8px", fontFamily: "monospace", fontSize: "13px", whiteSpace: "pre", overflowX: "auto"}}>{t("mdImport.format_example")}</pre>
 
             <h3 style={s.h3}>{t("mdImport.h3_sheetName")}</h3>
             <ul style={s.ul}>

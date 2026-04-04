@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { authApi } from "../api";
 import toast from "react-hot-toast";
 import PasswordInput from "../components/PasswordInput";
+import { translateError } from "../utils/errorMessage";
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -68,11 +69,8 @@ export default function RegisterPage() {
       toast.success(t("registerSuccess"));
       navigate("/login");
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ||
-        (err instanceof Error ? err.message : t("registerFailed"));
-      setError(msg);
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail ? translateError(detail) : (err instanceof Error ? err.message : t("registerFailed")));
     } finally {
       setLoading(false);
     }

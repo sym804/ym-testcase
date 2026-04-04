@@ -282,6 +282,7 @@
     "usage_li4": "If there are multiple tables, a sheet selection modal is displayed.",
     "h3_format": "6-5. Supported Format",
     "format_p1": "Uses standard Markdown table syntax. The first row is the header, the second row is the separator (<code>|---|</code>), and the rest is data.",
+    "format_example": "# Login Test\n\n| TC ID  | Category | Priority | Test Steps           | Expected Result      |\n|--------|----------|----------|----------------------|----------------------|\n| TC-001 | Login    | High     | Attempt normal login | Navigate to main     |\n| TC-002 | Login    | Medium   | Enter wrong password | Show error message   |\n\n## Search Feature\n\n| TC ID  | Category | Priority | Test Steps           | Expected Result      |\n|--------|----------|----------|----------------------|----------------------|\n| TC-003 | Search   | High     | Search by keyword    | Display results      |",
     "h3_sheetName": "6-6. Sheet Name Rules",
     "sn_li1": "The <code>#</code> or <code>##</code> heading above a table becomes the <strong>sheet name</strong>.",
     "sn_li2": "In the example above, \"Login Test\" and \"Search Feature\" become the respective sheet names.",
