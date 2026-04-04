@@ -45,6 +45,35 @@ YM TestCase System  v1.0.3.0  (2026-04-03)
 
 ---
 
+## v1.1.0.0 (2026-04-04) — 다국어 지원 (영문)
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.0.3.0 | **1.1.0.0** | feature +1 |
+| Frontend | 1.0.3.0 | **1.1.0.0** | feature +1 |
+| Backend | 1.0.3.0 | **1.1.0.0** | feature +1 |
+| Database | 0.4.0.0 | 0.4.0.0 | 변경 없음 |
+
+### 주요 변경
+
+- react-i18next 기반 i18n 시스템 구축
+- 한/영 로케일 파일 28개 (UI 12 + 매뉴얼 2 x 2언어, 650+ 번역 키)
+- 전체 UI 컴포넌트 17개 + 매뉴얼 2개 i18n 변환
+- Header에 EN/KO 언어 전환 버튼 (localStorage 저장)
+- AG Grid 로케일 자동 전환
+- 백엔드 에러 메시지 프론트 번역 매핑 (translateError, 25개)
+- TC Grid: priority/platform enum 표시 번역 (DB 값 유지, refData+valueFormatter)
+- 알림(notification) 기능 제거
+
+### 테스트 결과
+
+- Frontend: 358 PASS / 0 FAIL
+- Codex 검증 3회 → 시스템 UI 한글 누출 0건
+
+---
+
 ## v1.0.3.0 (2026-04-03) — 신규 기능 5개 + Codex 검증 수정
 
 ### 컴포넌트 버전
