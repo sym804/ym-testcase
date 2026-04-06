@@ -4,7 +4,8 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, load_only
+from sqlalchemy import func, case
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -41,60 +42,99 @@ def _get_run_or_404(project_id: int, test_run_id: int, db: Session) -> TestRun:
     return run
 
 
-def _build_report_data(run: TestRun, db: Session) -> dict:
-    results = (
-        db.query(TestResult)
-        .options(joinedload(TestResult.test_case))
-        .filter(TestResult.test_run_id == run.id)
+def _summary_sql(run_id: int, db: Session) -> dict:
+    """SQL 집계로 summary 생성 (Python 루프 대신)."""
+    row = db.query(
+        func.count(TestResult.id).label("total"),
+        func.sum(case((TestResult.result == TestResultValue.PASS, 1), else_=0)).label("passed"),
+        func.sum(case((TestResult.result == TestResultValue.FAIL, 1), else_=0)).label("failed"),
+        func.sum(case((TestResult.result == TestResultValue.BLOCK, 1), else_=0)).label("blocked"),
+        func.sum(case((TestResult.result == TestResultValue.NA, 1), else_=0)).label("na"),
+        func.sum(case((TestResult.result == TestResultValue.NS, 1), else_=0)).label("ns"),
+    ).filter(TestResult.test_run_id == run_id).first()
+
+    total = row.total or 0
+    passed = row.passed or 0
+    failed = row.failed or 0
+    blocked = row.blocked or 0
+    na = row.na or 0
+    ns = row.ns or 0
+    executed = passed + failed + blocked
+    pass_rate = round(passed / executed * 100, 1) if executed > 0 else 0.0
+
+    return {
+        "total": total, "passed": passed, "failed": failed,
+        "blocked": blocked, "na": na, "ns": ns, "pass_rate": pass_rate,
+    }
+
+
+def _category_summary_sql(run_id: int, db: Session) -> list:
+    """SQL 집계로 카테고리별 통계 생성."""
+    rows = (
+        db.query(
+            TestCase.category,
+            func.count(TestResult.id).label("total"),
+            func.sum(case((TestResult.result == TestResultValue.PASS, 1), else_=0)).label("passed"),
+            func.sum(case((TestResult.result == TestResultValue.FAIL, 1), else_=0)).label("failed"),
+            func.sum(case((TestResult.result == TestResultValue.BLOCK, 1), else_=0)).label("blocked"),
+            func.sum(case((TestResult.result == TestResultValue.NA, 1), else_=0)).label("na"),
+            func.sum(case((TestResult.result == TestResultValue.NS, 1), else_=0)).label("ns"),
+        )
+        .join(TestResult, TestResult.test_case_id == TestCase.id)
+        .filter(TestResult.test_run_id == run_id)
+        .group_by(TestCase.category)
         .all()
     )
+    return [
+        {
+            "category": r.category or "Uncategorized",
+            "total": r.total or 0,
+            "passed": r.passed or 0,
+            "failed": r.failed or 0,
+            "blocked": r.blocked or 0,
+            "na": r.na or 0,
+            "not_started": r.ns or 0,
+        }
+        for r in rows
+    ]
 
-    total = len(results)
-    passed = sum(1 for r in results if r.result == TestResultValue.PASS)
-    failed = sum(1 for r in results if r.result == TestResultValue.FAIL)
-    blocked = sum(1 for r in results if r.result == TestResultValue.BLOCK)
-    na = sum(1 for r in results if r.result == TestResultValue.NA)
-    ns = sum(1 for r in results if r.result == TestResultValue.NS)
 
-    executed = passed + failed + blocked
-    pass_rate = round((passed / executed * 100), 1) if executed > 0 else 0.0
+def _failed_items(run_id: int, db: Session) -> list:
+    """FAIL 결과만 필요한 컬럼으로 조회."""
+    results = (
+        db.query(TestResult)
+        .options(
+            joinedload(TestResult.test_case).load_only(
+                TestCase.tc_id, TestCase.category, TestCase.depth1,
+                TestCase.depth2, TestCase.test_steps, TestCase.expected_result,
+            )
+        )
+        .filter(
+            TestResult.test_run_id == run_id,
+            TestResult.result == TestResultValue.FAIL,
+        )
+        .all()
+    )
+    return [
+        {
+            "tc_id": r.test_case.tc_id,
+            "category": r.test_case.category,
+            "depth1": r.test_case.depth1,
+            "depth2": r.test_case.depth2,
+            "test_steps": r.test_case.test_steps,
+            "expected_result": r.test_case.expected_result,
+            "actual_result": r.actual_result,
+            "issue_link": r.issue_link,
+        }
+        for r in results
+    ]
 
-    # Group by category
-    category_map: dict[str, dict] = {}
-    for r in results:
-        cat = r.test_case.category or "Uncategorized"
-        if cat not in category_map:
-            category_map[cat] = {"total": 0, "passed": 0, "failed": 0, "blocked": 0, "na": 0, "not_started": 0}
-        category_map[cat]["total"] += 1
-        val = r.result.value if hasattr(r.result, "value") else r.result
-        if val == "PASS":
-            category_map[cat]["passed"] += 1
-        elif val == "FAIL":
-            category_map[cat]["failed"] += 1
-        elif val == "BLOCK":
-            category_map[cat]["blocked"] += 1
-        elif val in ("NA", "N/A"):
-            category_map[cat]["na"] += 1
-        elif val == "NS":
-            category_map[cat]["not_started"] += 1
-        else:
-            category_map[cat]["not_started"] += 1
 
-    # Failed items detail
-    failed_items = []
-    for r in results:
-        val = r.result.value if hasattr(r.result, "value") else r.result
-        if val == "FAIL":
-            failed_items.append({
-                "tc_id": r.test_case.tc_id,
-                "category": r.test_case.category,
-                "depth1": r.test_case.depth1,
-                "depth2": r.test_case.depth2,
-                "test_steps": r.test_case.test_steps,
-                "expected_result": r.test_case.expected_result,
-                "actual_result": r.actual_result,
-                "issue_link": r.issue_link,
-            })
+def _build_report_data(run: TestRun, db: Session) -> dict:
+    """SQL 집계 기반 리포트 데이터 생성 (전체 ORM 로드 없음)."""
+    summary = _summary_sql(run.id, db)
+    categories = _category_summary_sql(run.id, db)
+    failed = _failed_items(run.id, db)
 
     return {
         "run": {
@@ -107,19 +147,9 @@ def _build_report_data(run: TestRun, db: Session) -> dict:
             "created_at": run.created_at.isoformat() if run.created_at else None,
             "completed_at": run.completed_at.isoformat() if run.completed_at else None,
         },
-        "summary": {
-            "total": total,
-            "passed": passed,
-            "failed": failed,
-            "blocked": blocked,
-            "na": na,
-            "ns": ns,
-            "pass_rate": pass_rate,
-        },
-        "categories": [
-            {"category": k, **v} for k, v in category_map.items()
-        ],
-        "failed_items": failed_items,
+        "summary": summary,
+        "categories": categories,
+        "failed_items": failed,
     }
 
 
@@ -318,11 +348,11 @@ def report_pdf(
             pdf.set_font(font_name, "", 8)
             if item.get("test_steps"):
                 steps_text = str(item["test_steps"])[:200]
-                pdf.multi_cell(0, 5, f"   Steps: {steps_text}")
+                pdf.multi_cell(0, 5, f"   Steps: {steps_text}", new_x="LMARGIN", new_y="NEXT")
             if item.get("expected_result"):
-                pdf.multi_cell(0, 5, f"   Expected: {str(item['expected_result'])[:200]}")
+                pdf.multi_cell(0, 5, f"   Expected: {str(item['expected_result'])[:200]}", new_x="LMARGIN", new_y="NEXT")
             if item.get("actual_result"):
-                pdf.multi_cell(0, 5, f"   Actual: {str(item['actual_result'])[:200]}")
+                pdf.multi_cell(0, 5, f"   Actual: {str(item['actual_result'])[:200]}", new_x="LMARGIN", new_y="NEXT")
             if item.get("issue_link"):
                 pdf.cell(0, 5, f"   Issue: {item['issue_link']}", new_x="LMARGIN", new_y="NEXT")
             pdf.ln(3)
@@ -354,11 +384,20 @@ def report_excel(
         raise HTTPException(status_code=400, detail="run_id is required")
     project = _get_project_or_404(project_id, db)
     run = _get_run_or_404(project_id, run_id, db)
-    report_data = _build_report_data(run, db)
 
+    # SQL 집계로 summary + categories (전체 ORM 로드 없음)
+    summary = _summary_sql(run.id, db)
+
+    # Excel 결과 시트용: 1회만 조회 (이중 로드 제거), 필요한 컬럼만 load
     results = (
         db.query(TestResult)
-        .options(joinedload(TestResult.test_case))
+        .options(
+            joinedload(TestResult.test_case).load_only(
+                TestCase.no, TestCase.tc_id, TestCase.type, TestCase.category,
+                TestCase.depth1, TestCase.depth2, TestCase.priority,
+                TestCase.test_steps, TestCase.expected_result,
+            )
+        )
         .filter(TestResult.test_run_id == run.id)
         .all()
     )
@@ -391,7 +430,6 @@ def report_excel(
     ws_summary["B4"].value = f"Version: {run.version or 'N/A'}  |  Environment: {run.environment or 'N/A'}  |  Round: {run.round}"
 
     # Summary table
-    summary = report_data["summary"]
     sum_headers = ["Total", "Pass", "Fail", "Block", "NA", "NS", "Pass Rate"]
     sum_values = [
         summary["total"], summary["passed"], summary["failed"],

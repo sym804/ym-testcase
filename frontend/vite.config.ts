@@ -47,11 +47,15 @@ export default defineConfig({
     exclude: ["e2e/**", "node_modules/**"],
   },
   build: {
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ["react", "react-dom", "react-router-dom"],
           grid: ["ag-grid-community", "ag-grid-react"],
+          charts: ["chart.js", "react-chartjs-2"],
+          i18n: ["i18next", "react-i18next"],
+          utils: ["axios", "marked", "dompurify", "react-hot-toast"],
         },
       },
     },
