@@ -3,7 +3,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, case
 
 from database import get_db
 from models import User, TestCase, TestRun, TestResult, TestResultValue
@@ -15,8 +15,61 @@ router = APIRouter(
 )
 
 
+# ── SQL 집계 헬퍼 ────────────────────────────────────────────────────────────
+
+def _latest_run_subquery(project_id: int, db: Session, date_from: str = None, date_to: str = None):
+    """TC별 최신 런의 test_run_id를 구하는 서브쿼리."""
+    run_filter = [TestRun.project_id == project_id]
+    if date_from:
+        run_filter.append(TestRun.created_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        run_filter.append(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+
+    return (
+        db.query(
+            TestResult.test_case_id,
+            func.max(TestResult.test_run_id).label("max_run_id"),
+        )
+        .join(TestRun, TestResult.test_run_id == TestRun.id)
+        .filter(*run_filter)
+        .group_by(TestResult.test_case_id)
+        .subquery()
+    )
+
+
+def _result_count_cases():
+    """SQL CASE 기반 결과 카운트 표현식 목록."""
+    return {
+        "pass": func.sum(case((TestResult.result == TestResultValue.PASS, 1), else_=0)),
+        "fail": func.sum(case((TestResult.result == TestResultValue.FAIL, 1), else_=0)),
+        "block": func.sum(case((TestResult.result == TestResultValue.BLOCK, 1), else_=0)),
+        "na": func.sum(case((TestResult.result == TestResultValue.NA, 1), else_=0)),
+        "ns": func.sum(case((TestResult.result == TestResultValue.NS, 1), else_=0)),
+    }
+
+
+def _counts_from_row(row, total: int) -> dict:
+    """SQL 집계 결과 행을 dict로 변환."""
+    c = {
+        "pass": row.pass_count or 0,
+        "fail": row.fail_count or 0,
+        "block": row.block_count or 0,
+        "na": row.na_count or 0,
+        "not_started": 0,
+    }
+    c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
+    return c
+
+
+def _rates(counts: dict, total: int) -> dict:
+    """Calculate percentage rates."""
+    if total == 0:
+        return {f"{k}_rate": 0.0 for k in counts}
+    return {f"{k}_rate": round(v / total * 100, 1) for k, v in counts.items()}
+
+
 def _count_from_results(results: list) -> dict:
-    """Count test results from TestResult records."""
+    """Count test results from TestResult records (run_id 지정 시 사용)."""
     counts = {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": 0}
     for r in results:
         val = r.result.value if hasattr(r.result, "value") else str(r.result)
@@ -33,52 +86,6 @@ def _count_from_results(results: list) -> dict:
         else:
             counts["not_started"] += 1
     return counts
-
-
-def _get_all_results(project_id: int, db: Session, date_from: str = None, date_to: str = None) -> list:
-    """전체(run_id 미지정) 시: TC별 최신 런의 결과만 반환.
-
-    DB 서브쿼리로 TC별 가장 최신 런의 result_id를 구하고,
-    해당 결과만 조회한다. 런이 많아도 성능 OK.
-    """
-    # 날짜 필터 조건 구성
-    run_filter = [TestRun.project_id == project_id]
-    if date_from:
-        run_filter.append(TestRun.created_at >= datetime.fromisoformat(date_from))
-    if date_to:
-        run_filter.append(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
-
-    # 서브쿼리: TC별 최신 런의 test_run_id
-    latest_run_per_tc = (
-        db.query(
-            TestResult.test_case_id,
-            func.max(TestResult.test_run_id).label("max_run_id"),
-        )
-        .join(TestRun, TestResult.test_run_id == TestRun.id)
-        .filter(*run_filter)
-        .group_by(TestResult.test_case_id)
-        .subquery()
-    )
-
-    # 최신 런의 결과만 조회
-    return (
-        db.query(TestResult)
-        .join(
-            latest_run_per_tc,
-            and_(
-                TestResult.test_case_id == latest_run_per_tc.c.test_case_id,
-                TestResult.test_run_id == latest_run_per_tc.c.max_run_id,
-            ),
-        )
-        .all()
-    )
-
-
-def _rates(counts: dict, total: int) -> dict:
-    """Calculate percentage rates."""
-    if total == 0:
-        return {f"{k}_rate": 0.0 for k in counts}
-    return {f"{k}_rate": round(v / total * 100, 1) for k, v in counts.items()}
 
 
 # ── Summary ───────────────────────────────────────────────────────────────────
@@ -98,21 +105,42 @@ def dashboard_summary(
     ).count()
 
     if run_id:
-        results = db.query(TestResult).filter(TestResult.test_run_id == run_id).all()
-        if results:
-            c = _count_from_results(results)
+        cases = _result_count_cases()
+        row = db.query(
+            cases["pass"].label("pass_count"),
+            cases["fail"].label("fail_count"),
+            cases["block"].label("block_count"),
+            cases["na"].label("na_count"),
+        ).filter(TestResult.test_run_id == run_id).first()
+        if row and (row.pass_count or row.fail_count or row.block_count or row.na_count):
+            c = _counts_from_row(row, total)
         else:
             c = {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": total}
-        c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
         return {"total": total, **c, **_rates(c, total)}
 
-    # 전체 모드: TC별 최신 결과 기준
-    results = _get_all_results(project_id, db, date_from, date_to)
-    if results:
-        c = _count_from_results(results)
+    # 전체 모드: SQL 집계로 TC별 최신 결과 카운트
+    latest = _latest_run_subquery(project_id, db, date_from, date_to)
+    cases = _result_count_cases()
+    row = (
+        db.query(
+            cases["pass"].label("pass_count"),
+            cases["fail"].label("fail_count"),
+            cases["block"].label("block_count"),
+            cases["na"].label("na_count"),
+        )
+        .join(
+            latest,
+            and_(
+                TestResult.test_case_id == latest.c.test_case_id,
+                TestResult.test_run_id == latest.c.max_run_id,
+            ),
+        )
+        .first()
+    )
+    if row and (row.pass_count or row.fail_count or row.block_count or row.na_count):
+        c = _counts_from_row(row, total)
     else:
         c = {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": total}
-    c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
     return {"total": total, **c, **_rates(c, total)}
 
 
@@ -127,47 +155,77 @@ def priority_distribution(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
-    # 전체 모드: 모든 run 결과를 미리 조회
-    if not run_id:
-        all_results = _get_all_results(project_id, db, date_from, date_to)
-        results_by_tc: dict[int, list] = {}
-        for r in all_results:
-            results_by_tc.setdefault(r.test_case_id, []).append(r)
-    else:
-        results_by_tc = None
+    # TC priority별 총 건수
+    priority_totals = dict(
+        db.query(TestCase.priority, func.count(TestCase.id))
+        .filter(
+            TestCase.project_id == project_id,
+            TestCase.deleted_at.is_(None),
+            TestCase.priority.isnot(None),
+        )
+        .group_by(TestCase.priority)
+        .all()
+    )
+    if not priority_totals:
+        return []
 
-    # TC를 한 번에 조회 후 메모리에서 그룹핑 (N+1 방지)
-    all_tcs = db.query(TestCase).filter(
-        TestCase.project_id == project_id, TestCase.deleted_at.is_(None), TestCase.priority.isnot(None),
-    ).all()
+    cases = _result_count_cases()
 
-    tcs_by_priority: dict[str, list] = {}
-    for tc in all_tcs:
-        tcs_by_priority.setdefault(tc.priority, []).append(tc)
-
-    # run_id가 있으면 해당 런 결과도 한 번에 조회
-    run_results_by_tc: dict[int, TestResult] = {}
     if run_id:
-        all_tc_ids = [tc.id for tc in all_tcs]
-        if all_tc_ids:
-            for r in db.query(TestResult).filter(
+        rows = (
+            db.query(
+                TestCase.priority,
+                cases["pass"].label("pass_count"),
+                cases["fail"].label("fail_count"),
+                cases["block"].label("block_count"),
+                cases["na"].label("na_count"),
+            )
+            .join(TestResult, TestResult.test_case_id == TestCase.id)
+            .filter(
+                TestCase.project_id == project_id,
+                TestCase.deleted_at.is_(None),
+                TestCase.priority.isnot(None),
                 TestResult.test_run_id == run_id,
-                TestResult.test_case_id.in_(all_tc_ids),
-            ).all():
-                run_results_by_tc[r.test_case_id] = r
+            )
+            .group_by(TestCase.priority)
+            .all()
+        )
+    else:
+        latest = _latest_run_subquery(project_id, db, date_from, date_to)
+        rows = (
+            db.query(
+                TestCase.priority,
+                cases["pass"].label("pass_count"),
+                cases["fail"].label("fail_count"),
+                cases["block"].label("block_count"),
+                cases["na"].label("na_count"),
+            )
+            .join(TestResult, TestResult.test_case_id == TestCase.id)
+            .join(
+                latest,
+                and_(
+                    TestResult.test_case_id == latest.c.test_case_id,
+                    TestResult.test_run_id == latest.c.max_run_id,
+                ),
+            )
+            .filter(
+                TestCase.project_id == project_id,
+                TestCase.deleted_at.is_(None),
+                TestCase.priority.isnot(None),
+            )
+            .group_by(TestCase.priority)
+            .all()
+        )
+
+    counts_map = {}
+    for row in rows:
+        total = priority_totals.get(row.priority, 0)
+        counts_map[row.priority] = _counts_from_row(row, total)
 
     result = []
-    for priority, tcs in sorted(tcs_by_priority.items()):
-        tc_ids = [tc.id for tc in tcs]
-        total = len(tcs)
-
-        if run_id:
-            results = [run_results_by_tc[tid] for tid in tc_ids if tid in run_results_by_tc]
-        else:
-            results = [r for tid in tc_ids for r in results_by_tc.get(tid, [])]
-
-        c = _count_from_results(results)
-        c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
+    for priority in sorted(priority_totals.keys()):
+        total = priority_totals[priority]
+        c = counts_map.get(priority, {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": total})
         result.append({"priority": priority, "total": total, **c})
 
     return result
@@ -184,45 +242,76 @@ def category_breakdown(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
-    if not run_id:
-        all_results = _get_all_results(project_id, db, date_from, date_to)
-        results_by_tc: dict[int, list] = {}
-        for r in all_results:
-            results_by_tc.setdefault(r.test_case_id, []).append(r)
-    else:
-        results_by_tc = None
+    category_totals = dict(
+        db.query(TestCase.category, func.count(TestCase.id))
+        .filter(
+            TestCase.project_id == project_id,
+            TestCase.deleted_at.is_(None),
+            TestCase.category.isnot(None),
+        )
+        .group_by(TestCase.category)
+        .all()
+    )
+    if not category_totals:
+        return []
 
-    # TC를 한 번에 조회 후 메모리에서 그룹핑 (N+1 방지)
-    all_tcs = db.query(TestCase).filter(
-        TestCase.project_id == project_id, TestCase.deleted_at.is_(None), TestCase.category.isnot(None),
-    ).all()
+    cases = _result_count_cases()
 
-    tcs_by_category: dict[str, list] = {}
-    for tc in all_tcs:
-        tcs_by_category.setdefault(tc.category, []).append(tc)
-
-    run_results_by_tc: dict[int, TestResult] = {}
     if run_id:
-        all_tc_ids = [tc.id for tc in all_tcs]
-        if all_tc_ids:
-            for r in db.query(TestResult).filter(
+        rows = (
+            db.query(
+                TestCase.category,
+                cases["pass"].label("pass_count"),
+                cases["fail"].label("fail_count"),
+                cases["block"].label("block_count"),
+                cases["na"].label("na_count"),
+            )
+            .join(TestResult, TestResult.test_case_id == TestCase.id)
+            .filter(
+                TestCase.project_id == project_id,
+                TestCase.deleted_at.is_(None),
+                TestCase.category.isnot(None),
                 TestResult.test_run_id == run_id,
-                TestResult.test_case_id.in_(all_tc_ids),
-            ).all():
-                run_results_by_tc[r.test_case_id] = r
+            )
+            .group_by(TestCase.category)
+            .all()
+        )
+    else:
+        latest = _latest_run_subquery(project_id, db, date_from, date_to)
+        rows = (
+            db.query(
+                TestCase.category,
+                cases["pass"].label("pass_count"),
+                cases["fail"].label("fail_count"),
+                cases["block"].label("block_count"),
+                cases["na"].label("na_count"),
+            )
+            .join(TestResult, TestResult.test_case_id == TestCase.id)
+            .join(
+                latest,
+                and_(
+                    TestResult.test_case_id == latest.c.test_case_id,
+                    TestResult.test_run_id == latest.c.max_run_id,
+                ),
+            )
+            .filter(
+                TestCase.project_id == project_id,
+                TestCase.deleted_at.is_(None),
+                TestCase.category.isnot(None),
+            )
+            .group_by(TestCase.category)
+            .all()
+        )
+
+    counts_map = {}
+    for row in rows:
+        total = category_totals.get(row.category, 0)
+        counts_map[row.category] = _counts_from_row(row, total)
 
     result = []
-    for category, tcs in sorted(tcs_by_category.items()):
-        tc_ids = [tc.id for tc in tcs]
-        total = len(tcs)
-
-        if run_id:
-            results = [run_results_by_tc[tid] for tid in tc_ids if tid in run_results_by_tc]
-        else:
-            results = [r for tid in tc_ids for r in results_by_tc.get(tid, [])]
-
-        c = _count_from_results(results)
-        c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
+    for category in sorted(category_totals.keys()):
+        total = category_totals[category]
+        c = counts_map.get(category, {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": total})
         result.append({"category": category, "total": total, **c})
 
     return result
@@ -254,21 +343,34 @@ def round_comparison(
         if run.round not in seen_rounds:
             seen_rounds[run.round] = run
 
-    # 모든 라운드의 결과를 한 번에 조회 (N+1 방지)
-    run_ids = [run.id for run in seen_rounds.values()]
-    all_results = db.query(TestResult).filter(
-        TestResult.test_run_id.in_(run_ids)
-    ).all() if run_ids else []
+    if not seen_rounds:
+        return []
 
-    results_by_run: dict[int, list] = {}
-    for r in all_results:
-        results_by_run.setdefault(r.test_run_id, []).append(r)
+    # 모든 라운드의 결과를 SQL 집계로 한 번에 카운트
+    run_ids = [run.id for run in seen_rounds.values()]
+    cases = _result_count_cases()
+    rows = (
+        db.query(
+            TestResult.test_run_id,
+            cases["pass"].label("pass_count"),
+            cases["fail"].label("fail_count"),
+            cases["block"].label("block_count"),
+            cases["na"].label("na_count"),
+        )
+        .filter(TestResult.test_run_id.in_(run_ids))
+        .group_by(TestResult.test_run_id)
+        .all()
+    )
+
+    counts_by_run = {}
+    for row in rows:
+        c = _counts_from_row(row, total_tc)
+        counts_by_run[row.test_run_id] = c
 
     result = []
     for round_num in sorted(seen_rounds.keys()):
         run = seen_rounds[round_num]
-        results = results_by_run.get(run.id, [])
-        c = _count_from_results(results)
+        c = counts_by_run.get(run.id, {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": total_tc})
 
         executed = c["pass"] + c["fail"] + c["block"]
         pass_rate = round(c["pass"] / executed * 100, 1) if executed > 0 else 0.0
@@ -292,46 +394,79 @@ def assignee_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
-    if not run_id:
-        all_results = _get_all_results(project_id, db, date_from, date_to)
-        results_by_tc: dict[int, list] = {}
-        for r in all_results:
-            results_by_tc.setdefault(r.test_case_id, []).append(r)
-    else:
-        results_by_tc = None
+    assignee_totals = dict(
+        db.query(TestCase.assignee, func.count(TestCase.id))
+        .filter(
+            TestCase.project_id == project_id,
+            TestCase.deleted_at.is_(None),
+            TestCase.assignee.isnot(None),
+            TestCase.assignee != "",
+        )
+        .group_by(TestCase.assignee)
+        .all()
+    )
+    if not assignee_totals:
+        return []
 
-    # TC를 한 번에 조회 후 메모리에서 그룹핑 (N+1 방지)
-    all_tcs = db.query(TestCase).filter(
-        TestCase.project_id == project_id, TestCase.deleted_at.is_(None), TestCase.assignee.isnot(None),
-    ).all()
+    cases = _result_count_cases()
 
-    tcs_by_assignee: dict[str, list] = {}
-    for tc in all_tcs:
-        if tc.assignee and tc.assignee.strip():
-            tcs_by_assignee.setdefault(tc.assignee, []).append(tc)
-
-    run_results_by_tc: dict[int, TestResult] = {}
     if run_id:
-        all_tc_ids = [tc.id for tc in all_tcs]
-        if all_tc_ids:
-            for r in db.query(TestResult).filter(
+        rows = (
+            db.query(
+                TestCase.assignee,
+                cases["pass"].label("pass_count"),
+                cases["fail"].label("fail_count"),
+                cases["block"].label("block_count"),
+                cases["na"].label("na_count"),
+            )
+            .join(TestResult, TestResult.test_case_id == TestCase.id)
+            .filter(
+                TestCase.project_id == project_id,
+                TestCase.deleted_at.is_(None),
+                TestCase.assignee.isnot(None),
+                TestCase.assignee != "",
                 TestResult.test_run_id == run_id,
-                TestResult.test_case_id.in_(all_tc_ids),
-            ).all():
-                run_results_by_tc[r.test_case_id] = r
+            )
+            .group_by(TestCase.assignee)
+            .all()
+        )
+    else:
+        latest = _latest_run_subquery(project_id, db, date_from, date_to)
+        rows = (
+            db.query(
+                TestCase.assignee,
+                cases["pass"].label("pass_count"),
+                cases["fail"].label("fail_count"),
+                cases["block"].label("block_count"),
+                cases["na"].label("na_count"),
+            )
+            .join(TestResult, TestResult.test_case_id == TestCase.id)
+            .join(
+                latest,
+                and_(
+                    TestResult.test_case_id == latest.c.test_case_id,
+                    TestResult.test_run_id == latest.c.max_run_id,
+                ),
+            )
+            .filter(
+                TestCase.project_id == project_id,
+                TestCase.deleted_at.is_(None),
+                TestCase.assignee.isnot(None),
+                TestCase.assignee != "",
+            )
+            .group_by(TestCase.assignee)
+            .all()
+        )
+
+    counts_map = {}
+    for row in rows:
+        total = assignee_totals.get(row.assignee, 0)
+        counts_map[row.assignee] = _counts_from_row(row, total)
 
     result = []
-    for assignee, tcs in sorted(tcs_by_assignee.items()):
-        tc_ids = [tc.id for tc in tcs]
-        total = len(tcs)
-
-        if run_id:
-            results = [run_results_by_tc[tid] for tid in tc_ids if tid in run_results_by_tc]
-        else:
-            results = [r for tid in tc_ids for r in results_by_tc.get(tid, [])]
-
-        c = _count_from_results(results)
-        c["not_started"] = max(0, total - (c["pass"] + c["fail"] + c["block"] + c["na"]))
+    for assignee in sorted(assignee_totals.keys()):
+        total = assignee_totals[assignee]
+        c = counts_map.get(assignee, {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": total})
 
         done = total - c["not_started"]
         completion_rate = round(done / total * 100, 1) if total > 0 else 0.0
@@ -377,23 +512,8 @@ def get_heatmap(
             for r in query
         ]
 
-    # 전체 모드: TC별 최신 런 결과 기준 FAIL만 집계 (다른 위젯과 동일 기준)
-    run_filter = [TestRun.project_id == project_id]
-    if date_from:
-        run_filter.append(TestRun.created_at >= datetime.fromisoformat(date_from))
-    if date_to:
-        run_filter.append(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
-
-    latest_run_per_tc = (
-        db.query(
-            TestResult.test_case_id,
-            func.max(TestResult.test_run_id).label("max_run_id"),
-        )
-        .join(TestRun, TestResult.test_run_id == TestRun.id)
-        .filter(*run_filter)
-        .group_by(TestResult.test_case_id)
-        .subquery()
-    )
+    # 전체 모드: TC별 최신 런 결과 기준 FAIL만 집계
+    latest = _latest_run_subquery(project_id, db, date_from, date_to)
     query = (
         db.query(
             TestCase.category,
@@ -402,10 +522,10 @@ def get_heatmap(
         )
         .join(TestResult, TestResult.test_case_id == TestCase.id)
         .join(
-            latest_run_per_tc,
+            latest,
             and_(
-                TestResult.test_case_id == latest_run_per_tc.c.test_case_id,
-                TestResult.test_run_id == latest_run_per_tc.c.max_run_id,
+                TestResult.test_case_id == latest.c.test_case_id,
+                TestResult.test_run_id == latest.c.max_run_id,
             ),
         )
         .filter(

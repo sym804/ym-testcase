@@ -139,7 +139,9 @@ describe("ProjectPage", () => {
     });
 
     await user.click(screen.getByText("테스트 수행"));
-    expect(screen.getByTestId("run-manager")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("run-manager")).toBeInTheDocument();
+    });
   });
 
   it("설정 탭에서 접근 설정을 표시한다", async () => {

@@ -122,19 +122,26 @@ def _build_sheet_tree(sheets, tc_counts):
 
 
 def _collect_descendant_names(sheet_id: int, db: Session, project_id: int) -> list[str]:
-    """시트와 모든 하위 시트의 이름 목록 반환"""
+    """시트와 모든 하위 시트의 이름 목록 반환 (1회 DB 조회)"""
     from models import TestCaseSheet
+    # 전체 시트를 한 번에 로드 후 메모리에서 트리 탐색
+    all_sheets = db.query(TestCaseSheet).filter(
+        TestCaseSheet.project_id == project_id
+    ).all()
+    sheet_map = {s.id: s for s in all_sheets}
+    children_map: dict[int, list] = {}
+    for s in all_sheets:
+        if s.parent_id is not None:
+            children_map.setdefault(s.parent_id, []).append(s.id)
+
     names = []
     stack = [sheet_id]
     while stack:
         sid = stack.pop()
-        s = db.query(TestCaseSheet).filter(TestCaseSheet.id == sid, TestCaseSheet.project_id == project_id).first()
+        s = sheet_map.get(sid)
         if s:
             names.append(s.name)
-            children = db.query(TestCaseSheet).filter(
-                TestCaseSheet.parent_id == sid, TestCaseSheet.project_id == project_id
-            ).all()
-            stack.extend(c.id for c in children)
+            stack.extend(children_map.get(sid, []))
     return names
 
 

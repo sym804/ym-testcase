@@ -82,16 +82,23 @@ def create_testrun(
     db.add(run)
     db.flush()  # get run.id
 
-    # Auto-create empty TestResult for each TC in the project
-    tcs = db.query(TestCase).filter(TestCase.project_id == project_id, TestCase.deleted_at.is_(None)).order_by(TestCase.no).all()
-    for tc in tcs:
-        tr = TestResult(
-            test_run_id=run.id,
-            test_case_id=tc.id,
-            result=TestResultValue.NS,
-            executed_by=current_user.id,
-        )
-        db.add(tr)
+    # Auto-create empty TestResult for each TC in the project (bulk insert)
+    tc_ids = [
+        row[0] for row in db.query(TestCase.id)
+        .filter(TestCase.project_id == project_id, TestCase.deleted_at.is_(None))
+        .order_by(TestCase.no)
+        .all()
+    ]
+    if tc_ids:
+        db.bulk_insert_mappings(TestResult, [
+            {
+                "test_run_id": run.id,
+                "test_case_id": tc_id,
+                "result": TestResultValue.NS,
+                "executed_by": current_user.id,
+            }
+            for tc_id in tc_ids
+        ])
 
     db.commit()
     db.refresh(run)
@@ -175,22 +182,29 @@ def submit_results(
             detail="One or more test case IDs are invalid for this project",
         )
 
-    saved: list[TestResult] = []
+    # Validate result enums upfront
+    result_enums = {}
     for r in results:
-        # Validate result enum
         try:
-            result_enum = TestResultValue(r.result)
+            result_enums[r.test_case_id] = TestResultValue(r.result)
         except ValueError:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid result value: {r.result}. Must be one of PASS, FAIL, BLOCK, NA, NS",
             )
 
-        # Check if result already exists for this run + test case
-        existing = db.query(TestResult).filter(
-            TestResult.test_run_id == run_id,
-            TestResult.test_case_id == r.test_case_id,
-        ).first()
+    # Prefetch existing results in a single query (N+1 방지)
+    existing_map: dict[int, TestResult] = {}
+    existing_results = db.query(TestResult).filter(
+        TestResult.test_run_id == run_id,
+        TestResult.test_case_id.in_(tc_ids),
+    ).all()
+    for er in existing_results:
+        existing_map[er.test_case_id] = er
+
+    saved: list[TestResult] = []
+    for r in results:
+        result_enum = result_enums[r.test_case_id]
 
         # Parse optional time fields
         started = None
@@ -206,6 +220,7 @@ def submit_results(
             except (ValueError, TypeError):
                 pass
 
+        existing = existing_map.get(r.test_case_id)
         if existing:
             existing.result = result_enum
             existing.actual_result = r.actual_result
@@ -348,14 +363,16 @@ def clone_testrun(
     db.add(new_run)
     db.flush()
 
-    for r in source.results:
-        tr = TestResult(
-            test_run_id=new_run.id,
-            test_case_id=r.test_case_id,
-            result=TestResultValue.NS,
-            executed_by=current_user.id,
-        )
-        db.add(tr)
+    if source.results:
+        db.bulk_insert_mappings(TestResult, [
+            {
+                "test_run_id": new_run.id,
+                "test_case_id": r.test_case_id,
+                "result": TestResultValue.NS,
+                "executed_by": current_user.id,
+            }
+            for r in source.results
+        ])
 
     db.commit()
     db.refresh(new_run)

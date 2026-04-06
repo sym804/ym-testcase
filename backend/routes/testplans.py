@@ -54,6 +54,61 @@ def _plan_progress(plan_id: int, db: Session) -> dict:
     }
 
 
+from sqlalchemy import case as sa_case
+
+
+def _bulk_plan_stats(plan_ids: list[int], db: Session) -> dict[int, tuple[int, dict]]:
+    """여러 플랜의 run_count + progress를 2회 SQL로 일괄 조회 (N+1 방지)"""
+    if not plan_ids:
+        return {}
+
+    # 1) 플랜별 run count — 1회 쿼리
+    run_counts_rows = (
+        db.query(TestRun.test_plan_id, func.count(TestRun.id))
+        .filter(TestRun.test_plan_id.in_(plan_ids))
+        .group_by(TestRun.test_plan_id)
+        .all()
+    )
+    run_counts = dict(run_counts_rows)
+
+    # 2) 플랜별 결과 집계 — 1회 쿼리
+    progress_rows = (
+        db.query(
+            TestRun.test_plan_id,
+            func.sum(sa_case((TestResult.result == TestResultValue.PASS, 1), else_=0)).label("p"),
+            func.sum(sa_case((TestResult.result == TestResultValue.FAIL, 1), else_=0)).label("f"),
+            func.sum(sa_case((TestResult.result == TestResultValue.BLOCK, 1), else_=0)).label("b"),
+            func.sum(sa_case((TestResult.result == TestResultValue.NA, 1), else_=0)).label("na"),
+            func.sum(sa_case((TestResult.result == TestResultValue.NS, 1), else_=0)).label("ns"),
+            func.count(TestResult.id).label("total"),
+        )
+        .join(TestRun, TestResult.test_run_id == TestRun.id)
+        .filter(TestRun.test_plan_id.in_(plan_ids))
+        .group_by(TestRun.test_plan_id)
+        .all()
+    )
+
+    empty = {"total": 0, "pass": 0, "fail": 0, "block": 0, "na": 0, "ns": 0, "pass_rate": 0.0}
+    result: dict[int, tuple[int, dict]] = {}
+
+    progress_map = {}
+    for row in progress_rows:
+        p, f, b = row.p or 0, row.f or 0, row.b or 0
+        executed = p + f + b
+        pass_rate = round(p / executed * 100, 1) if executed > 0 else 0.0
+        progress_map[row.test_plan_id] = {
+            "total": row.total or 0,
+            "pass": p, "fail": f, "block": b,
+            "na": row.na or 0, "ns": row.ns or 0,
+            "pass_rate": pass_rate,
+        }
+
+    for pid in plan_ids:
+        result[pid] = (run_counts.get(pid, 0), progress_map.get(pid, empty.copy()))
+
+    return result
+
+
 @router.get("", response_model=List[TestPlanResponse])
 def list_test_plans(
     project_id: int,
@@ -67,10 +122,13 @@ def list_test_plans(
         .order_by(TestPlan.created_at.desc())
         .all()
     )
+
+    # 일괄 조회로 N+1 제거 (플랜 수와 무관하게 SQL 2회)
+    stats = _bulk_plan_stats([p.id for p in plans], db)
+
     result = []
     for p in plans:
-        run_count = db.query(TestRun).filter(TestRun.test_plan_id == p.id).count()
-        progress = _plan_progress(p.id, db)
+        run_count, progress = stats.get(p.id, (0, {"total": 0, "pass": 0, "fail": 0, "block": 0, "na": 0, "ns": 0, "pass_rate": 0.0}))
         r = TestPlanResponse.model_validate(p)
         r.run_count = run_count
         r.progress = progress

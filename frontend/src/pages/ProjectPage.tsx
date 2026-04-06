@@ -1,16 +1,17 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { projectsApi } from "../api";
 import type { Project } from "../types";
 import Header from "../components/Header";
-import TestCaseGrid from "../components/TestCaseGrid";
-import TestRunManager from "../components/TestRunManager";
-import Dashboard from "../components/Dashboard";
-import ReportView from "../components/ReportView";
-import CompareView from "../components/CompareView";
-import ProjectSettings from "../components/ProjectSettings";
 import toast from "react-hot-toast";
+
+const TestCaseGrid = lazy(() => import("../components/TestCaseGrid"));
+const TestRunManager = lazy(() => import("../components/TestRunManager"));
+const Dashboard = lazy(() => import("../components/Dashboard"));
+const ReportView = lazy(() => import("../components/ReportView"));
+const CompareView = lazy(() => import("../components/CompareView"));
+const ProjectSettings = lazy(() => import("../components/ProjectSettings"));
 
 const TAB_KEYS = ["tc", "run", "compare", "dashboard", "report", "settings"];
 
@@ -83,12 +84,14 @@ export default function ProjectPage() {
         </div>
       </div>
       <div style={activeTab === "tc" || activeTab === "run" || activeTab === "compare" ? styles.contentWide : styles.content}>
-        {activeTab === "tc" && <TestCaseGrid projectId={projectId} project={project} highlightTcId={highlightTcId} />}
-        {activeTab === "run" && <TestRunManager projectId={projectId} project={project} />}
-        {activeTab === "compare" && <CompareView projectId={projectId} />}
-        {activeTab === "dashboard" && <Dashboard projectId={projectId} />}
-        {activeTab === "report" && <ReportView projectId={projectId} />}
-        {activeTab === "settings" && <ProjectSettings project={project} onUpdate={setProject} />}
+        <Suspense fallback={<div style={{ textAlign: "center", padding: 40, color: "var(--text-secondary)" }}>{t("common:loadingData")}</div>}>
+          {activeTab === "tc" && <TestCaseGrid projectId={projectId} project={project} highlightTcId={highlightTcId} />}
+          {activeTab === "run" && <TestRunManager projectId={projectId} project={project} />}
+          {activeTab === "compare" && <CompareView projectId={projectId} />}
+          {activeTab === "dashboard" && <Dashboard projectId={projectId} />}
+          {activeTab === "report" && <ReportView projectId={projectId} />}
+          {activeTab === "settings" && <ProjectSettings project={project} onUpdate={setProject} />}
+        </Suspense>
       </div>
     </div>
   );
