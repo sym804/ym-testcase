@@ -400,7 +400,7 @@ def assignee_summary(
             TestCase.project_id == project_id,
             TestCase.deleted_at.is_(None),
             TestCase.assignee.isnot(None),
-            TestCase.assignee != "",
+            func.trim(TestCase.assignee) != "",
         )
         .group_by(TestCase.assignee)
         .all()
@@ -424,7 +424,7 @@ def assignee_summary(
                 TestCase.project_id == project_id,
                 TestCase.deleted_at.is_(None),
                 TestCase.assignee.isnot(None),
-                TestCase.assignee != "",
+                func.trim(TestCase.assignee) != "",
                 TestResult.test_run_id == run_id,
             )
             .group_by(TestCase.assignee)
@@ -452,7 +452,7 @@ def assignee_summary(
                 TestCase.project_id == project_id,
                 TestCase.deleted_at.is_(None),
                 TestCase.assignee.isnot(None),
-                TestCase.assignee != "",
+                func.trim(TestCase.assignee) != "",
             )
             .group_by(TestCase.assignee)
             .all()

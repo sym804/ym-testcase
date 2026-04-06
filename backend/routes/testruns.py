@@ -182,11 +182,10 @@ def submit_results(
             detail="One or more test case IDs are invalid for this project",
         )
 
-    # Validate result enums upfront
-    result_enums = {}
+    # Validate all result enums upfront
     for r in results:
         try:
-            result_enums[r.test_case_id] = TestResultValue(r.result)
+            TestResultValue(r.result)
         except ValueError:
             raise HTTPException(
                 status_code=400,
@@ -204,7 +203,7 @@ def submit_results(
 
     saved: list[TestResult] = []
     for r in results:
-        result_enum = result_enums[r.test_case_id]
+        result_enum = TestResultValue(r.result)
 
         # Parse optional time fields
         started = None
