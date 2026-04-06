@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YM TestCase API",
     description="Your Method, Your Test Case Manager",
-    version="1.0.3.0",
+    version="1.1.0.1",
     lifespan=lifespan,
 )
 
