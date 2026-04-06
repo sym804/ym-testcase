@@ -119,15 +119,6 @@ def get_testrun(
         .options(
             subqueryload(TestRun.results)
             .joinedload(TestResult.test_case)
-            .load_only(
-                TestCase.id, TestCase.project_id, TestCase.no, TestCase.tc_id,
-                TestCase.type, TestCase.category, TestCase.depth1, TestCase.depth2,
-                TestCase.priority, TestCase.test_type, TestCase.precondition,
-                TestCase.test_steps, TestCase.expected_result,
-                TestCase.issue_link, TestCase.assignee, TestCase.remarks,
-                TestCase.sheet_name, TestCase.custom_fields,
-                TestCase.created_at, TestCase.updated_at, TestCase.created_by,
-            )
         )
         .filter(TestRun.id == run_id, TestRun.project_id == project_id)
         .first()
