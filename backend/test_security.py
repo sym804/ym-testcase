@@ -1948,3 +1948,382 @@ class TestMemberRoleReset:
             "user_id": store.viewer_uid, "role": "viewer"
         })
         assert r.status_code == 400, f"viewer 역할이 허용됨: {r.status_code}"
+
+
+# ── 시트 Rename / Move (정규 회귀) ─────────────────────────────
+
+
+class TestSheetRenameMove:
+    """시트 이름 변경 및 이동 관련 회귀 테스트 (7개)."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, project_pair):
+        self.pub_id, _ = project_pair
+        self.h = auth(store.admin)
+        # 시트 생성: Root > Child
+        r = requests.post(f"{BASE}/api/projects/{self.pub_id}/testcases/sheets",
+                          headers=self.h, json={"name": "__rename_root__"})
+        self.root_id = r.json()["id"]
+        r2 = requests.post(f"{BASE}/api/projects/{self.pub_id}/testcases/sheets",
+                           headers=self.h, json={"name": "__rename_child__", "parent_id": self.root_id})
+        self.child_id = r2.json()["id"]
+        yield
+        # cleanup
+        try:
+            requests.delete(f"{BASE}/api/projects/{self.pub_id}/testcases/sheets/__rename_root__", headers=self.h)
+        except Exception:
+            pass
+
+    def test_rename_sheet(self):
+        """시트 이름 변경 성공"""
+        r = requests.put(
+            f"{BASE}/api/projects/{self.pub_id}/testcases/sheets/{self.root_id}/rename",
+            headers=self.h, json={"new_name": "__rename_root_v2__"})
+        assert r.status_code == 200
+        assert r.json()["name"] == "__rename_root_v2__"
+        # rollback
+        requests.put(
+            f"{BASE}/api/projects/{self.pub_id}/testcases/sheets/{self.root_id}/rename",
+            headers=self.h, json={"new_name": "__rename_root__"})
+
+    def test_rename_empty_rejected(self):
+        """빈 이름으로 변경 시 400"""
+        r = requests.put(
+            f"{BASE}/api/projects/{self.pub_id}/testcases/sheets/{self.root_id}/rename",
+            headers=self.h, json={"new_name": ""})
+        assert r.status_code == 400
+
+    def test_rename_duplicate_rejected(self):
+        """중복 이름으로 변경 시 400"""
+        r = requests.put(
+            f"{BASE}/api/projects/{self.pub_id}/testcases/sheets/{self.child_id}/rename",
+            headers=self.h, json={"new_name": "__rename_root__"})
+        assert r.status_code == 400
+
+    def test_move_sheet(self):
+        """시트 이동 성공"""
+        # child를 루트로 이동
+        r = requests.put(
+            f"{BASE}/api/projects/{self.pub_id}/testcases/sheets/{self.child_id}/move",
+            headers=self.h, json={"parent_id": None})
+        assert r.status_code == 200
+        assert r.json()["parent_id"] is None
+        # rollback
+        requests.put(
+            f"{BASE}/api/projects/{self.pub_id}/testcases/sheets/{self.child_id}/move",
+            headers=self.h, json={"parent_id": self.root_id})
+
+    def test_move_circular_rejected(self):
+        """순환 참조 이동 시 400"""
+        r = requests.put(
+            f"{BASE}/api/projects/{self.pub_id}/testcases/sheets/{self.root_id}/move",
+            headers=self.h, json={"parent_id": self.child_id})
+        assert r.status_code == 400
+
+    def test_rename_syncs_tc_sheet_name(self):
+        """시트 이름 변경 시 TC의 sheet_name도 동기화"""
+        # child에 TC 생성 (child는 leaf이므로 OK)
+        tc_r = requests.post(f"{BASE}/api/projects/{self.pub_id}/testcases", headers=self.h,
+                             json={"no": 19001, "tc_id": "TC-SYNC-RENAME", "sheet_name": "__rename_child__"})
+        tc_id = tc_r.json()["id"] if tc_r.status_code == 201 else None
+
+        requests.put(
+            f"{BASE}/api/projects/{self.pub_id}/testcases/sheets/{self.child_id}/rename",
+            headers=self.h, json={"new_name": "__rename_child_v2__"})
+
+        # TC 확인
+        tcs = requests.get(f"{BASE}/api/projects/{self.pub_id}/testcases",
+                           params={"sheet_name": "__rename_child_v2__"}, headers=self.h).json()
+        found = any(t["tc_id"] == "TC-SYNC-RENAME" for t in tcs)
+        assert found, "TC sheet_name이 동기화되지 않음"
+
+        # rollback
+        requests.put(
+            f"{BASE}/api/projects/{self.pub_id}/testcases/sheets/{self.child_id}/rename",
+            headers=self.h, json={"new_name": "__rename_child__"})
+        if tc_id:
+            requests.delete(f"{BASE}/api/projects/{self.pub_id}/testcases/{tc_id}", headers=self.h)
+
+    def test_viewer_cannot_rename(self, project_pair):
+        """viewer는 시트 이름 변경 불가 → 403"""
+        pub_id, _ = project_pair
+        r = requests.put(
+            f"{BASE}/api/projects/{pub_id}/testcases/sheets/{self.root_id}/rename",
+            headers=auth(store.viewer), json={"new_name": "hacked"})
+        assert r.status_code == 403
+
+
+# ── Bulk Clone (정규 회귀) ───────────────────────────────────
+
+
+class TestBulkClone:
+    """TC 복제 관련 회귀 테스트 (4개)."""
+
+    def test_single_clone(self, project_pair):
+        """TC 단건 복제"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h,
+                           json={"no": 19101, "tc_id": "TC-CLN-SRC", "test_steps": "s", "category": "Clone"}).json()
+        tc_id = tc["id"]
+
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testcases/{tc_id}/clone", headers=h)
+        assert r.status_code == 201
+        cloned = r.json()
+        assert cloned["tc_id"] == "TC-CLN-SRC-copy"
+        assert cloned["category"] == "Clone"
+
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{cloned['id']}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc_id}", headers=h)
+
+    def test_bulk_clone(self, project_pair):
+        """TC 벌크 복제"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        ids = []
+        for i in range(2):
+            tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h,
+                               json={"no": 19110 + i, "tc_id": f"TC-BCLN-{i}", "test_steps": "s"}).json()
+            ids.append(tc["id"])
+
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testcases/bulk-clone",
+                          headers=h, json={"ids": ids})
+        assert r.status_code == 201
+        assert len(r.json()) == 2
+
+        # cleanup
+        for c in r.json():
+            requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{c['id']}", headers=h)
+        for tid in ids:
+            requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tid}", headers=h)
+
+    def test_clone_nonexistent_404(self, project_pair):
+        """존재하지 않는 TC 복제 → 404"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testcases/999999/clone", headers=h)
+        assert r.status_code == 404
+
+    def test_viewer_cannot_clone(self, project_pair):
+        """viewer는 TC 복제 불가 → 403"""
+        pub_id, _ = project_pair
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testcases/999999/clone",
+                          headers=auth(store.viewer))
+        assert r.status_code == 403
+
+
+# ── TC Result History (정규 회귀) ────────────────────────────
+
+
+class TestResultHistory:
+    """TC별 결과 히스토리 회귀 테스트 (3개)."""
+
+    def test_result_history_basic(self, project_pair):
+        """TC 결과 히스토리 기본 조회"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h,
+                           json={"no": 19201, "tc_id": "TC-HIST-REG", "test_steps": "s"}).json()
+
+        # 런 생성 + 결과 제출
+        run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h,
+                            json={"name": "HistRun", "round": 1}).json()
+        requests.post(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}/results",
+                      headers=h, json=[{"test_case_id": tc["id"], "result": "PASS"}])
+
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/testcases/{tc['id']}/result-history", headers=h)
+        assert r.status_code == 200
+        history = r.json()
+        assert len(history) >= 1
+        assert history[0]["result"] == "PASS"
+        assert "run_name" in history[0]
+
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc['id']}", headers=h)
+
+    def test_result_history_nonexistent_tc_404(self, project_pair):
+        """존재하지 않는 TC 히스토리 → 404"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/testcases/999999/result-history", headers=h)
+        assert r.status_code == 404
+
+    def test_result_history_no_auth_401(self, project_pair):
+        """인증 없이 히스토리 조회 → 401"""
+        pub_id, _ = project_pair
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/testcases/1/result-history")
+        assert r.status_code == 401
+
+
+# ── Test Run Clone / Export / Complete / Reopen (정규 회귀) ──
+
+
+class TestRunLifecycle:
+    """테스트 런 생명주기 회귀 테스트 (6개)."""
+
+    def test_run_complete_and_reopen(self, project_pair):
+        """런 완료 후 재개"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h,
+                            json={"name": "LifecycleRun", "round": 1}).json()
+        run_id = run["id"]
+
+        # complete
+        r = requests.put(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}/complete", headers=h)
+        assert r.status_code == 200
+        assert r.json()["status"] == "completed"
+
+        # reopen
+        r = requests.put(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}/reopen", headers=h)
+        assert r.status_code == 200
+        assert r.json()["status"] == "in_progress"
+
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}", headers=h)
+
+    def test_run_clone(self, project_pair):
+        """런 복제 → 결과 NS 초기화"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h,
+                           json={"no": 19301, "tc_id": "TC-RCLONE", "test_steps": "s"}).json()
+        run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h,
+                            json={"name": "CloneRun", "round": 1}).json()
+        requests.post(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}/results",
+                      headers=h, json=[{"test_case_id": tc["id"], "result": "PASS"}])
+
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}/clone", headers=h)
+        assert r.status_code == 201
+        cloned = r.json()
+        assert cloned["status"] == "in_progress"
+
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{cloned['id']}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc['id']}", headers=h)
+
+    def test_run_export_excel(self, project_pair):
+        """런 Export Excel"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h,
+                            json={"name": "ExportRun", "round": 1}).json()
+
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}/export", headers=h)
+        assert r.status_code == 200
+        assert "spreadsheet" in r.headers.get("content-type", "")
+
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}", headers=h)
+
+    def test_run_clone_nonexistent_404(self, project_pair):
+        """존재하지 않는 런 복제 → 404"""
+        pub_id, _ = project_pair
+        r = requests.post(f"{BASE}/api/projects/{pub_id}/testruns/999999/clone",
+                          headers=auth(store.admin))
+        assert r.status_code == 404
+
+    def test_run_export_nonexistent_404(self, project_pair):
+        """존재하지 않는 런 export → 404"""
+        pub_id, _ = project_pair
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/testruns/999999/export",
+                         headers=auth(store.admin))
+        assert r.status_code == 404
+
+    def test_run_delete(self, project_pair):
+        """런 삭제 후 조회 시 404"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h,
+                            json={"name": "DelRun", "round": 1}).json()
+        run_id = run["id"]
+
+        r = requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}", headers=h)
+        assert r.status_code == 204
+
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/testruns/{run_id}", headers=h)
+        assert r.status_code == 404
+
+
+# ── Report API (정규 회귀) ───────────────────────────────────
+
+
+class TestReportAPI:
+    """리포트 API 회귀 테스트 (5개)."""
+
+    def test_report_json(self, project_pair):
+        """JSON 리포트 기본 조회"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h,
+                           json={"no": 19401, "tc_id": "TC-RPT", "test_steps": "s"}).json()
+        run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h,
+                            json={"name": "ReportRun", "round": 1}).json()
+        requests.post(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}/results",
+                      headers=h, json=[{"test_case_id": tc["id"], "result": "PASS"}])
+
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/reports",
+                         params={"run_id": run["id"]}, headers=h)
+        assert r.status_code == 200
+        data = r.json()
+        assert "project" in data and "summary" in data
+
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc['id']}", headers=h)
+
+    def test_report_pdf(self, project_pair):
+        """PDF 리포트 다운로드"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h,
+                           json={"no": 19411, "tc_id": "TC-RPT-PDF", "test_steps": "s"}).json()
+        run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h,
+                            json={"name": "PDFRun", "round": 1}).json()
+        requests.post(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}/results",
+                      headers=h, json=[{"test_case_id": tc["id"], "result": "PASS"}])
+
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/reports/pdf",
+                         params={"run_id": run["id"]}, headers=h)
+        assert r.status_code == 200
+        assert "pdf" in r.headers.get("content-type", "")
+        assert len(r.content) > 100
+
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc['id']}", headers=h)
+
+    def test_report_excel(self, project_pair):
+        """Excel 리포트 다운로드"""
+        pub_id, _ = project_pair
+        h = auth(store.admin)
+        tc = requests.post(f"{BASE}/api/projects/{pub_id}/testcases", headers=h,
+                           json={"no": 19421, "tc_id": "TC-RPT-XLS", "test_steps": "s"}).json()
+        run = requests.post(f"{BASE}/api/projects/{pub_id}/testruns", headers=h,
+                            json={"name": "XLSRun", "round": 1}).json()
+        requests.post(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}/results",
+                      headers=h, json=[{"test_case_id": tc["id"], "result": "PASS"}])
+
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/reports/excel",
+                         params={"run_id": run["id"]}, headers=h)
+        assert r.status_code == 200
+        assert "spreadsheet" in r.headers.get("content-type", "")
+
+        # cleanup
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run['id']}", headers=h)
+        requests.delete(f"{BASE}/api/projects/{pub_id}/testcases/{tc['id']}", headers=h)
+
+    def test_report_no_run_id_400(self, project_pair):
+        """run_id 없이 리포트 조회 → 400"""
+        pub_id, _ = project_pair
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/reports", headers=auth(store.admin))
+        assert r.status_code in (400, 422)
+
+    def test_report_no_auth_401(self, project_pair):
+        """인증 없이 리포트 조회 → 401"""
+        pub_id, _ = project_pair
+        r = requests.get(f"{BASE}/api/projects/{pub_id}/reports", params={"run_id": 1})
+        assert r.status_code == 401
