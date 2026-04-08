@@ -667,7 +667,7 @@
     "test_plan_id 저장",
     "PASS",
     "핵심",
-    "test_plan_id=2"
+    "test_plan_id=8"
   ],
   [
     "테스트 플랜",
@@ -957,7 +957,7 @@
     "priority=높음",
     "PASS",
     "핵심",
-    "got {'FLT-E01', 'FLT-E03'}"
+    "got {'FLT-E03', 'FLT-E01'}"
   ],
   [
     "고급 필터",
@@ -967,7 +967,7 @@
     "priority≠높음",
     "PASS",
     "핵심",
-    "got {'FLT-E04', 'FLT-E05', 'FLT-E06', 'FLT-E02'}"
+    "got {'FLT-E04', 'FLT-E06', 'FLT-E05', 'FLT-E02'}"
   ],
   [
     "고급 필터",
@@ -1007,7 +1007,7 @@
     "assignee 있음",
     "PASS",
     "핵심",
-    "got {'FLT-E01', 'FLT-E03', 'FLT-E06', 'FLT-E04'}"
+    "got {'FLT-E04', 'FLT-E03', 'FLT-E06', 'FLT-E01'}"
   ],
   [
     "고급 필터",
@@ -1147,7 +1147,7 @@
     "Login 일치",
     "PASS",
     "중간",
-    "got {'FLT-E01', 'FLT-E05', 'FLT-E06'}"
+    "got {'FLT-E05', 'FLT-E06', 'FLT-E01'}"
   ],
   [
     "고급 필터",

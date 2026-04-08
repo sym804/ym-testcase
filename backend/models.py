@@ -122,8 +122,6 @@ class TestCase(Base):
     r1 = Column(String(10), nullable=True)
     r2 = Column(String(10), nullable=True)
     r3 = Column(String(10), nullable=True)
-    issue_link = Column(String(500), nullable=True)
-    assignee = Column(String(100), nullable=True)
     remarks = Column(Text, nullable=True)
     created_at = Column(DateTime, default=now_kst)
     updated_at = Column(DateTime, default=now_kst, onupdate=now_kst)

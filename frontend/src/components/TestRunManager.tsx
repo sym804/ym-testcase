@@ -170,7 +170,17 @@ export default function TestRunManager({ projectId, project }: Props) {
     const api = gridApiRef.current;
     if (!api || event.rowIndex == null) return;
 
-    if (browserEvent?.shiftKey && fillAnchorRef.current && fillAnchorRef.current.field === field) {
+    // 일반 클릭은 앵커만 저장하고 AG Grid singleClickEdit에 맡김
+    if (!browserEvent?.shiftKey) {
+      fillAnchorRef.current = {
+        rowIndex: event.rowIndex,
+        field,
+        value: event.value as string,
+      };
+      return;
+    }
+
+    if (fillAnchorRef.current && fillAnchorRef.current.field === field) {
       // Shift+Click: 앵커부터 현재 행까지 같은 값으로 채우기
       const anchor = fillAnchorRef.current;
       const startIdx = Math.min(anchor.rowIndex, event.rowIndex);
@@ -191,13 +201,6 @@ export default function TestRunManager({ projectId, project }: Props) {
         saveManyResults(changed);
       }
       fillAnchorRef.current = null;
-    } else {
-      // 일반 클릭: 앵커 저장
-      fillAnchorRef.current = {
-        rowIndex: event.rowIndex,
-        field,
-        value: event.value as string,
-      };
     }
   }, [saveManyResults]);
 
@@ -609,7 +612,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       {
         field: "test_case.test_steps",
         headerName: "Test Steps",
-        width: 280,
+        minWidth: 350, flex: 2,
         wrapText: true,
         autoHeight: true,
         cellClass: "ag-cell-left",
@@ -619,7 +622,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       {
         field: "test_case.expected_result",
         headerName: "Expected",
-        width: 220,
+        minWidth: 300, flex: 2,
         wrapText: true,
         autoHeight: true,
         cellClass: "ag-cell-left",
@@ -629,16 +632,52 @@ export default function TestRunManager({ projectId, project }: Props) {
       {
         field: "result",
         headerName: "Result",
-        width: 90,
-        editable: true,
-        cellEditor: "agSelectCellEditor",
-        cellEditorParams: { values: RESULT_OPTIONS },
+        width: 100,
+        editable: false,
         cellStyle: resultCellStyle,
+        cellRenderer: (params: { data: TestResult; node: { rowIndex: number } }) => {
+          const row = params.data;
+          if (!row) return null;
+          return (
+            <select
+              value={row.result || ""}
+              onChange={(e) => {
+                const newVal = e.target.value;
+                row.result = newVal;
+                gridApiRef.current?.refreshCells({ rowNodes: [gridApiRef.current.getRowNode(String(row.id))!], columns: ["result"], force: true });
+                saveOneResult(row);
+                setCountTick((t) => t + 1);
+                // 앵커 저장 (Shift+클릭 채우기용)
+                fillAnchorRef.current = {
+                  rowIndex: params.node.rowIndex,
+                  field: "result",
+                  value: newVal,
+                };
+              }}
+              style={{
+                width: "100%",
+                height: "100%",
+                border: "none",
+                background: "transparent",
+                color: "inherit",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                textAlign: "center",
+                outline: "none",
+              }}
+            >
+              {RESULT_OPTIONS.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          );
+        },
       },
       {
         field: "actual_result",
         headerName: "Actual Result",
-        width: 250,
+        width: 200,
         wrapText: true,
         autoHeight: true,
         editable: true,
@@ -650,7 +689,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       {
         field: "issue_link",
         headerName: "Issue Link",
-        width: 160,
+        width: 140,
         editable: true,
       },
       ...(timerEnabled ? [{

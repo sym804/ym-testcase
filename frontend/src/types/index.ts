@@ -68,8 +68,6 @@ export interface TestCase {
   r1: string;
   r2: string;
   r3: string;
-  issue_link: string;
-  assignee: string;
   remarks: string;
   sheet_name: string;
   custom_fields?: Record<string, unknown>;

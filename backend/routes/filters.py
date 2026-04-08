@@ -116,7 +116,7 @@ def delete_filter(
 VALID_FIELDS = {
     "tc_id", "type", "category", "depth1", "depth2", "priority",
     "test_type", "precondition", "test_steps", "expected_result",
-    "remarks", "assignee", "issue_link", "sheet_name", "no",
+    "remarks", "sheet_name", "no",
 }
 
 

@@ -116,8 +116,6 @@ class TestCaseCreate(BaseModel):
     r1: Optional[str] = None
     r2: Optional[str] = None
     r3: Optional[str] = None
-    issue_link: Optional[str] = None
-    assignee: Optional[str] = None
     remarks: Optional[str] = None
     sheet_name: Optional[str] = "기본"
     custom_fields: Optional[dict[str, Any]] = None
@@ -138,8 +136,6 @@ class TestCaseUpdate(BaseModel):
     r1: Optional[str] = None
     r2: Optional[str] = None
     r3: Optional[str] = None
-    issue_link: Optional[str] = None
-    assignee: Optional[str] = None
     remarks: Optional[str] = None
     sheet_name: Optional[str] = None
     custom_fields: Optional[dict[str, Any]] = None
@@ -162,8 +158,6 @@ class TestCaseResponse(BaseModel):
     r1: Optional[str] = None
     r2: Optional[str] = None
     r3: Optional[str] = None
-    issue_link: Optional[str] = None
-    assignee: Optional[str] = None
     remarks: Optional[str] = None
     sheet_name: str = "기본"
     custom_fields: Optional[dict[str, Any]] = None
@@ -190,8 +184,6 @@ class TestCaseBulkItem(BaseModel):
     r1: Optional[str] = None
     r2: Optional[str] = None
     r3: Optional[str] = None
-    issue_link: Optional[str] = None
-    assignee: Optional[str] = None
     remarks: Optional[str] = None
     sheet_name: Optional[str] = None
     custom_fields: Optional[dict[str, Any]] = None

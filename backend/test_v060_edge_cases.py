@@ -149,8 +149,9 @@ r = requests.get(f"{BASE}/api/projects/{PID}/testcases/sheets", params={"flat": 
 check(SEC, "TC-BE-TREE-E25", SEC, "flat 조회", "기존 호환 포맷", r.status_code == 200 and all("name" in s for s in r.json()), "핵심")
 
 # TC가 있는 시트 삭제 시 TC 소프트 삭제
-requests.post(f"{BASE}/api/projects/{PID}/testcases", json={"no": 10, "tc_id": "DEL-TC-001", "sheet_name": "Root-A"}, headers=H)
-requests.post(f"{BASE}/api/projects/{PID}/testcases", json={"no": 11, "tc_id": "DEL-TC-002", "sheet_name": "Child-A1"}, headers=H)
+# Root-A/Child-A1/Grand-A1a 모두 is_folder=True → leaf인 Great-Grand에 TC 추가
+requests.post(f"{BASE}/api/projects/{PID}/testcases", json={"no": 10, "tc_id": "DEL-TC-001", "sheet_name": "Great-Grand"}, headers=H)
+requests.post(f"{BASE}/api/projects/{PID}/testcases", json={"no": 11, "tc_id": "DEL-TC-002", "sheet_name": "Great-Grand"}, headers=H)
 r = requests.delete(f"{BASE}/api/projects/{PID}/testcases/sheets/Root-A", headers=H)
 check(SEC, "TC-BE-TREE-E26", SEC, "CASCADE 삭제", "TC 소프트 삭제 포함", r.status_code == 200 and r.json()["deleted"] >= 2, "핵심",
       f"deleted={r.json().get('deleted')}")

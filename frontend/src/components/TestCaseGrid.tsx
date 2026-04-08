@@ -188,7 +188,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     const api = gridApiRef.current;
     if (!api) return;
 
-    const textFields = ["tc_id", "type", "category", "depth1", "depth2", "precondition", "test_steps", "expected_result", "remarks", "assignee", "issue_link"];
+    const textFields = ["tc_id", "type", "category", "depth1", "depth2", "precondition", "test_steps", "expected_result", "remarks"];
     let count = 0;
     const re = new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
     const undoGroup: UndoGroup = [];
@@ -424,7 +424,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const columnDefs = useMemo<ColDef[]>(
     () => {
       const builtIn: (ColDef & { _key?: string })[] = [
-        { _key: "no", field: "no", headerName: "No", width: 55, rowDrag: canEditTC, editable: canEditTC, type: "numericColumn", wrapText: false, autoHeight: false },
+        { _key: "no", field: "no", headerName: "No", width: 70, rowDrag: canEditTC, editable: canEditTC, type: "numericColumn", wrapText: false, autoHeight: false },
         { _key: "tc_id", field: "tc_id", headerName: fieldDisplay("tc_id", "TC ID").name, width: 110, editable: canEditTC, cellRenderer: HighlightCell },
         {
           _key: "type", field: "type",
@@ -461,18 +461,16 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         {
           _key: "test_steps", field: "test_steps",
           headerName: fieldDisplay("test_steps", "Test Steps").name,
-          width: 300, editable: canEditTC, wrapText: true, autoHeight: true,
+          minWidth: 400, flex: 2, editable: canEditTC, wrapText: true, autoHeight: true,
           cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
         },
         {
           _key: "expected_result", field: "expected_result",
           headerName: fieldDisplay("expected_result", "Expected Result").name,
-          width: 260, editable: canEditTC, wrapText: true, autoHeight: true,
+          minWidth: 350, flex: 2, editable: canEditTC, wrapText: true, autoHeight: true,
           cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
         },
-        { _key: "issue_link", field: "issue_link", headerName: fieldDisplay("issue_link", "Issue Link").name, width: 120, editable: canEditTC, cellRenderer: HighlightCell },
-        { _key: "assignee", field: "assignee", headerName: fieldDisplay("assignee", "Assignee").name, width: 100, editable: canEditTC, cellRenderer: HighlightCell },
-        { _key: "remarks", field: "remarks", headerName: fieldDisplay("remarks", "Remarks").name, minWidth: 180, flex: 1, editable: canEditTC, wrapText: true, autoHeight: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell },
+        { _key: "remarks", field: "remarks", headerName: fieldDisplay("remarks", "Remarks").name, width: 120, editable: canEditTC, wrapText: true, autoHeight: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell },
       ];
       // No는 항상 표시, 나머지는 visible 체크
       const filtered = builtIn.filter(col => col._key === "no" || fieldDisplay(col._key!, "").visible);
@@ -902,9 +900,12 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     }
   };
 
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportSplit, setExportSplit] = useState(false);
+
   const handleExport = async () => {
     try {
-      const blob = await testCasesApi.exportExcel(projectId);
+      const blob = await testCasesApi.exportExcel(projectId, exportSplit);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -912,6 +913,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       a.click();
       URL.revokeObjectURL(url);
       toast.success(t("exportSuccess"));
+      setShowExportModal(false);
     } catch (err) {
       console.error(err);
       toast.error(t("exportFailed"));
@@ -1422,7 +1424,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               />
             </>
           )}
-          <button style={styles.btnGhost} onClick={handleExport}>
+          <button style={styles.btnGhost} onClick={() => setShowExportModal(true)}>
             Excel Export
           </button>
           <div style={styles.separator} />
@@ -1610,9 +1612,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 {[
                   { v: "tc_id", l: "TC ID" }, { v: "type", l: "Type" }, { v: "category", l: "Category" },
                   { v: "depth1", l: "Depth 1" }, { v: "depth2", l: "Depth 2" }, { v: "priority", l: "Priority" },
-                  { v: "test_type", l: "Platform" }, { v: "assignee", l: "Assignee" }, { v: "test_steps", l: "Steps" },
+                  { v: "test_type", l: "Platform" }, { v: "test_steps", l: "Steps" },
                   { v: "expected_result", l: "Expected" }, { v: "remarks", l: "Remarks" }, { v: "precondition", l: "Precondition" },
-                  { v: "issue_link", l: "Issue Link" }, { v: "sheet_name", l: "Sheet" },
+                  { v: "sheet_name", l: "Sheet" },
                 ].map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
               <select
@@ -2020,6 +2022,41 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   {importLoading ? t("importing") : t("importAction")}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Excel Export 옵션 모달 ── */}
+      {showExportModal && (
+        <div style={sheetModalStyles.overlay} onClick={() => setShowExportModal(false)}>
+          <div style={{ ...sheetModalStyles.panel, maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
+            <div style={sheetModalStyles.header}>
+              <h3 style={sheetModalStyles.title}>Excel Export</h3>
+            </div>
+            <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
+                <input type="radio" name="exportMode" checked={!exportSplit} onChange={() => setExportSplit(false)} />
+                시트 통합 (단일 시트)
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
+                <input type="radio" name="exportMode" checked={exportSplit} onChange={() => setExportSplit(true)} />
+                시트 분리 (시트별 탭)
+              </label>
+            </div>
+            <div style={{ padding: "12px 20px", display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "1px solid var(--border)" }}>
+              <button
+                onClick={() => setShowExportModal(false)}
+                style={{ padding: "6px 16px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer" }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleExport}
+                style={{ padding: "6px 16px", borderRadius: 6, border: "none", background: "#3182f6", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+              >
+                다운로드
+              </button>
             </div>
           </div>
         </div>

@@ -17,7 +17,10 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
   const { t } = useTranslation("settings");
   const isAdmin = project.my_role === "admin";
   const [isPrivate, setIsPrivate] = useState(project.is_private);
+  const [projectName, setProjectName] = useState(project.name);
+  const [projectDesc, setProjectDesc] = useState(project.description || "");
   const [saving, setSaving] = useState(false);
+  const [nameSaving, setNameSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -56,8 +59,67 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
     }
   };
 
+  const handleSaveName = async () => {
+    if (!projectName.trim()) return;
+    setNameSaving(true);
+    try {
+      const updated = await projectsApi.update(project.id, {
+        name: projectName.trim(),
+        description: projectDesc.trim() || undefined,
+      });
+      onUpdate(updated);
+      toast.success(t("saved") || "저장되었습니다");
+    } catch (e) {
+      toast.error(translateError(e));
+    } finally {
+      setNameSaving(false);
+    }
+  };
+
   return (
     <div style={s.container}>
+      {/* 프로젝트 정보 */}
+      {isAdmin && (
+        <div style={s.card}>
+          <h3 style={s.title}>{t("projectInfo") || "프로젝트 정보"}</h3>
+          <div style={{ marginBottom: 12 }}>
+            <div style={s.label}>{t("projectName") || "프로젝트 이름"}</div>
+            <input
+              style={{ ...s.input, width: "100%", marginTop: 4 }}
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+            />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={s.label}>{t("projectDescription") || "설명"}</div>
+            <input
+              style={{ ...s.input, width: "100%", marginTop: 4 }}
+              value={projectDesc}
+              onChange={(e) => setProjectDesc(e.target.value)}
+              placeholder={t("projectDescPlaceholder") || "프로젝트 설명 (선택)"}
+            />
+          </div>
+          <button
+            style={{
+              padding: "8px 24px",
+              borderRadius: 6,
+              border: "none",
+              backgroundColor: "#3182f6",
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              marginTop: 4,
+              opacity: nameSaving || !projectName.trim() ? 0.5 : 1,
+            }}
+            onClick={handleSaveName}
+            disabled={nameSaving || !projectName.trim()}
+          >
+            {nameSaving ? "..." : t("save")}
+          </button>
+        </div>
+      )}
+
       {/* 접근 제한 설정 */}
       <div style={s.card}>
         <h3 style={s.title}>{t("accessSettings")}</h3>
@@ -211,6 +273,15 @@ const s: Record<string, React.CSSProperties> = {
     color: "var(--text-secondary)",
     lineHeight: 1.5,
   },
+  input: {
+    padding: "8px 12px",
+    borderRadius: 6,
+    border: "1px solid var(--border-input)",
+    fontSize: 14,
+    backgroundColor: "var(--bg-input)",
+    color: "var(--text-primary)",
+    outline: "none",
+  },
   toggleBtn: {
     padding: "6px 20px",
     borderRadius: 6,
@@ -322,8 +393,6 @@ const BUILTIN_FIELDS = [
   { key: "precondition", defaultName: "Precondition", canHide: true },
   { key: "test_steps", defaultName: "Test Steps", canHide: false },
   { key: "expected_result", defaultName: "Expected Result", canHide: false },
-  { key: "issue_link", defaultName: "Issue Link", canHide: true },
-  { key: "assignee", defaultName: "Assignee", canHide: true },
   { key: "remarks", defaultName: "Remarks", canHide: true },
 ];
 

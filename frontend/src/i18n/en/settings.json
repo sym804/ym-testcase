@@ -1,4 +1,10 @@
 {
+  "projectInfo": "Project Info",
+  "projectName": "Project Name",
+  "projectDescription": "Description",
+  "projectDescPlaceholder": "Project description (optional)",
+  "save": "Save",
+  "saved": "Saved successfully.",
   "accessSettings": "Access Settings",
   "projectVisibility": "Project Visibility",
   "privateDesc": "Private — Only registered members can access.",
