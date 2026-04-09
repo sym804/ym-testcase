@@ -334,7 +334,6 @@ test.describe("CSV Import", () => {
     expect(jt).toBeTruthy();
     expect(jt.depth2).toBe("Login Test");
     expect(jt.category).toBe("Auth");
-    expect(jt.assignee).toBe("robin");
 
     await request.delete(`/api/projects/${projId}`, { headers });
   });
@@ -380,9 +379,9 @@ test.describe("고급 필터", () => {
 
     // TC 추가
     const tcs = [
-      { no: 1, tc_id: "FLT-001", type: "Func.", priority: "높음", assignee: "robin" },
-      { no: 2, tc_id: "FLT-002", type: "UI/UX", priority: "보통", assignee: "" },
-      { no: 3, tc_id: "FLT-003", type: "Func.", priority: "높음", assignee: "admin" },
+      { no: 1, tc_id: "FLT-001", type: "Func.", priority: "높음", category: "Auth" },
+      { no: 2, tc_id: "FLT-002", type: "UI/UX", priority: "보통", category: "" },
+      { no: 3, tc_id: "FLT-003", type: "Func.", priority: "높음", category: "Pay" },
     ];
     for (const tc of tcs) {
       await request.post(`/api/projects/${projId}/testcases`, { data: tc, headers });
@@ -410,7 +409,7 @@ test.describe("고급 필터", () => {
         name: "_",
         conditions: [
           { field: "type", operator: "eq", value: "UI/UX" },
-          { field: "assignee", operator: "eq", value: "admin" },
+          { field: "category", operator: "eq", value: "Pay" },
         ],
         logic: "OR",
       },
@@ -424,7 +423,7 @@ test.describe("고급 필터", () => {
     const emptyRes = await request.post(`/api/projects/${projId}/filters/apply`, {
       data: {
         name: "_",
-        conditions: [{ field: "assignee", operator: "empty" }],
+        conditions: [{ field: "category", operator: "empty" }],
         logic: "AND",
       },
       headers,

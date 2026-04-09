@@ -383,7 +383,7 @@ def round_comparison(
     return result
 
 
-# ── Assignee Summary ──────────────────────────────────────────────────────────
+# ── Assignee Summary (deprecated — assignee 필드 v1.2.0에서 제거됨) ─────────
 
 @router.get("/assignee")
 def assignee_summary(
@@ -394,89 +394,8 @@ def assignee_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
-    assignee_totals = dict(
-        db.query(TestCase.assignee, func.count(TestCase.id))
-        .filter(
-            TestCase.project_id == project_id,
-            TestCase.deleted_at.is_(None),
-            TestCase.assignee.isnot(None),
-            func.trim(TestCase.assignee) != "",
-        )
-        .group_by(TestCase.assignee)
-        .all()
-    )
-    if not assignee_totals:
-        return []
-
-    cases = _result_count_cases()
-
-    if run_id:
-        rows = (
-            db.query(
-                TestCase.assignee,
-                cases["pass"].label("pass_count"),
-                cases["fail"].label("fail_count"),
-                cases["block"].label("block_count"),
-                cases["na"].label("na_count"),
-            )
-            .join(TestResult, TestResult.test_case_id == TestCase.id)
-            .filter(
-                TestCase.project_id == project_id,
-                TestCase.deleted_at.is_(None),
-                TestCase.assignee.isnot(None),
-                func.trim(TestCase.assignee) != "",
-                TestResult.test_run_id == run_id,
-            )
-            .group_by(TestCase.assignee)
-            .all()
-        )
-    else:
-        latest = _latest_run_subquery(project_id, db, date_from, date_to)
-        rows = (
-            db.query(
-                TestCase.assignee,
-                cases["pass"].label("pass_count"),
-                cases["fail"].label("fail_count"),
-                cases["block"].label("block_count"),
-                cases["na"].label("na_count"),
-            )
-            .join(TestResult, TestResult.test_case_id == TestCase.id)
-            .join(
-                latest,
-                and_(
-                    TestResult.test_case_id == latest.c.test_case_id,
-                    TestResult.test_run_id == latest.c.max_run_id,
-                ),
-            )
-            .filter(
-                TestCase.project_id == project_id,
-                TestCase.deleted_at.is_(None),
-                TestCase.assignee.isnot(None),
-                func.trim(TestCase.assignee) != "",
-            )
-            .group_by(TestCase.assignee)
-            .all()
-        )
-
-    counts_map = {}
-    for row in rows:
-        total = assignee_totals.get(row.assignee, 0)
-        counts_map[row.assignee] = _counts_from_row(row, total)
-
-    result = []
-    for assignee in sorted(assignee_totals.keys()):
-        total = assignee_totals[assignee]
-        c = counts_map.get(assignee, {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": total})
-
-        done = total - c["not_started"]
-        completion_rate = round(done / total * 100, 1) if total > 0 else 0.0
-
-        result.append({
-            "assignee": assignee, "total": total,
-            **c, "completion_rate": completion_rate,
-        })
-
-    return result
+    """assignee 필드가 v1.2.0에서 제거되어 빈 배열 반환. API 호환성 유지용."""
+    return []
 
 
 @router.get("/heatmap")
