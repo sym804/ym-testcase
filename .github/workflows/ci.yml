@@ -129,15 +129,6 @@ jobs:
         working-directory: backend
         run: pip install -r requirements.txt pytest requests
 
-      - name: Start server and register admin
-        working-directory: backend
-        run: |
-          python -m uvicorn main:app --port 8008 &
-          sleep 5
-          curl -s -X POST http://localhost:8008/api/auth/register \
-            -H "Content-Type: application/json" \
-            -d '{"username":"admin","password":"test1234","display_name":"Admin"}'
-
       - name: pytest (116 tests)
         working-directory: backend
         env:

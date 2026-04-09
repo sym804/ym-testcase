@@ -36,9 +36,9 @@ def auth(token):
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_tokens():
-    """세션 시작 시 토큰 준비"""
+    """세션 시작 시 토큰 준비 (admin은 conftest에서 이미 등록됨)"""
     store.admin = login("admin", os.getenv("TEST_ADMIN_PASSWORD", "test1234"))
-    assert store.admin, "Admin login failed - is the server running?"
+    assert store.admin, "Admin login failed - is the server running with admin seeded?"
 
     # 테스트용 viewer 생성
     r = requests.post(f"{BASE}/api/auth/register", json={
