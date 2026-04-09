@@ -20,6 +20,9 @@ import toast from "react-hot-toast";
 import { translateError } from "../utils/errorMessage";
 import MarkdownCell from "./MarkdownCell";
 import HighlightCell from "./HighlightCell";
+import { useUndoRedo } from "../hooks/useUndoRedo";
+import type { UndoGroup } from "../hooks/useUndoRedo";
+import SheetTreeSidebar from "./SheetTreeSidebar";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -49,17 +52,6 @@ function priorityCellStyle(params: CellClassParams): CellStyle {
   return {};
 }
 
-// ── Undo/Redo 타입 ──
-interface UndoEntry {
-  rowId: string;
-  field: string;
-  oldValue: unknown;
-  newValue: unknown;
-  dataId: number;
-}
-type UndoGroup = UndoEntry[];
-
-// TODO: 접근성(#13) — 주요 버튼에 aria-label 추가, 키보드 네비게이션 개선 필요
 export default function TestCaseGrid({ projectId, project, highlightTcId }: Props) {
   const { t, i18n } = useTranslation("testcase");
   const gridLocale = i18n.language === "ko" ? AG_GRID_LOCALE_KO : AG_GRID_LOCALE_EN;
@@ -105,79 +97,13 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     return result;
   }, [sheets]);
 
-  // ── Undo/Redo 스택 ──
-  const undoStackRef = useRef<UndoGroup[]>([]);
-  const redoStackRef = useRef<UndoGroup[]>([]);
-  const isUndoRedoRef = useRef(false);
-  const [undoCount, setUndoCount] = useState(0);
-  const [redoCount, setRedoCount] = useState(0);
-  const autoSaveRowRef = useRef<(data: TestCase) => void>(() => {});
-
-  const pushUndo = useCallback((group: UndoGroup) => {
-    if (group.length === 0) return;
-    undoStackRef.current.push(group);
-    if (undoStackRef.current.length > 200) undoStackRef.current.shift();
-    redoStackRef.current = [];
-    setUndoCount(undoStackRef.current.length);
-    setRedoCount(0);
-  }, []);
-
-  const applyUndoRedo = useCallback((entries: UndoGroup, direction: "undo" | "redo") => {
-    const api = gridApiRef.current;
-    if (!api) return;
-    isUndoRedoRef.current = true;
-
-    const reverseGroup: UndoGroup = [];
-    const updatedNodes: Set<string> = new Set();
-
-    for (const entry of entries) {
-      const value = direction === "undo" ? entry.oldValue : entry.newValue;
-      const reverseValue = direction === "undo" ? entry.newValue : entry.oldValue;
-      api.forEachNode((node) => {
-        const nodeRowId = node.data?.id ? String(node.data.id) : `new_${node.data?.no}`;
-        if (nodeRowId === entry.rowId && node.data) {
-          node.data[entry.field] = value;
-          updatedNodes.add(nodeRowId);
-        }
-      });
-      reverseGroup.push({ ...entry, oldValue: reverseValue, newValue: value });
-    }
-
-    if (direction === "undo") {
-      redoStackRef.current.push(reverseGroup.map(e => ({
-        ...e, oldValue: e.newValue, newValue: e.oldValue,
-      })));
-    } else {
-      undoStackRef.current.push(reverseGroup.map(e => ({
-        ...e, oldValue: e.newValue, newValue: e.oldValue,
-      })));
-    }
-
-    // 변경된 행 자동 저장
-    api.forEachNode((node) => {
-      const nodeRowId = node.data?.id ? String(node.data.id) : `new_${node.data?.no}`;
-      if (updatedNodes.has(nodeRowId) && node.data) {
-        autoSaveRowRef.current(node.data);
-      }
-    });
-
-    api.refreshCells({ force: true });
-    isUndoRedoRef.current = false;
-    setUndoCount(undoStackRef.current.length);
-    setRedoCount(redoStackRef.current.length);
-  }, []);
-
-  const handleUndo = useCallback(() => {
-    const group = undoStackRef.current.pop();
-    if (!group) return;
-    applyUndoRedo(group, "undo");
-  }, [applyUndoRedo]);
-
-  const handleRedo = useCallback(() => {
-    const group = redoStackRef.current.pop();
-    if (!group) return;
-    applyUndoRedo(group, "redo");
-  }, [applyUndoRedo]);
+  // ── Undo/Redo (커스텀 훅) ──
+  const {
+    undoStackRef, redoStackRef, isUndoRedoRef,
+    undoCount, redoCount, setUndoCount, setRedoCount,
+    autoSaveRowRef,
+    pushUndo, handleUndo, handleRedo,
+  } = useUndoRedo(gridApiRef);
 
   // ── 찾기/바꾸기 ──
   const [replaceOpen, setReplaceOpen] = useState(false);
@@ -796,34 +722,10 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
   const [importLoading, setImportLoading] = useState(false);
 
-  // ── 시트/폴더 추가 ──
-  const [showAddSheet, setShowAddSheet] = useState(false);
-  const [newSheetName, setNewSheetName] = useState("");
-  const [addSheetParentId, setAddSheetParentId] = useState<number | null>(null);
-  const [addingFolder, setAddingFolder] = useState(false);
-
-  const handleAddSheet = async () => {
-    const name = newSheetName.trim();
-    const label = addingFolder ? t("folder") : t("sheet");
-    if (!name) { toast.error(t("nameRequired", { label })); return; }
-    try {
-      await testCasesApi.createSheet(projectId, name, addSheetParentId, addingFolder);
-      setShowAddSheet(false);
-      setNewSheetName("");
-      setAddSheetParentId(null);
-      setAddingFolder(false);
-      if (!addingFolder) setActiveSheet(name);
-      // 부모가 있으면 자동 펼침
-      if (addSheetParentId) {
-        setExpandedSheets(prev => new Set([...prev, addSheetParentId!]));
-      }
-      loadSheets();
-      toast.success(t(addingFolder ? "folderAdded" : "sheetAdded", { name }));
-    } catch (err) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      toast.error(detail ? translateError(detail) : t(addingFolder ? "folderAddFailed" : "sheetAddFailed"));
-    }
-  };
+  const handleSheetChange = useCallback(() => {
+    loadSheets();
+    loadData();
+  }, [loadSheets, loadData]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -983,27 +885,6 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     }
   }, [projectId, rowData.length]);
 
-  // ── TC 복사 (로컬) ──
-  // @ts-ignore - kept for future use
-  const _handleCopySelected = () => {
-    const api = gridApiRef.current;
-    if (!api) return;
-    const selected = api.getSelectedRows() as TestCase[];
-    if (selected.length === 0) {
-      toast.error(t("copySelectFirst"));
-      return;
-    }
-    const maxNo = Math.max(...rowData.map((r) => r.no || 0), 0);
-    const copies = selected.map((row, idx) => ({
-      ...row,
-      id: 0,
-      no: maxNo + idx + 1,
-      tc_id: `${row.tc_id}-copy`,
-    }));
-    setRowData((prev) => [...prev, ...copies as TestCase[]]);
-    toast.success(t("copySuccess", { count: copies.length }));
-  };
-
   // ── 결과 히스토리 조회 ──
   const handleResultHistory = useCallback(async () => {
     const selected = gridApiRef.current?.getSelectedRows() as TestCase[];
@@ -1026,6 +907,28 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     }
   }, [projectId]);
 
+  // ── 빈 프로젝트: 시트/폴더 추가용 로컬 상태 ──
+  const [emptyShowAdd, setEmptyShowAdd] = useState(false);
+  const [emptyName, setEmptyName] = useState("");
+  const [emptyIsFolder, setEmptyIsFolder] = useState(false);
+
+  const handleEmptyAddSheet = async () => {
+    const name = emptyName.trim();
+    const label = emptyIsFolder ? t("folder") : t("sheet");
+    if (!name) { toast.error(t("nameRequired", { label })); return; }
+    try {
+      await testCasesApi.createSheet(projectId, name, null, emptyIsFolder);
+      setEmptyShowAdd(false);
+      setEmptyName("");
+      if (!emptyIsFolder) setActiveSheet(name);
+      loadSheets();
+      toast.success(t(emptyIsFolder ? "folderAdded" : "sheetAdded", { name }));
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t(emptyIsFolder ? "folderAddFailed" : "sheetAddFailed"));
+    }
+  };
+
   // 시트가 없고 "기본"도 없으면 시트 추가 화면 표시
   const hasSheet = sheets.length > 0;
 
@@ -1038,29 +941,29 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             {t("emptyProject")}
           </div>
           {canEditTC && (
-            showAddSheet ? (
+            emptyShowAdd ? (
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <input
                   style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-input)", fontSize: 14, outline: "none", width: 200, backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }}
-                  placeholder={addingFolder ? t("folderName") : t("sheetName")}
-                  value={newSheetName}
-                  onChange={(e) => setNewSheetName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddSheet()}
+                  placeholder={emptyIsFolder ? t("folderName") : t("sheetName")}
+                  value={emptyName}
+                  onChange={(e) => setEmptyName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleEmptyAddSheet()}
                   autoFocus
                 />
-                <button style={{ padding: "8px 18px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={handleAddSheet}>
+                <button style={{ padding: "8px 18px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={handleEmptyAddSheet}>
                   {t("common:add")}
                 </button>
-                <button style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-input)", backgroundColor: "transparent", color: "var(--text-secondary)", fontSize: 14, cursor: "pointer" }} onClick={() => { setShowAddSheet(false); setNewSheetName(""); setAddingFolder(false); }}>
+                <button style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border-input)", backgroundColor: "transparent", color: "var(--text-secondary)", fontSize: 14, cursor: "pointer" }} onClick={() => { setEmptyShowAdd(false); setEmptyName(""); setEmptyIsFolder(false); }}>
                   {t("common:cancel")}
                 </button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8 }}>
-                <button style={{ padding: "10px 24px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={() => { setAddingFolder(true); setShowAddSheet(true); }}>
+                <button style={{ padding: "10px 24px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }} onClick={() => { setEmptyIsFolder(true); setEmptyShowAdd(true); }}>
                   {t("addFolder")}
                 </button>
-                <button style={{ padding: "10px 24px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: 0.85 }} onClick={() => { setAddingFolder(false); setShowAddSheet(true); }}>
+                <button style={{ padding: "10px 24px", borderRadius: 8, border: "none", backgroundColor: "var(--accent)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: 0.85 }} onClick={() => { setEmptyIsFolder(false); setEmptyShowAdd(true); }}>
                   {t("addSheet")}
                 </button>
                 <button style={{ padding: "10px 24px", borderRadius: 8, border: "1px solid var(--border-input)", backgroundColor: "transparent", color: "var(--text-primary)", fontSize: 14, cursor: "pointer" }} onClick={() => emptyFileInputRef.current?.click()}>
@@ -1108,249 +1011,22 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     );
   }
 
-  // ── 시트 트리 사이드바 렌더링 (VS Code 스타일) ──
-  const renderSheetTree = () => {
-    if (flatSheets.length <= 1 && flatSheets[0]?.name === "기본") return null;
-
-    const renderNode = (node: SheetNode, depth: number): React.ReactNode => {
-      const isExpanded = expandedSheets.has(node.id);
-      const hasChildren = (node.children || []).length > 0;
-      const isActive = activeSheet === node.name;
-
-      return (
-        <div key={node.id || node.name}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              padding: "4px 8px",
-              paddingLeft: 8 + depth * 16,
-              cursor: "pointer",
-              backgroundColor: isActive ? "rgba(45,74,122,0.15)" : "transparent",
-              borderLeft: isActive ? "3px solid var(--accent)" : "3px solid transparent",
-              fontSize: 13,
-              color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-              fontWeight: isActive ? 600 : 400,
-              gap: 4,
-              userSelect: "none",
-            }}
-            onClick={() => {
-              if (node.is_folder) {
-                // 폴더: 펼침/접기 토글
-                setExpandedSheets(prev => {
-                  const next = new Set(prev);
-                  if (next.has(node.id)) { next.delete(node.id); } else { next.add(node.id); }
-                  return next;
-                });
-              } else {
-                // 시트: TC 표시
-                setActiveSheet(node.name);
-              }
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              // 컨텍스트 메뉴 대신 인라인으로
-            }}
-          >
-            {/* 펼침/접기 */}
-            {(node.is_folder || hasChildren) ? (
-              <span
-                style={{ fontSize: 10, width: 16, textAlign: "center", flexShrink: 0, color: "var(--text-secondary)" }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setExpandedSheets(prev => {
-                    const next = new Set(prev);
-                    if (next.has(node.id)) { next.delete(node.id); } else { next.add(node.id); }
-                    return next;
-                  });
-                }}
-              >
-                {isExpanded ? "▼" : "▶"}
-              </span>
-            ) : (
-              <span style={{ width: 16, flexShrink: 0 }} />
-            )}
-            {/* 아이콘 */}
-            <span style={{ fontSize: 14, flexShrink: 0 }}>{node.is_folder ? (isExpanded ? "📂" : "📁") : "📄"}</span>
-            {/* 이름 */}
-            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {node.name}
-            </span>
-            {/* TC 수 (시트만) */}
-            {!node.is_folder && (
-              <span style={{ fontSize: 10, color: "var(--text-secondary)", flexShrink: 0 }}>
-                {node.tc_count}
-              </span>
-            )}
-            {/* 액션 버튼 */}
-            {canEditTC && (
-              <span style={{ display: "flex", gap: 2, marginLeft: 4, flexShrink: 0 }}>
-                {/* 폴더: 하위 폴더/시트 추가 가능 */}
-                {node.is_folder && (
-                  <>
-                    <span
-                      title={t("addSubFolder")}
-                      style={{ cursor: "pointer", fontSize: 10, opacity: 0.4, padding: "0 1px" }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAddSheetParentId(node.id);
-                        setAddingFolder(true);
-                        setShowAddSheet(true);
-                        setNewSheetName("");
-                      }}
-                    >📁+</span>
-                    <span
-                      title={t("addSubSheet")}
-                      style={{ cursor: "pointer", fontSize: 10, opacity: 0.4, padding: "0 1px" }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAddSheetParentId(node.id);
-                        setAddingFolder(false);
-                        setShowAddSheet(true);
-                        setNewSheetName("");
-                      }}
-                    >📄+</span>
-                  </>
-                )}
-                <span
-                  title={node.is_folder ? t("deleteFolder") : t("deleteSheet")}
-                  style={{ cursor: "pointer", fontSize: 12, opacity: 0.4, padding: "0 2px" }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const label = node.is_folder ? t("folder") : t("sheet");
-                    const childInfo = hasChildren ? t("childInfo", { count: (node.children || []).length }) : "";
-                    if (!confirm(t("deleteSheetConfirm", { name: node.name, label, childInfo }))) return;
-                    testCasesApi.deleteSheet(projectId, node.name).then(() => {
-                      toast.success(t("sheetDeleted", { name: node.name, label }));
-                      if (activeSheet === node.name) setActiveSheet(null);
-                      loadSheets();
-                      loadData();
-                    }).catch(() => toast.error(t("sheetDeleteFailed", { label })));
-                  }}
-                >×</span>
-              </span>
-            )}
-          </div>
-          {/* 하위 노드 */}
-          {(node.is_folder || hasChildren) && isExpanded && (node.children || []).map(child => renderNode(child, depth + 1))}
-        </div>
-      );
-    };
-
-    return (
-      <div style={{
-        width: sidebarOpen ? 220 : 36,
-        minWidth: sidebarOpen ? 220 : 36,
-        borderRight: "1px solid var(--border-color)",
-        backgroundColor: "var(--bg-card)",
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        overflow: "hidden",
-        transition: "width 0.15s, min-width 0.15s",
-      }}>
-        {/* 헤더 */}
-        <div style={{
-          padding: sidebarOpen ? "10px 12px" : "10px 8px",
-          fontSize: 11,
-          fontWeight: 700,
-          color: "var(--text-secondary)",
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
-          borderBottom: "1px solid var(--border-color)",
-          display: "flex",
-          justifyContent: sidebarOpen ? "space-between" : "center",
-          alignItems: "center",
-        }}>
-          {sidebarOpen && <span>{t("sheets")}</span>}
-          <span
-            style={{ cursor: "pointer", fontSize: 14, opacity: 0.6, padding: "0 2px" }}
-            title={sidebarOpen ? t("sidebarCollapse") : t("sidebarExpand")}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-          >{sidebarOpen ? "◀" : "▶"}</span>
-          {canEditTC && sidebarOpen && (
-            <span style={{ display: "flex", gap: 2 }}>
-              <span
-                style={{ cursor: "pointer", fontSize: 12, opacity: 0.6, padding: "0 3px" }}
-                title={t("addFolder")}
-                onClick={() => { setAddSheetParentId(null); setAddingFolder(true); setShowAddSheet(true); setNewSheetName(""); }}
-              >📁+</span>
-              <span
-                style={{ cursor: "pointer", fontSize: 12, opacity: 0.6, padding: "0 3px" }}
-                title={t("addSheet")}
-                onClick={() => { setAddSheetParentId(null); setAddingFolder(false); setShowAddSheet(true); setNewSheetName(""); }}
-              >📄+</span>
-            </span>
-          )}
-        </div>
-
-        {!sidebarOpen ? null : <>
-        {/* 시트 추가 입력 */}
-        {showAddSheet && (
-          <div style={{ padding: "6px 8px", borderBottom: "1px solid var(--border-color)" }}>
-            {addSheetParentId && (
-              <div style={{ fontSize: 10, color: "var(--text-secondary)", marginBottom: 2 }}>
-                {t("subOf", { name: flatSheets.find(s => s.id === addSheetParentId)?.name })}
-              </div>
-            )}
-            <div style={{ fontSize: 10, color: "var(--accent)", marginBottom: 2, fontWeight: 600 }}>
-              {addingFolder ? `📁 ${t("folder")}` : `📄 ${t("sheet")}`} {t("addLabel")}
-            </div>
-            <div style={{ display: "flex", gap: 4 }}>
-              <input
-                style={{ flex: 1, padding: "4px 6px", fontSize: 12, borderRadius: 4, border: "1px solid var(--border-input)", backgroundColor: "var(--bg-input)", color: "var(--text-primary)", outline: "none" }}
-                placeholder={addingFolder ? t("folderName") : t("sheetName")}
-                value={newSheetName}
-                onChange={(e) => setNewSheetName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleAddSheet(); if (e.key === "Escape") { setShowAddSheet(false); setNewSheetName(""); setAddSheetParentId(null); setAddingFolder(false); } }}
-                autoFocus
-              />
-              <button
-                style={{ padding: "4px 8px", fontSize: 11, borderRadius: 4, border: "none", backgroundColor: "var(--accent)", color: "#fff", cursor: "pointer" }}
-                onClick={handleAddSheet}
-              >{t("common:add")}</button>
-            </div>
-          </div>
-        )}
-
-        {/* 트리 */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "4px 0" }}>
-          {/* 전체 보기 */}
-          {flatSheets.length > 1 && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "4px 8px",
-                cursor: "pointer",
-                backgroundColor: activeSheet === null ? "rgba(45,74,122,0.15)" : "transparent",
-                borderLeft: activeSheet === null ? "3px solid var(--accent)" : "3px solid transparent",
-                fontSize: 13,
-                color: activeSheet === null ? "var(--text-primary)" : "var(--text-secondary)",
-                fontWeight: activeSheet === null ? 600 : 400,
-                gap: 4,
-              }}
-              onClick={() => setActiveSheet(null)}
-            >
-              <span style={{ width: 16 }} />
-              <span style={{ fontSize: 14 }}>📋</span>
-              <span style={{ flex: 1 }}>{t("allSheets")}</span>
-              <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>
-                {flatSheets.reduce((a, s) => a + s.tc_count, 0)}
-              </span>
-            </div>
-          )}
-          {sheets.map(node => renderNode(node, 0))}
-        </div>
-        </>}
-      </div>
-    );
-  };
-
   return (
     <div style={{ display: "flex", height: "calc(100vh - 160px)" }}>
       {/* 왼쪽: 시트 트리 사이드바 */}
-      {renderSheetTree()}
+      <SheetTreeSidebar
+        sheets={sheets}
+        flatSheets={flatSheets}
+        activeSheet={activeSheet}
+        setActiveSheet={setActiveSheet}
+        expandedSheets={expandedSheets}
+        setExpandedSheets={setExpandedSheets}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        canEditTC={canEditTC}
+        projectId={projectId}
+        onSheetChange={handleSheetChange}
+      />
 
       {/* 오른쪽: 툴바 + 그리드 */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100%" }}>
