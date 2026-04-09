@@ -13,14 +13,17 @@ import {
   type CellValueChangedEvent,
 } from "ag-grid-community";
 import { useTranslation } from "react-i18next";
-import { testRunsApi, testCasesApi, attachmentsApi } from "../api";
-import type { TestRun, TestResult, Attachment } from "../types";
+import { testRunsApi, testCasesApi } from "../api";
+import type { TestRun, TestResult } from "../types";
 import { TestRunStatus } from "../types";
 import { AG_GRID_LOCALE_KO } from "../agGridLocaleKo";
 import { AG_GRID_LOCALE_EN } from "../agGridLocaleEn";
 import toast from "react-hot-toast";
 import MarkdownCell from "./MarkdownCell";
 import HighlightCell from "./HighlightCell";
+import { useTestTimer } from "../hooks/useTestTimer";
+import { useAttachments } from "../hooks/useAttachments";
+import { useResultFilters } from "../hooks/useResultFilters";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -72,75 +75,27 @@ export default function TestRunManager({ projectId, project }: Props) {
   // ── Undo 스택 ──
   const undoStackRef = useRef<{ rowId: number; field: string; oldValue: string }[]>([]);
 
-  // ── 타이머 상태 ──
-  const [timerEnabled, setTimerEnabled] = useState<boolean>(() => {
-    const saved = localStorage.getItem("tc_timer_enabled");
-    return saved === null ? false : saved === "true";
-  });
-  const [timerRowId, setTimerRowId] = useState<number | null>(null);
-  const [timerStart, setTimerStart] = useState<number | null>(null);
-  const [timerDisplay, setTimerDisplay] = useState("");
-  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // ── 커스텀 훅 ──
+  const {
+    timerEnabled, timerRowId, timerDisplay,
+    startTimer, stopTimer, toggleTimer,
+  } = useTestTimer(gridApiRef);
 
-  // ── 필터 상태 ──
-  const [filterText, setFilterText] = useState("");
-  const [filterResult, setFilterResult] = useState("");
-  const [filterCategory, setFilterCategory] = useState("");
-  const [filterPriority, setFilterPriority] = useState("");
+  const {
+    attachmentsMap, previewImage, setPreviewImage, fileInputRef,
+    resetAttachments, loadAttachmentFor, handleFileUpload,
+    handleDeleteAttachment, triggerUpload, handleDropUpload,
+  } = useAttachments(gridApiRef, t);
 
-  // ── 첨부 이미지 상태 ──
-  const [attachmentsMap, setAttachmentsMap] = useState<Record<number, Attachment[]>>({});
-  const [previewImage, setPreviewImage] = useState<{ url: string; filename: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadTargetResultId, setUploadTargetResultId] = useState<number | null>(null);
-
-  // ── 첨부파일 로드 (개별 result — 포커스 시) ──
-  const loadAttachmentFor = useCallback(async (resultId: number) => {
-    if (attachmentsMap[resultId] !== undefined) return; // 이미 로드됨
-    try {
-      const atts = await attachmentsApi.list(resultId);
-      setAttachmentsMap((prev) => ({ ...prev, [resultId]: atts }));
-    } catch { /* ignore */ }
-  }, [attachmentsMap]);
-
-  // ── 이미지 업로드 ──
-  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !uploadTargetResultId) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error(t("imageOnly"));
-      return;
-    }
-    try {
-      const att = await attachmentsApi.upload(uploadTargetResultId, file);
-      setAttachmentsMap((prev) => ({
-        ...prev,
-        [uploadTargetResultId]: [...(prev[uploadTargetResultId] || []), att],
-      }));
-      gridApiRef.current?.refreshCells({ force: true });
-      toast.success(t("imageAttached"));
-    } catch {
-      toast.error(t("uploadFailed"));
-    }
-    e.target.value = "";
-    setUploadTargetResultId(null);
-  }, [uploadTargetResultId]);
-
-  // ── 첨부파일 삭제 ──
-  const handleDeleteAttachment = useCallback(async (attachmentId: number, resultId: number) => {
-    if (!confirm(t("deleteAttachmentConfirm"))) return;
-    try {
-      await attachmentsApi.delete(attachmentId);
-      setAttachmentsMap((prev) => ({
-        ...prev,
-        [resultId]: (prev[resultId] || []).filter((a) => a.id !== attachmentId),
-      }));
-      gridApiRef.current?.refreshCells({ force: true });
-      toast.success(t("attachDeleteDone"));
-    } catch {
-      toast.error(t("attachDeleteFailed"));
-    }
-  }, []);
+  const {
+    filterText, setFilterText,
+    filterResult, setFilterResult,
+    filterCategory, setFilterCategory,
+    filterPriority, setFilterPriority,
+    categoryOptions, priorityOptions,
+    isExternalFilterPresent, doesExternalFilterPass,
+    clearFilters,
+  } = useResultFilters(gridApiRef, results, t);
 
   // ── 여러 행 일괄 저장 ──
   const saveManyResults = useCallback(async (rows: TestResult[]) => {
@@ -241,7 +196,7 @@ export default function TestRunManager({ projectId, project }: Props) {
     async (run: TestRun) => {
       setSelectedRun(run);
       setLoadingResults(true);
-      setAttachmentsMap({}); // 첨부파일 캐시 초기화
+      resetAttachments(); // 첨부파일 캐시 초기화
       try {
         const detail = await testRunsApi.getOne(projectId, run.id);
         // 백엔드 값 → 표시 값 변환 (NS→"", NA→"N/A")
@@ -294,46 +249,6 @@ export default function TestRunManager({ projectId, project }: Props) {
     return Math.round((done / rows.length) * 100);
   }, [countTick, getGridRows]);
 
-  // ── 타이머: 행 포커스 시 시작, 이동 시 종료 ──
-  const stopTimer = useCallback(() => {
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-    if (timerRowId && timerStart) {
-      const elapsed = Math.round((Date.now() - timerStart) / 1000);
-      const api = gridApiRef.current;
-      if (api) {
-        api.forEachNode((node) => {
-          if (node.data?.id === timerRowId) {
-            node.data.duration_sec = (node.data.duration_sec || 0) + elapsed;
-            api.refreshCells({ rowNodes: [node], columns: ["duration_sec"], force: true });
-          }
-        });
-      }
-    }
-    setTimerRowId(null);
-    setTimerStart(null);
-    setTimerDisplay("");
-  }, [timerRowId, timerStart]);
-
-  const startTimer = useCallback((rowId: number) => {
-    stopTimer();
-    setTimerRowId(rowId);
-    setTimerStart(Date.now());
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    timerIntervalRef.current = setInterval(() => {
-      setTimerStart((prev) => {
-        if (!prev) return prev;
-        const sec = Math.round((Date.now() - prev) / 1000);
-        const m = Math.floor(sec / 60);
-        const s = sec % 60;
-        setTimerDisplay(`${m}:${s.toString().padStart(2, "0")}`);
-        return prev;
-      });
-    }, 1000);
-  }, [stopTimer]);
-
   // 행 포커스 변경 시 타이머 전환 + 첨부파일 lazy 로드
   const onRowFocused = useCallback((rowId: number | null) => {
     if (!rowId) return;
@@ -341,13 +256,6 @@ export default function TestRunManager({ projectId, project }: Props) {
     if (!timerEnabled || rowId === timerRowId) return;
     startTimer(rowId);
   }, [timerEnabled, timerRowId, startTimer, loadAttachmentFor]);
-
-  // 컴포넌트 언마운트 시 타이머 정리
-  useEffect(() => {
-    return () => {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    };
-  }, []);
 
   // ── 셀 편집 시 즉시 저장 ──
   const saveResultRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -503,69 +411,6 @@ export default function TestRunManager({ projectId, project }: Props) {
     });
     return counts;
   }, [countTick, getGridRows]);
-
-  // ── 필터용 고유값 목록 ──
-  const categoryOptions = useMemo(() => {
-    const set = new Set<string>();
-    results.forEach((r) => { if (r.test_case?.category) set.add(r.test_case.category); });
-    return Array.from(set).sort();
-  }, [results]);
-
-  const priorityOptions = useMemo(() => {
-    const set = new Set<string>();
-    results.forEach((r) => { if (r.test_case?.priority) set.add(r.test_case.priority); });
-    return Array.from(set).sort();
-  }, [results]);
-
-  // ── 외부 필터 ──
-  const isExternalFilterPresent = useCallback(() => {
-    return filterText !== "" || filterResult !== "" || filterCategory !== "" || filterPriority !== "";
-  }, [filterText, filterResult, filterCategory, filterPriority]);
-
-  const doesExternalFilterPass = useCallback((node: { data?: TestResult }) => {
-    const row = node.data;
-    if (!row) return true;
-
-    // Result 필터
-    if (filterResult) {
-      const val = (row.result as string) || "";
-      if (filterResult === t("notEntered")) {
-        if (val !== "") return false;
-      } else {
-        if (val !== filterResult) return false;
-      }
-    }
-
-    // Category 필터
-    if (filterCategory && row.test_case?.category !== filterCategory) return false;
-
-    // Priority 필터
-    if (filterPriority && row.test_case?.priority !== filterPriority) return false;
-
-    // 텍스트 검색
-    if (filterText) {
-      const q = filterText.toLowerCase();
-      const fields = [
-        row.test_case?.tc_id,
-        row.test_case?.category,
-        row.test_case?.depth1,
-        row.test_case?.depth2,
-        row.test_case?.test_steps,
-        row.test_case?.expected_result,
-        row.actual_result,
-        row.remarks,
-      ];
-      const match = fields.some((f) => f && f.toLowerCase().includes(q));
-      if (!match) return false;
-    }
-
-    return true;
-  }, [filterText, filterResult, filterCategory, filterPriority]);
-
-  // 필터 변경 시 그리드 재필터링
-  useEffect(() => {
-    gridApiRef.current?.onFilterChanged();
-  }, [filterText, filterResult, filterCategory, filterPriority]);
 
   const columnDefs = useMemo<ColDef[]>(
     () => [
@@ -765,8 +610,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 title={t("imageAttach")}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setUploadTargetResultId(row.id);
-                  fileInputRef.current?.click();
+                  triggerUpload(row.id);
                 }}
               >
                 +
@@ -1116,12 +960,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                     ...styles.timerToggleBtn,
                     ...(timerEnabled ? styles.timerToggleBtnActive : {}),
                   }}
-                  onClick={() => {
-                    const next = !timerEnabled;
-                    setTimerEnabled(next);
-                    localStorage.setItem("tc_timer_enabled", String(next));
-                    if (!next) stopTimer();
-                  }}
+                  onClick={toggleTimer}
                   title={timerEnabled ? t("timerOff") : t("timerOn")}
                 >
                   ⏱
@@ -1194,7 +1033,7 @@ export default function TestRunManager({ projectId, project }: Props) {
               {(filterText || filterResult || filterCategory || filterPriority) && (
                 <button
                   style={styles.filterClearBtn}
-                  onClick={() => { setFilterText(""); setFilterResult(""); setFilterCategory(""); setFilterPriority(""); }}
+                  onClick={clearFilters}
                 >
                   {t("common:reset")}
                 </button>
@@ -1215,14 +1054,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 const node = gridApiRef.current?.getDisplayedRowAtIndex(focused.rowIndex);
                 const resultId = node?.data?.id;
                 if (!resultId) return;
-                files.forEach(async (file) => {
-                  try {
-                    const att = await attachmentsApi.upload(resultId, file);
-                    setAttachmentsMap((prev) => ({ ...prev, [resultId]: [...(prev[resultId] || []), att] }));
-                    gridApiRef.current?.refreshCells({ force: true });
-                    toast.success(t("fileAttached", { name: file.name }));
-                  } catch { toast.error(t("fileUploadFailed", { name: file.name })); }
-                });
+                handleDropUpload(resultId, files);
               }}
             >
               {loadingResults ? (
