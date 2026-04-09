@@ -34,13 +34,21 @@ async def lifespan(app: FastAPI):
     # Run Alembic migrations
     from alembic.config import Config as AlembicConfig
     from alembic import command as alembic_command
+    from database import engine
 
     alembic_cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), "alembic.ini"))
-    alembic_cfg.set_main_option(
-        "sqlalchemy.url",
-        os.getenv("DATABASE_URL", "sqlite:///./tc_manager.db"),
-    )
-    alembic_command.upgrade(alembic_cfg, "head")
+    db_url = os.getenv("DATABASE_URL", "sqlite:///./tc_manager.db")
+    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+
+    # 기존 pre-Alembic DB 감지: 테이블은 있는데 alembic_version이 없으면 stamp
+    from sqlalchemy import inspect as sa_inspect
+    inspector = sa_inspect(engine)
+    tables = inspector.get_table_names()
+    if tables and "alembic_version" not in tables:
+        logger.info("Pre-Alembic DB detected — stamping head")
+        alembic_command.stamp(alembic_cfg, "head")
+    else:
+        alembic_command.upgrade(alembic_cfg, "head")
 
     _purge_old_deleted_testcases()
     yield

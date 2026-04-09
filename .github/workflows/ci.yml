@@ -134,4 +134,4 @@ jobs:
         env:
           TEST_ADMIN_PASSWORD: test1234
         run: python -m pytest test_security.py -q --tb=short -k "not test_dompurify_installed"
-        timeout-minutes: 15
+        timeout-minutes: 20

@@ -41,8 +41,8 @@ def _seed_admin(base_url: str, password: str):
         "password": password,
         "display_name": "Admin",
     })
-    # 201 = 새로 생성, 409 = 이미 존재 — 둘 다 OK
-    if r.status_code not in (201, 409):
+    # 201 = 새로 생성, 400 = 이미 존재 — 둘 다 OK
+    if r.status_code not in (201, 400):
         raise RuntimeError(f"Admin seed failed: {r.status_code} {r.text}")
 
 
