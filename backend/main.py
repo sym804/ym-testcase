@@ -9,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from database import engine, Base
 from routes import auth as auth_routes
 from routes import projects as project_routes
 from routes import testcases as testcase_routes
@@ -32,11 +31,17 @@ import models  # noqa: F401
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    _migrate_roles()
-    _migrate_sheet_parent_id()
-    _migrate_field_config()
-    _migrate_indexes()
+    # Run Alembic migrations
+    from alembic.config import Config as AlembicConfig
+    from alembic import command as alembic_command
+
+    alembic_cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), "alembic.ini"))
+    alembic_cfg.set_main_option(
+        "sqlalchemy.url",
+        os.getenv("DATABASE_URL", "sqlite:///./tc_manager.db"),
+    )
+    alembic_command.upgrade(alembic_cfg, "head")
+
     _purge_old_deleted_testcases()
     yield
 
@@ -109,123 +114,6 @@ app.include_router(testplan_routes.router)
 app.include_router(filter_routes.router)
 app.include_router(tc_result_history_routes.router)
 
-
-
-def _migrate_roles():
-    """기존 역할 값을 새 역할 체계로 마이그레이션"""
-    from database import SessionLocal
-    db = SessionLocal()
-    try:
-        # UserRole: viewer/tester → user, editor → qa_manager
-        db.execute(
-            __import__("sqlalchemy").text(
-                "UPDATE users SET role = 'user' WHERE role IN ('viewer', 'tester')"
-            )
-        )
-        db.execute(
-            __import__("sqlalchemy").text(
-                "UPDATE users SET role = 'qa_manager' WHERE role = 'editor'"
-            )
-        )
-        # ProjectRole: viewer → tester, editor → admin
-        db.execute(
-            __import__("sqlalchemy").text(
-                "UPDATE project_members SET role = 'tester' WHERE role = 'viewer'"
-            )
-        )
-        db.execute(
-            __import__("sqlalchemy").text(
-                "UPDATE project_members SET role = 'admin' WHERE role = 'editor'"
-            )
-        )
-        db.commit()
-    except Exception:
-        logger.warning("Role migration failed (may already be migrated)", exc_info=True)
-        db.rollback()
-    finally:
-        db.close()
-
-
-def _migrate_sheet_parent_id():
-    """v0.6.0 마이그레이션: 새 컬럼 추가"""
-    from database import SessionLocal
-    import sqlalchemy as sa
-    db = SessionLocal()
-
-    migrations = [
-        "ALTER TABLE test_case_sheets ADD COLUMN parent_id INTEGER REFERENCES test_case_sheets(id) ON DELETE CASCADE",
-        "ALTER TABLE test_cases ADD COLUMN custom_fields TEXT",
-        "ALTER TABLE test_runs ADD COLUMN test_plan_id INTEGER REFERENCES test_plans(id) ON DELETE SET NULL",
-        "ALTER TABLE test_case_sheets ADD COLUMN is_folder BOOLEAN NOT NULL DEFAULT 0",
-    ]
-    for sql in migrations:
-        try:
-            db.execute(sa.text(sql))
-            db.commit()
-        except Exception:
-            logger.debug("Migration SQL skipped (may already exist): %s", sql[:60])
-            db.rollback()
-
-    # 기존 데이터: children이 있는 노드를 is_folder=True로 마이그레이션
-    try:
-        db.execute(sa.text(
-            "UPDATE test_case_sheets SET is_folder = 1 "
-            "WHERE id IN (SELECT DISTINCT parent_id FROM test_case_sheets WHERE parent_id IS NOT NULL)"
-        ))
-        db.commit()
-    except Exception:
-        logger.warning("is_folder migration failed", exc_info=True)
-        db.rollback()
-
-    db.close()
-
-
-def _migrate_field_config():
-    """v1.0.0 마이그레이션: projects 테이블에 field_config 컬럼 추가"""
-    from database import SessionLocal
-    import sqlalchemy as sa
-    db = SessionLocal()
-    try:
-        result = db.execute(sa.text("PRAGMA table_info(projects)"))
-        columns = [row[1] for row in result]
-        if "field_config" not in columns:
-            db.execute(sa.text("ALTER TABLE projects ADD COLUMN field_config TEXT"))
-            db.commit()
-            logger.info("Migration: added field_config column to projects")
-    except Exception:
-        logger.warning("field_config migration failed", exc_info=True)
-        db.rollback()
-    finally:
-        db.close()
-
-
-def _migrate_indexes():
-    """v1.0.3 마이그레이션: 성능 개선을 위한 인덱스 추가"""
-    from database import SessionLocal
-    import sqlalchemy as sa
-    db = SessionLocal()
-
-    indexes = [
-        "CREATE INDEX IF NOT EXISTS ix_test_case_sheets_project_id ON test_case_sheets(project_id)",
-        "CREATE INDEX IF NOT EXISTS ix_test_case_sheets_parent_id ON test_case_sheets(parent_id)",
-        "CREATE INDEX IF NOT EXISTS ix_test_cases_project_id_deleted ON test_cases(project_id, deleted_at)",
-        "CREATE INDEX IF NOT EXISTS ix_test_cases_sheet_name ON test_cases(project_id, sheet_name)",
-        "CREATE INDEX IF NOT EXISTS ix_test_runs_project_id ON test_runs(project_id)",
-        "CREATE INDEX IF NOT EXISTS ix_test_runs_status ON test_runs(project_id, status)",
-        "CREATE INDEX IF NOT EXISTS ix_test_results_run_id ON test_results(test_run_id)",
-        "CREATE INDEX IF NOT EXISTS ix_test_results_run_result ON test_results(test_run_id, result)",
-        "CREATE INDEX IF NOT EXISTS ix_test_results_case_id ON test_results(test_case_id)",
-        "CREATE INDEX IF NOT EXISTS ix_project_members_project_user ON project_members(project_id, user_id)",
-        "CREATE INDEX IF NOT EXISTS ix_test_case_history_tc_id ON test_case_history(test_case_id)",
-    ]
-    for sql in indexes:
-        try:
-            db.execute(sa.text(sql))
-            db.commit()
-        except Exception:
-            db.rollback()
-
-    db.close()
 
 
 def _purge_old_deleted_testcases():
