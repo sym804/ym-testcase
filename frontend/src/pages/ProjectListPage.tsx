@@ -264,11 +264,11 @@ export default function ProjectListPage() {
                         onClick={() => navigate(`/projects/${p.id}`)}
                       >
                         {isAdmin && (
-                          <td style={{ ...s.td, textAlign: "center" as const }} onClick={(e) => { e.stopPropagation(); toggleSelect(p.id, e); }}>
+                          <td style={{ ...s.td, textAlign: "center" as const }} onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }}>
                             <input
                               type="checkbox"
                               checked={selectedIds.has(p.id)}
-                              onChange={(e) => { e.stopPropagation(); toggleSelect(p.id); }}
+                              onChange={() => {}}
                               style={{ width: 15, height: 15, cursor: "pointer" }}
                             />
                           </td>

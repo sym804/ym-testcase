@@ -307,6 +307,7 @@ describe("testCasesApi", () => {
     mockGet.mockResolvedValueOnce({ data: blob });
     const result = await testCasesApi.exportExcel(1);
     expect(mockGet).toHaveBeenCalledWith("/api/projects/1/testcases/export", {
+      params: { split_sheets: false },
       responseType: "blob",
     });
     expect(result).toBe(blob);
