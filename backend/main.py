@@ -13,6 +13,7 @@ from database import engine, Base
 from routes import auth as auth_routes
 from routes import projects as project_routes
 from routes import testcases as testcase_routes
+from routes import sheets as sheets_routes
 from routes import testruns as testrun_routes
 from routes import dashboard as dashboard_routes
 from routes import reports as report_routes
@@ -93,6 +94,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth_routes.router)
 app.include_router(project_routes.router)
 app.include_router(testcase_routes.router)
+app.include_router(sheets_routes.router)
 app.include_router(testrun_routes.router)
 app.include_router(dashboard_routes.router)
 app.include_router(report_routes.router)
