@@ -131,8 +131,8 @@ export default function ProjectListPage() {
     }
   };
 
-  const toggleSelect = (id: number, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const toggleSelect = (id: number, e?: { stopPropagation?: () => void }) => {
+    e?.stopPropagation?.();
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) { next.delete(id); } else { next.add(id); }
@@ -268,7 +268,7 @@ export default function ProjectListPage() {
                             <input
                               type="checkbox"
                               checked={selectedIds.has(p.id)}
-                              onChange={() => {}}
+                              onChange={(e) => { e.stopPropagation(); toggleSelect(p.id); }}
                               style={{ width: 15, height: 15, cursor: "pointer" }}
                             />
                           </td>
@@ -314,8 +314,11 @@ export default function ProjectListPage() {
                 return (
                   <div
                     key={p.id}
+                    role="button"
+                    tabIndex={0}
                     style={s.card}
                     onClick={() => navigate(`/projects/${p.id}`)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/projects/${p.id}`); } }}
                     onMouseEnter={(e) => {
                       const el = e.currentTarget as HTMLDivElement;
                       el.style.borderTopColor = "var(--accent)";

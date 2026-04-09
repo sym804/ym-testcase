@@ -113,8 +113,11 @@ export default function Header() {
     <header style={styles.header}>
       <div style={styles.left}>
         <span
+          role="button"
+          tabIndex={0}
           style={styles.title}
           onClick={() => navigate("/projects")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/projects"); } }}
         >
           YM TestCase
         </span>
@@ -152,11 +155,21 @@ export default function Header() {
               {searchResults.slice(0, 15).map((tc) => (
                 <div
                   key={tc.id}
+                  role="button"
+                  tabIndex={0}
                   style={styles.searchItem}
                   onClick={() => {
                     navigate(`/projects/${tc.project_id}?tab=tc&highlight=${encodeURIComponent(tc.tc_id)}`);
                     setShowSearch(false);
                     setSearchQuery("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(`/projects/${tc.project_id}?tab=tc&highlight=${encodeURIComponent(tc.tc_id)}`);
+                      setShowSearch(false);
+                      setSearchQuery("");
+                    }
                   }}
                 >
                   <span style={styles.searchTcId}>{highlight(tc.tc_id, searchQuery)}</span>

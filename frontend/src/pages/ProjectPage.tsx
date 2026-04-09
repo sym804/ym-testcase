@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { projectsApi } from "../api";
@@ -18,12 +18,24 @@ const TAB_KEYS = ["tc", "run", "compare", "dashboard", "report", "settings"];
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation("project");
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const projectId = Number(id);
   const [project, setProject] = useState<Project | null>(null);
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "tc");
   const [loaded, setLoaded] = useState(false);
+
+  // URL searchParams에서 탭/하이라이트 직접 파생 (single source of truth)
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabParam && TAB_KEYS.includes(tabParam) ? tabParam : "tc";
   const highlightTcId = searchParams.get("highlight") || undefined;
+
+  const setActiveTab = useCallback((tab: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", tab);
+      next.delete("highlight");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   useEffect(() => {
     if (!projectId) return;

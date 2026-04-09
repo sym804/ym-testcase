@@ -69,8 +69,9 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
       });
       onUpdate(updated);
       toast.success(t("saved") || "저장되었습니다");
-    } catch (e) {
-      toast.error(translateError(e));
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t("saveFailed"));
     } finally {
       setNameSaving(false);
     }
@@ -644,10 +645,12 @@ function CustomFieldManager({ projectId }: { projectId: number }) {
                   {f.options?.join(", ") || "-"}
                 </td>
                 <td style={{ padding: "8px 10px", borderBottom: "1px solid var(--border-color)", textAlign: "center" }}>
-                  <span
-                    style={{ cursor: "pointer", color: "var(--color-fail)", fontSize: 16 }}
+                  <button
+                    type="button"
+                    aria-label={t("deleteField")}
+                    style={{ cursor: "pointer", color: "var(--color-fail)", fontSize: 16, background: "none", border: "none", padding: 0 }}
                     onClick={() => handleDelete(f)}
-                  >×</span>
+                  >×</button>
                 </td>
               </tr>
             ))}
