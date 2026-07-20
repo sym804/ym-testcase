@@ -46,6 +46,18 @@ def project(token):
     requests.delete(f"{BASE}/api/projects/{pid}", headers=h)
 
 
+@pytest.fixture(scope="module")
+def viewer_token():
+    """프로젝트 멤버가 아닌 일반 사용자 (공개 프로젝트에서는 viewer 로 취급된다)"""
+    requests.post(f"{BASE}/api/auth/register", json={
+        "username": "__sync_viewer__", "password": "viewer1234", "display_name": "Sync Viewer",
+    })
+    r = requests.post(f"{BASE}/api/auth/login",
+                      json={"username": "__sync_viewer__", "password": "viewer1234"})
+    assert r.status_code == 200, f"viewer login failed: {r.status_code} {r.text}"
+    return r.json()["access_token"]
+
+
 def make_sheet(token, pid, name):
     r = requests.post(f"{BASE}/api/projects/{pid}/testcases/sheets", headers=auth(token), json={"name": name})
     assert r.status_code in (200, 201), r.text
@@ -211,6 +223,59 @@ def test_run_with_no_results_is_still_returned(token, project):
     r = requests.get(f"{BASE}/api/projects/{project}/testruns/{run_id}", headers=auth(token))
     assert r.status_code == 200, r.text
     assert r.json()["results"] == []
+
+
+def _drop_one_result(run_id):
+    """런에서 결과 행 하나를 지워 '누락' 상태를 인위적으로 만든다.
+
+    푸시 동기화 때문에 누락 상태가 자연히 생기지 않으므로, 보정(pull) 경로를
+    검증하려면 이렇게 만들어야 한다. conftest 가 같은 프로세스에서 서버를 띄우므로
+    engine 은 테스트 대상 서버와 같은 DB 를 가리킨다.
+    """
+    from database import engine
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        tc_id = conn.execute(text(
+            "SELECT test_case_id FROM test_results WHERE test_run_id=:r ORDER BY id DESC LIMIT 1"
+        ), {"r": run_id}).scalar()
+        conn.execute(text("DELETE FROM test_results WHERE test_run_id=:r AND test_case_id=:t"),
+                     {"r": run_id, "t": tc_id})
+    return tc_id
+
+
+def test_viewer_read_does_not_write(token, project, viewer_token):
+    """viewer 조회만으로는 결과 행이 생성되지 않는다
+
+    viewer 는 읽기 전용 역할이고, 공개 프로젝트는 비멤버도 viewer 로 취급된다.
+    조회가 쓰기를 유발하면 읽기 전용 계약이 깨진다.
+    """
+    make_tc(token, project, 1, "TC-001")
+    make_tc(token, project, 2, "TC-002")
+    run_id = make_run(token, project)
+
+    dropped = _drop_one_result(run_id)
+
+    r = requests.get(f"{BASE}/api/projects/{project}/testruns/{run_id}", headers=auth(viewer_token))
+    assert r.status_code == 200, r.text
+    seen = {res["test_case_id"] for res in r.json()["results"]}
+    assert dropped not in seen, "viewer 조회가 결과 행을 새로 만들었다"
+
+    # tester 이상은 같은 상황에서 보정한다 (보정 자체가 죽은 게 아님을 확인)
+    assert dropped in run_tc_ids(token, project, run_id), "tester 조회에서 보정이 동작하지 않았다"
+
+
+def test_busy_timeout_is_configured(token):
+    """SQLite busy_timeout 이 30초 이상으로 설정되어 있다
+
+    다중 요청이 동시에 쓸 때 즉시 database is locked 로 실패하지 않아야 한다.
+    """
+    from database import engine
+    from sqlalchemy import text
+
+    with engine.connect() as conn:
+        timeout = conn.execute(text("PRAGMA busy_timeout")).scalar()
+    assert timeout >= 30000, f"busy_timeout 이 너무 짧다: {timeout}ms"
 
 
 def test_sync_is_idempotent(token, project):

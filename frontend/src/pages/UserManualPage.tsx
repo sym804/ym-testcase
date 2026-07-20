@@ -485,6 +485,14 @@ export default function UserManualPage() {
               <li>{t("testrun.list_li3")}</li>
             </ul>
 
+            <h3 style={s.h3}>{t("testrun.h3_sync")}</h3>
+            <ul style={s.ul}>
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.sync_li1") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.sync_li2") }} />
+              <li>{t("testrun.sync_li3")}</li>
+              <li>{t("testrun.sync_li4")}</li>
+            </ul>
+
             <h3 style={s.h3}>{t("testrun.h3_result")}</h3>
             <div style={s.featureGrid}>
               <div style={s.featureCard}>
