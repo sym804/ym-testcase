@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(me);
       setMustChangePassword(me.must_change_password);
     } catch {
-      // 쿠키 없거나 만료 — 미로그인 상태
+      // 쿠키 없거나 만료 - 미로그인 상태
       setUser(null);
     } finally {
       setLoading(false);

@@ -455,7 +455,7 @@ class TestFileUpload:
         if r.status_code != 200:
             pytest.skip("Upload failed")
         att_id = r.json()["id"]
-        # viewer가 다운로드 시도 — 공개 프로젝트이므로 접근 가능해야 함
+        # viewer가 다운로드 시도 - 공개 프로젝트이므로 접근 가능해야 함
         r2 = requests.get(f"{BASE}/api/attachments/download/{att_id}", headers=auth(store.viewer))
         assert r2.status_code == 200  # 공개 프로젝트라 viewer 접근 가능
 

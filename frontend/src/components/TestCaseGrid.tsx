@@ -33,7 +33,7 @@ interface Props {
 }
 
 const TYPE_OPTIONS = ["Func.", "UI/UX", "Perf.", "Security", "API", "Data"];
-// DB values (Korean) — display names are translated via priorityDisplay / platformDisplay in locale files
+// DB values (Korean) - display names are translated via priorityDisplay / platformDisplay in locale files
 const PRIORITY_OPTIONS = ["매우 높음", "높음", "보통", "낮음", "매우 낮음"];
 const PLATFORM_OPTIONS = ["Web", "Mobile Web", "Mobile App", "iOS", "Android", "PC", "API", "공통"];
 

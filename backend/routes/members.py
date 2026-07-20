@@ -52,7 +52,7 @@ def list_available_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
 ):
-    """멤버 추가용 사용자 목록 — 이미 멤버인 사용자 제외"""
+    """멤버 추가용 사용자 목록 - 이미 멤버인 사용자 제외"""
     from schemas import UserResponse
     existing_user_ids = {m.user_id for m in db.query(ProjectMember).filter(
         ProjectMember.project_id == project_id

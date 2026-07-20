@@ -586,7 +586,7 @@ def _parse_md_tables(file_content: bytes) -> list[dict]:
 
 
 def _preview_md(file_content: bytes, project_id: int, db: Session) -> list:
-    """Markdown 파일의 미리보기 — 테이블별 TC 수와 기존 중복 수 반환."""
+    """Markdown 파일의 미리보기 - 테이블별 TC 수와 기존 중복 수 반환."""
     tables = _parse_md_tables(file_content)
     result = []
     for t in tables:

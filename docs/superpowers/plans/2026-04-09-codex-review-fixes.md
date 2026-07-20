@@ -27,7 +27,7 @@
 ```python
 # backend/conftest.py 전체 교체
 
-"""pytest 전역 설정 — 테스트 세션 동안 uvicorn 서버를 자동으로 시작/종료"""
+"""pytest 전역 설정 - 테스트 세션 동안 uvicorn 서버를 자동으로 시작/종료"""
 import os
 import threading
 import time
@@ -71,7 +71,7 @@ def _seed_admin(base_url: str, password: str):
         "password": password,
         "display_name": "Admin",
     })
-    # 201 = 새로 생성, 409 = 이미 존재 — 둘 다 OK
+    # 201 = 새로 생성, 409 = 이미 존재 - 둘 다 OK
     assert r.status_code in (201, 409), f"Admin seed failed: {r.status_code} {r.text}"
 
 
@@ -87,7 +87,7 @@ def _server(tmp_path_factory):
         yield
         return
 
-    # 임시 DB 사용 — 테스트 간 격리
+    # 임시 DB 사용 - 테스트 간 격리
     tmp_dir = tmp_path_factory.mktemp("test_db")
     test_db = str(tmp_dir / "test_tc_manager.db")
     os.environ["DATABASE_URL"] = f"sqlite:///{test_db}"
@@ -115,7 +115,7 @@ def _server(tmp_path_factory):
 conftest.py가 이미 admin을 등록하므로, test_security.py의 `setup_tokens`에서는 로그인만 한다.
 
 ```python
-# backend/test_security.py — setup_tokens fixture 수정 (기존 37~55행)
+# backend/test_security.py - setup_tokens fixture 수정 (기존 37~55행)
 @pytest.fixture(scope="session", autouse=True)
 def setup_tokens():
     """세션 시작 시 토큰 준비 (admin은 conftest에서 이미 등록됨)"""
@@ -147,7 +147,7 @@ Expected: 서버 자동 시작 → admin 자동 등록 → 전체 PASS (임시 D
 conftest.py가 자동 처리하므로 CI의 수동 curl 등록을 제거한다.
 
 ```yaml
-# .github/workflows/ci.yml — backend job의 "Start server and register admin" 단계 수정
+# .github/workflows/ci.yml - backend job의 "Start server and register admin" 단계 수정
       - name: Start server
         working-directory: backend
         run: |
@@ -181,7 +181,7 @@ E2E는 playwright가 직접 UI 로그인하므로 admin 등록은 유지해야 �
 
 ```bash
 git add backend/conftest.py backend/test_security.py .github/workflows/ci.yml
-git commit -m "fix: pytest 원커맨드 재현성 — conftest에 임시DB + admin seed 자동화"
+git commit -m "fix: pytest 원커맨드 재현성 - conftest에 임시DB + admin seed 자동화"
 ```
 
 ---
@@ -191,17 +191,17 @@ git commit -m "fix: pytest 원커맨드 재현성 — conftest에 임시DB + adm
 ### Task 2: backend/routes/testcases.py → sheets + import/export 서비스 분리
 
 **Files:**
-- Create: `backend/routes/sheets.py` — 시트 CRUD 엔드포인트
+- Create: `backend/routes/sheets.py` - 시트 CRUD 엔드포인트
 - Create: `backend/services/__init__.py`
-- Create: `backend/services/import_service.py` — Excel/CSV/MD 파싱 로직
-- Create: `backend/services/export_service.py` — Excel export 로직
-- Modify: `backend/routes/testcases.py` — 분리된 코드 제거, import 경로 변경
-- Modify: `backend/main.py` — sheets router 등록
+- Create: `backend/services/import_service.py` - Excel/CSV/MD 파싱 로직
+- Create: `backend/services/export_service.py` - Excel export 로직
+- Modify: `backend/routes/testcases.py` - 분리된 코드 제거, import 경로 변경
+- Modify: `backend/main.py` - sheets router 등록
 
 **현재 문제:** testcases.py가 1722줄. TC CRUD + Sheet CRUD + Excel/CSV/MD import 파싱 + Excel export가 전부 한 파일에 섞여 있음.
 
 **분리 기준:**
-- `routes/sheets.py`: 시트/폴더 CRUD (현재 148~429행, ~280줄) — `_build_sheet_tree`, `_collect_descendant_names`, list/create/rename/move/delete + `_validate_sheet_name`
+- `routes/sheets.py`: 시트/폴더 CRUD (현재 148~429행, ~280줄) - `_build_sheet_tree`, `_collect_descendant_names`, list/create/rename/move/delete + `_validate_sheet_name`
 - `services/import_service.py`: `HEADER_MAP`, `_resolve_merged`, `_detect_header_row`, `_count_tc_rows`, `_parse_sheet`, CSV 매핑/파싱, MD 파싱 (현재 727~1588행, ~860줄)
 - `services/export_service.py`: Excel export (현재 1590~1722행, ~130줄)
 - `routes/testcases.py`: TC CRUD + clone + reorder만 남김 (~530줄)
@@ -232,7 +232,7 @@ testcases.py에서 `HEADER_MAP` (727행~) 부터 `_preview_csv`, `_parse_md_tabl
 
 ```python
 # backend/services/import_service.py
-"""TC 임포트 파싱 로직 — Excel, CSV, Markdown"""
+"""TC 임포트 파싱 로직 - Excel, CSV, Markdown"""
 import csv
 import io
 import logging
@@ -358,7 +358,7 @@ Expected: 기존 테스트 전부 PASS (URL 경로 변경 없음)
 
 ```bash
 git add backend/services/ backend/routes/sheets.py backend/routes/testcases.py backend/main.py
-git commit -m "refactor: testcases.py 분리 — sheets 라우터 + import/export 서비스 추출"
+git commit -m "refactor: testcases.py 분리 - sheets 라우터 + import/export 서비스 추출"
 ```
 
 ### Task 3: TestCaseGrid.tsx 커스텀 훅 추출
@@ -373,10 +373,10 @@ git commit -m "refactor: testcases.py 분리 — sheets 라우터 + import/expor
 **현재 문제:** TestCaseGrid.tsx 2274줄. undo/redo, find/replace, sheet 관리, sidebar 렌더링이 전부 한 컴포넌트에 있음.
 
 **분리 기준 (탐색 결과 기반):**
-- `useUndoRedo.ts`: 107~180행 — undo/redo 스택 상태 + pushUndo/applyUndoRedo/handleUndo/handleRedo
-- `useFindReplace.ts`: 181~260행 — 찾기/바꾸기 상태 + 핸들러
+- `useUndoRedo.ts`: 107~180행 - undo/redo 스택 상태 + pushUndo/applyUndoRedo/handleUndo/handleRedo
+- `useFindReplace.ts`: 181~260행 - 찾기/바꾸기 상태 + 핸들러
 - `useSheetManager.ts`: 시트 로딩/CRUD/선택 상태 (305~322행 loadSheets + 798~921행 sheet handlers)
-- `SheetTreeSidebar.tsx`: 1089~1327행 — VS Code 스타일 재귀 트리 렌더러
+- `SheetTreeSidebar.tsx`: 1089~1327행 - VS Code 스타일 재귀 트리 렌더러
 
 - [ ] **Step 1: `frontend/src/hooks/useUndoRedo.ts` 생성**
 
@@ -528,7 +528,7 @@ Expected: 358 tests PASS
 
 ```bash
 git add frontend/src/hooks/ frontend/src/components/SheetTreeSidebar.tsx frontend/src/components/TestCaseGrid.tsx
-git commit -m "refactor: TestCaseGrid 훅 추출 — useUndoRedo, useFindReplace, useSheetManager, SheetTreeSidebar"
+git commit -m "refactor: TestCaseGrid 훅 추출 - useUndoRedo, useFindReplace, useSheetManager, SheetTreeSidebar"
 ```
 
 ### Task 4: TestRunManager.tsx 커스텀 훅 추출
@@ -627,7 +627,7 @@ Expected: 타입 에러 0개, 358 tests PASS
 
 ```bash
 git add frontend/src/hooks/useTestTimer.ts frontend/src/hooks/useAttachments.ts frontend/src/hooks/useResultFilters.ts frontend/src/components/TestRunManager.tsx
-git commit -m "refactor: TestRunManager 훅 추출 — useTestTimer, useAttachments, useResultFilters"
+git commit -m "refactor: TestRunManager 훅 추출 - useTestTimer, useAttachments, useResultFilters"
 ```
 
 ---
@@ -641,7 +641,7 @@ git commit -m "refactor: TestRunManager 훅 추출 — useTestTimer, useAttachme
 - Create: `backend/alembic/env.py`
 - Create: `backend/alembic/script.py.mako`
 - Create: `backend/alembic/versions/0001_initial_schema.py`
-- Modify: `backend/main.py` — 수동 마이그레이션 함수 제거, Alembic 자동 실행으로 교체
+- Modify: `backend/main.py` - 수동 마이그레이션 함수 제거, Alembic 자동 실행으로 교체
 
 **현재 문제:** main.py lifespan에서 `create_all` + 5개 수동 `ALTER TABLE`을 try/except로 실행. 에러를 삼키므로 실패해도 모름.
 
@@ -651,7 +651,7 @@ git commit -m "refactor: TestRunManager 훅 추출 — useTestTimer, useAttachme
 cd backend && python -m alembic init alembic
 ```
 
-- [ ] **Step 2: alembic.ini 수정 — SQLite URL 설정**
+- [ ] **Step 2: alembic.ini 수정 - SQLite URL 설정**
 
 ```ini
 # backend/alembic.ini 핵심 설정
@@ -660,7 +660,7 @@ script_location = alembic
 sqlalchemy.url = sqlite:///./tc_manager.db
 ```
 
-- [ ] **Step 3: alembic/env.py 수정 — 모델 메타데이터 연결**
+- [ ] **Step 3: alembic/env.py 수정 - 모델 메타데이터 연결**
 
 ```python
 # backend/alembic/env.py
@@ -671,7 +671,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from database import Base
-import models  # noqa: F401 — 모델 등록용
+import models  # noqa: F401 - 모델 등록용
 
 target_metadata = Base.metadata
 
@@ -703,7 +703,7 @@ cd backend && python -m alembic stamp head
 - [ ] **Step 6: main.py에서 수동 마이그레이션 제거 + Alembic upgrade 실행**
 
 ```python
-# backend/main.py — lifespan 수정
+# backend/main.py - lifespan 수정
 from alembic.config import Config
 from alembic import command
 
@@ -719,10 +719,10 @@ async def lifespan(app: FastAPI):
 ```
 
 제거 대상 함수:
-- `_migrate_roles()` — 한번 실행되면 더 이상 필요 없음 (이미 적용된 DB)
-- `_migrate_sheet_parent_id()` — Alembic initial에 포함
-- `_migrate_field_config()` — Alembic initial에 포함
-- `_migrate_indexes()` — Alembic initial에 포함
+- `_migrate_roles()` - 한번 실행되면 더 이상 필요 없음 (이미 적용된 DB)
+- `_migrate_sheet_parent_id()` - Alembic initial에 포함
+- `_migrate_field_config()` - Alembic initial에 포함
+- `_migrate_indexes()` - Alembic initial에 포함
 
 `_purge_old_deleted_testcases()`는 마이그레이션이 아닌 일일 정리 작업이므로 유지.
 
@@ -757,7 +757,7 @@ Expected: 전체 PASS
 
 ```bash
 git add backend/alembic.ini backend/alembic/ backend/main.py
-git commit -m "feat: Alembic 마이그레이션 도입 — 수동 ALTER TABLE 제거, initial schema revision"
+git commit -m "feat: Alembic 마이그레이션 도입 - 수동 ALTER TABLE 제거, initial schema revision"
 ```
 
 ---
@@ -804,5 +804,5 @@ Run: `cd backend && python -m uvicorn main:app --port 8008`
 
 ```bash
 git add -A
-git commit -m "chore: Codex 리뷰 지적사항 구조 개선 완료 — pytest 재현성 + 파일 분리 + Alembic"
+git commit -m "chore: Codex 리뷰 지적사항 구조 개선 완료 - pytest 재현성 + 파일 분리 + Alembic"
 ```

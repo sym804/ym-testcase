@@ -62,7 +62,7 @@ def _bulk_plan_stats(plan_ids: list[int], db: Session) -> dict[int, tuple[int, d
     if not plan_ids:
         return {}
 
-    # 1) 플랜별 run count — 1회 쿼리
+    # 1) 플랜별 run count - 1회 쿼리
     run_counts_rows = (
         db.query(TestRun.test_plan_id, func.count(TestRun.id))
         .filter(TestRun.test_plan_id.in_(plan_ids))
@@ -71,7 +71,7 @@ def _bulk_plan_stats(plan_ids: list[int], db: Session) -> dict[int, tuple[int, d
     )
     run_counts = dict(run_counts_rows)
 
-    # 2) 플랜별 결과 집계 — 1회 쿼리
+    # 2) 플랜별 결과 집계 - 1회 쿼리
     progress_rows = (
         db.query(
             TestRun.test_plan_id,

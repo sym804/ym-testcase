@@ -23,7 +23,7 @@ if not SECRET_KEY:
         raise RuntimeError("SECRET_KEY environment variable must be set in production")
     # 개발 환경: 프로세스마다 랜덤 키 생성 (재시작 시 기존 토큰 무효화)
     SECRET_KEY = secrets.token_urlsafe(64)
-    logger.warning("SECRET_KEY not set – using random key (dev only)")
+    logger.warning("SECRET_KEY not set - using random key (dev only)")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("TOKEN_EXPIRE_HOURS", "72"))
 
@@ -35,10 +35,10 @@ COOKIE_MAX_AGE = ACCESS_TOKEN_EXPIRE_HOURS * 3600
 # Swagger UI용 (OpenAPI docs에서 Authorization 버튼 표시)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
-# System role hierarchy – higher index = more privileged
+# System role hierarchy - higher index = more privileged
 SYSTEM_ROLE_HIERARCHY: List[str] = ["user", "qa_manager", "admin"]
 
-# Project role hierarchy – higher index = more privileged
+# Project role hierarchy - higher index = more privileged
 PROJECT_ROLE_HIERARCHY: List[str] = ["viewer", "tester", "admin"]
 
 

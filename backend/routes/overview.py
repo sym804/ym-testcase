@@ -47,7 +47,7 @@ def global_overview(
             "projects": [],
         }
 
-    # 1) 프로젝트별 활성 TC 수 — 1회 SQL
+    # 1) 프로젝트별 활성 TC 수 - 1회 SQL
     tc_counts = dict(
         db.query(TestCase.project_id, func.count(TestCase.id))
         .filter(TestCase.project_id.in_(project_ids), TestCase.deleted_at.is_(None))
@@ -55,7 +55,7 @@ def global_overview(
         .all()
     )
 
-    # 2) 프로젝트별 최신 TestRun ID — 서브쿼리 1회
+    # 2) 프로젝트별 최신 TestRun ID - 서브쿼리 1회
     latest_run_sq = (
         db.query(
             TestRun.project_id,
@@ -66,7 +66,7 @@ def global_overview(
         .subquery()
     )
 
-    # 3) 최신 런의 결과를 SQL CASE 집계 — 1회 SQL
+    # 3) 최신 런의 결과를 SQL CASE 집계 - 1회 SQL
     # 활성 TC만 집계하기 위해 TestCase join + deleted_at IS NULL
     result_rows = (
         db.query(

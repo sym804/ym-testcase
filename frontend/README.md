@@ -1,4 +1,4 @@
-# YM TestCase — Frontend
+# YM TestCase - Frontend
 
 React 19 + TypeScript + Vite 기반 프론트엔드.
 
@@ -26,7 +26,7 @@ npm run build        # dist/ 디렉토리에 빌드 결과 생성
 
 ## 주요 의존성
 
-- **ag-grid** — 스프레드시트 스타일 그리드
-- **Chart.js** — 대시보드 차트
-- **React Router** — SPA 라우팅
-- **Zustand** — 상태 관리
+- **ag-grid** - 스프레드시트 스타일 그리드
+- **Chart.js** - 대시보드 차트
+- **React Router** - SPA 라우팅
+- **Zustand** - 상태 관리

@@ -383,7 +383,7 @@ def round_comparison(
     return result
 
 
-# ── Assignee Summary (deprecated — assignee 필드 v1.2.0에서 제거됨) ─────────
+# ── Assignee Summary (deprecated - assignee 필드 v1.2.0에서 제거됨) ─────────
 
 @router.get("/assignee")
 def assignee_summary(

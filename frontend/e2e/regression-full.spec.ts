@@ -505,7 +505,7 @@ test.describe("6. 테스트 수행", () => {
     const proj = await request.post("/api/projects", { data: { name: `E2E_TRV_${Date.now()}` }, headers: h });
     const pid = (await proj.json()).id;
 
-    // 빈 이름 — Pydantic에서 str 타입은 빈 문자열도 허용할 수 있으므로 201도 가능
+    // 빈 이름 - Pydantic에서 str 타입은 빈 문자열도 허용할 수 있으므로 201도 가능
     const run = await request.post(`/api/projects/${pid}/testruns`, { data: { name: "" }, headers: h });
     expect([201, 400, 422].includes(run.status())).toBe(true);
 

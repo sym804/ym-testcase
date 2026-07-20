@@ -142,7 +142,7 @@ test("README + 매뉴얼 스크린샷 (ymseo_test)", async ({ page, request }) =
   await page.waitForTimeout(2000);
   await page.screenshot({ path: path.join(MANUAL_DIR, "09_testrun_tab.png") });
 
-  // 10~11. 테스트 수행 결과 — 첫 번째 런 클릭
+  // 10~11. 테스트 수행 결과 - 첫 번째 런 클릭
   const runItem = page.getByText("v0.6.0 Full Test").first();
   const runItem2 = page.locator("text=v0.6.0").first();
   const anyRun = (await runItem.isVisible({ timeout: 2000 }).catch(() => false)) ? runItem : runItem2;
@@ -162,7 +162,7 @@ test("README + 매뉴얼 스크린샷 (ymseo_test)", async ({ page, request }) =
   // 13~15. 대시보드
   await page.getByRole("button", { name: "대시보드" }).click();
   await page.waitForTimeout(2000);
-  // 특정 런 선택 — 정확한 수치 표시
+  // 특정 런 선택 - 정확한 수치 표시
   const dashSelect = page.locator("select").first();
   if (await dashSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
     const options = await dashSelect.locator("option").allTextContents();

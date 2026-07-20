@@ -42,9 +42,9 @@
 | 분류 | 사용 가능 심각도 | 비고 |
 |---|---|---|
 | BUG, ENC, PERF | Block, Critical, Major, Minor, Trivial | 5단계 전체 |
-| SEC (보안 이슈) | Block, Critical, Major, Minor | 최소 Minor 이상 (Trivial 불가 — 보안은 사소하지 않음) |
+| SEC (보안 이슈) | Block, Critical, Major, Minor | 최소 Minor 이상 (Trivial 불가 - 보안은 사소하지 않음) |
 | DB 관련 이슈 | Block, Critical, Major | 최소 Major 이상 (DB 문제는 데이터 정합성 직결) |
-| ENH (개선 요청) | Major, Minor, Trivial | 3단계만 (Block/Critical 불가 — 개선은 장애/마비가 아님) |
+| ENH (개선 요청) | Major, Minor, Trivial | 3단계만 (Block/Critical 불가 - 개선은 장애/마비가 아님) |
 
 ## 상태 관리
 
@@ -144,9 +144,9 @@ Open → Won't Fix (수정 안 함)
 
 ## 관리 파일
 
-- `Issue_list.xlsx` — 시트 구성: 이슈 로그 (94건) / 통계
-- `Release_note.md` — 릴리즈별 변경사항 및 알려진 이슈
-- GitHub Issues — `sym804/ym-testcase` 레포의 Issues (엑셀과 1:1 동기화)
+- `Issue_list.xlsx` - 시트 구성: 이슈 로그 (94건) / 통계
+- `Release_note.md` - 릴리즈별 변경사항 및 알려진 이슈
+- GitHub Issues - `sym804/ym-testcase` 레포의 Issues (엑셀과 1:1 동기화)
 
 ### GitHub 라벨 체계
 

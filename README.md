@@ -5,15 +5,15 @@
 QA 팀과 개발팀을 위한 셀프 호스팅형 테스트케이스 관리 도구.
 TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트**를 한 곳에서 관리합니다.
 
-- **빠르게 작성** — 스프레드시트 스타일 그리드로 TC를 즉시 편집
-- **실행 결과 추적** — 테스트 런 · 플랜 · 대시보드로 진행률을 한눈에
-- **팀 프로세스에 맞춤** — 역할 기반 접근 제어, 커스텀 필드, 고급 필터
+- **빠르게 작성** - 스프레드시트 스타일 그리드로 TC를 즉시 편집
+- **실행 결과 추적** - 테스트 런 · 플랜 · 대시보드로 진행률을 한눈에
+- **팀 프로세스에 맞춤** - 역할 기반 접근 제어, 커스텀 필드, 고급 필터
 
-![TC 관리 — 스프레드시트 스타일 편집](docs/screenshots/tc_grid.png)
+![TC 관리 - 스프레드시트 스타일 편집](docs/screenshots/tc_grid.png)
 
 | ![프로젝트 목록](docs/screenshots/project_list.png) | ![대시보드](docs/screenshots/dashboard.png) |
 |---|---|
-| **프로젝트 목록** — 현황 및 진행률 | **대시보드** — 통계 한눈에 |
+| **프로젝트 목록** - 현황 및 진행률 | **대시보드** - 통계 한눈에 |
 
 ## 기존 도구와의 비교
 
@@ -54,7 +54,7 @@ cp backend/.env.example backend/.env
 복사한 `backend/.env` 파일을 열어서 **SECRET_KEY를 반드시 변경**하세요:
 
 ```dotenv
-# 변경 전 (기본값 — 이대로 쓰면 안 됩니다)
+# 변경 전 (기본값 - 이대로 쓰면 안 됩니다)
 SECRET_KEY=change-me-to-a-random-string
 
 # 변경 후 (아무 랜덤 문자열로 교체)
@@ -184,7 +184,7 @@ ym-testcase/
 
 ## 라이선스
 
-AGPL-3.0 — [GNU Affero General Public License v3.0](LICENSE)
+AGPL-3.0 - [GNU Affero General Public License v3.0](LICENSE)
 
 ## 만든 사람
 

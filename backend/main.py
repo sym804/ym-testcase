@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
     inspector = sa_inspect(engine)
     tables = inspector.get_table_names()
     if tables and "alembic_version" not in tables:
-        logger.info("Pre-Alembic DB detected — stamping head")
+        logger.info("Pre-Alembic DB detected - stamping head")
         alembic_command.stamp(alembic_cfg, "head")
     else:
         alembic_command.upgrade(alembic_cfg, "head")
@@ -61,7 +61,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS – use CORS_ORIGINS env var in production (comma-separated)
+# CORS - use CORS_ORIGINS env var in production (comma-separated)
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,

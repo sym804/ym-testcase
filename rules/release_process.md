@@ -28,13 +28,13 @@
 ### Frontend
 - [ ] TypeScript 컴파일 통과 (`npx tsc --noEmit`)
 - [ ] Vite 프로덕션 빌드 통과 (`npm run build`)
-- [ ] Vitest 단위 테스트 전체 통과 (`npx vitest run`) — 현재 358개
-- [ ] Playwright E2E 테스트 전체 통과 (`npx playwright test`) — 현재 93개
+- [ ] Vitest 단위 테스트 전체 통과 (`npx vitest run`) - 현재 358개
+- [ ] Playwright E2E 테스트 전체 통과 (`npx playwright test`) - 현재 93개
 - [ ] 주요 화면 스모크 테스트 (로그인 → 프로젝트 목록 → TC 탭 → 테스트 수행)
 
 ### Backend
 - [ ] 서버 정상 시작 확인 (`uvicorn main:app --port 8008`)
-- [ ] pytest 전체 통과 (`pytest test_security.py`) — 현재 116개
+- [ ] pytest 전체 통과 (`pytest test_security.py`) - 현재 116개
 - [ ] 핵심 API 스모크 테스트 (로그인, TC 조회, 런 생성, 결과 저장)
 
 ### Database
@@ -78,13 +78,13 @@
 
 1. 이전 버전 Frontend 빌드 파일 복원
 2. 이전 버전 Backend 코드 복원
-3. DB 롤백 (스키마 변경 시 — 백업에서 복원)
+3. DB 롤백 (스키마 변경 시 - 백업에서 복원)
 4. 서버 재시작
 5. 스모크 테스트로 롤백 확인
 
 ## 관리 파일
 
-- `Release_note.md` — 전체 릴리즈 이력
-- `Issue_list.xlsx` — 이슈 추적 (94건, GitHub 동기화)
-- `rules/versioning.md` — 버전 체계
-- `rules/issue_management.md` — 이슈 관리 규칙
+- `Release_note.md` - 전체 릴리즈 이력
+- `Issue_list.xlsx` - 이슈 추적 (94건, GitHub 동기화)
+- `rules/versioning.md` - 버전 체계
+- `rules/issue_management.md` - 이슈 관리 규칙

@@ -97,9 +97,9 @@ fix/xxx         ← 버그 수정
 
 - [ ] TypeScript 타입 체크 통과 (`cd frontend && npx tsc --noEmit`)
 - [ ] ESLint 통과 (`cd frontend && npx eslint src/ --quiet`)
-- [ ] Vitest 통과 (`cd frontend && npx vitest run`) — 358+ 테스트
-- [ ] Playwright E2E 통과 (`cd frontend && npx playwright test`) — 93+ 테스트
-- [ ] pytest 통과 (`cd backend && pytest test_security.py -q`) — 116+ 테스트
+- [ ] Vitest 통과 (`cd frontend && npx vitest run`) - 358+ 테스트
+- [ ] Playwright E2E 통과 (`cd frontend && npx playwright test`) - 93+ 테스트
+- [ ] pytest 통과 (`cd backend && pytest test_security.py -q`) - 116+ 테스트
 - [ ] **전체 567+ 테스트 ALL PASS**
 - [ ] 새 기능이면 테스트 추가
 - [ ] 사용자 매뉴얼 업데이트 (해당 시)

@@ -1,4 +1,4 @@
-"""pytest 전역 설정 — 테스트 세션 동안 uvicorn 서버를 자동으로 시작/종료"""
+"""pytest 전역 설정 - 테스트 세션 동안 uvicorn 서버를 자동으로 시작/종료"""
 import os
 import threading
 import time
@@ -41,7 +41,7 @@ def _seed_admin(base_url: str, password: str):
         "password": password,
         "display_name": "Admin",
     })
-    # 201 = 새로 생성, 400 = 이미 존재 — 둘 다 OK
+    # 201 = 새로 생성, 400 = 이미 존재 - 둘 다 OK
     if r.status_code not in (201, 400):
         raise RuntimeError(f"Admin seed failed: {r.status_code} {r.text}")
 
@@ -56,14 +56,14 @@ def _server(tmp_path_factory):
     if _server_already_running(port):
         import warnings
         warnings.warn(
-            f"Using already-running server at port {port} — tests are NOT isolated (no temp DB)",
+            f"Using already-running server at port {port} - tests are NOT isolated (no temp DB)",
             stacklevel=2,
         )
         _seed_admin(base_url, admin_pw)
         yield
         return
 
-    # 임시 DB 사용 — 테스트 간 격리
+    # 임시 DB 사용 - 테스트 간 격리
     tmp_dir = tmp_path_factory.mktemp("test_db")
     test_db = str(tmp_dir / "test_tc_manager.db").replace("\\", "/")
     os.environ["DATABASE_URL"] = f"sqlite:///{test_db}"
