@@ -37,11 +37,92 @@ YM TestCase는 3개 컴포넌트로 구성되며, 각각 독립적으로 버전�
 ## 현재 버전
 
 ```
-YM TestCase System  v1.2.1.0  (2026-04-10)
-├── Frontend       v1.2.1.0
-├── Backend        v1.2.1.0
+YM TestCase System  v1.2.2.0  (2026-07-20)
+├── Frontend       v1.2.2.0
+├── Backend        v1.2.2.0
 └── Database       v0.6.0.0
 ```
+
+---
+
+## v1.2.2.0 (2026-07-20) - 런 생성 이후 추가된 TC 누락 수정
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.2.1.0 | **1.2.2.0** | fix +1 |
+| Frontend | 1.2.1.0 | **1.2.2.0** | fix +1 |
+| Backend | 1.2.1.0 | **1.2.2.0** | fix +1 |
+| Database | 0.6.0.0 | 0.6.0.0 | 변경 없음 |
+
+### 배경
+
+테스트 수행 화면에서 시트 탭 배지가 5로 표시되는데 클릭하면 그리드가 비어 있고, 그 순간
+시트 탭 바 자체가 사라져 다른 시트로 되돌아갈 수 없는 문제가 보고됐다. 원인은 세 가지였다.
+
+- 결과 행(`test_results`)이 런 생성 시점에만 만들어져, 이후 추가된 TC는 결과 행이 영영 없었다
+- 시트 탭 바 렌더 조건에 `results.length > 0`이 있어 결과 0건 시트를 고르면 탭 바가 사라졌다
+- 탭 배지는 TC 라이브러리 기준, 그리드는 런 스냅샷 기준이라 숫자가 어긋났다
+
+### 주요 변경
+
+**런과 TC 목록 동기화 (신규 `services/run_sync_service.py`)**
+
+- 진행 중(`in_progress`)인 런은 누락된 TC의 결과 행(NS)을 자동으로 흡수한다
+- 완료(`completed`)된 런은 과거 기록의 무결성을 위해 생성 당시 스냅샷을 유지한다
+- TC가 생기는 모든 경로(생성/복원/복제/일괄복제/엑셀·CSV·마크다운 임포트)에서 동기화하므로,
+  런 상세를 열지 않아도 대시보드·리포트가 같은 숫자를 본다
+- 런 상세 조회에도 보정을 두어 이 수정 이전에 만들어진 런을 복구한다.
+  단 viewer는 읽기 전용 역할이므로 tester 이상에서만 보정한다
+  (공개 프로젝트는 비멤버도 viewer로 취급되기 때문)
+- `reopen` 시점에도 보정해, 완료 기간에 추가된 TC가 상세를 열지 않고 완료해도 누락되지 않게 했다
+
+**결과 정렬 보장**
+
+결과 행은 런에 편입된 순서로 저장되므로, 기존 TC 사이에 끼는 번호로 추가하면 화면 맨 뒤로
+밀렸다(실측: `[1, 3, 2]`). 런 상세 API, 리포트 엑셀, 그리드 세 곳에서 TC 번호 순을 보장한다.
+
+**시트 탭**
+
+- 결과 0건 시트를 선택해도 탭 바가 유지된다 (막다른 길 제거)
+- 배지를 TC 라이브러리가 아니라 해당 런의 결과 수로 표시한다.
+  완료된 런에서도 배지와 그리드 행 수가 항상 일치한다
+
+**DB 안전성**
+
+- `PRAGMA busy_timeout=30000` 추가. 다중 요청 동시 쓰기에서 즉시 실패하지 않고 대기한다
+
+### 테스트
+
+- 백엔드 신규 10건 (`backend/test_run_tc_sync.py`), 프론트 신규 2건
+- 각 테스트는 가드 로직을 제거하는 뮤테이션으로 실제 결함을 잡는지 검증했다
+- 기존 회귀: 백엔드 `test_security.py` 169건, 프론트 360건 통과
+
+신규 백엔드 테스트는 개발 서버(8008)의 실 DB를 오염시키지 않도록 가드를 두었다.
+격리 포트를 지정해 실행한다.
+
+```
+cd backend
+TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_sync.py
+```
+
+### 알려진 제한
+
+`test_results`에 `(test_run_id, test_case_id)` 유니크 제약이 없어 동시 요청에서 중복 행이
+생길 수 있다. 운영 DB에 이미 중복 1건이 존재한다(런 25 / TC 5345, 2026-04-09 발생).
+스키마 변경이 필요해 별건으로 분리했다 (이슈 #111).
+
+### 변경 파일
+
+- `backend/services/run_sync_service.py` (신규)
+- `backend/routes/testruns.py`
+- `backend/routes/testcases.py`
+- `backend/routes/reports.py`
+- `backend/database.py`
+- `backend/test_run_tc_sync.py` (신규)
+- `frontend/src/components/TestRunManager.tsx`
+- `frontend/src/test/TestRunManager.test.tsx`
 
 ---
 

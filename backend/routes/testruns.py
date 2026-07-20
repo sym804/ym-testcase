@@ -17,8 +17,9 @@ from schemas import (
     TestRunCreate, TestRunUpdate, TestRunResponse, TestRunListResponse,
     TestResultCreate, TestResultResponse,
 )
-from auth import get_current_user, role_required, check_project_access
+from auth import get_current_user, role_required, check_project_access, get_project_role
 from routes.attachments import UPLOAD_DIR
+from services.run_sync_service import sync_run_results
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/testruns",
@@ -116,6 +117,21 @@ def get_testrun(
 
     run = (
         db.query(TestRun)
+        .filter(TestRun.id == run_id, TestRun.project_id == project_id)
+        .first()
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Test run not found")
+
+    # 런 생성 이후 추가된 TC 반영 (진행 중인 런만).
+    # TC 생성 경로에서 이미 반영되므로 여기는 이 수정 이전에 만들어진 런을 위한 안전망이다.
+    # viewer는 읽기 전용 역할이므로 조회만으로 쓰기가 일어나지 않도록 tester 이상에서만 보정한다
+    # (공개 프로젝트는 비멤버도 viewer로 취급되기 때문에 특히 중요하다).
+    if get_project_role(project_id, current_user, db) in ("tester", "admin"):
+        sync_run_results(run, db)
+
+    loaded = (
+        db.query(TestRun)
         .options(
             subqueryload(TestRun.results)
             .joinedload(TestResult.test_case)
@@ -123,9 +139,15 @@ def get_testrun(
         .filter(TestRun.id == run_id, TestRun.project_id == project_id)
         .first()
     )
-    if not run:
-        raise HTTPException(status_code=404, detail="Test run not found")
-    return run
+
+    # 결과 행은 런에 편입된 순서로 저장되므로, 나중에 추가된 TC는 뒤에 붙는다.
+    # 소비자(그리드, 리포트)가 모두 TC 번호 순을 기대하므로 여기서 정렬을 보장한다.
+    # 세션에서 분리한 뒤 정렬해 ORM 컬렉션 변경으로 잡히지 않게 한다
+    # (엑셀 내보내기도 같은 방식으로 파이썬 정렬을 쓴다).
+    if loaded:
+        db.expunge(loaded)
+        loaded.results.sort(key=lambda r: r.test_case.no if r.test_case else 0)
+    return loaded
 
 
 @router.put("/{run_id}", response_model=TestRunListResponse)
@@ -298,6 +320,11 @@ def reopen_testrun(
     run.status = TestRunStatus.in_progress
     run.completed_at = None
     db.commit()
+
+    # 완료 상태였던 동안 추가된 TC는 동기화 대상에서 빠져 있었다.
+    # 다시 진행 중이 된 시점에 흡수해야, 상세를 열지 않고 바로 완료해도 누락되지 않는다.
+    sync_run_results(run, db)
+
     db.refresh(run)
     return run
 

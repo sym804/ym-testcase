@@ -19,6 +19,8 @@ if DATABASE_URL.startswith("sqlite"):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA journal_mode=WAL")
+        # 다중 요청이 동시에 쓸 때 즉시 "database is locked"로 실패하지 않고 대기하도록 한다
+        cursor.execute("PRAGMA busy_timeout=30000")
         cursor.close()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

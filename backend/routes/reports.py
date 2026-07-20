@@ -399,6 +399,9 @@ def report_excel(
             )
         )
         .filter(TestResult.test_run_id == run.id)
+        # 런에 나중에 편입된 TC가 뒤에 붙지 않도록 TC 번호 순으로 고정한다
+        .join(TestCase, TestResult.test_case_id == TestCase.id)
+        .order_by(TestCase.no)
         .all()
     )
 

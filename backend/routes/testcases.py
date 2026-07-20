@@ -20,6 +20,7 @@ from services.import_service import (
     _parse_md_table, _preview_csv, MAX_IMPORT_SIZE,
 )
 from services.export_service import export_testcases_excel
+from services.run_sync_service import sync_project_in_progress_runs
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,7 @@ def create_testcase(
     )
     db.add(tc)
     db.commit()
+    sync_project_in_progress_runs(project_id, db)
     db.refresh(tc)
     return tc
 
@@ -294,6 +296,7 @@ def restore_testcase(
 
     tc.deleted_at = None
     db.commit()
+    sync_project_in_progress_runs(project_id, db)
     db.refresh(tc)
     return tc
 
@@ -352,6 +355,7 @@ def bulk_clone_testcases(
         cloned.append(new_tc)
 
     db.commit()
+    sync_project_in_progress_runs(project_id, db)
     for tc in cloned:
         db.refresh(tc)
     return cloned
@@ -389,6 +393,7 @@ def clone_testcase(
     )
     db.add(new_tc)
     db.commit()
+    sync_project_in_progress_runs(project_id, db)
     db.refresh(new_tc)
     return new_tc
 
@@ -465,6 +470,7 @@ def import_testcases(
             db.flush()
         r = _parse_csv(content, project_id, current_user.id, db, sheet_name=sheet_name)
         db.commit()
+        sync_project_in_progress_runs(project_id, db)
         return {"created": r["created"], "updated": r["updated"], "imported": r["created"] + r["updated"], "sheets": [{"sheet": sheet_name, "created": r["created"], "updated": r["updated"]}]}
 
     # Markdown 파일 처리
@@ -504,6 +510,7 @@ def import_testcases(
             total_updated += r["updated"]
 
         db.commit()
+        sync_project_in_progress_runs(project_id, db)
         return {"created": total_created, "updated": total_updated, "imported": total_created + total_updated, "sheets": results}
 
     wb = _load_workbook_from_upload(file)
@@ -549,6 +556,7 @@ def import_testcases(
         total_updated += r["updated"]
 
     db.commit()
+    sync_project_in_progress_runs(project_id, db)
     return {"created": total_created, "updated": total_updated, "imported": total_created + total_updated, "sheets": results}
 
 

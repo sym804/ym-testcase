@@ -71,6 +71,10 @@ export default function TestRunManager({ projectId, project }: Props) {
   const [sheets, setSheets] = useState<{ name: string; tc_count: number }[]>([]);
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
   const sheetInitRef = useRef(false);
+  // 선택된 런에 실제로 들어 있는 시트별 결과 수.
+  // 탭 배지를 TC 라이브러리(sheets[].tc_count)가 아니라 이 값으로 표시해야
+  // 완료된 런처럼 스냅샷이 고정된 경우에도 배지와 그리드 행 수가 어긋나지 않는다.
+  const [runSheetCounts, setRunSheetCounts] = useState<Record<string, number> | null>(null);
 
   // ── Undo 스택 ──
   const undoStackRef = useRef<{ rowId: number; field: string; oldValue: string }[]>([]);
@@ -204,9 +208,22 @@ export default function TestRunManager({ projectId, project }: Props) {
           ...r,
           result: r.result === "NS" ? "" : r.result === "NA" ? "N/A" : r.result,
         }));
+        // 시트 탭 배지용: 이 런이 실제로 담고 있는 시트별 결과 수
+        const counts: Record<string, number> = {};
+        for (const r of mapped) {
+          const name = r.test_case?.sheet_name || "기본";
+          counts[name] = (counts[name] || 0) + 1;
+        }
+        setRunSheetCounts(counts);
         // 시트 필터 적용
         if (activeSheet) {
-          setResults(mapped.filter((r) => r.test_case?.sheet_name === activeSheet));
+          // 결과 행은 런에 편입된 순서로 오므로, 런 생성 이후 추가된 TC는 뒤에 붙는다.
+          // 화면에는 항상 TC 번호 순으로 보여야 한다.
+          setResults(
+            mapped
+              .filter((r) => r.test_case?.sheet_name === activeSheet)
+              .sort((a, b) => (a.test_case?.no || 0) - (b.test_case?.no || 0))
+          );
         } else if (sheets.length > 1) {
           // 전체 보기: 시트 순서대로 정렬 + 연속 번호
           const sheetOrder = sheets.map((s) => s.name);
@@ -1093,7 +1110,9 @@ export default function TestRunManager({ projectId, project }: Props) {
           </>
         )}
         {/* ── 시트 탭 바 (그리드 하단) ── */}
-        {sheets.length >= 1 && !(sheets.length === 1 && sheets[0].name === "기본") && selectedRun && results.length > 0 && (
+        {/* results.length 조건을 두지 않는다: 결과 0건 시트를 선택했을 때 탭 바가 사라져
+            다른 시트로 되돌아갈 수 없게 되는 막다른 길이 생긴다 */}
+        {sheets.length >= 1 && !(sheets.length === 1 && sheets[0].name === "기본") && selectedRun && (
           <div style={sheetTabStyles.bar}>
             {sheets.map((s) => (
               <div
@@ -1105,7 +1124,9 @@ export default function TestRunManager({ projectId, project }: Props) {
                 onClick={() => setActiveSheet(s.name)}
               >
                 {s.name}
-                <span style={sheetTabStyles.badge}>{s.tc_count}</span>
+                <span style={sheetTabStyles.badge}>
+                  {runSheetCounts ? (runSheetCounts[s.name] || 0) : s.tc_count}
+                </span>
               </div>
             ))}
             {sheets.length > 1 && (
@@ -1117,7 +1138,11 @@ export default function TestRunManager({ projectId, project }: Props) {
                 onClick={() => setActiveSheet(null)}
               >
                 {t("common:all")}
-                <span style={sheetTabStyles.badge}>{sheets.reduce((a, s) => a + s.tc_count, 0)}</span>
+                <span style={sheetTabStyles.badge}>
+                  {runSheetCounts
+                    ? Object.values(runSheetCounts).reduce((a, n) => a + n, 0)
+                    : sheets.reduce((a, s) => a + s.tc_count, 0)}
+                </span>
               </div>
             )}
           </div>

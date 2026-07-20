@@ -1046,6 +1046,79 @@ describe("TestRunManager", () => {
         expect(screen.getByText("UI")).toBeInTheDocument();
       });
     });
+
+    it("배지는 TC 라이브러리가 아니라 이 런에 담긴 결과 수를 표시한다", async () => {
+      // 완료된 런은 생성 당시 스냅샷이라, 완료 후 추가된 TC는 런에 없다.
+      // 배지를 라이브러리 tc_count로 표시하면 "배지 5인데 그리드는 빈 화면"이 된다.
+      vi.mocked(testCasesApi.listSheets).mockResolvedValue([
+        { name: "기능", tc_count: 5, id: 1, parent_id: null, sort_order: 0, children: [] },
+        { name: "공통", tc_count: 5, id: 2, parent_id: null, sort_order: 1, children: [] },
+      ] as any);
+      vi.mocked(testRunsApi.getOne).mockResolvedValue({
+        ...mockRuns[0],
+        results: [
+          makeResult({ id: 1, test_case: { ...mockTC, id: 1, sheet_name: "기능" } }),
+          makeResult({ id: 2, test_case: { ...mockTC, id: 2, sheet_name: "기능" } }),
+        ],
+      } as any);
+
+      const user = userEvent.setup();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText("Sprint 1 테스트")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Sprint 1 테스트"));
+
+      await waitFor(() => {
+        expect(screen.getByText("기능")).toBeInTheDocument();
+      });
+
+      // 기능 시트: 런에 2건 (라이브러리는 5건)
+      const featureTab = screen.getByText("기능").closest("div");
+      expect(featureTab?.textContent).toContain("2");
+      expect(featureTab?.textContent).not.toContain("5");
+
+      // 공통 시트: 런에 0건 (라이브러리는 5건)
+      const commonTab = screen.getByText("공통").closest("div");
+      expect(commonTab?.textContent).toContain("0");
+      expect(commonTab?.textContent).not.toContain("5");
+    });
+
+    it("결과가 0건인 시트를 선택해도 시트 탭 바가 사라지지 않는다", async () => {
+      // 탭 바가 사라지면 다른 시트로 돌아갈 방법이 없는 막다른 길이 된다
+      vi.mocked(testCasesApi.listSheets).mockResolvedValue([
+        { name: "기능", tc_count: 2, id: 1, parent_id: null, sort_order: 0, children: [] },
+        { name: "공통", tc_count: 5, id: 2, parent_id: null, sort_order: 1, children: [] },
+      ] as any);
+      vi.mocked(testRunsApi.getOne).mockResolvedValue({
+        ...mockRuns[0],
+        results: [
+          makeResult({ id: 1, test_case: { ...mockTC, sheet_name: "기능" } }),
+        ],
+      } as any);
+
+      const user = userEvent.setup();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText("Sprint 1 테스트")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Sprint 1 테스트"));
+
+      await waitFor(() => {
+        expect(screen.getByText("공통")).toBeInTheDocument();
+      });
+
+      // 결과 0건인 '공통' 시트로 전환
+      await user.click(screen.getByText("공통"));
+
+      // 탭 바가 유지돼 다른 시트로 되돌아갈 수 있어야 한다
+      await waitFor(() => {
+        expect(screen.getByText("기능")).toBeInTheDocument();
+        expect(screen.getByText("공통")).toBeInTheDocument();
+      });
+    });
   });
 
   describe("NS→빈값 변환", () => {
