@@ -704,7 +704,7 @@ export default function TestRunManager({ projectId, project }: Props) {
 
   const handleComplete = async () => {
     if (!selectedRun) return;
-    // 전체 결과 조회 (모든 시트 포함 — 현재 화면은 시트 필터링된 상태일 수 있음)
+    // 전체 결과 조회 (모든 시트 포함 - 현재 화면은 시트 필터링된 상태일 수 있음)
     try {
       const fullDetail = await testRunsApi.getOne(projectId, selectedRun.id);
       const allResults = fullDetail.results || [];

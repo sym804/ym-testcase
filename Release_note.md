@@ -126,7 +126,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v1.2.1.0 (2026-04-10) — 코드 구조 개선, Alembic 마이그레이션, pytest 재현성
+## v1.2.1.0 (2026-04-10) - 코드 구조 개선, Alembic 마이그레이션, pytest 재현성
 
 ### 컴포넌트 버전
 
@@ -139,20 +139,20 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ### 주요 변경
 
-#### Backend — 구조 개선 (ENH-044 ~ ENH-047)
+#### Backend - 구조 개선 (ENH-044 ~ ENH-047)
 
 - **pytest 원커맨드 재현성 (ENH-044)**: conftest.py에 임시 DB + admin 자동 시드 추가. `pytest -q`만으로 전체 테스트 통과 가능
 - **testcases.py 분리 (ENH-045)**: 1722줄 → 571줄. 시트 CRUD → `routes/sheets.py`, import 파싱 → `services/import_service.py`, export → `services/export_service.py` 분리
 - **Alembic 마이그레이션 도입 (ENH-046)**: 수동 ALTER TABLE 4개 제거, initial schema + sync migration 생성. 기존 DB 자동 감지 + stamp
 - **CI 개선 (ENH-047)**: backend pytest timeout 20분 상향, conftest 자동 서버 시작으로 CI 수동 curl 제거
 
-#### Frontend — 접근성/훅 추출 (ENH-048 ~ ENH-050)
+#### Frontend - 접근성/훅 추출 (ENH-048 ~ ENH-050)
 
 - **TestCaseGrid 훅 추출 (ENH-048)**: 2274줄 → 1972줄. `useUndoRedo` 훅 + `SheetTreeSidebar` 컴포넌트 분리
 - **TestRunManager 훅 추출 (ENH-049)**: 1776줄 → 1607줄. `useTestTimer`, `useAttachments`, `useResultFilters` 훅 분리
 - **접근성(a11y) 개선 (ENH-050)**: Header/ProjectListPage에 role="button", tabIndex, onKeyDown 추가. 체크박스 이벤트 핸들러 수정. 삭제 버튼 `<button>` 태그 전환
 
-#### Database — Alembic 도입
+#### Database - Alembic 도입
 
 - **Alembic 마이그레이션 도입**: SQLAlchemy 모델 기반 자동 스키마 관리
 - **notifications 테이블 제거**: v1.1.0에서 모델 삭제된 잔여 테이블 정리
@@ -182,7 +182,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v1.2.0.0 (2026-04-08) — 엑셀 Export 옵션, 필드 정리, UI 개선
+## v1.2.0.0 (2026-04-08) - 엑셀 Export 옵션, 필드 정리, UI 개선
 
 ### 컴포넌트 버전
 
@@ -195,20 +195,20 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ### 주요 변경
 
-#### Backend — 기능 (ENH-036 ~ ENH-039)
+#### Backend - 기능 (ENH-036 ~ ENH-039)
 
 - **엑셀 Export 시트 분리 옵션**: `split_sheets=true` 쿼리 파라미터로 sheet_name 기준 엑셀 탭 분리 내보내기 지원
 - **issue_link/assignee 컬럼 제거**: TC 모델에서 미사용 컬럼 삭제, 임포트(Excel/CSV/MD/Jira) 매핑을 `_skip` 처리
 - **프로젝트 이름/설명 수정 API**: 기존 프로젝트 설정 업데이트 경로에서 name/description 변경 지원
 
-#### Frontend — UI 개선 (ENH-040 ~ ENH-043)
+#### Frontend - UI 개선 (ENH-040 ~ ENH-043)
 
 - **Excel Export 옵션 모달**: 통합(단일 시트) / 분리(시트별 탭) 선택 라디오 UI 추가
-- **프로젝트 설정 — 이름/설명 편집**: admin 권한 시 프로젝트 이름/설명 인라인 수정 가능
+- **프로젝트 설정 - 이름/설명 편집**: admin 권한 시 프로젝트 이름/설명 인라인 수정 가능
 - **TestRunManager result `<select>` 전환**: AG Grid 셀 에디터 → 네이티브 select 위젯으로 변경 (직관적 결과 입력)
 - **컬럼 flex 레이아웃**: test_steps/expected_result에 `minWidth + flex:2` 적용, 화면 크기에 따라 자동 확장
 
-#### Database — 스키마 변경
+#### Database - 스키마 변경
 
 - **issue_link, assignee 컬럼 삭제**: TestCase 테이블에서 미사용 컬럼 제거
 
@@ -226,7 +226,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v1.1.0.1 (2026-04-06) — 성능 최적화
+## v1.1.0.1 (2026-04-06) - 성능 최적화
 
 ### 컴포넌트 버전
 
@@ -239,7 +239,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ### 주요 변경
 
-#### Backend — 성능 (PERF-003 ~ PERF-010)
+#### Backend - 성능 (PERF-003 ~ PERF-010)
 
 - **대시보드 SQL 집계 전환**: summary/priority/category/assignee/rounds/heatmap 6개 엔드포인트를 ORM 전체 로드 → SQL CASE+GROUP BY 집계로 전면 전환 (최대 43x 개선)
 - **Overview SQL 집계 전환**: Python 카운팅 → SQL 서브쿼리 3회 집계 (12x 개선)
@@ -252,7 +252,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 - **TestRun 상세 조회**: `joinedload` → `subqueryload` 전환 (cartesian product 방지)
 - **assignee 필터**: `func.trim` 적용 (공백만 있는 값 제외)
 
-#### Frontend — 번들 최적화 (ENH-034 ~ ENH-035)
+#### Frontend - 번들 최적화 (ENH-034 ~ ENH-035)
 
 - **ProjectPage 탭 lazy 분리**: 6개 탭 컴포넌트를 `React.lazy` + `Suspense`로 분리 (ProjectPage 청크 195KB → 3.77KB)
 - **번들 chunk 세분화**: charts/i18n/utils 별도 chunk 분리 (index 638KB → 356KB, 경고 해소)
@@ -274,24 +274,24 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ### 변경 파일
 
-- `backend/database.py` — WAL 모드 추가
-- `backend/routes/dashboard.py` — SQL CASE+GROUP BY 전면 전환
-- `backend/routes/overview.py` — SQL 서브쿼리 집계 전환
-- `backend/routes/testplans.py` — `_bulk_plan_stats` N+1 제거
-- `backend/routes/testruns.py` — bulk insert, subqueryload, IN prefetch
-- `backend/routes/testcases.py` — `_collect_descendant_names` 1회 조회
-- `backend/routes/reports.py` — SQL 집계 + 이중 로드 제거
-- `frontend/src/pages/ProjectPage.tsx` — 탭 lazy import
-- `frontend/src/test/ProjectPage.test.tsx` — lazy에 맞게 waitFor 추가
-- `frontend/vite.config.ts` — chunk 세분화
+- `backend/database.py` - WAL 모드 추가
+- `backend/routes/dashboard.py` - SQL CASE+GROUP BY 전면 전환
+- `backend/routes/overview.py` - SQL 서브쿼리 집계 전환
+- `backend/routes/testplans.py` - `_bulk_plan_stats` N+1 제거
+- `backend/routes/testruns.py` - bulk insert, subqueryload, IN prefetch
+- `backend/routes/testcases.py` - `_collect_descendant_names` 1회 조회
+- `backend/routes/reports.py` - SQL 집계 + 이중 로드 제거
+- `frontend/src/pages/ProjectPage.tsx` - 탭 lazy import
+- `frontend/src/test/ProjectPage.test.tsx` - lazy에 맞게 waitFor 추가
+- `frontend/vite.config.ts` - chunk 세분화
 
 ### 이슈
 
-- PERF-003 ~ PERF-010 (8건), ENH-034 ~ ENH-035 (2건) — 전체 완료
+- PERF-003 ~ PERF-010 (8건), ENH-034 ~ ENH-035 (2건) - 전체 완료
 
 ---
 
-## v1.1.0.0 (2026-04-04) — 다국어 지원 (영문)
+## v1.1.0.0 (2026-04-04) - 다국어 지원 (영문)
 
 ### 컴포넌트 버전
 
@@ -320,7 +320,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v1.0.3.0 (2026-04-03) — 신규 기능 5개 + Codex 검증 수정
+## v1.0.3.0 (2026-04-03) - 신규 기능 5개 + Codex 검증 수정
 
 ### 컴포넌트 버전
 
@@ -358,7 +358,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v1.0.2.0 (2026-04-01) — 보안 검수 지적사항 13건 수정
+## v1.0.2.0 (2026-04-01) - 보안 검수 지적사항 13건 수정
 
 ### 컴포넌트 버전
 
@@ -400,7 +400,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v1.0.1.0 (2026-04-01) — 로그인 유지 기능 및 토큰 만료 개선
+## v1.0.1.0 (2026-04-01) - 로그인 유지 기능 및 토큰 만료 개선
 
 ### 컴포넌트 버전
 
@@ -420,7 +420,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v1.0.0.1 (2026-03-31) — 설치 가이드 개선 및 체크박스 수정
+## v1.0.0.1 (2026-03-31) - 설치 가이드 개선 및 체크박스 수정
 
 ### 컴포넌트 버전
 
@@ -448,7 +448,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v1.0.0.0 (2026-03-24) — 오픈소스 정식 공개
+## v1.0.0.0 (2026-03-24) - 오픈소스 정식 공개
 
 ### 컴포넌트 버전
 
@@ -489,7 +489,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.7.1.0 (2026-03-23) — 품질 게이트 수정 + 라이선스 변경 + README 정비
+## v0.7.1.0 (2026-03-23) - 품질 게이트 수정 + 라이선스 변경 + README 정비
 
 > 빌드/린트/테스트 전체 통과 + AGPL-3.0 전환 + README 정확성 개선 + 전체 테스트 567건 PASS
 
@@ -502,14 +502,14 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ### 버그 수정
 
-- **BUG-056**: 프론트 빌드 실패 — 테스트 파일 타입 오류 9개 수정 (잘못된 필드명, 누락 프로퍼티, 미사용 import)
+- **BUG-056**: 프론트 빌드 실패 - 테스트 파일 타입 오류 9개 수정 (잘못된 필드명, 누락 프로퍼티, 미사용 import)
 - **BUG-057**: vite.config.ts writeHead 타입 오류 수정
-- **BUG-058**: 대시보드 차트 색상 전부 검은색 — Chart.js가 CSS 변수 미지원, 라이트/다크 hex 값으로 분리
-- **BUG-059**: ESLint가 coverage/e2e 디렉토리까지 검사 — globalIgnores 추가
+- **BUG-058**: 대시보드 차트 색상 전부 검은색 - Chart.js가 CSS 변수 미지원, 라이트/다크 hex 값으로 분리
+- **BUG-059**: ESLint가 coverage/e2e 디렉토리까지 검사 - globalIgnores 추가
 - **BUG-060**: 소스 파일 lint 에러 7개 (빈 블록, 삼항식을 표현식으로 사용)
-- **BUG-061**: backend pytest 수집 단계 실패 — 독립 스크립트(test_v060_*.py)가 모듈 레벨에서 login() 호출, collect_ignore 추가
-- **BUG-062**: 마이그레이션 예외를 삼키고 로그 없음 — logger.warning/debug 추가
-- **BUG-063**: E2E 시트 트리 테스트 2개 실패 — 셀렉터 `루트 시트 추가` → `시트 추가` 수정
+- **BUG-061**: backend pytest 수집 단계 실패 - 독립 스크립트(test_v060_*.py)가 모듈 레벨에서 login() 호출, collect_ignore 추가
+- **BUG-062**: 마이그레이션 예외를 삼키고 로그 없음 - logger.warning/debug 추가
+- **BUG-063**: E2E 시트 트리 테스트 2개 실패 - 셀렉터 `루트 시트 추가` → `시트 추가` 수정
 
 ### 개선
 
@@ -537,7 +537,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.7.0.0 (2026-03-21) — Git 관리 + GitHub 공개 + 브랜딩
+## v0.7.0.0 (2026-03-21) - Git 관리 + GitHub 공개 + 브랜딩
 
 > 브랜딩 변경 (TC Manager → YM TestCase) + Git 공개 준비 + 테스트 293건 PASS
 
@@ -568,7 +568,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.6.0.0 (2026-03-20) — 시트 트리, 커스텀 필드, 테스트 플랜, Jira CSV, 고급 필터
+## v0.6.0.0 (2026-03-20) - 시트 트리, 커스텀 필드, 테스트 플랜, Jira CSV, 고급 필터
 
 > TC 관리 본질 기능 5개 구현 + 326건 PASS
 
@@ -581,11 +581,11 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ### 주요 기능
 
-1. **시트 트리 구조** — N-depth 계층, VS Code 사이드바 UI
-2. **커스텀 필드** — 6타입 (text, number, select, multiselect, checkbox, date)
-3. **테스트 플랜/마일스톤** — 릴리즈 단위 수행 관리
-4. **Jira CSV Import** — 35+ 헤더 매핑, CP949/UTF-8 BOM 자동 감지
-5. **고급 필터 + 저장된 뷰** — AND/OR 다중 조건, 6개 연산자
+1. **시트 트리 구조** - N-depth 계층, VS Code 사이드바 UI
+2. **커스텀 필드** - 6타입 (text, number, select, multiselect, checkbox, date)
+3. **테스트 플랜/마일스톤** - 릴리즈 단위 수행 관리
+4. **Jira CSV Import** - 35+ 헤더 매핑, CP949/UTF-8 BOM 자동 감지
+5. **고급 필터 + 저장된 뷰** - AND/OR 다중 조건, 6개 연산자
 
 ### 테스트
 
@@ -596,7 +596,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.5.0.0 (2026-03-19) — 시트 관리, 자동저장, 테스트 자동화 312건
+## v0.5.0.0 (2026-03-19) - 시트 관리, 자동저장, 테스트 자동화 312건
 
 > 신규 기능 5개 + DB 스키마 변경 + 테스트 0개 → 312개 구축
 
@@ -646,18 +646,18 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 ### Backend 변경사항
 
 **신규 API (7개)**
-- `GET /api/projects/{id}/testcases/sheets` — 시트 목록 (TC 수 포함)
-- `POST /api/projects/{id}/testcases/sheets` — 시트 생성
-- `DELETE /api/projects/{id}/testcases/sheets/{name}` — 시트 삭제
-- `POST /api/projects/{id}/testcases/import/preview` — Import 미리보기
-- `DELETE /api/projects/{id}/testcases/bulk` — TC 벌크 삭제
+- `GET /api/projects/{id}/testcases/sheets` - 시트 목록 (TC 수 포함)
+- `POST /api/projects/{id}/testcases/sheets` - 시트 생성
+- `DELETE /api/projects/{id}/testcases/sheets/{name}` - 시트 삭제
+- `POST /api/projects/{id}/testcases/import/preview` - Import 미리보기
+- `DELETE /api/projects/{id}/testcases/bulk` - TC 벌크 삭제
 - Import API 개선: `sheet_names` 파라미터, upsert 로직
 
 **버그 수정 (4건)**
-- `overview.py` — deleted_at 필터 누락 → TC 카운트 부풀림
-- `dashboard.py` — deleted_at 필터 누락 → 라운드 비교 부정확
-- `testruns.py` — deleted_at 필터 누락 → 삭제된 TC가 TestResult에 포함
-- `schemas.py` — ProjectCreate에 `name: min_length=1` 추가 (빈 이름 방어)
+- `overview.py` - deleted_at 필터 누락 → TC 카운트 부풀림
+- `dashboard.py` - deleted_at 필터 누락 → 라운드 비교 부정확
+- `testruns.py` - deleted_at 필터 누락 → 삭제된 TC가 TestResult에 포함
+- `schemas.py` - ProjectCreate에 `name: min_length=1` 추가 (빈 이름 방어)
 
 **코드 리팩토링**
 - `_parse_sheet()` 함수 분리 (임포트 로직 재사용)
@@ -722,49 +722,49 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.4.1.0 (2026-03-18) — 전수 검증 27건 수정 (보안+안정성)
+## v0.4.1.0 (2026-03-18) - 전수 검증 27건 수정 (보안+안정성)
 
 > Backend 14건 + Frontend 13건 버그/보안 수정
 
 ### Backend (14건)
 
 **심각 (3건)**
-- `routes/history.py` — 이력 조회 프로젝트 멤버 권한 체크 추가
-- `routes/attachments.py` — ROLE_HIERARCHY에서 모델에 없는 "editor" 제거
-- `auth.py` — user_id 파싱 ValueError/TypeError 예외 처리 추가 (500→401)
+- `routes/history.py` - 이력 조회 프로젝트 멤버 권한 체크 추가
+- `routes/attachments.py` - ROLE_HIERARCHY에서 모델에 없는 "editor" 제거
+- `auth.py` - user_id 파싱 ValueError/TypeError 예외 처리 추가 (500→401)
 
 **높음 (4건)**
-- `routes/dashboard.py` — not_started를 실제 "NS" 결과 건수로 카운트 (기존: total에서 빼기)
-- `routes/testruns.py` — 엑셀 열 26개 초과 시 get_column_letter() 사용
-- `routes/search.py` — 프라이빗 프로젝트 검색 필터 추가 (is_private + 멤버 체크)
-- `routes/reports.py` — PDF 한글 폰트 탐색 경로에 NanumGothic 추가 + 미발견 시 경고 로그
+- `routes/dashboard.py` - not_started를 실제 "NS" 결과 건수로 카운트 (기존: total에서 빼기)
+- `routes/testruns.py` - 엑셀 열 26개 초과 시 get_column_letter() 사용
+- `routes/search.py` - 프라이빗 프로젝트 검색 필터 추가 (is_private + 멤버 체크)
+- `routes/reports.py` - PDF 한글 폰트 탐색 경로에 NanumGothic 추가 + 미발견 시 경고 로그
 
 **중간 (4건)**
-- `routes/members.py` — joinedload()로 N+1 쿼리 해소
-- `routes/dashboard.py` — 미사용 매개변수 total_tc 제거
-- `routes/dashboard.py` — 메모리 로드 최적화 TODO 주석
-- `routes/auth.py` — 레이트리밋 O(n) 탐색 TODO 주석
+- `routes/members.py` - joinedload()로 N+1 쿼리 해소
+- `routes/dashboard.py` - 미사용 매개변수 total_tc 제거
+- `routes/dashboard.py` - 메모리 로드 최적화 TODO 주석
+- `routes/auth.py` - 레이트리밋 O(n) 탐색 TODO 주석
 
 **낮음 (3건)**
-- `routes/search.py` — limit 매개변수화 (기본 100, 최대 500)
-- `routes/testcases.py` — depth3 병합 로직 의도 주석
+- `routes/search.py` - limit 매개변수화 (기본 100, 최대 500)
+- `routes/testcases.py` - depth3 병합 로직 의도 주석
 
 ### Frontend (13건)
 
 **심각 (2건)**
-- `MarkdownCell.tsx` — DOMPurify 이미 적용 확인 (수정 불필요)
-- `api/client.ts` — localStorage JWT + CSRF 미적용 TODO 주석 추가
+- `MarkdownCell.tsx` - DOMPurify 이미 적용 확인 (수정 불필요)
+- `api/client.ts` - localStorage JWT + CSRF 미적용 TODO 주석 추가
 
 **높음 (5건)**
 - 5개 컴포넌트 catch 블록에 에러 로깅 추가 (TestCaseGrid 8곳, Dashboard 1곳, ReportView 3곳, CompareView 1곳, AdminPage 7곳, ProjectListPage 2곳)
-- `Header.tsx` — searchTimer useEffect cleanup 추가
-- `Header.tsx` — catch ignore → console.warn 변경
+- `Header.tsx` - searchTimer useEffect cleanup 추가
+- `Header.tsx` - catch ignore → console.warn 변경
 
 **중간 (4건)**
-- `TestCaseGrid.tsx` — 경쟁 조건 TODO 주석
-- `ProjectListPage.tsx` — 프로젝트 이름 100자 제한
-- `TestCaseGrid.tsx` — 낙관적 업데이트 TODO 주석
-- `ProjectListPage.tsx` — Date 파싱 실패 방어 (isNaN 체크)
+- `TestCaseGrid.tsx` - 경쟁 조건 TODO 주석
+- `ProjectListPage.tsx` - 프로젝트 이름 100자 제한
+- `TestCaseGrid.tsx` - 낙관적 업데이트 TODO 주석
+- `ProjectListPage.tsx` - Date 파싱 실패 방어 (isNaN 체크)
 
 **낮음 (2건)**
 - 전체 console.error 로깅 (위에서 함께 처리)
@@ -772,7 +772,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.4.0.0 (2026-03-16) — 권한 체계 개편 및 관리 기능 강화
+## v0.4.0.0 (2026-03-16) - 권한 체계 개편 및 관리 기능 강화
 
 | 컴포넌트 | 이전 | 이후 | 변경 사유 |
 |---|---|---|---|
@@ -813,10 +813,10 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 - 프로젝트 생성 권한: `admin` → `qa_manager` 이상
 
 **신규 API**
-- `GET /api/auth/check-username` — 아이디 중복 확인
-- `PUT /api/auth/users/{user_id}/reset-password` — 비밀번호 초기화 (임시 PW 발급 + 강제 변경)
-- `POST /api/projects/assign-all` — 사용자를 모든 프로젝트에 일괄 배정
-- `GET /api/projects/all-assignments` — 전체 사용자의 프로젝트 배정 현황 조회
+- `GET /api/auth/check-username` - 아이디 중복 확인
+- `PUT /api/auth/users/{user_id}/reset-password` - 비밀번호 초기화 (임시 PW 발급 + 강제 변경)
+- `POST /api/projects/assign-all` - 사용자를 모든 프로젝트에 일괄 배정
+- `GET /api/projects/all-assignments` - 전체 사용자의 프로젝트 배정 현황 조회
 
 **대시보드 수정**
 - "전체" 모드: 모든 run의 결과를 합산 (기존: 최근 run 1개만 표시)
@@ -872,7 +872,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.3.0.0 (2026-03-16) — 매뉴얼 및 문서화
+## v0.3.0.0 (2026-03-16) - 매뉴얼 및 문서화
 
 | 컴포넌트 | 이전 | 이후 | 변경 사유 |
 |---|---|---|---|
@@ -897,11 +897,11 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 - **헤더 "도움말" 버튼 추가**: 사용자 매뉴얼 페이지로 이동
 
 **변경 파일**
-- `App.tsx` — `/manual`, `/admin-manual` 라우트 추가
-- `Header.tsx` — 도움말 버튼 추가
-- `pages/UserManualPage.tsx` — 신규
-- `pages/AdminManualPage.tsx` — 신규
-- `public/manual-images/` — 캡처 이미지 23장
+- `App.tsx` - `/manual`, `/admin-manual` 라우트 추가
+- `Header.tsx` - 도움말 버튼 추가
+- `pages/UserManualPage.tsx` - 신규
+- `pages/AdminManualPage.tsx` - 신규
+- `public/manual-images/` - 캡처 이미지 23장
 
 ### 문서
 - Confluence 사내 업무 가이드 초안 (`docs/confluence_draft.md`)
@@ -911,7 +911,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.2.1.1 (2026-03-16) — 보안 강화
+## v0.2.1.1 (2026-03-16) - 보안 강화
 
 | 컴포넌트 | 이전 | 이후 | 변경 사유 |
 |---|---|---|---|
@@ -938,7 +938,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.2.1.0 (2026-03-09) — 코드 리뷰 반영 및 안정화
+## v0.2.1.0 (2026-03-09) - 코드 리뷰 반영 및 안정화
 
 | 컴포넌트 | 이전 | 이후 | 변경 사유 |
 |---|---|---|---|
@@ -974,7 +974,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.2.0.0 (2026-03-06) — 핵심 기능 구현 완료
+## v0.2.0.0 (2026-03-06) - 핵심 기능 구현 완료
 
 | 컴포넌트 | 이전 | 이후 | 변경 사유 |
 |---|---|---|---|
@@ -1012,7 +1012,7 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ---
 
-## v0.1.0.0 (2026-03-05 이전) — MVP 초기 구현
+## v0.1.0.0 (2026-03-05 이전) - MVP 초기 구현
 
 | 컴포넌트 | 이전 | 이후 | 변경 사유 |
 |---|---|---|---|
@@ -1085,12 +1085,12 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 ### 현황: Open 3건 / Fixed 31건 / Deferred 1건
 
 **Open (3건)**
-- ENH-001: Alembic 마이그레이션 미도입 — `create_all()` + 수동 ALTER TABLE 사용 중 (프로덕션 전 필수)
-- ENH-002: PostgreSQL 전환 준비 — 현재 SQLite, 프로덕션 시 전환 필요
-- ENH-003: N+1 쿼리 최적화 — overview/dashboard/reports 대량 데이터 시 성능 저하 가능
+- ENH-001: Alembic 마이그레이션 미도입 - `create_all()` + 수동 ALTER TABLE 사용 중 (프로덕션 전 필수)
+- ENH-002: PostgreSQL 전환 준비 - 현재 SQLite, 프로덕션 시 전환 필요
+- ENH-003: N+1 쿼리 최적화 - overview/dashboard/reports 대량 데이터 시 성능 저하 가능
 
 **Deferred (1건)**
-- SEC-002: localStorage JWT 토큰 저장 — XSS 시 탈취 가능 (장기 과제, DOMPurify로 현재 리스크 낮음)
+- SEC-002: localStorage JWT 토큰 저장 - XSS 시 탈취 가능 (장기 과제, DOMPurify로 현재 리스크 낮음)
 
 **v0.5.0.0에서 해결 (4건)**
 - FIX-032: overview/dashboard/testruns에서 deleted_at 필터 누락 → 삭제된 TC가 카운트에 포함
