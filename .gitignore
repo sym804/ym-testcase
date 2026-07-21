@@ -17,6 +17,17 @@ dist-ssr/
 *.db
 *.sqlite
 *.sqlite3
+*.db-wal
+*.db-shm
+*.db-journal
+
+# ── Secrets / local scratch (커밋 금지) ──
+account.txt
+.tmp*
+# 루트에 쌓이는 수동 테스트 스크린샷
+/*.png
+# 다른 프로젝트(stockradar) 스크린샷이 잘못 생성된 것
+backend/toss_*.png
 
 # ── Environment ──
 .env

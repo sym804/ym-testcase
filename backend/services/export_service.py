@@ -7,6 +7,18 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 
+def _sanitize_cell(value):
+    """엑셀 수식 인젝션(CWE-1236) 방지.
+
+    사용자 입력 TC 필드가 =, +, -, @, 탭, 개행으로 시작하면 openpyxl 이 수식 셀로
+    저장해, 파일을 여는 팀원 PC 에서 =HYPERLINK/DDE 등이 실행될 수 있다.
+    위험 문자로 시작하는 문자열에 앞따옴표(')를 붙여 텍스트로 강제한다.
+    """
+    if isinstance(value, str) and value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
+
 def export_testcases_excel(project, testcases, split_sheets: bool) -> StreamingResponse:
     """TC 목록을 Excel 파일로 생성하여 StreamingResponse로 반환한다."""
     wb = Workbook()
@@ -43,7 +55,7 @@ def export_testcases_excel(project, testcases, split_sheets: bool) -> StreamingR
             max_col_letter = get_column_letter(len(headers) + 1)
             ws.merge_cells(f"B1:{max_col_letter}1")
             title_cell = ws["B1"]
-            title_cell.value = f"{project.name} - {sheet_title}"
+            title_cell.value = _sanitize_cell(f"{project.name} - {sheet_title}")
             title_cell.font = Font(name="Malgun Gothic", bold=True, size=14)
             title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
@@ -70,7 +82,7 @@ def export_testcases_excel(project, testcases, split_sheets: bool) -> StreamingR
             ]
             for col_offset, value in enumerate(values):
                 col = col_offset + 2
-                cell = ws.cell(row=row, column=col, value=value)
+                cell = ws.cell(row=row, column=col, value=_sanitize_cell(value))
                 cell.font = cell_font
                 cell.border = thin_border
                 if col_offset < 2 or col_offset == 6 or col_offset == 7 or col_offset == 12 or col_offset == 14:

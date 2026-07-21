@@ -89,7 +89,7 @@ npm run dev
 
 ```bash
 cd ym-testcase
-git pull origin master
+git pull origin main
 pip install -r backend/requirements.txt   # 백엔드 의존성 변경 시
 cd frontend && npm install                # 프론트엔드 의존성 변경 시
 ```
@@ -142,7 +142,7 @@ cd frontend && npm install                # 프론트엔드 의존성 변경 시
 |---|---|
 | Frontend | React 19, TypeScript, Vite, ag-grid, Chart.js |
 | Backend | Python 3.12, FastAPI, SQLAlchemy, SQLite |
-| Test | Vitest (357 tests), Playwright (E2E), pytest |
+| Test | Vitest 360+ (프론트 단위), pytest (백엔드 API·보안·통합), Playwright (E2E) |
 | Deploy | 셀프호스팅 (로컬 실행) |
 
 ## 테스트
