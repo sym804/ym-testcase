@@ -3,10 +3,11 @@ uvicorn[standard]==0.41.0
 sqlalchemy==2.0.48
 psycopg2-binary
 alembic
-pydantic[email]==2.11.7
+pydantic[email]==2.13.4  # keep >=2.13: pydantic-core 2.33.x has no cp314 wheel
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 bcrypt==5.0.0
 python-multipart
+python-dotenv==1.2.3
 openpyxl==3.1.5
 fpdf2==2.8.6

@@ -1,3 +1,6 @@
+# .env 로딩 - 아래 os.getenv 호출보다 먼저 실행되어야 한다
+import env_setup  # noqa: F401
+
 import os
 
 from sqlalchemy import create_engine, event

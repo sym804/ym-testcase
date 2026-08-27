@@ -1,0 +1,5 @@
+-r requirements.txt
+
+# Test-only dependencies (not needed to run the server)
+pytest==9.1.1
+requests==2.34.2

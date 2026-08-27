@@ -112,8 +112,37 @@ jobs:
           --reporter=list
         timeout-minutes: 15
 
+  install-matrix:
+    name: Backend install (Python 3.12 / 3.14)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # 신규 clone 시 pip install 이 소스 빌드로 넘어가지 않는지 검증한다.
+      # 과거 사고: pydantic-core 2.33.2 에 cp314 wheel 이 없어 Rust 빌드로 넘어가
+      # Python 3.14 에서 설치 전체가 실패했다. --only-binary 로 재발을 막는다.
+      - name: Install with wheels only
+        working-directory: backend
+        run: 'pip install --only-binary=:all: -r requirements-dev.txt'
+
+      - name: Import check
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-import-check
+          DATABASE_URL: sqlite:///./ci_import_check.db
+        run: python -c "import main, auth, database; print('import ok')"
+
   backend:
-    name: Backend (pytest 116 tests)
+    name: Backend (pytest)
     runs-on: ubuntu-latest
 
     steps:
@@ -123,15 +152,17 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
       - name: Install dependencies
         working-directory: backend
-        run: pip install -r requirements.txt pytest requests
+        run: pip install -r requirements-dev.txt
 
-      - name: pytest (116 tests)
+      - name: pytest
         working-directory: backend
         env:
           TEST_ADMIN_PASSWORD: test1234
-        run: python -m pytest test_security.py -q --tb=short -k "not test_dompurify_installed"
+        run: python -m pytest -q --tb=short -k "not test_dompurify_installed"
         timeout-minutes: 20

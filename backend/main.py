@@ -1,3 +1,6 @@
+# .env 로딩 - 아래 os.getenv 호출보다 먼저 실행되어야 한다
+import env_setup  # noqa: F401
+
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -57,7 +60,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YM TestCase API",
     description="Your Method, Your Test Case Manager",
-    version="1.2.2.0",
+    version="1.2.3.0",
     lifespan=lifespan,
 )
 

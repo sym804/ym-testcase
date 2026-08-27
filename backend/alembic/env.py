@@ -8,6 +8,8 @@ from alembic import context
 # Add backend directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+import env_setup  # noqa: F401  # .env 로딩
+
 from database import Base
 import models  # noqa: F401
 

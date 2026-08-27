@@ -15,11 +15,12 @@ cd ym-testcase
 # 2. 백엔드 설정
 cd backend
 cp .env.example .env          # SECRET_KEY 설정
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # 실행 + 테스트 의존성
 
 # 3. 프론트엔드 설정
 cd ../frontend
 npm install
+npx playwright install chromium       # E2E 브라우저
 
 # 4. 서버 실행
 cd ..
@@ -48,7 +49,7 @@ run_dev.bat                    # Windows
 
 ### Backend (Python / FastAPI)
 
-- Python 3.12
+- Python 3.11 ~ 3.14 지원 (CI 검증 기준: 3.12, 3.14)
 - FastAPI + Pydantic 2 스키마
 - SQLAlchemy 2 ORM
 - 함수명/변수명: snake_case
@@ -99,7 +100,7 @@ fix/xxx         ← 버그 수정
 - [ ] ESLint 통과 (`cd frontend && npx eslint src/ --quiet`)
 - [ ] Vitest 통과 (`cd frontend && npx vitest run`) - 358+ 테스트
 - [ ] Playwright E2E 통과 (`cd frontend && npx playwright test`) - 93+ 테스트
-- [ ] pytest 통과 (`cd backend && pytest test_security.py -q`) - 116+ 테스트
+- [ ] pytest 통과 (`cd backend && pytest -q`) - 169+ 테스트
 - [ ] **전체 567+ 테스트 ALL PASS**
 - [ ] 새 기능이면 테스트 추가
 - [ ] 사용자 매뉴얼 업데이트 (해당 시)
@@ -155,7 +156,7 @@ GitHub Issues에서 템플릿을 선택하여 등록합니다.
 cd frontend && npx tsc --noEmit      # TypeScript
 cd frontend && npx vitest run         # Unit (358)
 cd frontend && npx playwright test    # E2E (93)
-cd backend && pytest test_security.py -q  # API (116)
+cd backend && pytest -q                   # API + 환경설정 (169+)
 ```
 
 ### 테스트 작성 규칙

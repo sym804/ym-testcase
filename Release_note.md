@@ -37,11 +37,126 @@ YM TestCase는 3개 컴포넌트로 구성되며, 각각 독립적으로 버전�
 ## 현재 버전
 
 ```
-YM TestCase System  v1.2.2.0  (2026-07-20)
+YM TestCase System  v1.2.3.0  (2026-08-27)
 ├── Frontend       v1.2.2.0
-├── Backend        v1.2.2.0
+├── Backend        v1.2.3.0
 └── Database       v0.6.0.0
 ```
+
+---
+
+## v1.2.3.0 (2026-08-27) - 신규 clone 셋업 실패 수정
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.2.2.0 | **1.2.3.0** | fix +1 |
+| Frontend | 1.2.2.0 | 1.2.2.0 | 변경 없음 |
+| Backend | 1.2.2.0 | **1.2.3.0** | fix +1 |
+| Database | 0.6.0.0 | 0.6.0.0 | 변경 없음 |
+
+### 배경
+
+GitHub 레포를 처음 clone 한 사용자가 README 대로 따라가도 셋업이 되지 않는다는 제보가 있었다.
+신규 clone 을 실제로 만들어 README 를 글자 그대로 따라간 결과 세 가지가 확인됐다.
+
+- Python 3.14 에서 `pip install -r requirements.txt` 가 통째로 실패했다
+- `backend/.env` 를 만들어도 아무 설정이 적용되지 않았다
+- README 의 테스트 절차가 첫 명령부터 실패했다
+
+### 주요 변경
+
+**Python 3.14 설치 실패 수정 (Block)**
+
+`pydantic[email]==2.11.7` 이 `pydantic-core==2.33.2` 를 정확히 고정하는데, 이 버전은 휠 98개를
+배포하면서 cp314 휠은 하나도 내지 않았다. 그래서 Python 3.14 에서는 pip 이 소스 빌드로 넘어가고,
+pydantic-core 는 Rust 로 작성돼 있어 cargo 가 필요하다. 일반 사용자 PC 에 Rust 는 없으므로
+`maturin failed` 로 설치가 중단되고, fastapi 와 uvicorn 을 포함한 나머지 패키지도 하나도 깔리지
+않아 백엔드가 아예 뜨지 않았다.
+
+`pydantic-core` 가 cp314 휠을 처음 낸 버전은 2.35.0 이다. `pydantic[email]==2.13.4`
+(pydantic-core 2.46.4) 로 올려 해결했다. 나머지 바이너리 의존성(bcrypt, cryptography, greenlet,
+httptools, watchfiles, PyYAML, psycopg2-binary)은 전부 cp314 휠이 있어 pydantic 단독 원인이었다.
+
+**.env 파일이 전혀 읽히지 않던 문제 수정 (Critical)**
+
+레포 어디에도 `.env` 를 읽는 코드가 없었다. `load_dotenv()` 호출이 0건이고
+`run_dev.bat`, `run_dev.sh`, `playwright.config.ts`, CI 어느 것도 `--env-file` 을 주지 않았다.
+그래서 `auth.py` 의 `os.getenv("SECRET_KEY", "")` 는 항상 빈 값을 받았고, 매 기동마다 랜덤 키가
+생성되어 서버를 재시작할 때마다 모든 로그인 세션이 끊겼다. README 가 "기본값 그대로 두면 로그인이
+풀립니다" 라고 경고한 바로 그 증상이, 시키는 대로 해도 그대로 발생한 것이다.
+`ENV`, `CORS_ORIGINS`, `TOKEN_EXPIRE_HOURS`, `DATABASE_URL` 도 같이 무시됐고,
+`ENV=production` 으로 지정해도 절대 production 으로 동작하지 않았다.
+
+`backend/env_setup.py` 를 신설해 `auth.py`, `database.py`, `main.py`, `alembic/env.py` 최상단에서
+임포트한다. `override=False` 라서 실제 환경변수와 `conftest.py` 가 임시 DB 격리를 위해 미리 지정하는
+`DATABASE_URL` 이 항상 `.env` 보다 우선하므로 테스트 격리는 그대로 유지된다.
+`ENV_FILE` 로 다른 경로를 지정할 수도 있다.
+
+**테스트 의존성 분리 (Major)**
+
+`pytest` 와 `requests`(conftest.py 가 임포트한다)가 어느 requirements 에도 없어서
+README 의 `python -m pytest -v` 는 `No module named pytest` 로 즉시 실패했다.
+CI 만 `pip install -r requirements.txt pytest requests` 로 인라인으로 채워 통과하고 있었다.
+`backend/requirements-dev.txt` 를 신설하고 CI 도 이를 쓰도록 바꿨다.
+
+**CI 게이트 보강**
+
+- `pytest test_security.py` 로 파일을 명시하면 `pytest.ini` 의 `testpaths` 가 무시되어
+  신규 테스트 파일이 영영 수집되지 않았다(실측: 파일 지정 169건, 무인자 173건).
+  무인자 `pytest -q` 로 바꿔 이번에 추가한 회귀 테스트가 게이트에 들어가게 했다
+- Python 3.12 / 3.14 설치 검증 매트릭스 job 을 추가했다.
+  `pip install --only-binary=:all:` 로 소스 빌드 폴백 자체를 금지한다.
+  GitHub 러너에는 Rust 가 설치돼 있어 일반 설치로는 이번 사고를 잡지 못하기 때문이다.
+  옛 핀(2.11.7)으로 되돌려 확인한 결과 `No matching distribution found for pydantic-core==2.33.2`
+  로 실패하는 것을 확인했다
+- pip 캐시 키가 `requirements.txt` 만 보고 있어 `requirements-dev.txt` 도 포함시켰다
+
+**문서 수정**
+
+- README 사전 요구사항을 "Python 3.11+"(상한 없음)에서 "Python 3.11 ~ 3.14" 로 바꿨다.
+  상한이 없어 최신 파이썬을 받은 사용자가 자동으로 설치 실패에 부딪혔다
+- 기술 스택 표의 "Python 3.12" 도 같은 범위로 통일했다(문서끼리 어긋나 있었다)
+- README 테스트 절에 `requirements-dev.txt` 설치와 `npx playwright install chromium` 을 추가했다.
+  브라우저 설치는 CI 에만 있고 README 에는 없었다
+- CONTRIBUTING 개발 환경 설정과 PR 체크리스트도 동일하게 갱신했다.
+  체크리스트의 "116+ 테스트" 는 실제 169건과 어긋나 있어 바로잡았다
+- `.gitignore` 의 `.env.example` 을 `/.env.example` 로 바꿨다.
+  기존 패턴은 하위 경로까지 매칭돼 `backend/.env.example` 을 가릴 수 있는 지뢰였다
+
+### 테스트
+
+- 백엔드 pytest 174 passed / 1 skipped (수정 전 기준선 169 passed)
+- 신규 `backend/test_env_loading.py` 5건.
+  `env_setup` 임포트를 3개 파일에서 모두 제거하면 3건이 실패하는 것을 확인해 이빨을 검증했다
+- 프론트 Vitest 360 passed (프론트 코드 변경 없음)
+- E2E Playwright auth 7 passed
+- Python 3.14.6 실환경에서 설치, 마이그레이션, 가입, 로그인, 프로젝트 생성, openapi 생성까지 확인
+- 재시작 후 세션 유지: 수정 전 401, 수정 후 200
+
+### 알려진 제한
+
+- `env_setup` 임포트를 한 파일에서만 지우면 `auth -> database -> env_setup` 임포트 체인이
+  대신 보장하므로 테스트가 잡지 못한다. 동작은 유지되므로 결함은 아니다.
+  메커니즘 자체가 사라지는 경우(전부 제거)는 잡힌다
+- `ENV_FILE` 로 임의 경로를 읽게 할 수 있다. 다만 환경변수를 통제할 수 있는 주체는 이미
+  `SECRET_KEY` 와 `DATABASE_URL` 을 직접 통제할 수 있어 권한 상승은 없다
+
+### 변경 파일
+
+- `backend/env_setup.py` (신규)
+- `backend/requirements-dev.txt` (신규)
+- `backend/test_env_loading.py` (신규)
+- `backend/requirements.txt`
+- `backend/auth.py`
+- `backend/database.py`
+- `backend/main.py`
+- `backend/alembic/env.py`
+- `.github/workflows/ci.yml`
+- `.gitignore`
+- `README.md`
+- `CONTRIBUTING.md`
 
 ---
 
