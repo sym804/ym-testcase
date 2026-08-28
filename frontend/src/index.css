@@ -471,3 +471,51 @@ select:focus {
   background-color: #D97706;
   color: #FFF;
 }
+
+/* 사전조건 참조 (다른 TC 의 사전조건을 가리키는 문구) */
+.pre-ref {
+  color: var(--primary);
+  border-bottom: 1px dashed var(--primary);
+  cursor: help;
+}
+.pre-ref:hover,
+.pre-ref:focus-visible {
+  background-color: var(--primary-light);
+  outline: none;
+}
+
+.pre-ref-popup {
+  position: fixed;
+  z-index: 300;
+  pointer-events: none;
+  max-height: 60vh;
+  overflow: hidden;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background-color: var(--bg-card);
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  text-align: left;
+  white-space: normal;
+}
+.pre-ref-popup-title {
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.pre-ref-popup-list {
+  margin: 0;
+  padding-left: 18px;
+}
+.pre-ref-popup-list li {
+  margin-bottom: 3px;
+  white-space: pre-line;
+}
+.pre-ref-popup-list li:last-child {
+  margin-bottom: 0;
+}

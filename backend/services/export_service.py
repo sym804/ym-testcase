@@ -3,8 +3,11 @@ from urllib.parse import quote
 
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
+from openpyxl.comments import Comment
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+from services.precondition_service import build_index, expand_text, has_ref
 
 
 def _sanitize_cell(value):
@@ -19,8 +22,24 @@ def _sanitize_cell(value):
     return value
 
 
-def export_testcases_excel(project, testcases, split_sheets: bool) -> StreamingResponse:
-    """TC 목록을 Excel 파일로 생성하여 StreamingResponse로 반환한다."""
+# 헤더에서 Precondition 이 몇 번째 열인지 (values 리스트 기준 0-based)
+PRECONDITION_OFFSET = 8
+
+
+def export_testcases_excel(
+    project, testcases, split_sheets: bool, expand_refs: bool = False
+) -> StreamingResponse:
+    """TC 목록을 Excel 파일로 생성하여 StreamingResponse로 반환한다.
+
+    사전조건이 다른 TC 를 참조하는 경우(예: "REC-API-01 의 사전조건 1~4 참조"),
+    엑셀에서는 앱의 호버 팝업이 없어 참조가 읽히지 않는다. 두 가지로 보완한다.
+
+    - expand_refs=False (기본): 참조 문구는 그대로 두고, 펼친 사전조건을 셀 메모로 단다.
+    - expand_refs=True: 참조를 펼친 전문으로 바꿔 쓴다. 메모를 못 읽는 도구용.
+
+    색인은 프로젝트 전체 TC 로 만든다. 시트 분리 시에도 참조를 따라갈 수 있어야 한다.
+    """
+    index = build_index(testcases)
     wb = Workbook()
 
     # -- Styles --
@@ -82,9 +101,18 @@ def export_testcases_excel(project, testcases, split_sheets: bool) -> StreamingR
             ]
             for col_offset, value in enumerate(values):
                 col = col_offset + 2
+                is_precondition = col_offset == PRECONDITION_OFFSET and has_ref(tc.precondition)
+                if is_precondition and expand_refs:
+                    value = expand_text(tc.tc_id, index)
                 cell = ws.cell(row=row, column=col, value=_sanitize_cell(value))
                 cell.font = cell_font
                 cell.border = thin_border
+                if is_precondition and not expand_refs:
+                    note = "펼친 사전조건\n" + expand_text(tc.tc_id, index)
+                    comment = Comment(note, "TC Manager")
+                    comment.width = 420
+                    comment.height = 30 + 18 * (note.count("\n") + 1)
+                    cell.comment = comment
                 if col_offset < 2 or col_offset == 6 or col_offset == 7 or col_offset == 12 or col_offset == 14:
                     cell.alignment = center_align
                 else:

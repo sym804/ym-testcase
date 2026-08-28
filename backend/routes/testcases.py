@@ -566,14 +566,15 @@ def import_testcases(
 def export_testcases(
     project_id: int,
     split_sheets: bool = False,
+    expand_refs: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
     project = _get_project_or_404(project_id, db)
     testcases = (
         db.query(TestCase)
-        .filter(TestCase.project_id == project_id)
+        .filter(TestCase.project_id == project_id, TestCase.deleted_at.is_(None))
         .order_by(TestCase.no)
         .all()
     )
-    return export_testcases_excel(project, testcases, split_sheets)
+    return export_testcases_excel(project, testcases, split_sheets, expand_refs)
