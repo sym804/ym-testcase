@@ -98,3 +98,7 @@ docker-compose.yml
 TC_Manager_Regression_Checklist_v2_merged.xlsx
 TC_Manager_Full_Regression_Checklist.xlsx
 Issue_list.xlsx
+
+# ── 로컬 QA 자격증명·데이터 (공개 저장소에 올리지 않는다) ──
+starfort.test.txt
+*.db.bak-*
