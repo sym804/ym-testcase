@@ -19,6 +19,7 @@ import { AG_GRID_LOCALE_EN } from "../agGridLocaleEn";
 import toast from "react-hot-toast";
 import { translateError } from "../utils/errorMessage";
 import MarkdownCell from "./MarkdownCell";
+import PreconditionCell from "./PreconditionCell";
 import HighlightCell from "./HighlightCell";
 import { useUndoRedo } from "../hooks/useUndoRedo";
 import type { UndoGroup } from "../hooks/useUndoRedo";
@@ -382,7 +383,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           _key: "precondition", field: "precondition",
           headerName: fieldDisplay("precondition", "Precondition").name,
           width: 200, editable: canEditTC, wrapText: true, autoHeight: true,
-          cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
+          cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: PreconditionCell,
         },
         {
           _key: "test_steps", field: "test_steps",
@@ -446,6 +447,20 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       autoHeight: true,
     }),
     []
+  );
+
+  // 사전조건 참조("<TC-ID> 의 사전조건 참조")를 호버로 펼치기 위한 tc_id -> 사전조건 원문 색인
+  const preconditionIndex = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rowData) {
+      if (row.tc_id) map.set(row.tc_id, row.precondition || "");
+    }
+    return map;
+  }, [rowData]);
+
+  const gridContext = useMemo(
+    () => ({ jiraBaseUrl: project.jira_base_url, searchKeyword: searchText, preconditionIndex }),
+    [project.jira_base_url, searchText, preconditionIndex]
   );
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
@@ -804,10 +819,11 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportSplit, setExportSplit] = useState(false);
+  const [exportExpandRefs, setExportExpandRefs] = useState(false);
 
   const handleExport = async () => {
     try {
-      const blob = await testCasesApi.exportExcel(projectId, exportSplit);
+      const blob = await testCasesApi.exportExcel(projectId, exportSplit, exportExpandRefs);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -1356,7 +1372,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             onCellValueChanged={onCellValueChanged}
             onCellKeyDown={onCellKeyDown}
             onSelectionChanged={() => setSelectedCount(gridApiRef.current?.getSelectedRows().length || 0)}
-            context={{ jiraBaseUrl: project.jira_base_url, searchKeyword: searchText }}
+            context={gridContext}
             animateRows={true}
             rowDragManaged={true}
             onRowDragEnd={handleRowDragEnd}
@@ -1719,6 +1735,22 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 <input type="radio" name="exportMode" checked={exportSplit} onChange={() => setExportSplit(true)} />
                 시트 분리 (시트별 탭)
               </label>
+              <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 12, marginTop: 4 }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
+                  <input
+                    type="checkbox"
+                    checked={exportExpandRefs}
+                    onChange={(e) => setExportExpandRefs(e.target.checked)}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span>
+                    사전조건 참조 펼치기
+                    <span style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+                      끄면 참조 문구를 두고 펼친 내용을 셀 메모로 답니다.
+                    </span>
+                  </span>
+                </label>
+              </div>
             </div>
             <div style={{ padding: "12px 20px", display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "1px solid var(--border)" }}>
               <button

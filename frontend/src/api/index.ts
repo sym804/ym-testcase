@@ -220,10 +220,10 @@ export const testCasesApi = {
     return res.data;
   },
 
-  exportExcel: async (projectId: number, splitSheets = false) => {
+  exportExcel: async (projectId: number, splitSheets = false, expandRefs = false) => {
     const res = await client.get(
       `/api/projects/${projectId}/testcases/export`,
-      { params: { split_sheets: splitSheets }, responseType: "blob" }
+      { params: { split_sheets: splitSheets, expand_refs: expandRefs }, responseType: "blob" }
     );
     return res.data;
   },

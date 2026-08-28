@@ -307,10 +307,20 @@ describe("testCasesApi", () => {
     mockGet.mockResolvedValueOnce({ data: blob });
     const result = await testCasesApi.exportExcel(1);
     expect(mockGet).toHaveBeenCalledWith("/api/projects/1/testcases/export", {
-      params: { split_sheets: false },
+      params: { split_sheets: false, expand_refs: false },
       responseType: "blob",
     });
     expect(result).toBe(blob);
+  });
+
+  it("exportExcel 는 시트 분리와 참조 펼치기 옵션을 그대로 넘긴다", async () => {
+    const blob = new Blob(["data"]);
+    mockGet.mockResolvedValueOnce({ data: blob });
+    await testCasesApi.exportExcel(1, true, true);
+    expect(mockGet).toHaveBeenCalledWith("/api/projects/1/testcases/export", {
+      params: { split_sheets: true, expand_refs: true },
+      responseType: "blob",
+    });
   });
 });
 
