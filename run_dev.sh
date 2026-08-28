@@ -15,7 +15,11 @@ trap cleanup SIGINT SIGTERM
 
 echo "[1/2] Starting Backend (FastAPI)..."
 cd backend
-python3 -m uvicorn main:app --reload --port 8008 &
+# .venv 가 있으면 그것을 쓰고, 없으면 전역 python3로 폴백
+if [ -x ".venv/bin/python" ]; then PY=".venv/bin/python"
+elif [ -x ".venv/Scripts/python.exe" ]; then PY=".venv/Scripts/python.exe"
+else PY="python3"; fi
+$PY -m uvicorn main:app --reload --port 8008 &
 BACKEND_PID=$!
 cd ..
 

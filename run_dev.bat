@@ -4,8 +4,12 @@ echo   YM TestCase - Dev Server
 echo ==============================
 echo.
 
+REM backend\.venv 가 있으면 그것을 쓰고, 없으면 전역 python으로 폴백
+set "PY=python"
+if exist "backend\.venv\Scripts\python.exe" set "PY=.venv\Scripts\python.exe"
+
 echo [1/2] Starting Backend (FastAPI)...
-start "YM TestCase Backend" cmd /c "cd backend && python -m uvicorn main:app --reload --port 8008"
+start "YM TestCase Backend" cmd /c "cd backend && %PY% -m uvicorn main:app --reload --port 8008"
 
 timeout /t 2 /nobreak >nul
 
