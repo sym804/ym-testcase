@@ -30,12 +30,16 @@ client.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// 비로그인 상태로 쓰는 화면들. 여기서 나는 401 은 세션 만료가 아니라 정상 흐름이다.
+// (로그인 여부 확인 실패, 잘못된 재설정 코드 입력 등) 로그인으로 튕기면 안 된다.
+const PUBLIC_PATHS = ["/login", "/register", "/account-help", "/reset-password"];
+
 // Response interceptor: handle 401
 client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      if (window.location.pathname !== "/login") {
+      if (!PUBLIC_PATHS.includes(window.location.pathname)) {
         window.location.href = "/login";
       }
     }
