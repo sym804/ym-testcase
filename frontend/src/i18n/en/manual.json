@@ -26,7 +26,7 @@
   },
   "overview": {
     "title": "YM TestCase User Manual",
-    "updatedAt": "Last updated: 2026-03-24",
+    "updatedAt": "Last updated: 2026-09-04",
     "info1": "<strong>YM TestCase</strong> is a web-based test management system for managing test cases (TC), executing tests, analyzing results, and generating reports.",
     "featuresIntro": "Key Features:",
     "li1": "Project-level test case management (CRUD, Excel Import/Export)",
@@ -66,6 +66,24 @@
     "pw_li4": "Click the <strong>Change</strong> button.",
     "info3": "<strong>Forced change:</strong> If an administrator has reset your password, you will be required to change it on your next login. You cannot use other features until the change is completed.",
     "imgAlt_forcePassword": "Forced password change screen"
+  },
+  "accountRecovery": {
+    "title": "1-4. Account Help Request (Account Recovery)",
+    "p1": "If you forgot your username or password, use the <strong>\"Account Help\"</strong> link at the bottom of the login screen. Since there is no email sending feature, requests are processed through admin approval.",
+    "h3_findId": "1-5. When you forgot your username",
+    "imgAlt_findId": "Account help screen - Find username tab",
+    "findId_li1": "Click the \"Account Help\" link at the bottom of the login screen.",
+    "findId_li2": "On the <strong>\"Find Username\"</strong> tab, enter your display name and contact info, then submit.",
+    "findId_li3": "A submission confirmation is displayed.",
+    "findId_info": "<strong>Note:</strong> After verifying your identity, the administrator will tell you your username through the contact info you provided.",
+    "h3_reset": "1-6. When you forgot your password",
+    "imgAlt_reset": "Account help screen - Reset password tab",
+    "reset_li1": "On the account help screen, select the <strong>\"Reset Password\"</strong> tab.",
+    "reset_li2": "Enter your username and contact info, then submit.",
+    "reset_li3": "Once the administrator approves, a one-time reset code is issued and delivered to your contact info.",
+    "reset_li4": "On the <strong>/reset-password</strong> screen, enter your username and the code you received, then set a new password yourself.",
+    "imgAlt_resetPage": "Reset password page",
+    "reset_warn": "<strong>Note:</strong> The reset code can be used <strong>only once within 24 hours</strong> of issuance. A code that has already been used or has expired cannot be used again."
   },
   "projectList": {
     "title": "2. Project List",
@@ -605,6 +623,6 @@
     "link": "Go to Admin Manual"
   },
   "footer": {
-    "text": "YM TestCase v1.0.0.0 | User Manual"
+    "text": "YM TestCase v1.3.0.0 | User Manual"
   }
 }

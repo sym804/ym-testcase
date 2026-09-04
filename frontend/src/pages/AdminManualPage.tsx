@@ -220,6 +220,18 @@ npx tsc --noEmit`}</pre>
 
             <h3 style={s.h3}>{t("userMgmt.initialAccountTitle")}</h3>
             <div style={s.infoBox} dangerouslySetInnerHTML={{ __html: t("userMgmt.initialAccountInfo") }} />
+
+            <h3 style={s.h3}>{t("userMgmt.accountRequestTitle")}</h3>
+            <p style={s.p}>{t("userMgmt.accountRequestP1")}</p>
+            <img src="/manual-images/39_admin_account_requests.png" alt={t("userMgmt.accountRequestImgAlt")} style={s.img} />
+            <ol style={s.ol}>
+              <li>{t("userMgmt.accountRequestOl1")}</li>
+              <li>{t("userMgmt.accountRequestOl2")}</li>
+              <li dangerouslySetInnerHTML={{ __html: t("userMgmt.accountRequestOl3") }} />
+              <li>{t("userMgmt.accountRequestOl4")}</li>
+            </ol>
+            <img src="/manual-images/40_admin_code_issued.png" alt={t("userMgmt.accountRequestImgAlt2")} style={s.img} />
+            <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("userMgmt.accountRequestWarn") }} />
           </section>
 
           {/* 6. 역할/권한 체계 */}
@@ -351,6 +363,11 @@ npx tsc --noEmit`}</pre>
                 ["GET", "/api/auth/users", t("apiRef.auth.users")],
                 ["PUT", "/api/auth/users/{user_id}/role", t("apiRef.auth.changeRole")],
                 ["PUT", "/api/auth/users/{user_id}/reset-password", t("apiRef.auth.resetPassword")],
+                ["POST", "/api/auth/account-requests", t("apiRef.auth.submitAccountRequest")],
+                ["GET", "/api/auth/account-requests", t("apiRef.auth.listAccountRequests")],
+                ["POST", "/api/auth/account-requests/{id}/approve", t("apiRef.auth.approveAccountRequest")],
+                ["POST", "/api/auth/account-requests/{id}/reject", t("apiRef.auth.rejectAccountRequest")],
+                ["POST", "/api/auth/reset-password/verify", t("apiRef.auth.resetPasswordWithCode")],
               ]},
               { title: t("apiRef.projects.title"), endpoints: [
                 ["GET", "/api/projects", t("apiRef.projects.list")],
