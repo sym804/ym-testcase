@@ -48,10 +48,10 @@ class Token(BaseModel):
 
 class AccountRequestCreate(BaseModel):
     request_type: str  # find_id | reset_password
-    claimed_username: Optional[str] = None
-    claimed_display_name: Optional[str] = None
+    claimed_username: Optional[str] = Field(None, max_length=100)
+    claimed_display_name: Optional[str] = Field(None, max_length=100)
     contact: str = Field(..., min_length=1, max_length=200)
-    note: Optional[str] = None
+    note: Optional[str] = Field(None, max_length=1000)
 
 
 class AccountRequestAck(BaseModel):
