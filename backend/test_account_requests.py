@@ -3,6 +3,7 @@
 실행: cd backend && python -m pytest test_account_requests.py -v
 """
 import os
+import time
 
 import pytest
 import requests
@@ -376,3 +377,117 @@ def test_wrong_code_is_rate_limited(admin_headers):
             break
         assert r.status_code == 401
     assert saw_429
+
+
+def test_older_approved_code_is_killed_by_newer_redemption(admin_headers, normal_user):
+    """승인이 여러 건 살아 있으면, 하나를 쓸 때 나머지도 같이 죽어야 한다.
+
+    중복 억제는 pending 만 보므로 한 사용자가 approved 를 여러 건 들 수 있다.
+    쓴 한 건만 닫으면 이미 메신저로 흘러간 옛 코드가 24시간 동안 유효하게 남는다.
+    """
+    from database import SessionLocal
+    from models import AccountRequest, AccountRequestStatus, AccountRequestType
+
+    _, old_code = _issue_code(
+        admin_headers, normal_user["username"], normal_user["id"], contact="메신저 old")
+    _, new_code = _issue_code(
+        admin_headers, normal_user["username"], normal_user["id"], contact="메신저 new")
+    assert old_code != new_code
+
+    r = requests.post(f"{BASE}/api/auth/reset-password/verify", json={
+        "username": normal_user["username"], "code": new_code, "new_password": "origin1234",
+    })
+    assert r.status_code == 200, r.text
+
+    # 옛 코드가 그대로 통하면 안 된다
+    again = requests.post(f"{BASE}/api/auth/reset-password/verify", json={
+        "username": normal_user["username"], "code": old_code, "new_password": "origin1234",
+    })
+    assert again.status_code == 401, "앞서 발급된 코드가 아직 살아 있다"
+
+    # 401 이 status 필터 때문에 나온 것인지 code_hash 가 지워져서인지 직접 확인한다
+    db = SessionLocal()
+    try:
+        alive = (
+            db.query(AccountRequest)
+            .filter(
+                AccountRequest.user_id == normal_user["id"],
+                AccountRequest.request_type == AccountRequestType.reset_password,
+                AccountRequest.status == AccountRequestStatus.approved,
+            )
+            .all()
+        )
+        assert alive == [], f"살아 있는 approved 요청이 {len(alive)}건 남았다"
+    finally:
+        db.close()
+
+
+def test_reject_requires_admin(normal_user):
+    """반려도 관리자 전용이다. 목록과 승인만 막고 반려를 열어두면 의미가 없다."""
+    h = _login("__recover_user__", "origin1234")
+    r = requests.post(
+        f"{BASE}/api/auth/account-requests/1/reject",
+        json={"note": "권한 없이 반려"}, headers=h,
+    )
+    assert r.status_code == 403, r.text
+
+
+def test_resubmit_updates_contact_on_existing_pending(admin_headers):
+    """연락처를 잘못 적어 다시 보내면 기존 대기 요청이 새 연락처로 갱신되어야 한다.
+
+    행을 새로 만들지 않는 것과 새 내용을 버리는 것은 다르다. 연락처는 관리자가
+    사용자에게 닿는 유일한 수단이라 버려지면 기능이 조용히 죽는다.
+    """
+    target = "__contact_fix__"
+    first = _submit({
+        "request_type": "reset_password",
+        "claimed_username": target,
+        "contact": "메신저 오타주소",
+        "note": "첫 제출",
+    })
+    assert first.status_code == 201, first.text
+
+    second = _submit({
+        "request_type": "reset_password",
+        "claimed_username": target,
+        "contact": "메신저 정정주소",
+        "note": "연락처를 고쳐 다시 보냅니다",
+    })
+    # 응답은 완전히 같아야 한다. 다르면 중복 여부가 응답으로 새어 나간다
+    assert second.status_code == first.status_code
+    assert second.json() == first.json()
+
+    r = requests.get(f"{BASE}/api/auth/account-requests", headers=admin_headers)
+    same = [x for x in r.json()
+            if x["request_type"] == "reset_password" and x["claimed_username"] == target]
+    assert len(same) == 1, f"pending 이 {len(same)}건 쌓였다"
+    assert same[0]["contact"] == "메신저 정정주소", "정정한 연락처가 버려졌다"
+    assert same[0]["note"] == "연락처를 고쳐 다시 보냅니다"
+
+
+def test_submit_rate_limit_returns_429():
+    """접수 제한이 실제로 동작하는지 카운터를 직접 채워 확인한다.
+
+    HTTP 로 11번 두드리면 느리고, autouse 픽스처가 매 테스트 앞에서 카운터를
+    비우기 때문에 그 방식으로는 429 경로에 영영 닿지 못한다.
+    """
+    from routes.account_requests import _submit_hits, SUBMIT_MAX_PER_WINDOW
+
+    payload = {
+        "request_type": "reset_password",
+        "claimed_username": "__rate_limit_probe__",
+        "contact": "메신저 rate",
+    }
+
+    _submit_hits.clear()
+    assert _submit(payload).status_code == 201
+    # 카운터 키는 서버가 본 클라이언트 IP 표기다. 환경마다 다르므로 실측해서 쓴다
+    assert len(_submit_hits) == 1, f"접수 카운터가 기록되지 않았다: {dict(_submit_hits)}"
+    key = next(iter(_submit_hits))
+
+    try:
+        _submit_hits[key] = [time.time()] * SUBMIT_MAX_PER_WINDOW
+        r = _submit(payload)
+        assert r.status_code == 429, f"한도를 넘겼는데 {r.status_code} 가 나왔다: {r.text}"
+    finally:
+        _submit_hits.clear()
