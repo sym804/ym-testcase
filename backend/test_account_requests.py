@@ -32,3 +32,47 @@ def test_account_request_columns():
         "user_id", "code_hash", "code_expires_at",
         "created_at", "resolved_at", "resolved_by_id",
     }
+
+
+def _submit(payload):
+    return requests.post(f"{BASE}/api/auth/account-requests", json=payload)
+
+
+def test_submit_reset_request_for_existing_user():
+    r = _submit({
+        "request_type": "reset_password",
+        "claimed_username": "admin",
+        "contact": "사내 메신저 admin",
+    })
+    assert r.status_code == 201, r.text
+    assert r.json() == {"message": "요청이 접수되었습니다. 관리자 확인 후 연락드립니다."}
+
+
+def test_submit_reset_request_for_missing_user_is_indistinguishable():
+    """계정 열거 방지: 없는 아이디로 요청해도 응답이 동일해야 한다."""
+    r = _submit({
+        "request_type": "reset_password",
+        "claimed_username": "__no_such_user__",
+        "contact": "사내 메신저 nobody",
+    })
+    assert r.status_code == 201, r.text
+    assert r.json() == {"message": "요청이 접수되었습니다. 관리자 확인 후 연락드립니다."}
+
+
+def test_submit_find_id_request():
+    r = _submit({
+        "request_type": "find_id",
+        "claimed_display_name": "Admin",
+        "contact": "사내 메신저 admin",
+    })
+    assert r.status_code == 201, r.text
+
+
+def test_reset_request_without_username_is_rejected():
+    r = _submit({"request_type": "reset_password", "contact": "x"})
+    assert r.status_code == 422, r.text
+
+
+def test_find_id_request_without_display_name_is_rejected():
+    r = _submit({"request_type": "find_id", "contact": "x"})
+    assert r.status_code == 422, r.text

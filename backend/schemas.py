@@ -44,6 +44,58 @@ class Token(BaseModel):
     must_change_password: bool = False
 
 
+# ── Account Recovery ──────────────────────────────────────────────────────────
+
+class AccountRequestCreate(BaseModel):
+    request_type: str  # find_id | reset_password
+    claimed_username: Optional[str] = None
+    claimed_display_name: Optional[str] = None
+    contact: str = Field(..., min_length=1, max_length=200)
+    note: Optional[str] = None
+
+
+class AccountRequestAck(BaseModel):
+    """접수 응답. 대상 존재 여부를 드러내지 않도록 항상 같은 값을 낸다."""
+    message: str
+
+
+class AccountRequestListItem(BaseModel):
+    id: int
+    request_type: str
+    status: str
+    claimed_username: Optional[str] = None
+    claimed_display_name: Optional[str] = None
+    contact: str
+    note: Optional[str] = None
+    user_id: Optional[int] = None
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AccountRequestApprove(BaseModel):
+    user_id: int
+
+
+class AccountRequestReject(BaseModel):
+    note: Optional[str] = None
+
+
+class AccountRequestApproveResult(BaseModel):
+    """find_id 는 username 만, reset_password 는 code 와 만료 시각만 채워진다."""
+    request_type: str
+    username: Optional[str] = None
+    code: Optional[str] = None
+    code_expires_at: Optional[datetime] = None
+
+
+class ResetPasswordWithCode(BaseModel):
+    username: str
+    code: str
+    new_password: str = Field(..., min_length=8)
+
+
 # ── Project ───────────────────────────────────────────────────────────────────
 
 class ProjectCreate(BaseModel):
