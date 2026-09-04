@@ -88,3 +88,181 @@ def test_reset_request_without_username_is_rejected():
 def test_find_id_request_without_display_name_is_rejected():
     r = _submit({"request_type": "find_id", "contact": "x"})
     assert r.status_code == 422, r.text
+
+
+def _login(username, password):
+    r = requests.post(f"{BASE}/api/auth/login", json={"username": username, "password": password})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+@pytest.fixture(scope="module")
+def admin_headers():
+    return _login("admin", os.getenv("TEST_ADMIN_PASSWORD", "test1234"))
+
+
+@pytest.fixture(scope="module")
+def normal_user(admin_headers):
+    """일반 사용자 하나를 만들어 둔다. 비밀번호를 바꾸는 테스트의 대상이 된다."""
+    requests.post(f"{BASE}/api/auth/register", json={
+        "username": "__recover_user__", "password": "origin1234", "display_name": "Recover User",
+    })
+    r = requests.get(f"{BASE}/api/auth/users", headers=admin_headers)
+    uid = next(u["id"] for u in r.json() if u["username"] == "__recover_user__")
+    return {"username": "__recover_user__", "id": uid}
+
+
+def test_list_requires_admin(normal_user):
+    h = _login("__recover_user__", "origin1234")
+    r = requests.get(f"{BASE}/api/auth/account-requests", headers=h)
+    assert r.status_code == 403, r.text
+
+
+def test_admin_can_list_pending(admin_headers):
+    r = requests.get(f"{BASE}/api/auth/account-requests", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert isinstance(body, list)
+    assert all("code_hash" not in item for item in body)
+
+
+def test_approve_find_id_returns_username_and_no_code(admin_headers, normal_user):
+    _submit({
+        "request_type": "find_id",
+        "claimed_display_name": "Recover User",
+        "contact": "메신저 recover",
+    })
+    r = requests.get(f"{BASE}/api/auth/account-requests", headers=admin_headers)
+    req = next(x for x in r.json()
+               if x["request_type"] == "find_id" and x["claimed_display_name"] == "Recover User")
+
+    r = requests.post(
+        f"{BASE}/api/auth/account-requests/{req['id']}/approve",
+        json={"user_id": normal_user["id"]}, headers=admin_headers,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["username"] == "__recover_user__"
+    assert body["code"] is None
+
+
+def test_approve_reset_returns_plaintext_code_once(admin_headers, normal_user):
+    _submit({
+        "request_type": "reset_password",
+        "claimed_username": "__recover_user__",
+        "contact": "메신저 recover",
+    })
+    r = requests.get(f"{BASE}/api/auth/account-requests", headers=admin_headers)
+    req = next(x for x in r.json()
+               if x["request_type"] == "reset_password"
+               and x["claimed_username"] == "__recover_user__")
+
+    r = requests.post(
+        f"{BASE}/api/auth/account-requests/{req['id']}/approve",
+        json={"user_id": normal_user["id"]}, headers=admin_headers,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["code"] and len(body["code"]) >= 12
+    assert body["code_expires_at"]
+
+    # 목록에는 코드가 다시 나오지 않는다
+    r2 = requests.get(f"{BASE}/api/auth/account-requests",
+                      params={"status": "approved"}, headers=admin_headers)
+    item = next(x for x in r2.json() if x["id"] == req["id"])
+    assert "code" not in item and "code_hash" not in item
+
+
+def test_approve_twice_conflicts(admin_headers, normal_user):
+    _submit({
+        "request_type": "find_id",
+        "claimed_display_name": "Dup Target",
+        "contact": "메신저 dup",
+    })
+    r = requests.get(f"{BASE}/api/auth/account-requests", headers=admin_headers)
+    req = next(x for x in r.json() if x["claimed_display_name"] == "Dup Target")
+    url = f"{BASE}/api/auth/account-requests/{req['id']}/approve"
+    assert requests.post(url, json={"user_id": normal_user["id"]}, headers=admin_headers).status_code == 200
+    assert requests.post(url, json={"user_id": normal_user["id"]}, headers=admin_headers).status_code == 409
+
+
+def test_duplicate_pending_is_not_created(admin_headers):
+    """같은 대상으로 두 번 요청해도 큐에는 하나만 쌓인다."""
+    target = "__dup_pending__"
+    for _ in range(2):
+        r = _submit({
+            "request_type": "reset_password",
+            "claimed_username": target,
+            "contact": "메신저 dup-pending",
+        })
+        assert r.status_code == 201, r.text
+
+    r = requests.get(f"{BASE}/api/auth/account-requests", headers=admin_headers)
+    same = [x for x in r.json()
+            if x["request_type"] == "reset_password" and x["claimed_username"] == target]
+    assert len(same) == 1, f"pending 이 {len(same)}건 쌓였다"
+
+
+def test_approve_requires_admin(normal_user):
+    """승인도 관리자 전용이다. 목록만 막고 승인을 열어두면 의미가 없다."""
+    _submit({
+        "request_type": "find_id",
+        "claimed_display_name": "Forbidden Target",
+        "contact": "메신저 forbidden",
+    })
+    h = _login("__recover_user__", "origin1234")
+    r = requests.post(
+        f"{BASE}/api/auth/account-requests/1/approve",
+        json={"user_id": normal_user["id"]}, headers=h,
+    )
+    assert r.status_code == 403, r.text
+
+
+def test_code_is_stored_hashed_not_plaintext(admin_headers, normal_user):
+    """승인 응답의 평문 코드가 DB 에 그대로 들어가면 안 된다."""
+    from database import SessionLocal
+    from models import AccountRequest
+
+    _submit({
+        "request_type": "reset_password",
+        "claimed_username": "__hash_check__",
+        "contact": "메신저 hash",
+    })
+    r = requests.get(f"{BASE}/api/auth/account-requests", headers=admin_headers)
+    req = next(x for x in r.json() if x["claimed_username"] == "__hash_check__")
+    r = requests.post(
+        f"{BASE}/api/auth/account-requests/{req['id']}/approve",
+        json={"user_id": normal_user["id"]}, headers=admin_headers,
+    )
+    code = r.json()["code"]
+
+    db = SessionLocal()
+    try:
+        row = db.query(AccountRequest).filter(AccountRequest.id == req["id"]).first()
+        assert row.code_hash, "코드 해시가 비어 있다"
+        assert row.code_hash != code, "평문 코드가 그대로 저장되었다"
+        assert row.code_hash.startswith("$2"), "bcrypt 해시가 아니다"
+    finally:
+        db.close()
+
+
+def test_reject_moves_to_rejected(admin_headers):
+    _submit({
+        "request_type": "reset_password",
+        "claimed_username": "__no_such_user__",
+        "contact": "메신저 nobody",
+    })
+    r = requests.get(f"{BASE}/api/auth/account-requests", headers=admin_headers)
+    req = next(x for x in r.json() if x["claimed_username"] == "__no_such_user__")
+
+    r = requests.post(
+        f"{BASE}/api/auth/account-requests/{req['id']}/reject",
+        json={"note": "존재하지 않는 계정"}, headers=admin_headers,
+    )
+    assert r.status_code == 200, r.text
+
+    r = requests.get(f"{BASE}/api/auth/account-requests",
+                     params={"status": "rejected"}, headers=admin_headers)
+    item = next(x for x in r.json() if x["id"] == req["id"])
+    assert item["status"] == "rejected"
+    assert item["note"] == "존재하지 않는 계정"
