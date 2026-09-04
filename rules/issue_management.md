@@ -24,7 +24,7 @@
 
 | 심각도 | 기준 | 예시 |
 |---|---|---|
-| **Block** | 서비스 전체 장애, 작업 진행 불가. workaround 없음 | 서버 미기동, 로그인 불가, DB 연결 실패 |
+| **Blocker** | 제품 전면 사용 불가. 우회 경로가 없다 | 서버 미기동, 로그인 불가, DB 연결 실패 |
 | **Critical** | 핵심 기능 마비, 데이터 유실/손상. 다른 작업은 가능 | 빌드 실패, 인증 우회, TC 저장 안 됨, 특정 페이지 진입 불가 |
 | **Major** | 주요 기능 오류, 중요 UI 문제 | 대시보드 통계 오류, Import 실패, 권한 불일치, deleted_at 필터 누락 |
 | **Minor** | 사소한 기능 오류, 경미한 UI 문제 | 토스트 중복, 날짜 포맷 오류, 정렬 안 됨, 에러 메시지 영문 표시 |
@@ -32,7 +32,7 @@
 
 ### 심각도 판단 기준
 
-- **Block vs Critical**: 로그인이 안 되면 Block(아무것도 못 함), 로그인은 되는데 TC 관리 페이지 진입이 안 되면 Critical(다른 페이지는 사용 가능)
+- **Blocker vs Critical**: 로그인이 안 되면 Blocker(제품 전면 사용 불가), 로그인은 되는데 TC 관리 페이지 진입이 안 되면 Critical(다른 페이지는 사용 가능)
 - **Critical vs Major**: 기능이 완전히 안 되면 Critical, 기능은 되는데 결과가 틀리면 Major
 - **Major vs Minor**: 업무에 지장이 있으면 Major, 불편하지만 우회 가능하면 Minor
 - **Minor vs Trivial**: 기능 관련이면 Minor, 기능과 무관한 외관/텍스트이면 Trivial
@@ -41,10 +41,10 @@
 
 | 분류 | 사용 가능 심각도 | 비고 |
 |---|---|---|
-| BUG, ENC, PERF | Block, Critical, Major, Minor, Trivial | 5단계 전체 |
-| SEC (보안 이슈) | Block, Critical, Major, Minor | 최소 Minor 이상 (Trivial 불가 - 보안은 사소하지 않음) |
-| DB 관련 이슈 | Block, Critical, Major | 최소 Major 이상 (DB 문제는 데이터 정합성 직결) |
-| ENH (개선 요청) | Major, Minor, Trivial | 3단계만 (Block/Critical 불가 - 개선은 장애/마비가 아님) |
+| BUG, ENC, PERF | Blocker, Critical, Major, Minor, Trivial | 5단계 전체 |
+| SEC (보안 이슈) | Blocker, Critical, Major, Minor | 최소 Minor 이상 (Trivial 불가 - 보안은 사소하지 않음) |
+| DB 관련 이슈 | Blocker, Critical, Major | 최소 Major 이상 (DB 문제는 데이터 정합성 직결) |
+| ENH (개선 요청) | Major, Minor, Trivial | 3단계만 (Blocker/Critical 불가 - 개선은 장애/마비가 아님) |
 
 ## 상태 관리
 
