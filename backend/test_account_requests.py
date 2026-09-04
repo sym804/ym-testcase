@@ -290,32 +290,47 @@ def test_reset_with_code_changes_password(admin_headers, normal_user):
     })
     assert r.status_code == 200, r.text
 
-    # 새 비밀번호로 로그인된다
-    ok = requests.post(f"{BASE}/api/auth/login", json={
-        "username": normal_user["username"], "password": "changed1234",
-    })
-    assert ok.status_code == 200, ok.text
+    try:
+        # 새 비밀번호로 로그인된다
+        ok = requests.post(f"{BASE}/api/auth/login", json={
+            "username": normal_user["username"], "password": "changed1234",
+        })
+        assert ok.status_code == 200, ok.text
 
-    # 옛 비밀번호는 실패한다
-    ng = requests.post(f"{BASE}/api/auth/login", json={
-        "username": normal_user["username"], "password": "origin1234",
-    })
-    assert ng.status_code == 401
-
-    # 원복: 코드를 새로 발급받아 원래 비밀번호로 되돌린다
-    _, code2 = _issue_code(admin_headers, normal_user["username"], normal_user["id"])
-    back = requests.post(f"{BASE}/api/auth/reset-password/verify", json={
-        "username": normal_user["username"], "code": code2, "new_password": "origin1234",
-    })
-    assert back.status_code == 200, back.text
+        # 옛 비밀번호는 실패한다
+        ng = requests.post(f"{BASE}/api/auth/login", json={
+            "username": normal_user["username"], "password": "origin1234",
+        })
+        assert ng.status_code == 401
+    finally:
+        # 위 assert 가 실패해도 계정을 origin1234 로 되돌려야 한다(테스트 데이터 원복 규칙)
+        _, code2 = _issue_code(admin_headers, normal_user["username"], normal_user["id"])
+        back = requests.post(f"{BASE}/api/auth/reset-password/verify", json={
+            "username": normal_user["username"], "code": code2, "new_password": "origin1234",
+        })
+        assert back.status_code == 200, back.text
 
 
 def test_code_cannot_be_reused(admin_headers, normal_user):
-    _, code = _issue_code(admin_headers, normal_user["username"], normal_user["id"])
+    req_id, code = _issue_code(admin_headers, normal_user["username"], normal_user["id"])
     first = requests.post(f"{BASE}/api/auth/reset-password/verify", json={
         "username": normal_user["username"], "code": code, "new_password": "origin1234",
     })
     assert first.status_code == 200, first.text
+
+    # status 필터가 아니라 code_hash 자체가 지워졌는지 직접 확인한다.
+    # status 필터만으로 재사용이 막힌다면, code_hash 를 지우는 코드가 회귀해도
+    # 아래 401 재사용 검증만으로는 잡히지 않는다.
+    from database import SessionLocal
+    from models import AccountRequest
+
+    db = SessionLocal()
+    try:
+        row = db.query(AccountRequest).filter(AccountRequest.id == req_id).first()
+        assert row.code_hash is None, "코드 해시가 남아 있다. 재사용 방어가 status 필터에만 의존한다"
+        assert row.status.value == "completed"
+    finally:
+        db.close()
 
     again = requests.post(f"{BASE}/api/auth/reset-password/verify", json={
         "username": normal_user["username"], "code": code, "new_password": "origin1234",
