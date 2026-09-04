@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import type { User, Project, ProjectMember } from "../types";
 import { UserRole } from "../types";
 import Header from "../components/Header";
+import AccountRequestSection from "../components/AccountRequestSection";
 import toast from "react-hot-toast";
 import { translateError } from "../utils/errorMessage";
 
@@ -394,6 +395,8 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        <AccountRequestSection />
       </div>
     </div>
   );
