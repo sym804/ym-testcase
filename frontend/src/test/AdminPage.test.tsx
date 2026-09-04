@@ -43,9 +43,19 @@ vi.mock("../api", () => ({
   },
   searchApi: { global: vi.fn() },
   authApi: { getMe: vi.fn() },
+  // AdminPage 는 AccountRequestSection 을 조건 없이 렌더한다. 이 키가 없으면
+  // 섹션 로더가 TypeError 를 내고 컴포넌트가 그것을 오류 상태로 삼켜서,
+  // 테스트는 통과하지만 섹션은 한 줄도 검증되지 않는다.
+  accountRequestsApi: {
+    submit: vi.fn(),
+    list: vi.fn(),
+    approve: vi.fn(),
+    reject: vi.fn(),
+    resetWithCode: vi.fn(),
+  },
 }));
 
-import { usersApi, projectsApi, membersApi, searchApi } from "../api";
+import { usersApi, projectsApi, membersApi, searchApi, accountRequestsApi } from "../api";
 
 const mockUsers = [
   { id: 1, username: "admin", display_name: "관리자", role: UserRole.ADMIN, must_change_password: false, created_at: "2026-01-01T00:00:00" },
@@ -70,6 +80,7 @@ beforeEach(() => {
   vi.mocked(membersApi.updateRole).mockResolvedValue({} as any);
   vi.mocked(membersApi.remove).mockResolvedValue(undefined);
   vi.mocked(searchApi.global).mockResolvedValue([]);
+  vi.mocked(accountRequestsApi.list).mockResolvedValue([]);
 });
 
 function renderPage() {
@@ -160,6 +171,17 @@ describe("AdminPage", () => {
         expect(usersApi.updateRole).toHaveBeenCalledWith(2, "qa_manager");
       });
     }
+  });
+
+  it("계정 요청 섹션이 함께 렌더링된다", async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText("계정 요청")).toBeInTheDocument();
+    });
+    // 오류 상태가 아니라 실제 목록 응답으로 그려진 것이어야 한다
+    expect(accountRequestsApi.list).toHaveBeenCalledWith("pending");
+    expect(screen.getByText("대기 중인 요청이 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("처리에 실패했습니다.")).not.toBeInTheDocument();
   });
 
   it("프로젝트 배정 관리 버튼이 있다", async () => {
