@@ -7,6 +7,7 @@
     "title": "목차",
     "overview": "개요",
     "login": "1. 로그인 / 회원가입",
+    "accountRecovery": "1-4. 계정 도움 요청 (계정 복구)",
     "projectList": "2. 프로젝트 목록",
     "projectDetail": "3. 프로젝트 상세",
     "tcManage": "4. TC 관리",

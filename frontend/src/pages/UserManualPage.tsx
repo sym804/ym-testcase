@@ -32,6 +32,7 @@ export default function UserManualPage() {
           <div style={s.tocTitle}>{t("toc.title")}</div>
           <a href="#overview" style={s.tocItem}>{t("toc.overview")}</a>
           <a href="#login" style={s.tocItem}>{t("toc.login")}</a>
+          <a href="#account-recovery" style={s.tocItem}>{t("toc.accountRecovery")}</a>
           <a href="#project-list" style={s.tocItem}>{t("toc.projectList")}</a>
           <a href="#project-detail" style={s.tocItem}>{t("toc.projectDetail")}</a>
           <a href="#tc-manage" style={s.tocItem}>{t("toc.tcManage")}</a>
