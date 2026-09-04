@@ -22,6 +22,7 @@ from schemas import (
     ResetPasswordWithCode,
 )
 from auth import hash_password, verify_password, role_required
+from routes.auth import _check_rate_limit, _record_failure
 
 logger = logging.getLogger(__name__)
 
@@ -199,3 +200,54 @@ def reject_account_request(
     db.refresh(req)
     logger.info("Account request rejected: request=%s by=%s", req.id, current_user.username)
     return req
+
+
+@router.post("/reset-password/verify")
+def reset_password_with_code(
+    payload: ResetPasswordWithCode,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """코드로 새 비밀번호를 정한다.
+
+    실패는 단계를 구분하지 않고 모두 같은 401 을 낸다. 어디서 틀렸는지 알려주면
+    계정 존재 여부와 승인 여부가 새어 나간다.
+    """
+    _check_rate_limit(request, payload.username)
+    fail = HTTPException(status_code=401, detail="코드가 올바르지 않거나 만료되었습니다.")
+
+    user = db.query(User).filter(User.username == payload.username).first()
+    if not user:
+        _record_failure(request, payload.username)
+        raise fail
+
+    req = (
+        db.query(AccountRequest)
+        .filter(
+            AccountRequest.user_id == user.id,
+            AccountRequest.request_type == AccountRequestType.reset_password,
+            AccountRequest.status == AccountRequestStatus.approved,
+        )
+        .order_by(AccountRequest.created_at.desc())
+        .first()
+    )
+    if not req or not req.code_hash:
+        _record_failure(request, payload.username)
+        raise fail
+
+    if req.code_expires_at is None or req.code_expires_at < now_kst():
+        _record_failure(request, payload.username)
+        raise fail
+
+    if not verify_password(payload.code, req.code_hash):
+        _record_failure(request, payload.username)
+        raise fail
+
+    user.password_hash = hash_password(payload.new_password)
+    user.must_change_password = False
+    req.status = AccountRequestStatus.completed
+    req.code_hash = None
+    req.resolved_at = now_kst()
+    db.commit()
+    logger.info("Password reset via code: user=%s request=%s", user.username, req.id)
+    return {"message": "비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요."}
