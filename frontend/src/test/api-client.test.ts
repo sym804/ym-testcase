@@ -89,7 +89,43 @@ describe("API Client Interceptors", () => {
       const error = { response: { status: 401 } };
 
       await expect(interceptor.rejected(error)).rejects.toEqual(error);
+      expect(window.location.href).toBe("/login");
     });
+
+    it("인증이 필요한 경로(/projects)에서 401을 받으면 href 를 /login 으로 바꾼다", async () => {
+      Object.defineProperty(window, "location", {
+        value: { ...window.location, pathname: "/projects", href: "http://localhost/projects" },
+        writable: true,
+        configurable: true,
+      });
+
+      const interceptor = instance._responseInterceptors[0];
+      const error = { response: { status: 401 } };
+
+      await expect(interceptor.rejected(error)).rejects.toEqual(error);
+      expect(window.location.href).toBe("/login");
+    });
+
+    it.each(["/login", "/register", "/account-help", "/reset-password"])(
+      "비로그인 공개 경로 %s 에서는 401을 받아도 href 를 바꾸지 않는다",
+      async (pathname) => {
+        const initialHref = `http://localhost${pathname}`;
+        Object.defineProperty(window, "location", {
+          value: { ...window.location, pathname, href: initialHref },
+          writable: true,
+          configurable: true,
+        });
+
+        const interceptor = instance._responseInterceptors[0];
+        const error = { response: { status: 401 } };
+
+        // /reset-password/verify 는 잘못된/만료된 코드에도 401을 내려주므로,
+        // 이 경로에서 401은 세션 만료가 아니라 정상적인 실패 응답이다.
+        // 여기서 리다이렉트가 걸리면 resetFailed 에러 문구를 절대 볼 수 없다.
+        await expect(interceptor.rejected(error)).rejects.toEqual(error);
+        expect(window.location.href).toBe(initialHref);
+      }
+    );
 
     it("401이 아닌 에러는 그대로 reject한다", async () => {
       const interceptor = instance._responseInterceptors[0];
