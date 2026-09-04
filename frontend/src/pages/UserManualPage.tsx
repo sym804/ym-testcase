@@ -117,6 +117,32 @@ export default function UserManualPage() {
             </div>
           </section>
 
+          {/* 1-4. 계정 도움 요청 (계정 복구) */}
+          <section id="account-recovery" style={s.section}>
+            <h2 style={s.h2}>{t("accountRecovery.title")}</h2>
+            <p style={s.p}>{t("accountRecovery.p1")}</p>
+
+            <h3 style={s.h3}>{t("accountRecovery.h3_findId")}</h3>
+            <img src="/manual-images/36_account_help_find_id.png" alt={t("accountRecovery.imgAlt_findId")} style={s.img} />
+            <ol style={s.ol}>
+              <li>{t("accountRecovery.findId_li1")}</li>
+              <li dangerouslySetInnerHTML={{ __html: t("accountRecovery.findId_li2") }} />
+              <li>{t("accountRecovery.findId_li3")}</li>
+            </ol>
+            <div style={s.infoBox} dangerouslySetInnerHTML={{ __html: t("accountRecovery.findId_info") }} />
+
+            <h3 style={s.h3}>{t("accountRecovery.h3_reset")}</h3>
+            <img src="/manual-images/37_account_help_reset.png" alt={t("accountRecovery.imgAlt_reset")} style={s.img} />
+            <ol style={s.ol}>
+              <li>{t("accountRecovery.reset_li1")}</li>
+              <li dangerouslySetInnerHTML={{ __html: t("accountRecovery.reset_li2") }} />
+              <li>{t("accountRecovery.reset_li3")}</li>
+              <li dangerouslySetInnerHTML={{ __html: t("accountRecovery.reset_li4") }} />
+            </ol>
+            <img src="/manual-images/38_reset_password_page.png" alt={t("accountRecovery.imgAlt_resetPage")} style={s.img} />
+            <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("accountRecovery.reset_warn") }} />
+          </section>
+
           {/* 1. 프로젝트 목록 */}
           {/* 1. 프로젝트 목록 */}
           <section id="project-list" style={s.section}>

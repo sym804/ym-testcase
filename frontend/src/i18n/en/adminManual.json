@@ -1,6 +1,6 @@
 {
   "title": "YM TestCase Admin Manual",
-  "updatedAt": "Last updated: 2026-03-24 | v1.0.0.0 | Admin-only document",
+  "updatedAt": "Last updated: 2026-09-04 | v1.3.0.0 | Admin-only document",
   "badge": "Admin Manual",
   "backBtn": "Go Back",
   "toc": {
@@ -112,7 +112,16 @@
     "resetOl4": "The user will see a <strong>forced password change</strong> screen on their next login.",
     "resetPwWarn": "<strong>Warning:</strong> The temporary password is displayed only once. Make sure to note it down before sharing.",
     "initialAccountTitle": "5-4. Initial Account",
-    "initialAccountInfo": "The first user to register is automatically assigned the <strong>Admin</strong> role. All subsequent users start as <strong>User</strong>. An administrator must change their roles as needed."
+    "initialAccountInfo": "The first user to register is automatically assigned the <strong>Admin</strong> role. All subsequent users start as <strong>User</strong>. An administrator must change their roles as needed.",
+    "accountRequestTitle": "5-5. Approving Account Recovery Requests",
+    "accountRequestP1": "Requests for finding a username or resetting a password, submitted from the login screen's \"Account Help\" link, are processed on the admin page.",
+    "accountRequestImgAlt": "Admin page - Account recovery request queue",
+    "accountRequestOl1": "Check pending requests in the \"Account Requests\" list at the bottom of the admin page.",
+    "accountRequestOl2": "Verify the requester's identity using the contact info and note.",
+    "accountRequestOl3": "Select the target account from the dropdown and click <strong>Approve</strong>. If identity cannot be verified, click <strong>Reject</strong> and provide a reason.",
+    "accountRequestOl4": "The approval result is displayed on screen. For find-username requests the username is shown; for password resets, a one-time code is shown.",
+    "accountRequestImgAlt2": "Admin page - Issued code display",
+    "accountRequestWarn": "<strong>Warning:</strong> The code is stored on the server only as a hash, and the plaintext is displayed on this screen <strong>only once</strong>. Be sure to copy it with the copy button and deliver it to the user right away. Once you click Close, it cannot be viewed again."
   },
   "roleSystem": {
     "title": "6. Roles & Permissions",
@@ -216,7 +225,7 @@
     "apiAuthSetting": "Per-endpoint role check"
   },
   "apiRef": {
-    "title": "10. API Endpoints (70)",
+    "title": "10. API Endpoints (73)",
     "swaggerInfo": "API documentation (Swagger UI) is available at",
     "swaggerInfoSuffix": ".",
     "descTh": "Description",
@@ -229,7 +238,12 @@
       "changePassword": "Change password (min 8 chars)",
       "users": "User list (QA Manager+)",
       "changeRole": "Change role (Admin)",
-      "resetPassword": "Reset password (Admin)"
+      "resetPassword": "Reset password (Admin)",
+      "submitAccountRequest": "Submit account recovery request",
+      "listAccountRequests": "List account recovery requests",
+      "approveAccountRequest": "Approve account recovery request",
+      "rejectAccountRequest": "Reject account recovery request",
+      "resetPasswordWithCode": "Reset password with code"
     },
     "projects": {
       "title": "Projects",
