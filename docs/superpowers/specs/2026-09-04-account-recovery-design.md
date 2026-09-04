@@ -174,6 +174,7 @@ IP 기준으로 두고 1시간에 10회로 제한한다. 초과하면 429. 기�
 - `LoginPage` 의 안내 문구를 `/account-help` 링크로 바꾼다.
 - `AdminPage` 에 '계정 요청' 섹션을 추가한다. 대기 목록, 승인 시 대상 선택과 코드 표시,
   반려. 코드는 복사할 수 있어야 하고 다시 볼 수 없다는 것을 화면에 명시한다.
+  액션 버튼(승인/반려/새로고침)은 프로젝트 규칙대로 해당 표 바로 위에 둔다.
 - i18n `accountHelp.json` 을 ko/en 신규 추가하고 `login.json`, `admin.json` 에 키를 더한다.
 
 ## 테스트
@@ -192,6 +193,46 @@ IP 기준으로 두고 1시간에 10회로 제한한다. 초과하면 429. 기�
 - `pending` 이 아닌 요청 승인 시 409
 
 프론트는 `frontend/src/test/api-index.test.ts` 에 새 API 호출 검증을 더한다.
+
+## 버전 계획
+
+`rules/versioning.md` 의 `system.feature.fix.patch` 체계를 따른다. 새 테이블을 만들고
+신규 기능을 얹으므로 네 컴포넌트 모두 feature 자리를 올린다.
+
+- System: 1.2.3.0 -> 1.3.0.0
+- Frontend: 1.2.2.0 -> 1.3.0.0 (신규 페이지 2개, 관리자 섹션)
+- Backend: 1.2.3.0 -> 1.3.0.0 (신규 엔드포인트 5개)
+- Database: 0.6.0.0 -> 0.7.0.0 (테이블 추가)
+
+버전을 적는 자리는 `frontend/package.json`, `backend/main.py` 의 `version=`,
+`rules/versioning.md` 의 이력 표, `Release_note.md` 신규 섹션이다.
+
+작업 중 확인된 별건이 하나 있다. `frontend/src/i18n/{ko,en}/common.json` 의 `version`
+문자열이 "YM TestCase v1.0.0.0" 으로 멈춰 있어 화면 하단에 실제와 다른 버전이 표시된다.
+프론트가 1.2.2.0 인데 사용자에게는 1.0.0.0 으로 보인다. 이번 릴리즈에서 같이 맞춘다.
+
+## 기능 추가 체크리스트
+
+`CLAUDE.md` 의 필수 체크리스트를 이 기능에 대입한다.
+
+1. 코드 구현과 TypeScript 타입 체크 통과
+2. 테스트 작성과 수행. 아래 테스트 절에 정리했다
+3. 사용자 매뉴얼 갱신. `frontend/src/pages/UserManualPage.tsx` 에 계정 복구 절을 넣고
+   `AdminManualPage.tsx` 에 승인 절차와 새 엔드포인트를 넣는다. 스크린샷을 첨부한다
+4. 회귀 체크리스트 엑셀(`TC_Manager_Full_Regression_Checklist.xlsx`)에 TC 추가.
+   `rules/tc_writing_guide.md` 의 `TC-[모듈약어]-[번호]` 형식을 따라 `TC-AUTH-` 대역을
+   쓰고 기존 마지막 번호 다음부터 채운다
+5. 테스트 중 바꾼 비밀번호와 DB 데이터는 수행 후 원복한다
+
+릴리즈 기록은 `Release_note.md` 신규 섹션, `Issue_list.xlsx`, GitHub Issues 순으로 남긴다.
+
+## 로컬 확인
+
+백엔드 8008, 프론트엔드 5173 이다. 8000 은 다른 프로젝트가 쓴다.
+
+수동 확인 중 로그인 실패가 10회 쌓이면 5분 잠기고 서버 재시작으로만 풀린다.
+코드 오입력 테스트를 반복할 때 이 한도에 먼저 걸릴 수 있으니, 자동화 테스트는
+계정과 IP 키를 나눠 쓰고 수동 확인은 마지막에 한다.
 
 ## 범위 밖
 
