@@ -45,5 +45,29 @@
   "removeSuccess": "Removed from project.",
   "removeFailed": "Failed to remove.",
   "projectRoleChanged": "Project role has been changed.",
-  "projectRoleChangeFailed": "Failed to change role."
+  "projectRoleChangeFailed": "Failed to change role.",
+  "accountRequests": {
+    "title": "Account Requests",
+    "empty": "No pending requests.",
+    "refresh": "Refresh",
+    "colType": "Type",
+    "colClaimed": "Request",
+    "colContact": "Contact",
+    "colNote": "Note",
+    "colCreated": "Submitted",
+    "colActions": "Actions",
+    "typeFindId": "Find ID",
+    "typeResetPassword": "Reset Password",
+    "selectUser": "Select target account",
+    "approve": "Approve",
+    "reject": "Reject",
+    "rejectReason": "Reason",
+    "codeIssued": "A reset code has been issued. Copy it now and pass it on. You cannot see it again.",
+    "usernameFound": "This is the target username. Pass it on to the requester.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "expiresAt": "Expires",
+    "needUser": "Select the target account first.",
+    "failed": "The action failed."
+  }
 }

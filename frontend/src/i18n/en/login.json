@@ -11,5 +11,6 @@
   "loginFailed": "Login failed.",
   "noAccount": "Don't have an account?",
   "register": "Sign up",
-  "forgotPassword": "If you forgot your password, please contact the administrator for a reset."
+  "forgotPassword": "Forgot your username or password?",
+  "forgotPasswordLink": "Get account help"
 }

@@ -45,5 +45,29 @@
   "removeSuccess": "프로젝트에서 제거되었습니다.",
   "removeFailed": "제거에 실패했습니다.",
   "projectRoleChanged": "프로젝트 역할이 변경되었습니다.",
-  "projectRoleChangeFailed": "역할 변경에 실패했습니다."
+  "projectRoleChangeFailed": "역할 변경에 실패했습니다.",
+  "accountRequests": {
+    "title": "계정 요청",
+    "empty": "대기 중인 요청이 없습니다.",
+    "refresh": "새로고침",
+    "colType": "종류",
+    "colClaimed": "요청 내용",
+    "colContact": "연락처",
+    "colNote": "메모",
+    "colCreated": "접수일",
+    "colActions": "처리",
+    "typeFindId": "아이디 찾기",
+    "typeResetPassword": "비밀번호 재설정",
+    "selectUser": "대상 계정 선택",
+    "approve": "승인",
+    "reject": "반려",
+    "rejectReason": "반려 사유",
+    "codeIssued": "재설정 코드가 발급되었습니다. 지금 복사해서 전달하세요. 다시 볼 수 없습니다.",
+    "usernameFound": "대상 아이디입니다. 요청자에게 전달하세요.",
+    "copy": "복사",
+    "copied": "복사됨",
+    "expiresAt": "만료",
+    "needUser": "대상 계정을 먼저 선택해 주세요.",
+    "failed": "처리에 실패했습니다."
+  }
 }

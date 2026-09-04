@@ -11,5 +11,6 @@
   "loginFailed": "로그인에 실패했습니다.",
   "noAccount": "계정이 없으신가요?",
   "register": "회원가입",
-  "forgotPassword": "비밀번호를 잊으셨다면 관리자에게 초기화를 요청하세요."
+  "forgotPassword": "아이디나 비밀번호를 잊으셨나요?",
+  "forgotPasswordLink": "계정 도움 요청"
 }
