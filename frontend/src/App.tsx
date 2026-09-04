@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "./contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import ChangePasswordModal from "./components/ChangePasswordModal";
+import AccountHelpPage from "./pages/AccountHelpPage";
 import type { ReactNode } from "react";
 
 // Lazy-loaded pages
@@ -61,6 +62,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/account-help" element={<AccountHelpPage />} />
       <Route path="/" element={<Navigate to="/projects" replace />} />
       <Route
         path="/projects"

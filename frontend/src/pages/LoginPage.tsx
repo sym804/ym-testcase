@@ -83,7 +83,10 @@ export default function LoginPage() {
             </Link>
           </div>
           <div style={styles.hint}>
-            {t("forgotPassword")}
+            {t("forgotPassword")}{" "}
+            <Link to="/account-help" style={styles.link}>
+              {t("forgotPasswordLink")}
+            </Link>
           </div>
         </div>
       </div>
