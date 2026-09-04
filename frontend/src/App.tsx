@@ -5,6 +5,7 @@ import { useAuth } from "./contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 import AccountHelpPage from "./pages/AccountHelpPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import type { ReactNode } from "react";
 
 // Lazy-loaded pages
@@ -63,6 +64,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/account-help" element={<AccountHelpPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/" element={<Navigate to="/projects" replace />} />
       <Route
         path="/projects"
