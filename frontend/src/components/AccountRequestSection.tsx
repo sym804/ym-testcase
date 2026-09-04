@@ -13,12 +13,15 @@ export default function AccountRequestSection() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    setError("");
     try {
       const [reqs, us] = await Promise.all([
         accountRequestsApi.list("pending"),
         usersApi.list(),
       ]);
+      // await 이후에 상태를 지워야 effect 콜백 안에서 동기적으로 setState 되지 않는다
+      // (eslint react-hooks 규칙 위반 방지). 성공했을 때만 지우므로 기존 에러 메시지도
+      // 새로고침이 실제로 성공하기 전까지 유지된다.
+      setError("");
       setItems(reqs);
       setUsers(us);
     } catch {
@@ -27,6 +30,11 @@ export default function AccountRequestSection() {
   }, [t]);
 
   useEffect(() => {
+    // load 내부의 setState는 전부 await 뒤(성공 시) 또는 catch 안에서만 실행되어
+    // effect 호출 시점에 동기적으로 실행되지 않는다. 하지만 react-hooks/set-state-in-effect
+    // 규칙은 함수 본문을 정적으로만 훑어 await 이전/이후를 구분하지 못해 오탐이 발생하므로
+    // 이 한 줄에서만 규칙을 끈다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
