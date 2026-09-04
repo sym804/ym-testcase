@@ -39,6 +39,18 @@ class TestResultValue(str, enum.Enum):
     NS = "NS"
 
 
+class AccountRequestType(str, enum.Enum):
+    find_id = "find_id"
+    reset_password = "reset_password"
+
+
+class AccountRequestStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+    completed = "completed"
+
+
 # ── User ──────────────────────────────────────────────────────────────────────
 
 class User(Base):
@@ -308,4 +320,36 @@ class TestCaseHistory(Base):
 
     __table_args__ = (
         Index("ix_test_case_history_tc_id", "test_case_id"),
+    )
+
+
+# ── AccountRequest ────────────────────────────────────────────────────────────
+
+class AccountRequest(Base):
+    """계정 복구 요청. 비로그인 사용자가 넣고 관리자가 처리한다.
+
+    claimed_* 는 사용자가 적은 값을 검증 없이 담는 자리다. 승인 전까지는
+    실재하는 계정을 가리킨다는 보장이 없다. 관리자가 확정한 대상만 user_id 로 들어간다.
+    """
+    __tablename__ = "account_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_type = Column(SAEnum(AccountRequestType), nullable=False)
+    status = Column(SAEnum(AccountRequestStatus), default=AccountRequestStatus.pending, nullable=False)
+
+    claimed_username = Column(String(100), nullable=True)
+    claimed_display_name = Column(String(100), nullable=True)
+    contact = Column(String(200), nullable=False)
+    note = Column(Text, nullable=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    code_hash = Column(String(255), nullable=True)
+    code_expires_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=now_kst)
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    __table_args__ = (
+        Index("ix_account_requests_status_created", "status", "created_at"),
     )
