@@ -48,7 +48,7 @@
 - [ ] 엑셀 ↔ GitHub 이슈 개수 일치 확인
 
 ### 공통
-- [ ] Open 이슈 중 Block/Critical 없는지 확인
+- [ ] Open 이슈 중 Blocker/Critical 없는지 확인
 - [ ] 보안 이슈 중 Major 이상 미해결 여부 재확인
 - [ ] 롤백 계획 수립 (이전 버전 복구 절차 확인)
 - [ ] Release_note.md 최상단에 새 버전 추가
