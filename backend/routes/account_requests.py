@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -113,3 +113,89 @@ def submit_account_request(
         logger.info("Account request submitted: type=%s ip=%s", req_type.value, _client_ip(request))
 
     return AccountRequestAck(message=ACK_MESSAGE)
+
+
+@router.get("/account-requests", response_model=list[AccountRequestListItem])
+def list_account_requests(
+    status_filter: str = Query("pending", alias="status"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(role_required("admin")),
+):
+    try:
+        st = AccountRequestStatus(status_filter)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="상태 값이 올바르지 않습니다.")
+
+    return (
+        db.query(AccountRequest)
+        .filter(AccountRequest.status == st)
+        .order_by(AccountRequest.created_at.desc())
+        .all()
+    )
+
+
+@router.post("/account-requests/{request_id}/approve", response_model=AccountRequestApproveResult)
+def approve_account_request(
+    request_id: int,
+    payload: AccountRequestApprove,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(role_required("admin")),
+):
+    req = db.query(AccountRequest).filter(AccountRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="요청을 찾을 수 없습니다.")
+    if req.status is not AccountRequestStatus.pending:
+        raise HTTPException(status_code=409, detail="이미 처리된 요청입니다.")
+
+    target = db.query(User).filter(User.id == payload.user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="대상 사용자를 찾을 수 없습니다.")
+
+    req.user_id = target.id
+    req.resolved_by_id = current_user.id
+    req.resolved_at = now_kst()
+
+    if req.request_type is AccountRequestType.find_id:
+        req.status = AccountRequestStatus.completed
+        db.commit()
+        logger.info("Find-id approved: request=%s target=%s by=%s",
+                    req.id, target.username, current_user.username)
+        return AccountRequestApproveResult(
+            request_type=req.request_type.value, username=target.username,
+        )
+
+    code = secrets.token_urlsafe(9)
+    req.code_hash = hash_password(code)
+    req.code_expires_at = now_kst() + timedelta(hours=CODE_TTL_HOURS)
+    req.status = AccountRequestStatus.approved
+    db.commit()
+    logger.info("Reset code issued: request=%s target=%s by=%s",
+                req.id, target.username, current_user.username)
+    return AccountRequestApproveResult(
+        request_type=req.request_type.value,
+        code=code,
+        code_expires_at=req.code_expires_at,
+    )
+
+
+@router.post("/account-requests/{request_id}/reject", response_model=AccountRequestListItem)
+def reject_account_request(
+    request_id: int,
+    payload: AccountRequestReject,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(role_required("admin")),
+):
+    req = db.query(AccountRequest).filter(AccountRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="요청을 찾을 수 없습니다.")
+    if req.status is not AccountRequestStatus.pending:
+        raise HTTPException(status_code=409, detail="이미 처리된 요청입니다.")
+
+    req.status = AccountRequestStatus.rejected
+    req.note = payload.note
+    req.resolved_by_id = current_user.id
+    req.resolved_at = now_kst()
+    db.commit()
+    db.refresh(req)
+    logger.info("Account request rejected: request=%s by=%s", req.id, current_user.username)
+    return req
