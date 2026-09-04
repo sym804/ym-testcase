@@ -10,6 +10,18 @@ import requests
 BASE = os.getenv("TEST_BASE_URL", "http://localhost:8008")
 
 
+@pytest.fixture(autouse=True)
+def _reset_submit_limit():
+    """접수 제한은 IP 기준 1시간 10회다. 테스트가 같은 IP 로 그 예산을 나눠 쓰면
+    뒤쪽 테스트가 429 로 죽는다. 프로덕션 한도는 그대로 두고 테스트만 격리한다."""
+    try:
+        from routes.account_requests import _submit_hits
+        _submit_hits.clear()
+    except ImportError:
+        pass
+    yield
+
+
 def test_account_request_model_exists():
     from models import AccountRequest, AccountRequestStatus, AccountRequestType
 
