@@ -8,7 +8,8 @@ export default function AccountRequestSection() {
   const [items, setItems] = useState<AccountRequestItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [picked, setPicked] = useState<Record<number, number>>({});
-  const [result, setResult] = useState<{ id: number; text: string; note: string } | null>(null);
+  const [results, setResults] = useState<{ id: number; text: string; note: string }[]>([]);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -38,22 +39,25 @@ export default function AccountRequestSection() {
     setError("");
     try {
       const res = await accountRequestsApi.approve(item.id, userId);
-      if (res.request_type === "find_id") {
-        setResult({
-          id: item.id,
-          text: res.username ?? "",
-          note: t("accountRequests.usernameFound"),
-        });
-      } else {
-        const until = res.code_expires_at
-          ? ` (${t("accountRequests.expiresAt")}: ${new Date(res.code_expires_at).toLocaleString()})`
-          : "";
-        setResult({
-          id: item.id,
-          text: res.code ?? "",
-          note: t("accountRequests.codeIssued") + until,
-        });
-      }
+      const entry =
+        res.request_type === "find_id"
+          ? {
+              id: item.id,
+              text: res.username ?? "",
+              note: t("accountRequests.usernameFound"),
+            }
+          : {
+              id: item.id,
+              text: res.code ?? "",
+              note:
+                t("accountRequests.codeIssued") +
+                (res.code_expires_at
+                  ? ` (${t("accountRequests.expiresAt")}: ${new Date(res.code_expires_at).toLocaleString()})`
+                  : ""),
+            };
+      // 승인 결과는 이전 항목을 덮어쓰지 않고 누적한다. 코드는 서버에 해시로만
+      // 남기 때문에, 관리자가 직접 닫기 전까지 화면에서 사라지면 영구히 잃는다.
+      setResults((prev) => [...prev, entry]);
       await load();
     } catch {
       setError(t("accountRequests.failed"));
@@ -61,7 +65,8 @@ export default function AccountRequestSection() {
   };
 
   const reject = async (item: AccountRequestItem) => {
-    const reason = window.prompt(t("accountRequests.rejectReason")) ?? "";
+    const reason = window.prompt(t("accountRequests.rejectReason"));
+    if (reason === null) return; // 취소는 반려가 아니다
     setError("");
     try {
       await accountRequestsApi.reject(item.id, reason);
@@ -69,6 +74,22 @@ export default function AccountRequestSection() {
     } catch {
       setError(t("accountRequests.failed"));
     }
+  };
+
+  const copyResult = async (entry: { id: number; text: string }) => {
+    try {
+      await navigator.clipboard.writeText(entry.text);
+      setCopiedId(entry.id);
+      window.setTimeout(() => {
+        setCopiedId((cur) => (cur === entry.id ? null : cur));
+      }, 1500);
+    } catch {
+      setError(t("accountRequests.failed"));
+    }
+  };
+
+  const dismissResult = (id: number) => {
+    setResults((prev) => prev.filter((r) => r.id !== id));
   };
 
   const label = (item: AccountRequestItem) =>
@@ -83,16 +104,22 @@ export default function AccountRequestSection() {
     <section style={s.section}>
       <h3 style={s.title}>{t("accountRequests.title")}</h3>
 
-      {result && (
-        <div style={s.result}>
-          <div style={s.resultNote}>{result.note}</div>
-          <div style={s.resultRow}>
-            <code style={s.code}>{result.text}</code>
-            <button style={s.copyBtn}
-                    onClick={() => void navigator.clipboard.writeText(result.text)}>
-              {t("accountRequests.copy")}
-            </button>
-          </div>
+      {results.length > 0 && (
+        <div style={s.resultsWrap}>
+          {results.map((r) => (
+            <div key={r.id} style={s.result}>
+              <div style={s.resultNote}>{r.note}</div>
+              <div style={s.resultRow}>
+                <code style={s.code}>{r.text}</code>
+                <button style={s.copyBtn} onClick={() => void copyResult(r)}>
+                  {copiedId === r.id ? t("accountRequests.copied") : t("accountRequests.copy")}
+                </button>
+                <button style={s.copyBtn} onClick={() => dismissResult(r.id)}>
+                  {t("common:close")}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -187,8 +214,9 @@ const s: Record<string, React.CSSProperties> = {
   },
   empty: { fontSize: 13, color: "var(--text-secondary, #64748B)" },
   error: { color: "var(--danger, #DC2626)", fontSize: 12, marginBottom: 8 },
+  resultsWrap: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 },
   result: {
-    padding: 12, marginBottom: 12, borderRadius: 6,
+    padding: 12, borderRadius: 6,
     border: "1px solid var(--accent, #2563EB)",
   },
   resultNote: { fontSize: 12, marginBottom: 8 },
