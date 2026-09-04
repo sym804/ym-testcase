@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ── Auth / User ───────────────────────────────────────────────────────────────
@@ -52,6 +52,17 @@ class AccountRequestCreate(BaseModel):
     claimed_display_name: Optional[str] = Field(None, max_length=100)
     contact: str = Field(..., min_length=1, max_length=200)
     note: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("claimed_username", "claimed_display_name", "contact", mode="before")
+    @classmethod
+    def _strip(cls, v):
+        """앞뒤 공백을 서버에서 없앤다.
+
+        중복 판정이 이 값들을 그대로 비교하므로, 뒤에 공백 하나가 붙은 값은 다른
+        요청으로 취급되어 큐에 같은 건이 두 번 쌓인다. 길이 제한은 공백을 없앤
+        뒤에 적용된다.
+        """
+        return v.strip() if isinstance(v, str) else v
 
 
 class AccountRequestAck(BaseModel):
