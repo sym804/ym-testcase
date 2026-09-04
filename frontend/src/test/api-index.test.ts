@@ -27,6 +27,7 @@ import {
   testPlansApi,
   filtersApi,
   historyApi,
+  accountRequestsApi,
 } from "../api/index";
 
 const mockGet = vi.mocked(client.get);
@@ -817,5 +818,57 @@ describe("filtersApi", () => {
       { params: { sheet_name: "Sheet1" } }
     );
     expect(result).toEqual(tcs);
+  });
+});
+
+describe("accountRequestsApi", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("submit 은 POST /api/auth/account-requests 를 호출한다", async () => {
+    mockPost.mockResolvedValue({ data: { message: "ok" } });
+    await accountRequestsApi.submit({
+      request_type: "reset_password",
+      claimed_username: "kim",
+      contact: "메신저",
+    });
+    expect(mockPost).toHaveBeenCalledWith("/api/auth/account-requests", {
+      request_type: "reset_password",
+      claimed_username: "kim",
+      contact: "메신저",
+    });
+  });
+
+  it("list 는 status 파라미터를 실어 GET 한다", async () => {
+    mockGet.mockResolvedValue({ data: [] });
+    await accountRequestsApi.list("approved");
+    expect(mockGet).toHaveBeenCalledWith("/api/auth/account-requests", {
+      params: { status: "approved" },
+    });
+  });
+
+  it("approve 는 user_id 를 실어 POST 한다", async () => {
+    mockPost.mockResolvedValue({ data: { request_type: "find_id", username: "kim" } });
+    await accountRequestsApi.approve(7, 3);
+    expect(mockPost).toHaveBeenCalledWith("/api/auth/account-requests/7/approve", { user_id: 3 });
+  });
+
+  it("reject 는 사유를 실어 POST 한다", async () => {
+    mockPost.mockResolvedValue({ data: {} });
+    await accountRequestsApi.reject(7, "없는 계정");
+    expect(mockPost).toHaveBeenCalledWith("/api/auth/account-requests/7/reject", {
+      note: "없는 계정",
+    });
+  });
+
+  it("resetWithCode 는 POST /api/auth/reset-password/verify 를 호출한다", async () => {
+    mockPost.mockResolvedValue({ data: { message: "ok" } });
+    await accountRequestsApi.resetWithCode("kim", "abc123", "newpass1234");
+    expect(mockPost).toHaveBeenCalledWith("/api/auth/reset-password/verify", {
+      username: "kim",
+      code: "abc123",
+      new_password: "newpass1234",
+    });
   });
 });

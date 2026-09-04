@@ -547,6 +547,74 @@ export const usersApi = {
   },
 };
 
+// ─── Account Recovery ─────────────────────────────────
+export interface AccountRequestItem {
+  id: number;
+  request_type: "find_id" | "reset_password";
+  status: "pending" | "approved" | "rejected" | "completed";
+  claimed_username: string | null;
+  claimed_display_name: string | null;
+  contact: string;
+  note: string | null;
+  user_id: number | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface AccountRequestSubmit {
+  request_type: "find_id" | "reset_password";
+  claimed_username?: string;
+  claimed_display_name?: string;
+  contact: string;
+  note?: string;
+}
+
+export interface ApproveResult {
+  request_type: "find_id" | "reset_password";
+  username: string | null;
+  code: string | null;
+  code_expires_at: string | null;
+}
+
+export const accountRequestsApi = {
+  submit: async (data: AccountRequestSubmit) => {
+    const res = await client.post<{ message: string }>("/api/auth/account-requests", data);
+    return res.data;
+  },
+
+  list: async (status: string) => {
+    const res = await client.get<AccountRequestItem[]>("/api/auth/account-requests", {
+      params: { status },
+    });
+    return res.data;
+  },
+
+  approve: async (requestId: number, userId: number) => {
+    const res = await client.post<ApproveResult>(
+      `/api/auth/account-requests/${requestId}/approve`,
+      { user_id: userId }
+    );
+    return res.data;
+  },
+
+  reject: async (requestId: number, note: string) => {
+    const res = await client.post<AccountRequestItem>(
+      `/api/auth/account-requests/${requestId}/reject`,
+      { note }
+    );
+    return res.data;
+  },
+
+  resetWithCode: async (username: string, code: string, newPassword: string) => {
+    const res = await client.post<{ message: string }>("/api/auth/reset-password/verify", {
+      username,
+      code,
+      new_password: newPassword,
+    });
+    return res.data;
+  },
+};
+
 // ─── Custom Fields ──────────────────────────────────
 export const customFieldsApi = {
   list: async (projectId: number) => {
