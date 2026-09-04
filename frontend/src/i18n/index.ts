@@ -15,6 +15,7 @@ import compareKo from "./ko/compare.json";
 import adminKo from "./ko/admin.json";
 import manualKo from "./ko/manual.json";
 import adminManualKo from "./ko/adminManual.json";
+import accountHelpKo from "./ko/accountHelp.json";
 
 import commonEn from "./en/common.json";
 import loginEn from "./en/login.json";
@@ -30,6 +31,7 @@ import compareEn from "./en/compare.json";
 import adminEn from "./en/admin.json";
 import manualEn from "./en/manual.json";
 import adminManualEn from "./en/adminManual.json";
+import accountHelpEn from "./en/accountHelp.json";
 
 i18n.use(initReactI18next).init({
   lng: localStorage.getItem("lang") || "ko",
@@ -54,6 +56,7 @@ i18n.use(initReactI18next).init({
       admin: adminKo,
       manual: manualKo,
       adminManual: adminManualKo,
+      accountHelp: accountHelpKo,
     },
     en: {
       common: commonEn,
@@ -70,6 +73,7 @@ i18n.use(initReactI18next).init({
       admin: adminEn,
       manual: manualEn,
       adminManual: adminManualEn,
+      accountHelp: accountHelpEn,
     },
   },
 });
