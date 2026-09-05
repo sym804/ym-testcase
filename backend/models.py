@@ -207,6 +207,10 @@ class TestResult(Base):
         Index("ix_test_results_run_id", "test_run_id"),
         Index("ix_test_results_run_result", "test_run_id", "result"),
         Index("ix_test_results_case_id", "test_case_id"),
+        # 한 런에서 한 TC 의 결과 행은 하나다. 결과 행을 만드는 경로가 셋이고
+        # (런 생성 / 런 동기화 / 결과 제출) 셋 다 "없는 것을 조회한 뒤 넣는" 모양이라
+        # 동시 요청에서 같은 쌍이 두 번 들어갈 수 있다. 실제로 운영 DB 에 있었다.
+        Index("uq_test_results_run_case", "test_run_id", "test_case_id", unique=True),
     )
 
 

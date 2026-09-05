@@ -6,6 +6,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, subqueryload, load_only
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -272,7 +273,20 @@ def submit_results(
             db.add(tr)
             saved.append(tr)
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # ★같은 TC 를 동시에 제출하면 둘 다 "없음" 으로 보고 각자 새 행을 넣는다.
+        #   유니크 제약이 뒤늦게 잡아 주므로 그대로 500 을 내지 말고 다시 시도하게 한다.
+        # ★유니크 위반만 409 로 바꾼다. 외래키 위반 같은 다른 무결성 오류까지 삼키면
+        #   원인이 다른 사고를 "동시 저장" 으로 오인시켜 헛된 재시도를 유도한다(QA1 지적).
+        db.rollback()
+        if "uq_test_results_run_case" not in str(getattr(exc, "orig", exc)):
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="같은 테스트 케이스의 결과가 동시에 저장됐습니다. 새로고침 후 다시 시도해주세요.",
+        )
     for item in saved:
         db.refresh(item)
     return saved
@@ -393,15 +407,21 @@ def clone_testrun(
     db.flush()
 
     if source.results:
-        db.bulk_insert_mappings(TestResult, [
-            {
+        # ★원본 런에 같은 TC 결과가 둘 이상이면 그대로 복사돼 새 런에도 중복이 생긴다.
+        #   유니크 제약이 생긴 뒤로는 아예 실패한다. TC 기준으로 한 번만 넣는다.
+        seen = set()
+        rows = []
+        for r in source.results:
+            if r.test_case_id in seen:
+                continue
+            seen.add(r.test_case_id)
+            rows.append({
                 "test_run_id": new_run.id,
                 "test_case_id": r.test_case_id,
                 "result": TestResultValue.NS,
                 "executed_by": current_user.id,
-            }
-            for r in source.results
-        ])
+            })
+        db.bulk_insert_mappings(TestResult, rows)
 
     db.commit()
     db.refresh(new_run)

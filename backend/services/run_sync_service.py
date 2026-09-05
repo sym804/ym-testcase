@@ -12,6 +12,34 @@ from sqlalchemy.orm import Session
 from models import TestCase, TestRun, TestResult, TestRunStatus, TestResultValue
 
 
+def insert_results_ignoring_duplicates(db: Session, rows: list[dict]) -> int:
+    """(test_run_id, test_case_id) 가 이미 있으면 그 행은 건너뛰고 넣는다.
+
+    ★조회해서 없는 것만 골라 넣어도, 그 사이에 다른 요청이 같은 것을 넣을 수 있다.
+      예외로 처리하면 세션 전체가 죽어 나머지 행까지 못 넣는다. DB 가 충돌 행만
+      조용히 버리게 하는 편이 맞다.
+    ★방언을 보고 고른다. SQLite 와 PostgreSQL 둘 다 같은 의미를 지원한다.
+      PostgreSQL 전환(SYM-6) 때 이 함수만 그대로 돌면 된다.
+    """
+    if not rows:
+        return 0
+    dialect = db.get_bind().dialect.name
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert as _insert
+    elif dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert as _insert
+    else:
+        # ★모르는 방언을 SQLite 로 취급하면 조용히 틀린 SQL 을 낸다. 차라리 멈춘다.
+        raise NotImplementedError(
+            f"on_conflict_do_nothing 을 지원하지 않는 방언: {dialect}")
+    stmt = _insert(TestResult).values(rows).on_conflict_do_nothing(
+        index_elements=["test_run_id", "test_case_id"]
+    )
+    # ★일부 DBAPI 는 rowcount 로 -1 을 준다. 그대로 내면 호출부가 음수를 더한다.
+    affected = db.execute(stmt).rowcount
+    return affected if affected and affected > 0 else 0
+
+
 def sync_run_results(run: TestRun, db: Session, commit: bool = True) -> int:
     """런 하나에 누락된 TC의 결과 행(NS)을 채운다.
 
@@ -38,7 +66,7 @@ def sync_run_results(run: TestRun, db: Session, commit: bool = True) -> int:
 
     # executed_by는 조회자가 아니라 런 소유자로 기록한다
     # (단순 조회 행위가 다른 사람의 실행 이력으로 남지 않도록)
-    db.bulk_insert_mappings(TestResult, [
+    inserted = insert_results_ignoring_duplicates(db, [
         {
             "test_run_id": run.id,
             "test_case_id": tc_id,
@@ -49,7 +77,8 @@ def sync_run_results(run: TestRun, db: Session, commit: bool = True) -> int:
     ])
     if commit:
         db.commit()
-    return len(missing)
+    # 다른 요청이 먼저 넣었으면 inserted 가 missing 보다 작다. 실제로 넣은 수를 낸다.
+    return inserted
 
 
 def sync_project_in_progress_runs(project_id: int, db: Session, commit: bool = True) -> int:
