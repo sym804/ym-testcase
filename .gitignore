@@ -103,3 +103,7 @@ docker-compose.yml
 # ── 로컬 QA 자격증명·데이터 (공개 저장소에 올리지 않는다) ──
 starfort.test.txt
 *.db.bak-*
+
+# issuelog 가 엑셀 로그를 쓰기 전에 남기는 백업
+.issuelog_backup/
+*.xlsx.lock
