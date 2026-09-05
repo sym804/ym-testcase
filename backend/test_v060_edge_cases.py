@@ -4,7 +4,7 @@ v0.6.0 엣지케이스 포함 확장 테스트
 """
 import io, csv, sys, json, requests, tempfile, os
 
-BASE = os.getenv("TEST_BASE_URL", "http://localhost:8008")
+BASE = os.getenv("TEST_BASE_URL", "http://127.0.0.1:8008")
 PASS_COUNT = 0
 FAIL_COUNT = 0
 TOTAL = 0
