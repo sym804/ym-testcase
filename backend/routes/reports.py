@@ -258,8 +258,10 @@ def report_pdf(
     font_loaded = False
     for font_path in korean_font_paths:
         if os.path.exists(font_path):
-            pdf.add_font("MalgunGothic", "", font_path, uni=True)
-            pdf.add_font("MalgunGothic", "B", font_path, uni=True)
+            # ★uni 인자는 fpdf2 2.5.1 부터 폐기됐고 앞으로 제거된다.
+            #   지금은 TTF 가 기본 유니코드라 인자 없이 같은 동작이다.
+            pdf.add_font("MalgunGothic", "", font_path)
+            pdf.add_font("MalgunGothic", "B", font_path)
             font_name = "MalgunGothic"
             font_loaded = True
             break

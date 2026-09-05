@@ -11,10 +11,28 @@ import requests
 import uvicorn
 
 
+# ★requests 에 기본 타임아웃을 건다. 테스트 354개 호출에 timeout 인자가 하나도 없어
+#   서버가 굳으면 스위트가 영원히 매달린다(2026-09-05 실측: 600초 타임아웃에 걸림).
+#   여기서 한 번 감싸면 호출부를 354곳 고치지 않아도 된다.
+_DEFAULT_TIMEOUT = float(os.getenv("TEST_HTTP_TIMEOUT", "30"))
+_orig_request = requests.Session.request
+
+
+def _request_with_timeout(self, method, url, **kw):
+    kw.setdefault("timeout", _DEFAULT_TIMEOUT)
+    return _orig_request(self, method, url, **kw)
+
+
+requests.Session.request = _request_with_timeout
+
+
+# ★주소는 127.0.0.1 을 쓴다. Windows 에서 localhost 는 ::1 과 127.0.0.1 둘 다로
+#   풀리는데 uvicorn 은 IPv4 로만 듣는다. 그래서 매 요청이 IPv6 시도에서 2초를 버렸다
+#   (실측 2046ms -> 2ms, 스위트 18분 39초 -> 1분대).
 def _server_already_running(port: int) -> bool:
     """이미 서버가 해당 포트에서 실행 중인지 확인"""
     try:
-        r = requests.get(f"http://localhost:{port}/", timeout=2)
+        r = requests.get(f"http://127.0.0.1:{port}/", timeout=2)
         return r.status_code < 500
     except requests.exceptions.RequestException:
         return False
@@ -51,7 +69,7 @@ def _server(tmp_path_factory):
     """세션 시작 시 uvicorn 서버를 백그라운드 스레드로 실행 (이미 실행 중이면 스킵)"""
     port = int(os.getenv("TEST_PORT", "8008"))
     admin_pw = os.getenv("TEST_ADMIN_PASSWORD", "test1234")
-    base_url = f"http://localhost:{port}"
+    base_url = f"http://127.0.0.1:{port}"
 
     if _server_already_running(port):
         import warnings

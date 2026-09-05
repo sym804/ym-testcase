@@ -15,7 +15,7 @@ import requests
 import tempfile
 import os
 
-BASE = os.getenv("TEST_BASE_URL", "http://localhost:8008")
+BASE = os.getenv("TEST_BASE_URL", "http://127.0.0.1:8008")
 PASS_COUNT = 0
 FAIL_COUNT = 0
 TOTAL = 0

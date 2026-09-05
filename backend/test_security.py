@@ -8,7 +8,7 @@ import os
 import pytest
 import requests
 
-BASE = os.getenv("TEST_BASE_URL", "http://localhost:8008")
+BASE = os.getenv("TEST_BASE_URL", "http://127.0.0.1:8008")
 
 
 class TokenStore:

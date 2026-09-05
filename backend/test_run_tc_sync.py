@@ -10,7 +10,7 @@ import os
 import pytest
 import requests
 
-BASE = os.getenv("TEST_BASE_URL", "http://localhost:8008")
+BASE = os.getenv("TEST_BASE_URL", "http://127.0.0.1:8008")
 ADMIN_PW = os.getenv("TEST_ADMIN_PASSWORD", "test1234")
 
 # 이 테스트는 프로젝트와 TC를 실제로 만든다. 개발 서버(8008)는 사용자의 실 DB를 쓰므로
@@ -20,7 +20,7 @@ ADMIN_PW = os.getenv("TEST_ADMIN_PASSWORD", "test1234")
 if BASE.endswith(":8008") and os.getenv("ALLOW_DEV_DB") != "1":
     pytest.skip(
         "개발 서버(8008)의 실 DB 오염 방지를 위해 건너뜀. "
-        "격리 실행: TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 pytest test_run_tc_sync.py",
+        "격리 실행: TEST_PORT=8009 TEST_BASE_URL=http://127.0.0.1:8009 pytest test_run_tc_sync.py",
         allow_module_level=True,
     )
 

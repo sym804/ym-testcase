@@ -27,10 +27,12 @@ def get_project_history(
 ):
     """Get recent change history for all test cases in a project."""
     _check_project_member(project_id, current_user, db)
+    # ★IN() 에 Subquery 를 그대로 넘기면 SQLAlchemy 가 select() 로 강제 변환하며
+    #   경고를 낸다(SAWarning). 앞으로 그 자동 변환은 사라진다. 명시적으로 넘긴다.
     tc_ids = (
         db.query(TestCase.id)
         .filter(TestCase.project_id == project_id)
-        .subquery()
+        .scalar_subquery()
     )
     rows = (
         db.query(TestCaseHistory)
