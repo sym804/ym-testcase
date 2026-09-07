@@ -18,6 +18,8 @@ import { AG_GRID_LOCALE_KO } from "../agGridLocaleKo";
 import { AG_GRID_LOCALE_EN } from "../agGridLocaleEn";
 import toast from "react-hot-toast";
 import { translateError } from "../utils/errorMessage";
+import { LARGE_TEXT_EDITOR_PARAMS } from "../utils/gridEditors";
+import { planTcIdFill, dominantTcIdPrefix, findTcIdCollisions } from "../utils/tcId";
 import MarkdownCell from "./MarkdownCell";
 import PreconditionCell from "./PreconditionCell";
 import HighlightCell from "./HighlightCell";
@@ -238,9 +240,14 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       const flatAll: SheetNode[] = [];
       const collectFlat = (nodes: SheetNode[]) => { for (const n of nodes) { flatAll.push(n); collectFlat(n.children); } };
       collectFlat(s);
-      if (flatAll.length > 1 && !sheetInitialized.current) {
-        sheetInitialized.current = true;
-        setActiveSheet(s[0].name);
+      // 시트가 하나뿐인 프로젝트도 선택해 둔다. activeSheet 가 null 이면
+      // 행 추가가 대상 시트를 못 정한다.
+      if (flatAll.length > 0 && !sheetInitialized.current) {
+        const firstLeaf = flatAll.find((n) => !n.is_folder);
+        if (firstLeaf) {
+          sheetInitialized.current = true;
+          setActiveSheet(firstLeaf.name);
+        }
       }
     } catch {
       // 시트 API 실패 시 무시 (기존 호환)
@@ -383,21 +390,28 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           _key: "precondition", field: "precondition",
           headerName: fieldDisplay("precondition", "Precondition").name,
           width: 200, editable: canEditTC, wrapText: true, autoHeight: true,
-          cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: PreconditionCell,
+          cellEditor: "agLargeTextCellEditor", cellEditorParams: LARGE_TEXT_EDITOR_PARAMS, cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: PreconditionCell,
         },
         {
           _key: "test_steps", field: "test_steps",
           headerName: fieldDisplay("test_steps", "Test Steps").name,
           minWidth: 400, flex: 2, editable: canEditTC, wrapText: true, autoHeight: true,
-          cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
+          cellEditor: "agLargeTextCellEditor", cellEditorParams: LARGE_TEXT_EDITOR_PARAMS, cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
         },
         {
           _key: "expected_result", field: "expected_result",
           headerName: fieldDisplay("expected_result", "Expected Result").name,
           minWidth: 350, flex: 2, editable: canEditTC, wrapText: true, autoHeight: true,
-          cellEditor: "agLargeTextCellEditor", cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
+          cellEditor: "agLargeTextCellEditor", cellEditorParams: LARGE_TEXT_EDITOR_PARAMS, cellEditorPopup: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
         },
-        { _key: "remarks", field: "remarks", headerName: fieldDisplay("remarks", "Remarks").name, width: 120, editable: canEditTC, wrapText: true, autoHeight: true, cellClass: "ag-cell-left", cellRenderer: MarkdownCell },
+        {
+          _key: "remarks", field: "remarks",
+          headerName: fieldDisplay("remarks", "Remarks").name,
+          width: 120, editable: canEditTC, wrapText: true, autoHeight: true,
+          // 기본 편집기는 <input type="text"> 라 줄바꿈이 지워진다. 비고는 여러 줄로 쓴다.
+          cellEditor: "agLargeTextCellEditor", cellEditorParams: LARGE_TEXT_EDITOR_PARAMS, cellEditorPopup: true,
+          cellClass: "ag-cell-left", cellRenderer: MarkdownCell,
+        },
       ];
       // No는 항상 표시, 나머지는 visible 체크
       const filtered = builtIn.filter(col => col._key === "no" || fieldDisplay(col._key!, "").visible);
@@ -493,8 +507,12 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           delete (saveData as Record<string, unknown>)._originalNo;
         }
         await testCasesApi.update(projectId, data.id, saveData);
-      } catch {
-        toast.error(t("autoSaveFailed"));
+      } catch (err) {
+        // TC ID 중복 같은 409 는 이유를 그대로 보여 준다.
+        // "저장 실패"만 뜨면 무엇을 고쳐야 하는지 알 수 없다.
+        const detail = (err as { response?: { data?: { detail?: string } } })
+          ?.response?.data?.detail;
+        toast.error(detail ? translateError(detail) : t("autoSaveFailed"));
       }
       delete autoSaveTimerRef.current[key];
     }, 300);
@@ -554,42 +572,63 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     [pushUndo, autoSaveRow]
   );
 
-  const handleAddRow = async () => {
-    const nextNo = rowData.length > 0 ? Math.max(...rowData.map((r) => r.no || 0)) + 1 : 1;
-    const newRow: Partial<TestCase> = {
-      no: nextNo,
-      tc_id: `TC-${String(nextNo).padStart(3, "0")}`,
-      type: "",
-      category: "",
-      depth1: "",
-      depth2: "",
-      priority: t("priority.normal"),
-      test_type: "Web",
-      precondition: "",
-      test_steps: "",
-      expected_result: "",
-      remarks: "",
-      sheet_name: activeSheet || "기본",
-    };
+  const addRows = async (count: number) => {
+    if (!activeSheet) {
+      toast.error(t("addRowPickSheet"));
+      return;
+    }
+    // 번호와 TC ID 를 루프 밖에서 한 번에 계산한다. handleAddRow 를 await 루프로
+    // 돌리면 rowData 클로저가 갱신되지 않아 모든 행이 같은 값을 받는다.
+    const baseNo = rowData.reduce((m, r) => Math.max(m, r.no || 0), 0);
+    const seed = dominantTcIdPrefix(rowData.map((r) => r.tc_id));
+    const prefix = seed?.prefix ?? "TC-";
+    const numWidth = seed?.numWidth ?? 3;
+    const baseNum = seed?.maxNum ?? 0;
+
+    const created: TestCase[] = [];
     try {
-      const created = await testCasesApi.create(projectId, newRow as TestCase);
-      setRowData((prev) => [...prev, created]);
-      // 생성된 행으로 스크롤
-      setTimeout(() => {
-        const api = gridApiRef.current;
-        if (api) {
-          api.forEachNode((node) => {
-            if (node.data?.id === created.id) {
-              node.setSelected(true);
-              api.ensureNodeVisible(node, "bottom");
-            }
-          });
-        }
-      }, 100);
+      for (let i = 1; i <= count; i++) {
+        const newRow: Partial<TestCase> = {
+          no: baseNo + i,
+          tc_id: prefix + String(baseNum + i).padStart(numWidth, "0"),
+          type: "",
+          category: "",
+          depth1: "",
+          depth2: "",
+          priority: t("priority.normal"),
+          test_type: "Web",
+          precondition: "",
+          test_steps: "",
+          expected_result: "",
+          remarks: "",
+          sheet_name: activeSheet,
+        };
+        created.push(await testCasesApi.create(projectId, newRow as TestCase));
+      }
     } catch {
       toast.error(t("addRowFailed"));
     }
+
+    if (created.length === 0) return;
+    setRowData((prev) => [...prev, ...created]);
+
+    // 마지막으로 만든 행으로 스크롤
+    const lastId = created[created.length - 1].id;
+    setTimeout(() => {
+      const api = gridApiRef.current;
+      if (!api) return;
+      api.forEachNode((node) => {
+        if (node.data?.id === lastId) {
+          node.setSelected(true);
+          api.ensureNodeVisible(node, "bottom");
+        }
+      });
+    }, 100);
+
+    return created.length;
   };
+
+  const handleAddRow = () => addRows(1);
 
   const handleAutoFillTcId = () => {
     const api = gridApiRef.current;
@@ -600,64 +639,76 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       return;
     }
 
-    // Get all rows in display order
-    const allRows: TestCase[] = [];
+    // 채우는 순서는 화면 기준(필터·정렬 반영), 판단 근거는 전체 행 기준으로 나눈다.
+    // 둘을 섞으면 필터로 숨은 행과 ID 가 겹쳐도 알아채지 못한다.
+    const visibleRows: TestCase[] = [];
     api.forEachNodeAfterFilterAndSort((node) => {
-      if (node.data) allRows.push(node.data);
+      if (node.data) visibleRows.push(node.data);
+    });
+    const everyRow: TestCase[] = [];
+    api.forEachNode((node) => {
+      if (node.data) everyRow.push(node.data);
     });
 
-    const selectedSet = new Set(selected.map((r) => r.id || r.no));
+    const rowKey = (r: TestCase) => (r.id ? `id:${r.id}` : `no:${r.no}`);
+    const selectedSet = new Set(selected.map(rowKey));
+    const selectedIndices = visibleRows
+      .map((r, i) => (selectedSet.has(rowKey(r)) ? i : -1))
+      .filter((i) => i >= 0);
 
-    // Find selected rows' indices
-    const selectedIndices = allRows
-      .map((r, i) => (selectedSet.has(r.id || r.no) ? i : -1))
-      .filter((i) => i >= 0)
-      .sort((a, b) => a - b);
-
-    if (selectedIndices.length === 0) return;
-
-    // Collect all existing TC IDs to find max number per prefix
-    const prefixMax = new Map<string, number>();
-    for (const row of allRows) {
-      if (!row.tc_id) continue;
-      const match = row.tc_id.match(/^(.+-)(\d+)$/);
-      if (match) {
-        const prefix = match[1];
-        const num = parseInt(match[2], 10);
-        prefixMax.set(prefix, Math.max(prefixMax.get(prefix) || 0, num));
-      }
+    if (selectedIndices.length === 0) {
+      toast.error(t("tcIdAllHidden"));
+      return;
     }
 
-    // For each selected row: if it has a tc_id with pattern "PREFIX-NNN",
-    // use that as starting point. Then fill subsequent selected rows.
-    let currentPrefix = "";
-    let currentNum = 0;
-    let numWidth = 3;
-    const changedRows: TestCase[] = [];
+    const plan = planTcIdFill(
+      visibleRows.map((r) => r.tc_id),
+      selectedIndices,
+      everyRow.map((r) => r.tc_id)
+    );
+    if (plan === null) {
+      toast.error(t("tcIdNoSeed"));
+      return;
+    }
+    if (plan.length === 0) {
+      toast(t("tcIdAlreadyFilled"));
+      return;
+    }
 
-    for (const idx of selectedIndices) {
-      const row = allRows[idx];
-      if (row.tc_id) {
-        const match = row.tc_id.match(/^(.+-)(\d+)$/);
-        if (match) {
-          currentPrefix = match[1];
-          currentNum = parseInt(match[2], 10);
-          numWidth = match[2].length;
-          prefixMax.set(currentPrefix, Math.max(prefixMax.get(currentPrefix) || 0, currentNum));
-          continue;
-        }
-      }
-      if (!currentPrefix) continue;
-      currentNum++;
-      prefixMax.set(currentPrefix, currentNum);
-      row.tc_id = currentPrefix + String(currentNum).padStart(numWidth, "0");
+    const undoGroup: UndoGroup = [];
+    const changedRows: TestCase[] = [];
+    for (const { index, tcId } of plan) {
+      const row = visibleRows[index];
+      undoGroup.push({
+        rowId: row.id ? String(row.id) : `new_${row.no}`,
+        field: "tc_id",
+        oldValue: row.tc_id,
+        newValue: tcId,
+        dataId: row.id || 0,
+      });
+      row.tc_id = tcId;
       changedRows.push(row);
     }
 
-    api.applyTransaction({ update: allRows.filter((_, i) => selectedIndices.includes(i)) });
+    pushUndo(undoGroup);
+    api.applyTransaction({ update: selectedIndices.map((i) => visibleRows[i]) });
     api.refreshCells({ force: true });
     changedRows.forEach((r) => autoSaveRow(r));
-    toast.success(t("tcIdAutoFillDone"));
+
+    // 숨은 행까지 넣어야 충돌 판정이 의미를 갖는다
+    const collisions = findTcIdCollisions(
+      changedRows.map((r) => ({ key: rowKey(r), tcId: r.tc_id as string })),
+      everyRow.map((r) => ({ key: rowKey(r), tcId: r.tc_id }))
+    );
+    if (collisions.length > 0) {
+      toast(t("tcIdDuplicateWarn", { count: collisions.length }), { icon: "⚠️" });
+    }
+
+    // 필터로 숨은 선택 행은 순서를 정할 자리가 없어 건너뛴다. 조용히 빠지면 안 된다.
+    const skipped = selected.length - selectedIndices.length;
+    if (skipped > 0) toast(t("tcIdHiddenSkipped", { count: skipped }), { icon: "⚠️" });
+
+    toast.success(t("tcIdAutoFillCount", { count: changedRows.length }));
   };
 
   const handleDeleteSelected = async () => {
@@ -770,6 +821,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           ? t("importCreatedUpdated", { created, updated })
           : t("importCreated", { count: imported });
         toast.success(msg);
+        // 프로젝트 안에 이미 있던 TC ID 는 빈 번호로 바꿔 넣는다. 조용히 넘기지 않는다.
+        const renamed = result.renamed ?? 0;
+        if (renamed > 0) toast(t("importRenamed", { count: renamed }), { icon: "⚠️" });
         setActiveSheet(sheet.name);
         // 시트 목록 + 데이터 갱신 (빈 프로젝트에서 import 시 화면 전환 보장)
         const newSheets = await testCasesApi.listSheets(projectId);
@@ -804,6 +858,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         return `${s.sheet}: ${t("importCreated", { count: s.created })}`;
       }).join(", ");
       toast.success(details);
+      const renamedTotal = result.renamed ?? 0;
+      if (renamedTotal > 0) toast(t("importRenamed", { count: renamedTotal }), { icon: "⚠️" });
       const firstImported = result.sheets.find((s: { created: number; updated: number }) => s.created + s.updated > 0);
       if (firstImported) setActiveSheet((firstImported as { sheet: string }).sheet);
       loadSheets();
@@ -1051,17 +1107,20 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         <div style={styles.toolbarLeft}>
           {canEditTC && (
             <>
-              <button style={styles.btnPrimary} onClick={handleAddRow}>
+              <button style={styles.btnPrimary} onClick={handleAddRow}
+                disabled={!activeSheet} title={!activeSheet ? t("addRowPickSheet") : undefined}>
                 {t("addRow")}
               </button>
               <select
                 style={styles.btnGhost}
+                disabled={!activeSheet}
+                title={!activeSheet ? t("addRowPickSheet") : undefined}
                 defaultValue="5"
                 onChange={async (e) => {
                   const count = parseInt(e.target.value);
                   if (!count) return;
-                  for (let i = 0; i < count; i++) await handleAddRow();
-                  toast.success(t("rowsAdded", { count }));
+                  const added = await addRows(count);
+                  if (added) toast.success(t("rowsAdded", { count: added }));
                 }}
               >
                 <option value="1">{t("rowCount", { count: 1 })}</option>

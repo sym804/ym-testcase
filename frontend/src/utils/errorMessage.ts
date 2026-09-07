@@ -30,6 +30,8 @@ const ERROR_MAP: Record<string, string> = {
   "필드 이름을 입력해 주세요.": "errors.fieldNameRequired",
   "이미 존재하는 필드 이름입니다.": "errors.fieldNameExists",
   "필드를 찾을 수 없습니다.": "errors.fieldNotFound",
+  // Test cases
+  "이미 쓰이는 TC ID입니다. 다른 값으로 바꿔 주세요.": "errors.tcIdTaken",
   // Filters
   "필터 이름을 입력해 주세요.": "errors.filterNameRequired",
   "logic은 AND 또는 OR이어야 합니다.": "errors.invalidFilterLogic",

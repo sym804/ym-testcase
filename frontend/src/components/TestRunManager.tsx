@@ -24,6 +24,7 @@ import HighlightCell from "./HighlightCell";
 import { useTestTimer } from "../hooks/useTestTimer";
 import { useAttachments } from "../hooks/useAttachments";
 import { useResultFilters } from "../hooks/useResultFilters";
+import { LARGE_TEXT_EDITOR_PARAMS } from "../utils/gridEditors";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -544,6 +545,7 @@ export default function TestRunManager({ projectId, project }: Props) {
         autoHeight: true,
         editable: true,
         cellEditor: "agLargeTextCellEditor",
+        cellEditorParams: LARGE_TEXT_EDITOR_PARAMS,
         cellEditorPopup: true,
         cellClass: "ag-cell-left",
         cellRenderer: MarkdownCell,
