@@ -1,5 +1,8 @@
 """pytest 전역 설정 - 테스트 세션 동안 uvicorn 서버를 자동으로 시작/종료"""
+import atexit
 import os
+import shutil
+import tempfile
 import threading
 import time
 
@@ -38,6 +41,44 @@ def _server_already_running(port: int) -> bool:
         return False
 
 
+# ★DATABASE_URL 은 conftest 를 임포트하는 시점에 정한다. 픽스처 안은 늦다.
+#   `database.py` 는 임포트 시점에 engine 을 만드는데, 테스트 모듈이 모듈 수준에서
+#   `models` 를 임포트하면(tests_unit/test_tc_id_dedup.py) 수집 단계에서 이미
+#   engine 이 기본값인 개발용 tc_manager.db 에 묶인다. 그러면 lifespan(실행 시점에
+#   os.getenv 를 읽는다)은 임시 DB 로 마이그레이션하고 앱 세션은 개발 DB 를 본다
+#   (2026-09-07 실측: CI 223 errors, 로컬 184 errors).
+#   conftest 는 어떤 테스트 모듈보다 먼저 임포트되므로 여기가 유일하게 안전한 자리다.
+DEV_DB_SUFFIX = "/tc_manager.db"
+TEST_PORT = int(os.getenv("TEST_PORT", "8008"))
+
+#: 개발 서버가 이미 떠 있으면 HTTP 는 그 서버의 DB 로 간다. 그때 in-process engine 만
+#: 임시 DB 로 돌리면 한 테스트가 두 DB 를 보게 되므로 손대지 않는다.
+USING_RUNNING_DEV_SERVER = _server_already_running(TEST_PORT)
+
+
+def _needs_temp_db(url) -> bool:
+    if not url:
+        return True
+    #: 셸에 개발 DB 가 박혀 있으면 그대로 쓰지 않는다. 되돌릴 수 없는 쓰기가 들어간다.
+    #: 일부러 쓰려면 test_run_tc_sync.py 와 같은 이름의 opt-in 을 준다.
+    return url.endswith(DEV_DB_SUFFIX) and os.getenv("ALLOW_DEV_DB") != "1"
+
+
+def _isolate_database_url():
+    if USING_RUNNING_DEV_SERVER or not _needs_temp_db(os.getenv("DATABASE_URL")):
+        return None
+    tmp_dir = tempfile.mkdtemp(prefix="ymtc-test-db-")
+    path = os.path.join(tmp_dir, "ymtc_test.db").replace("\\", "/")
+    os.environ["DATABASE_URL"] = f"sqlite:///{path}"
+    #: ignore_errors 를 켠다. Windows 에서 SQLite 핸들이 아직 열려 있으면 삭제가
+    #: 실패하는데, 임시 폴더가 남는 것은 테스트 결과를 바꾸지 않는다.
+    atexit.register(shutil.rmtree, tmp_dir, True)
+    return tmp_dir
+
+
+TEST_DB_DIR = _isolate_database_url()
+
+
 def _wait_for_server(url: str, timeout: float = 15):
     """서버가 응답할 때까지 대기"""
     deadline = time.time() + timeout
@@ -65,7 +106,7 @@ def _seed_admin(base_url: str, password: str):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _server(tmp_path_factory):
+def _server():
     """세션 시작 시 uvicorn 서버를 백그라운드 스레드로 실행 (이미 실행 중이면 스킵)"""
     port = int(os.getenv("TEST_PORT", "8008"))
     admin_pw = os.getenv("TEST_ADMIN_PASSWORD", "test1234")
@@ -81,11 +122,8 @@ def _server(tmp_path_factory):
         yield
         return
 
-    # 임시 DB 사용 - 테스트 간 격리
-    tmp_dir = tmp_path_factory.mktemp("test_db")
-    test_db = str(tmp_dir / "test_tc_manager.db").replace("\\", "/")
-    os.environ["DATABASE_URL"] = f"sqlite:///{test_db}"
-
+    # 임시 DB 는 이 파일 맨 위에서 이미 DATABASE_URL 에 박아 두었다.
+    # 여기서 다시 바꾸면 수집 단계에 만들어진 engine 과 갈라진다.
     from main import app
 
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
