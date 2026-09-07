@@ -8,7 +8,7 @@ def now_kst():
     return datetime.now(KST).replace(tzinfo=None)
 
 from sqlalchemy import (
-    Boolean, Column, Integer, String, Text, DateTime, Float, ForeignKey, Enum as SAEnum, JSON, Index
+    Boolean, Column, Integer, String, Text, DateTime, Float, ForeignKey, Enum as SAEnum, JSON, Index, text
 )
 from sqlalchemy.orm import relationship
 
@@ -149,6 +149,15 @@ class TestCase(Base):
     __table_args__ = (
         Index("ix_test_cases_project_id_deleted", "project_id", "deleted_at"),
         Index("ix_test_cases_sheet_name", "project_id", "sheet_name"),
+        # TC ID 는 프로젝트 안에서 유일하다. 사전조건 참조 색인이 프로젝트 전체
+        # TC 로 만들어져서, 중복이면 참조가 어느 쪽을 가리키는지 정해지지 않는다.
+        # 소프트 삭제된 행은 제외해야 지운 번호를 다시 쓸 수 있다.
+        Index(
+            "uq_test_cases_project_tc_id", "project_id", "tc_id",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
 
