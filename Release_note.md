@@ -37,11 +37,57 @@ YM TestCase는 3개 컴포넌트로 구성되며, 각각 독립적으로 버전�
 ## 현재 버전
 
 ```
-YM TestCase System  v1.3.0.0  (2026-09-04)
-├── Frontend       v1.3.0.0
-├── Backend        v1.3.0.0
-└── Database       v0.7.0.0
+YM TestCase System  v1.3.2.0  (2026-09-07)
+├── Frontend       v1.3.1.0
+├── Backend        v1.3.2.0
+└── Database       v0.7.2.0
 ```
+
+---
+
+## v1.3.2.0 (2026-09-07) - [fix] TC ID 유일성, 그리드 편집기 제한 해제, 마이그레이션 체인 복구
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.3.1.0 | **1.3.2.0** | fix +1 |
+| Frontend | 1.3.0.0 | **1.3.1.0** | fix +1 |
+| Backend | 1.3.1.0 | **1.3.2.0** | fix +1 |
+| Database | 0.7.1.0 | **0.7.2.0** | fix +1 |
+
+### 이슈
+
+- SYM-23 TC ID 가 프로젝트 안에서 중복돼 사전조건 참조가 엉뚱한 TC 를 가리킨다 (bug/critical/db)
+- SYM-24 Expected Result 가 경고 없이 200자에서 잘린다 (bug/major/frontend)
+- SYM-25 Remarks 를 편집하면 줄바꿈이 사라진 채 저장된다 (bug/major/frontend)
+- SYM-26 TC ID 자동채우기가 한 행도 채우지 않는데 완료 토스트가 뜬다 (bug/major/frontend)
+- SYM-27 행을 여러 개 추가하면 전부 같은 순번과 TC ID 를 받는다 (bug/major/frontend)
+- SYM-28 시트가 하나인 프로젝트에서 행을 추가하면 `기본` 시트가 조용히 생긴다 (bug/minor/frontend)
+- SYM-29 자동 저장이 실패해도 이유를 알려주지 않는다 (bug/minor/frontend)
+- SYM-30 그리드 헤더의 필터 버튼이 배경과 대비가 없어 보이지 않는다 (bug/minor/frontend)
+- SYM-31 alembic head 가 둘로 갈라져 앱이 기동하지 못한다 (bug/blocker/db)
+- SYM-32 로컬 자격증명 파일과 QA 스크래치 스크립트가 gitignore 에 없다 (bug/minor/security)
+- SYM-33 package-lock 버전이 package.json 과 어긋난다 (bug/trivial/etc)
+
+### 변경
+
+- 마이그레이션 `b7d3c9a1e450`: `(project_id, tc_id)` 부분 유니크 인덱스(체인 맨 뒤). 임포트·복제·복원 세 경로 수정, 중복 시도는 409
+- 대용량 텍스트 편집기 `maxLength` 명시, Remarks 에 동일 편집기 적용
+- TC ID 순번 계산을 `utils/tcId.ts` 로 분리, 대량 추가는 `addRows(count)` 로 통합
+- 시트 자동 선택 조건 수정, `전체` 보기에서 행 추가 차단
+- 헤더 필터 버튼 대비 개선 (1.1:1 -> 13.35:1)
+- `.gitignore` 에 로컬 자격증명과 `frontend/_*.mjs` 추가
+
+### 영향
+
+- 기존 DB 의 중복 TC ID 는 첫 기동 시 정리. 먼저 만든 행이 원래 ID 를 지키고 나머지에 `-2`, `-3`
+- Expected Result 와 Remarks 의 입력 제한 해제. 이미 잘려 저장된 값은 복구 불가
+- 같은 TC ID 저장 시도는 409
+
+### 조치
+
+- 배포 전 DB 백업. 첫 기동 로그에서 TC ID 재부여 WARNING 확인
 
 ---
 
