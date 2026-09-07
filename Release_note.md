@@ -37,11 +37,38 @@ YM TestCase는 3개 컴포넌트로 구성되며, 각각 독립적으로 버전�
 ## 현재 버전
 
 ```
-YM TestCase System  v1.3.2.0  (2026-09-07)
+YM TestCase System  v1.3.2.1  (2026-09-07)
 ├── Frontend       v1.3.1.0
-├── Backend        v1.3.2.0
+├── Backend        v1.3.2.1
 └── Database       v0.7.2.0
 ```
+
+---
+
+## v1.3.2.1 (2026-09-07) - [fix] 테스트가 개발용 DB 에 붙던 문제
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.3.2.0 | **1.3.2.1** | patch +1 |
+| Backend | 1.3.2.0 | **1.3.2.1** | patch +1 |
+
+### 이슈
+
+- SYM-34 pytest 수집 단계에서 engine 이 개발용 DB 에 묶여 CI 백엔드 잡이 전부 실패한다 (bug/critical/db)
+
+### 변경
+
+- `conftest.py` 임포트 시점에 임시 DB 를 `DATABASE_URL` 에 박는다. 픽스처는 수집 이후라 늦다
+- 셸에 개발 DB 가 박혀 있어도 임시 DB 로 돌린다. 일부러 쓰려면 `ALLOW_DEV_DB=1`
+- 서버가 이미 떠 있으면 건드리지 않는다. HTTP 와 in-process engine 이 갈라지는 것을 막는다
+- `test_db_isolation.py` 5건 추가. 서브프로세스로 임포트 순서를 재현해 수집 순서에 기대지 않는다
+
+### 영향
+
+- 제품 런타임 동작은 바뀌지 않는다. 테스트와 CI 만 바뀐다
+- 백엔드 스위트 249 passed / 1 skipped (수정 전 223 errors)
 
 ---
 
