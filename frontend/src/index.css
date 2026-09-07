@@ -322,6 +322,42 @@ select:focus {
   background-color: #334155 !important;
 }
 
+/* 헤더 아이콘(필터 버튼·메뉴·정렬 표시)은 --ag-foreground-color(#1A1D23)를 따라가서
+   어두운 헤더 배경(#1E293B) 위에서 거의 안 보였다. 헤더 전경색으로 맞춘다.
+   아이콘은 mask-image + background-color 로 그려지므로 ::before 도 같이 지정한다. */
+.ag-header-cell .ag-header-icon,
+.ag-header-cell .ag-header-icon .ag-icon,
+.ag-header-cell .ag-sort-indicator-icon .ag-icon {
+  color: var(--ag-header-foreground-color) !important;
+  opacity: 0.7;
+  transition: opacity 0.12s ease;
+}
+
+.ag-header-cell .ag-header-icon::before,
+.ag-header-cell .ag-header-icon .ag-icon::before,
+.ag-header-cell .ag-sort-indicator-icon .ag-icon::before {
+  background-color: var(--ag-header-foreground-color) !important;
+  color: var(--ag-header-foreground-color) !important;
+}
+
+.ag-header-cell .ag-header-icon:hover,
+.ag-header-cell .ag-header-icon:hover .ag-icon,
+.ag-header-cell:hover .ag-header-icon,
+.ag-header-cell:hover .ag-header-icon .ag-icon {
+  opacity: 1;
+}
+
+/* 필터가 걸린 열은 아이콘을 강조해 어떤 열에 필터가 있는지 바로 보이게 한다 */
+.ag-header-cell.ag-header-cell-filtered .ag-header-icon,
+.ag-header-cell.ag-header-cell-filtered .ag-header-icon .ag-icon {
+  opacity: 1;
+}
+
+.ag-header-cell.ag-header-cell-filtered .ag-header-icon::before,
+.ag-header-cell.ag-header-cell-filtered .ag-header-icon .ag-icon::before {
+  background-color: var(--primary-light, #93C5FD) !important;
+}
+
 .ag-cell {
   line-height: 1.5;
   display: flex;
