@@ -494,11 +494,48 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   // ── 자동 저장 (디바운스) ──
   const autoSaveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  // 저장이 거부되면 되돌리려고, 행마다 서버가 확정한 마지막 상태를 들고 있는다.
+  // 거부된 값을 화면에 남기면 자동저장이 행 전체를 보내므로 같은 행의 다음 편집도
+  // 계속 같은 이유로 실패한다. 사용자는 토스트를 놓치면 저장된 줄 안다.
+  //
+  // 편집 지점마다 기록하지 않고 여기 한 곳에 두는 이유가 있다. 이 파일에서
+  // autoSaveRow 를 부르는 경로는 여섯이고(셀 편집, 찾기/바꾸기, 일괄 변경,
+  // TC ID 자동채우기, Ctrl+D 채우기, undo/redo) 그중 다섯은 node.data 를 직접
+  // 대입해 onCellValueChanged 를 타지 않는다. 편집 쪽에 기록을 붙이면 그 다섯이
+  // 빠진다(2026-09-07 실측: 모두 바꾸기가 409 로 거부돼도 값이 화면에 남았다).
+  const lastSavedRef = useRef<Record<string, TestCase>>({});
+
+  // 서버에서 온 행으로 스냅샷을 새로 잡는다. rowData 는 셀 편집으로는 바뀌지
+  // 않고(그 경로는 node.data 를 직접 고친다) 로드·추가·복제·삭제에서만 바뀌므로,
+  // 여기서 통째로 다시 잡아도 편집 중인 값을 스냅샷으로 굳히지 않는다.
+  // 사라진 행의 스냅샷은 같이 버려져 시트나 프로젝트를 옮겨도 남지 않는다.
+  useEffect(() => {
+    const next: Record<string, TestCase> = {};
+    for (const row of rowData) {
+      if (row.id) next[String(row.id)] = { ...row };
+    }
+    lastSavedRef.current = next;
+  }, [rowData]);
+
+  const restoreRow = useCallback((rowKey: string) => {
+    const saved = lastSavedRef.current[rowKey];
+    const gridApi = gridApiRef.current;
+    if (!saved || !gridApi) return;
+    const node = gridApi.getRowNode(rowKey);
+    if (!node?.data) return;
+    // 같은 객체를 그대로 채운다. rowData 배열이 이 객체를 참조하므로
+    // 새 객체로 갈아끼우면 state 와 그리드가 갈라진다.
+    Object.assign(node.data, saved);
+    gridApi.refreshCells({ rowNodes: [node], force: true });
+  }, []);
+
   const autoSaveRow = useCallback(async (data: TestCase) => {
     if (!data.id || data.id === 0) return; // 미저장 행은 무시
     const key = String(data.id);
     if (autoSaveTimerRef.current[key]) clearTimeout(autoSaveTimerRef.current[key]);
     autoSaveTimerRef.current[key] = setTimeout(async () => {
+      // 보낸 시점의 상태. 성공하면 이것이 서버가 확정한 상태가 된다.
+      const sent = { ...data } as TestCase;
       try {
         // 전체 보기에서 화면용 연속 번호가 DB에 저장되지 않도록 원본 no 복원
         const saveData = { ...data };
@@ -507,16 +544,19 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           delete (saveData as Record<string, unknown>)._originalNo;
         }
         await testCasesApi.update(projectId, data.id, saveData);
+        lastSavedRef.current[key] = sent;
       } catch (err) {
         // TC ID 중복 같은 409 는 이유를 그대로 보여 준다.
         // "저장 실패"만 뜨면 무엇을 고쳐야 하는지 알 수 없다.
         const detail = (err as { response?: { data?: { detail?: string } } })
           ?.response?.data?.detail;
         toast.error(detail ? translateError(detail) : t("autoSaveFailed"));
+        // 저장되지 않은 값을 화면에 남기지 않는다
+        restoreRow(key);
       }
       delete autoSaveTimerRef.current[key];
     }, 300);
-  }, [projectId]);
+  }, [projectId, restoreRow]);
   autoSaveRowRef.current = autoSaveRow;
 
   const handleRowDragEnd = useCallback(async () => {
