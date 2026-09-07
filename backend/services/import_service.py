@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from openpyxl import load_workbook
 
 from models import TestCase
+from services.tc_id_service import allocate_tc_id, taken_tc_ids
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +204,7 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
 
     created_count = 0
     updated_count = 0
+    renamed_count = 0
     empty_streak = 0
 
     # 기존 TC 맵 (같은 프로젝트+시트+tc_id → TC 객체)
@@ -212,6 +214,9 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
         .all()
     )
     existing_map = {tc.tc_id: tc for tc in existing_tcs}
+    # existing_map 은 시트 단위지만 TC ID 유일성은 프로젝트 단위다.
+    # 새로 만드는 행은 프로젝트 전체에서 빈 번호를 찾아 붙인다.
+    taken = taken_tc_ids(project_id, db)
 
     for row_idx in range(header_row + 1, ws.max_row + 1):
         row_data: dict = {}
@@ -287,17 +292,21 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
                     setattr(existing, key, val)
             updated_count += 1
         else:
+            new_id = allocate_tc_id(tc_id_val, taken)
+            if new_id != tc_id_val:
+                renamed_count += 1
+            taken.add(new_id)
             tc = TestCase(
                 project_id=project_id,
                 created_by=user_id,
-                tc_id=tc_id_val,
+                tc_id=new_id,
                 sheet_name=sheet_name,
                 **fields,
             )
             db.add(tc)
             created_count += 1
 
-    return {"created": created_count, "updated": updated_count}
+    return {"created": created_count, "updated": updated_count, "renamed": renamed_count}
 
 
 # ── Jira/Xray/Zephyr CSV 헤더 매핑 ───────────────────────────────────────────
@@ -383,9 +392,13 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
         .all()
     )
     existing_map = {tc.tc_id: tc for tc in existing_tcs}
+    # existing_map 은 시트 단위지만 TC ID 유일성은 프로젝트 단위다.
+    # 새로 만드는 행은 프로젝트 전체에서 빈 번호를 찾아 붙인다.
+    taken = taken_tc_ids(project_id, db)
 
     created_count = 0
     updated_count = 0
+    renamed_count = 0
 
     for row_num, row in enumerate(reader, start=1):
         row_data = {}
@@ -437,17 +450,21 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
                     setattr(existing, key, val)
             updated_count += 1
         else:
+            new_id = allocate_tc_id(tc_id_val, taken)
+            if new_id != tc_id_val:
+                renamed_count += 1
+            taken.add(new_id)
             tc = TestCase(
                 project_id=project_id,
                 created_by=user_id,
-                tc_id=tc_id_val,
+                tc_id=new_id,
                 sheet_name=sheet_name,
                 **fields,
             )
             db.add(tc)
             created_count += 1
 
-    return {"created": created_count, "updated": updated_count}
+    return {"created": created_count, "updated": updated_count, "renamed": renamed_count}
 
 
 MAX_IMPORT_SIZE = 10 * 1024 * 1024  # 10MB
@@ -625,9 +642,13 @@ def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, she
         .all()
     )
     existing_map = {tc.tc_id: tc for tc in existing_tcs}
+    # existing_map 은 시트 단위지만 TC ID 유일성은 프로젝트 단위다.
+    # 새로 만드는 행은 프로젝트 전체에서 빈 번호를 찾아 붙인다.
+    taken = taken_tc_ids(project_id, db)
 
     created_count = 0
     updated_count = 0
+    renamed_count = 0
 
     for row_num, cells in enumerate(table["rows"], start=1):
         row_data = {}
@@ -680,17 +701,21 @@ def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, she
                     setattr(existing, key, val)
             updated_count += 1
         else:
+            new_id = allocate_tc_id(tc_id_val, taken)
+            if new_id != tc_id_val:
+                renamed_count += 1
+            taken.add(new_id)
             tc = TestCase(
                 project_id=project_id,
                 created_by=user_id,
-                tc_id=tc_id_val,
+                tc_id=new_id,
                 sheet_name=sheet_name,
                 **fields,
             )
             db.add(tc)
             created_count += 1
 
-    return {"created": created_count, "updated": updated_count}
+    return {"created": created_count, "updated": updated_count, "renamed": renamed_count}
 
 
 def _preview_csv(file_content: bytes, project_id: int, db: Session) -> list:

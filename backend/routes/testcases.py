@@ -13,6 +13,7 @@ from schemas import (
 )
 from auth import get_current_user, role_required, check_project_access
 from routes.sheets import _validate_sheet_name
+from services.tc_id_service import allocate_tc_id, taken_tc_ids
 from services.import_service import (
     HEADER_MAP, SKIP_SHEETS, _resolve_merged, _detect_header_row, _count_tc_rows,
     _parse_sheet, _parse_csv, _load_workbook_from_upload, _is_csv_file,
@@ -294,7 +295,13 @@ def restore_testcase(
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found or not deleted")
 
+    # 지운 뒤에 같은 TC ID 가 새로 생겼을 수 있다. 그러면 빈 번호로 되살린다.
+    # deleted_at 을 풀기 전에 조회한다. 풀고 나서 조회하면 autoflush 가
+    # 이 행까지 살아 있는 것으로 반영해 자기 자신과 충돌한다고 판정한다.
+    taken = taken_tc_ids(project_id, db)
     tc.deleted_at = None
+    if tc.tc_id in taken:
+        tc.tc_id = allocate_tc_id(tc.tc_id, taken)
     db.commit()
     sync_project_in_progress_runs(project_id, db)
     db.refresh(tc)
@@ -341,13 +348,18 @@ def bulk_clone_testcases(
         TestCase.deleted_at.is_(None),
     ).scalar() or 0
 
+    # "-copy" 를 그대로 쓰면 같은 TC 를 두 번 복제할 때 ID 가 겹친다.
+    taken = taken_tc_ids(project_id, db)
+
     cloned = []
     for i, orig in enumerate(originals):
         data = {f: getattr(orig, f) for f in _CLONE_FIELDS}
+        new_id = allocate_tc_id(f"{orig.tc_id}-copy", taken)
+        taken.add(new_id)
         new_tc = TestCase(
             project_id=project_id,
             no=max_no + 1 + i,
-            tc_id=f"{orig.tc_id}-copy",
+            tc_id=new_id,
             created_by=current_user.id,
             **data,
         )
@@ -384,10 +396,11 @@ def clone_testcase(
     ).scalar() or 0
 
     data = {f: getattr(original, f) for f in _CLONE_FIELDS}
+    new_id = allocate_tc_id(f"{original.tc_id}-copy", taken_tc_ids(project_id, db))
     new_tc = TestCase(
         project_id=project_id,
         no=max_no + 1,
-        tc_id=f"{original.tc_id}-copy",
+        tc_id=new_id,
         created_by=current_user.id,
         **data,
     )
@@ -471,7 +484,7 @@ def import_testcases(
         r = _parse_csv(content, project_id, current_user.id, db, sheet_name=sheet_name)
         db.commit()
         sync_project_in_progress_runs(project_id, db)
-        return {"created": r["created"], "updated": r["updated"], "imported": r["created"] + r["updated"], "sheets": [{"sheet": sheet_name, "created": r["created"], "updated": r["updated"]}]}
+        return {"created": r["created"], "updated": r["updated"], "renamed": r.get("renamed", 0), "imported": r["created"] + r["updated"], "sheets": [{"sheet": sheet_name, "created": r["created"], "updated": r["updated"], "renamed": r.get("renamed", 0)}]}
 
     # Markdown 파일 처리
     if _is_md_file(file.filename):
@@ -480,7 +493,7 @@ def import_testcases(
             raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_IMPORT_SIZE // (1024*1024)}MB")
         tables = _parse_md_tables(content)
         if not tables:
-            return {"created": 0, "updated": 0, "imported": 0, "sheets": []}
+            return {"created": 0, "updated": 0, "renamed": 0, "imported": 0, "sheets": []}
 
         if sheet_names:
             target_names = [s.strip() for s in sheet_names.split(",") if s.strip()]
@@ -490,6 +503,7 @@ def import_testcases(
         from models import TestCaseSheet
         total_created = 0
         total_updated = 0
+        total_renamed = 0
         results = []
         for table in tables:
             if table["name"] not in target_names:
@@ -505,13 +519,14 @@ def import_testcases(
                 db.add(TestCaseSheet(project_id=project_id, name=table["name"], sort_order=(max_order[0] + 1) if max_order else 0))
                 db.flush()
             r = _parse_md_table(table, project_id, current_user.id, db, sheet_name=table["name"])
-            results.append({"sheet": table["name"], "created": r["created"], "updated": r["updated"]})
+            results.append({"sheet": table["name"], "created": r["created"], "updated": r["updated"], "renamed": r.get("renamed", 0)})
             total_created += r["created"]
             total_updated += r["updated"]
+            total_renamed += r.get("renamed", 0)
 
         db.commit()
         sync_project_in_progress_runs(project_id, db)
-        return {"created": total_created, "updated": total_updated, "imported": total_created + total_updated, "sheets": results}
+        return {"created": total_created, "updated": total_updated, "renamed": total_renamed, "imported": total_created + total_updated, "sheets": results}
 
     wb = _load_workbook_from_upload(file)
 
@@ -533,6 +548,7 @@ def import_testcases(
 
     total_created = 0
     total_updated = 0
+    total_renamed = 0
     results = []
     for name in target_names:
         if name not in wb.sheetnames:
@@ -551,13 +567,14 @@ def import_testcases(
             db.flush()
 
         r = _parse_sheet(ws, project_id, current_user.id, db, no_offset=0, sheet_name=name)
-        results.append({"sheet": name, "created": r["created"], "updated": r["updated"]})
+        results.append({"sheet": name, "created": r["created"], "updated": r["updated"], "renamed": r.get("renamed", 0)})
         total_created += r["created"]
         total_updated += r["updated"]
+        total_renamed += r.get("renamed", 0)
 
     db.commit()
     sync_project_in_progress_runs(project_id, db)
-    return {"created": total_created, "updated": total_updated, "imported": total_created + total_updated, "sheets": results}
+    return {"created": total_created, "updated": total_updated, "renamed": total_renamed, "imported": total_created + total_updated, "sheets": results}
 
 
 # ── Export ───────────────────────────────────────────────────────────────────

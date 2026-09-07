@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import IntegrityError
 
 from routes import auth as auth_routes
 from routes import projects as project_routes
@@ -98,6 +99,24 @@ async def add_security_headers(request: Request, call_next):
 
 
 # ── Global exception handler ─────────────────────────────────────────────────
+# TC ID 중복은 사용자가 그리드에서 흔히 만드는 상황이다. 500 으로 떨어지면
+# 자동 저장이 "저장 실패"만 띄워 이유를 알 수 없으므로 409 로 갈라 준다.
+_TC_ID_INDEX = "uq_test_cases_project_tc_id"
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError):
+    detail = str(getattr(exc, "orig", exc))
+    if _TC_ID_INDEX in detail or "test_cases.project_id, test_cases.tc_id" in detail:
+        logger.info("TC ID 중복 거절: %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=409,
+            content={"detail": "이미 쓰이는 TC ID입니다. 다른 값으로 바꿔 주세요."},
+        )
+    logger.error("Integrity error on %s %s: %s", request.method, request.url.path, detail)
+    return JSONResponse(status_code=409, content={"detail": "데이터 제약 조건에 걸렸습니다."})
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error("Unhandled error on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
