@@ -65,6 +65,7 @@
     "fieldNotFound": "필드를 찾을 수 없습니다.",
     "filterNameRequired": "필터 이름을 입력해 주세요.",
     "invalidFilterLogic": "logic은 AND 또는 OR이어야 합니다.",
-    "filterNotFound": "필터를 찾을 수 없습니다."
+    "filterNotFound": "필터를 찾을 수 없습니다.",
+    "tcIdTaken": "이미 쓰이는 TC ID입니다. 다른 값으로 바꿔 주세요."
   }
 }

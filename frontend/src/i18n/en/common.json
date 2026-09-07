@@ -65,6 +65,7 @@
     "fieldNotFound": "Field not found.",
     "filterNameRequired": "Please enter a filter name.",
     "invalidFilterLogic": "Logic must be AND or OR.",
-    "filterNotFound": "Filter not found."
+    "filterNotFound": "Filter not found.",
+    "tcIdTaken": "That TC ID is already in use. Please pick another."
   }
 }

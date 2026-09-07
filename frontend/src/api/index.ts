@@ -163,7 +163,7 @@ export const testCasesApi = {
     const formData = new FormData();
     formData.append("file", file);
     const params = sheetNames?.length ? { sheet_names: sheetNames.join(",") } : {};
-    const res = await client.post<{ created: number; updated: number; imported: number; sheets: { sheet: string; created: number; updated: number }[] }>(
+    const res = await client.post<{ created: number; updated: number; renamed?: number; imported: number; sheets: { sheet: string; created: number; updated: number; renamed?: number }[] }>(
       `/api/projects/${projectId}/testcases/import`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" }, params }
