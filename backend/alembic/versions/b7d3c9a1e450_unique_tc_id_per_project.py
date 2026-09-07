@@ -1,7 +1,7 @@
 """TC ID 를 프로젝트 안에서 유일하게
 
 Revision ID: b7d3c9a1e450
-Revises: 06933fddb519
+Revises: a1c4e7b9d2f0
 Create Date: 2026-09-07 16:05:00.000000
 
 사전조건 참조("<TC-ID> 의 사전조건 참조")를 푸는 색인이 프로젝트 전체 TC 로
@@ -24,7 +24,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "b7d3c9a1e450"
-down_revision: Union[str, Sequence[str], None] = "06933fddb519"
+down_revision: Union[str, Sequence[str], None] = "a1c4e7b9d2f0"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
