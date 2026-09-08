@@ -530,6 +530,14 @@ describe("attachmentsApi", () => {
     expect(result).toEqual(attachments);
   });
 
+  it("listByRun sends GET with runId", async () => {
+    const attachments = [{ id: 1, test_result_id: 11, filename: "f.png" }];
+    mockGet.mockResolvedValueOnce({ data: attachments });
+    const result = await attachmentsApi.listByRun(7);
+    expect(mockGet).toHaveBeenCalledWith("/api/attachments/by-run/7");
+    expect(result).toEqual(attachments);
+  });
+
   it("upload sends FormData with file", async () => {
     const attachment = { id: 1, filename: "test.png" };
     mockPost.mockResolvedValueOnce({ data: attachment });

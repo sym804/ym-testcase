@@ -438,6 +438,11 @@ export const attachmentsApi = {
     return res.data;
   },
 
+  listByRun: async (runId: number) => {
+    const res = await client.get<Attachment[]>(`/api/attachments/by-run/${runId}`);
+    return res.data;
+  },
+
   upload: async (testResultId: number, file: File) => {
     const formData = new FormData();
     formData.append("file", file);

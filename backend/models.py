@@ -229,7 +229,10 @@ class Attachment(Base):
     __tablename__ = "attachments"
 
     id = Column(Integer, primary_key=True, index=True)
-    test_result_id = Column(Integer, ForeignKey("test_results.id", ondelete="CASCADE"), nullable=False)
+    test_result_id = Column(
+        Integer, ForeignKey("test_results.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
     filename = Column(String(500), nullable=False)
     filepath = Column(String(1000), nullable=False)
     content_type = Column(String(200), nullable=True)
