@@ -75,5 +75,8 @@
   "categoryFilter": "Category: 전체",
   "priorityFilter": "Priority: 전체",
   "durationSec": "소요(초)",
-  "attachment": "첨부"
+  "attachment": "첨부",
+  "runSheets": "포함할 시트",
+  "tcCountShort": "{{count}}개 TC",
+  "runSheetsSummary": "{{count}}개 시트 ({{tcCount}}개 TC)를 이 수행에 담습니다"
 }

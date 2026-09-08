@@ -264,6 +264,8 @@ class TestRunCreate(BaseModel):
     environment: Optional[str] = None
     round: int = 1
     test_plan_id: Optional[int] = None
+    #: 이 런에 담을 시트. 생략하거나 None 이면 프로젝트 전체를 담는다.
+    sheet_names: Optional[List[str]] = None
 
 
 class TestRunUpdate(BaseModel):
@@ -347,6 +349,7 @@ class TestRunResponse(BaseModel):
     environment: Optional[str] = None
     round: int
     status: str
+    sheet_names: Optional[List[str]] = None
     test_plan_id: Optional[int] = None
     created_by: int
     created_at: datetime
@@ -364,6 +367,7 @@ class TestRunListResponse(BaseModel):
     environment: Optional[str] = None
     round: int
     status: str
+    sheet_names: Optional[List[str]] = None
     test_plan_id: Optional[int] = None
     created_by: int
     created_at: datetime

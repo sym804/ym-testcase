@@ -173,6 +173,10 @@ class TestRun(Base):
     environment = Column(String(100), nullable=True)
     round = Column(Integer, default=1)
     status = Column(SAEnum(TestRunStatus), default=TestRunStatus.in_progress)
+    # 이 런이 담는 시트. NULL 이면 프로젝트 전체다(이 컬럼이 생기기 전 런과 같다).
+    # 생성 시점의 필터가 아니라 런의 범위다. 진행 중 런이 새 TC 를 흡수할 때도
+    # 이 범위를 지켜야 제외한 시트가 나중에 슬그머니 들어오지 않는다.
+    sheet_names = Column(JSON, nullable=True, default=None)
     test_plan_id = Column(Integer, ForeignKey("test_plans.id", ondelete="SET NULL"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=now_kst)

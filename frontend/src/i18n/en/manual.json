@@ -359,13 +359,13 @@
     "h3_create": "8-1. Create Test Run",
     "create_li1": "Click the <strong>\"+ New Test Run\"</strong> button at the bottom of the left panel.",
     "create_li2": "Enter the run name, round (R1/R2/...), version, and environment.",
-    "create_li3": "When created, all TCs in the project are included with <strong>NS (Not Started)</strong> status.",
+    "create_li3": "Under <strong>Sheets to include</strong>, pick the sheets this run covers. Every sheet starts checked; unchecking one leaves it out. The section is hidden when the project has only one sheet.",
     "h3_list": "8-2. Test Run List",
     "list_li1": "All test runs for the project are displayed in the left panel.",
     "list_li2": "Run name, round, version, and status (In Progress/Completed) are shown.",
     "list_li3": "Click a run to display the results grid on the right.",
     "h3_sync": "8-3. Syncing the Run with the TC List",
-    "sync_li1": "When you add TCs after creating a run, <strong>in-progress</strong> runs pick them up automatically and show them as <strong>NS (Not Started)</strong>.",
+    "sync_li1": "When you add TCs after creating a run, <strong>in-progress</strong> runs pick them up automatically and show them as <strong>NS (Not Started)</strong>. A run scoped to specific sheets only picks up TCs <strong>added within those sheets</strong>.",
     "sync_li2": "<strong>Completed</strong> runs keep the snapshot taken at completion, so TCs added later are not included. Use \"Reopen\" or create a new run to include them.",
     "sync_li3": "The number on each sheet tab is the count of TCs actually contained in that run. It may differ from the per-sheet count on the TC management screen, which is expected for completed runs.",
     "sync_li4": "The grid is always sorted by TC number. TCs added later still appear at their numbered position.",
@@ -400,7 +400,9 @@
     "timer_li1": "Turn on the <strong>timer toggle</strong> at the top of the run results grid to display a timer for each TC row.",
     "timer_li2": "The timer starts automatically when TC execution begins, and elapsed time is recorded when results are entered.",
     "timer_li3": "Recorded time is included in reports and exports.",
-    "tip1": "<strong>TIP:</strong> The timer is optional. Turn off the toggle to enter results without time recording."
+    "tip1": "<strong>TIP:</strong> The timer is optional. Turn off the toggle to enter results without time recording.",
+    "create_li4": "TCs from the picked sheets are included with <strong>NS (Not Started)</strong> status. Picking every sheet covers the whole project.",
+    "imgAlt_create": "Sheet picker in the New Test Run modal"
   },
   "testPlans": {
     "title": "9. Test Plans / Milestones",

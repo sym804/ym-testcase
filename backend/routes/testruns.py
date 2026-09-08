@@ -13,7 +13,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 from database import get_db
-from models import User, Project, TestCase, TestRun, TestResult, TestRunStatus, TestResultValue, Attachment
+from models import User, Project, TestCase, TestCaseSheet, TestRun, TestResult, TestRunStatus, TestResultValue, Attachment
 from schemas import (
     TestRunCreate, TestRunUpdate, TestRunResponse, TestRunListResponse,
     TestResultCreate, TestResultResponse,
@@ -72,6 +72,29 @@ def create_testrun(
         if plan.project_id != project_id:
             raise HTTPException(status_code=400, detail="다른 프로젝트의 테스트 플랜은 연결할 수 없습니다.")
 
+    # 시트를 골라 만든 런은 그 범위를 저장한다. 생성 시점의 필터가 아니라 런의
+    # 범위라서, 진행 중 런이 새 TC 를 흡수할 때도 같은 조건을 쓴다.
+    sheet_names = None
+    if payload.sheet_names is not None:
+        # 같은 이름을 여러 번 보내도 한 번만 저장한다. 순서는 보낸 순서를 지킨다.
+        sheet_names = list(dict.fromkeys(n.strip() for n in payload.sheet_names if n and n.strip()))
+        if not sheet_names:
+            raise HTTPException(status_code=400, detail="시트를 하나 이상 선택하세요.")
+        # 폴더는 TC 를 직접 담지 않는다. 범위로 받으면 빈 런이 되므로 거부한다.
+        known = {
+            row[0] for row in db.query(TestCaseSheet.name)
+            .filter(
+                TestCaseSheet.project_id == project_id,
+                TestCaseSheet.is_folder.is_(False),
+            ).all()
+        }
+        unknown = [n for n in sheet_names if n not in known]
+        if unknown:
+            raise HTTPException(
+                status_code=400,
+                detail=f"런에 담을 수 없는 시트입니다: {', '.join(unknown)}",
+            )
+
     run = TestRun(
         project_id=project_id,
         name=payload.name,
@@ -79,18 +102,20 @@ def create_testrun(
         environment=payload.environment,
         round=payload.round,
         test_plan_id=payload.test_plan_id,
+        sheet_names=sheet_names,
         created_by=current_user.id,
     )
     db.add(run)
     db.flush()  # get run.id
 
     # Auto-create empty TestResult for each TC in the project (bulk insert)
-    tc_ids = [
-        row[0] for row in db.query(TestCase.id)
+    tc_q = (
+        db.query(TestCase.id)
         .filter(TestCase.project_id == project_id, TestCase.deleted_at.is_(None))
-        .order_by(TestCase.no)
-        .all()
-    ]
+    )
+    if sheet_names is not None:
+        tc_q = tc_q.filter(TestCase.sheet_name.in_(sheet_names))
+    tc_ids = [row[0] for row in tc_q.order_by(TestCase.no).all()]
     if tc_ids:
         db.bulk_insert_mappings(TestResult, [
             {
@@ -207,6 +232,22 @@ def submit_results(
             status_code=400,
             detail="One or more test case IDs are invalid for this project",
         )
+
+    # ★프로젝트 소속만 보면 시트를 골라 만든 런에 범위 밖 TC 가 들어온다.
+    #   결과 행이 없으면 아래에서 새로 만들기 때문에, 여기서 막지 않으면 제출 한 번으로
+    #   런의 범위가 늘어난다.
+    if run.sheet_names is not None:
+        outside = [
+            row[0] for row in db.query(TestCase.tc_id).filter(
+                TestCase.id.in_(tc_ids),
+                ~TestCase.sheet_name.in_(run.sheet_names),
+            ).all()
+        ]
+        if outside:
+            raise HTTPException(
+                status_code=400,
+                detail=f"이 수행의 시트 범위 밖 TC 입니다: {', '.join(outside[:5])}",
+            )
 
     # Validate all result enums upfront
     for r in results:
@@ -401,6 +442,7 @@ def clone_testrun(
         version=source.version,
         environment=source.environment,
         round=source.round,
+        sheet_names=source.sheet_names,
         created_by=current_user.id,
     )
     db.add(new_run)

@@ -221,6 +221,14 @@ def rename_sheet(
         TestCase.project_id == project_id, TestCase.sheet_name == old_name
     ).update({TestCase.sheet_name: new_name}, synchronize_session="fetch")
 
+    # ★시트를 골라 만든 테스트 수행은 그 범위를 시트 이름으로 들고 있다. 여기서 같이
+    #   바꾸지 않으면 범위가 아무것도 가리키지 않게 되어, 그 수행은 결과 제출이 전부
+    #   거부되고 새 TC 도 흡수하지 못하며 시트 탭도 사라진다.
+    from models import TestRun
+    for run in db.query(TestRun).filter(TestRun.project_id == project_id).all():
+        if run.sheet_names and old_name in run.sheet_names:
+            run.sheet_names = [new_name if n == old_name else n for n in run.sheet_names]
+
     db.commit()
     return {"id": sheet.id, "name": sheet.name, "old_name": old_name}
 
@@ -313,6 +321,16 @@ def delete_sheet(
             stack.extend(c.id for c in children)
         for sid in reversed(all_ids):
             db.query(TestCaseSheet).filter(TestCaseSheet.id == sid).delete()
+
+    # ★시트를 골라 만든 수행의 범위에서도 뺀다. 남겨 두면 없는 시트를 가리키는 범위가
+    #   되어, 그 수행은 이름이 같은 시트가 나중에 다시 생기면 엉뚱하게 흡수한다.
+    #   범위가 통째로 비면 프로젝트 전체로 되돌리지 않고 빈 목록으로 둔다. 담을 것이
+    #   없어진 수행이 갑자기 전체를 담으면 안 된다.
+    from models import TestRun
+    gone = set(all_names)
+    for run in db.query(TestRun).filter(TestRun.project_id == project_id).all():
+        if run.sheet_names and gone.intersection(run.sheet_names):
+            run.sheet_names = [n for n in run.sheet_names if n not in gone]
 
     db.commit()
     return {"deleted": count, "sheet": sheet_name}

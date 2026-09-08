@@ -84,6 +84,12 @@ def global_overview(
         .group_by(TestRun.project_id)
         .all()
     )
+    # 최신 런이 있는 프로젝트. 결과 행이 0 이면 아래 집계에는 안 잡히므로 따로 둔다.
+    latest_run_project_ids = {
+        row[0] for row in db.query(TestRun.project_id)
+        .join(latest_run_sq, TestRun.id == latest_run_sq.c.max_run_id).all()
+    }
+
     stats_by_project = {}
     for row in result_rows:
         stats_by_project[row.project_id] = {
@@ -102,10 +108,18 @@ def global_overview(
     project_summaries = []
 
     for proj in projects:
-        count = tc_counts.get(proj.id, 0)
+        s = stats_by_project.get(proj.id)
+        # 진행 수치는 최신 런에서 나온다. 분모도 그 런이 담은 행 수여야 한다.
+        # 프로젝트 전체 TC 수를 분모로 쓰면, 시트를 골라 만든 런은 전부 수행해도
+        # 미실행이 남은 것처럼 보인다.
+        # ★"런이 아예 없다" 와 "런은 있는데 결과 행이 0 이다" 는 다르다. 후자에서
+        #   전체 TC 로 되돌리면 빈 런이 전부 미실행으로 보인다.
+        if proj.id in latest_run_project_ids:
+            count = s["with_result"] if s else 0
+        else:
+            count = tc_counts.get(proj.id, 0)
         total_tc += count
 
-        s = stats_by_project.get(proj.id)
         if s:
             p, f, b, na = s["pass"], s["fail"], s["block"], s["na"]
             ns = max(0, count - (p + f + b + na))

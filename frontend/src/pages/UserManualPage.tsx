@@ -503,7 +503,9 @@ export default function UserManualPage() {
               <li dangerouslySetInnerHTML={{ __html: t("testrun.create_li1") }} />
               <li>{t("testrun.create_li2")}</li>
               <li dangerouslySetInnerHTML={{ __html: t("testrun.create_li3") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.create_li4") }} />
             </ol>
+            <img src="/manual-images/42_testrun_create_sheets.png" alt={t("testrun.imgAlt_create")} style={s.img} />
 
             <h3 style={s.h3}>{t("testrun.h3_list")}</h3>
             <ul style={s.ul}>

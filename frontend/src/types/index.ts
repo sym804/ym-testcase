@@ -84,6 +84,8 @@ export interface TestRun {
   round: number;
   status: TestRunStatus;
   test_plan_id?: number | null;
+  /** 이 런이 담는 시트. 없거나 null 이면 프로젝트 전체다. */
+  sheet_names?: string[] | null;
   created_by: number;
   created_at: string;
   completed_at?: string;
