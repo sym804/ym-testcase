@@ -13,7 +13,7 @@ import {
   type CellValueChangedEvent,
 } from "ag-grid-community";
 import { useTranslation } from "react-i18next";
-import { testRunsApi, testCasesApi } from "../api";
+import { testRunsApi, testCasesApi, attachmentsApi } from "../api";
 import type { TestRun, TestResult } from "../types";
 import { TestRunStatus } from "../types";
 import { AG_GRID_LOCALE_KO } from "../agGridLocaleKo";
@@ -88,7 +88,7 @@ export default function TestRunManager({ projectId, project }: Props) {
 
   const {
     attachmentsMap, previewImage, setPreviewImage, fileInputRef,
-    resetAttachments, loadAttachmentFor, handleFileUpload,
+    resetAttachments, seedAttachments, loadAttachmentFor, handleFileUpload,
     handleDeleteAttachment, triggerUpload, handleDropUpload,
   } = useAttachments(gridApiRef, t);
 
@@ -197,13 +197,24 @@ export default function TestRunManager({ projectId, project }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSheet]);
 
+  // ★런 상세는 런 선택과 시트 탭 전환 양쪽에서 다시 부른다. 앞 요청이 늦게 도착하면
+  //   이전 런의 결과와 첨부가 지금 보고 있는 런 위에 그려진다. 세대 번호를 붙여
+  //   최신 요청만 화면에 반영한다.
+  const runDetailSeqRef = useRef(0);
+  // 첨부를 이미 통째로 받아 둔 런. 시트 탭만 바꿀 때는 다시 받지 않는다.
+  const seededRunIdRef = useRef<number | null>(null);
+
   const loadRunDetail = useCallback(
     async (run: TestRun) => {
+      const seq = ++runDetailSeqRef.current;
+      const isStale = () => seq !== runDetailSeqRef.current;
+      const sameRun = seededRunIdRef.current === run.id;
       setSelectedRun(run);
       setLoadingResults(true);
-      resetAttachments(); // 첨부파일 캐시 초기화
+      if (!sameRun) resetAttachments(); // 다른 런으로 옮길 때만 첨부 캐시를 비운다
       try {
         const detail = await testRunsApi.getOne(projectId, run.id);
+        if (isStale()) return;
         // 백엔드 값 → 표시 값 변환 (NS→"", NA→"N/A")
         const mapped = (detail.results || []).map((r: TestResult) => ({
           ...r,
@@ -216,6 +227,18 @@ export default function TestRunManager({ projectId, project }: Props) {
           counts[name] = (counts[name] || 0) + 1;
         }
         setRunSheetCounts(counts);
+        // 첨부는 런 단위로 한 번에 받아 둔다.
+        // 행 포커스 때 하나씩 받으면 그 행을 눌러 보기 전까지 첨부가 없는 것처럼 보인다.
+        // 실패해도 결과 표시는 막지 않는다. 이 경우 기존 lazy 로더가 그대로 받아 준다.
+        if (!sameRun) {
+          try {
+            const atts = await attachmentsApi.listByRun(run.id);
+            if (isStale()) return;
+            seedAttachments(mapped.map((r) => r.id), atts);
+            seededRunIdRef.current = run.id;
+          } catch { /* 실패하면 표시만 놓친다. 다음 진입에서 다시 받는다 */ }
+        }
+        if (isStale()) return;
         // 시트 필터 적용
         if (activeSheet) {
           // 결과 행은 런에 편입된 순서로 오므로, 런 생성 이후 추가된 TC는 뒤에 붙는다.
@@ -243,13 +266,13 @@ export default function TestRunManager({ projectId, project }: Props) {
           setResults(mapped);
         }
       } catch {
-        toast.error(t("resultLoadFailed"));
+        if (!isStale()) toast.error(t("resultLoadFailed"));
       } finally {
-        setLoadingResults(false);
+        if (!isStale()) setLoadingResults(false);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projectId, activeSheet]
+    [projectId, activeSheet, seedAttachments]
   );
 
   // countTick을 의존성에 넣어 그리드 변경 시 재계산

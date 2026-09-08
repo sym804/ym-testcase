@@ -18,6 +18,29 @@ export function useAttachments(
     setAttachmentsMap({});
   }, []);
 
+  /** 런 전체의 첨부를 한 번에 채운다.
+   *
+   * 첨부가 없는 행도 빈 배열로 박아 둔다. 그래야 lazy 로더가 그 행을 다시
+   * 부르지 않고, 셀 렌더러도 "아직 모름" 과 "없음" 을 구분하지 않아도 된다.
+   *
+   * ★맵을 통째로 갈아끼우지 않는다. 이 조회가 도는 동안 사용자가 파일을 올리거나
+   *   지울 수 있는데, 그 응답은 서버가 목록을 뜬 시점보다 새롭다. 통째로 바꾸면
+   *   방금 올린 첨부가 사라지고 방금 지운 첨부가 되살아난다.
+   *   화면에서 이미 손댄 행은 그 값을 남기고, 나머지만 서버 값으로 채운다.
+   *   (resetAttachments 가 런을 열 때 맵을 비우므로, 남는 것은 그 뒤에 손댄 행뿐이다.)
+   */
+  const seedAttachments = useCallback((resultIds: number[], atts: Attachment[]) => {
+    setAttachmentsMap((prev) => {
+      const next: Record<number, Attachment[]> = {};
+      for (const id of resultIds) next[id] = [];
+      for (const att of atts) {
+        if (!next[att.test_result_id]) next[att.test_result_id] = [];
+        next[att.test_result_id].push(att);
+      }
+      return { ...next, ...prev };
+    });
+  }, []);
+
   const loadAttachmentFor = useCallback(async (resultId: number) => {
     if (attachmentsMap[resultId] !== undefined) return;
     try {
@@ -87,6 +110,7 @@ export function useAttachments(
     setPreviewImage,
     fileInputRef,
     resetAttachments,
+    seedAttachments,
     loadAttachmentFor,
     handleFileUpload,
     handleDeleteAttachment,

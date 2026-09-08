@@ -196,6 +196,31 @@ def list_attachments(
     )
 
 
+@router.get("/by-run/{run_id}", response_model=List[AttachmentResponse])
+def list_run_attachments(
+    run_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """런 하나에 달린 첨부파일을 한 번에 준다.
+
+    행마다 따로 부르면 화면에 들어온 시점에는 첨부 유무를 알 수 없어,
+    그 셀을 눌러 보기 전까지 첨부가 없는 것처럼 보인다.
+    """
+    run = db.query(TestRun).filter(TestRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Test run not found")
+    _check_attachment_access(run.project_id, current_user, db, "viewer")
+
+    return (
+        db.query(Attachment)
+        .join(TestResult, Attachment.test_result_id == TestResult.id)
+        .filter(TestResult.test_run_id == run_id)
+        .order_by(Attachment.test_result_id, Attachment.uploaded_at.desc())
+        .all()
+    )
+
+
 @router.get("/download/{attachment_id}")
 def download_attachment(
     attachment_id: int,
