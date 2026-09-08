@@ -51,16 +51,22 @@ def sync_run_results(run: TestRun, db: Session, commit: bool = True) -> int:
         return 0
 
     existing = db.query(TestResult.test_case_id).filter(TestResult.test_run_id == run.id).subquery()
-    missing = [
-        row[0] for row in db.query(TestCase.id)
+    q = (
+        db.query(TestCase.id)
         .filter(
             TestCase.project_id == run.project_id,
             TestCase.deleted_at.is_(None),
             ~TestCase.id.in_(db.query(existing.c.test_case_id)),
         )
-        .order_by(TestCase.no)
-        .all()
-    ]
+    )
+    # ★시트를 골라 만든 런은 그 범위 밖의 TC 를 흡수하면 안 된다. 저장해 둔 범위를
+    #   여기서 다시 걸지 않으면, 새 TC 가 하나 생기는 순간 제외했던 시트가 통째로
+    #   런에 들어온다. sheet_names 가 없는 런(옛 런 포함)은 종전대로 전체를 담는다.
+    # ★빈 목록은 "전체" 가 아니라 "없음" 이다. 범위의 시트가 전부 지워진 수행이
+    #   갑자기 프로젝트 전체를 담으면 안 되므로 None 인지로 가른다.
+    if run.sheet_names is not None:
+        q = q.filter(TestCase.sheet_name.in_(run.sheet_names))
+    missing = [row[0] for row in q.order_by(TestCase.no).all()]
     if not missing:
         return 0
 

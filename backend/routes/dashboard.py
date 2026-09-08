@@ -90,6 +90,16 @@ def _count_from_results(results: list) -> dict:
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 
+def _run_tc_ids(run_id: int, db: Session):
+    """런이 담고 있는 TC id 서브쿼리.
+
+    시트를 골라 만든 런은 프로젝트 TC 의 일부만 담는다. 총계를 프로젝트 전체로
+    잡으면 그 런을 전부 수행해도 진행률이 100%% 에 닿지 않는다(실측: 4/4 를 PASS
+    했는데 36.4%%). 런의 결과 행이 곧 그 런의 범위이므로 그것으로 좁힌다.
+    """
+    return db.query(TestResult.test_case_id).filter(TestResult.test_run_id == run_id).subquery()
+
+
 @router.get("/summary")
 def dashboard_summary(
     project_id: int,
@@ -99,19 +109,27 @@ def dashboard_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
-    total = db.query(TestCase).filter(
+    total_q = db.query(TestCase).filter(
         TestCase.project_id == project_id,
         TestCase.deleted_at.is_(None),
-    ).count()
+    )
+    if run_id:
+        total_q = total_q.filter(TestCase.id.in_(db.query(_run_tc_ids(run_id, db).c.test_case_id)))
+    total = total_q.count()
 
     if run_id:
         cases = _result_count_cases()
+        # ★분모는 활성 TC 로 좁혔다. 분자가 결과 행 전체면 지운 TC 의 결과가 남아
+        #   pass 가 total 을 넘는다. 같은 기준으로 좁힌다.
         row = db.query(
             cases["pass"].label("pass_count"),
             cases["fail"].label("fail_count"),
             cases["block"].label("block_count"),
             cases["na"].label("na_count"),
-        ).filter(TestResult.test_run_id == run_id).first()
+        ).join(TestCase, TestCase.id == TestResult.test_case_id).filter(
+            TestResult.test_run_id == run_id,
+            TestCase.deleted_at.is_(None),
+        ).first()
         if row and (row.pass_count or row.fail_count or row.block_count or row.na_count):
             c = _counts_from_row(row, total)
         else:
@@ -156,16 +174,19 @@ def priority_distribution(
     current_user: User = Depends(check_project_access("viewer")),
 ):
     # TC priority별 총 건수
-    priority_totals = dict(
+    priority_totals_q = (
         db.query(TestCase.priority, func.count(TestCase.id))
         .filter(
             TestCase.project_id == project_id,
             TestCase.deleted_at.is_(None),
             TestCase.priority.isnot(None),
         )
-        .group_by(TestCase.priority)
-        .all()
     )
+    if run_id:
+        priority_totals_q = priority_totals_q.filter(
+            TestCase.id.in_(db.query(_run_tc_ids(run_id, db).c.test_case_id))
+        )
+    priority_totals = dict(priority_totals_q.group_by(TestCase.priority).all())
     if not priority_totals:
         return []
 
@@ -242,16 +263,19 @@ def category_breakdown(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
-    category_totals = dict(
+    category_totals_q = (
         db.query(TestCase.category, func.count(TestCase.id))
         .filter(
             TestCase.project_id == project_id,
             TestCase.deleted_at.is_(None),
             TestCase.category.isnot(None),
         )
-        .group_by(TestCase.category)
-        .all()
     )
+    if run_id:
+        category_totals_q = category_totals_q.filter(
+            TestCase.id.in_(db.query(_run_tc_ids(run_id, db).c.test_case_id))
+        )
+    category_totals = dict(category_totals_q.group_by(TestCase.category).all())
     if not category_totals:
         return []
 
@@ -357,26 +381,40 @@ def round_comparison(
             cases["block"].label("block_count"),
             cases["na"].label("na_count"),
         )
-        .filter(TestResult.test_run_id.in_(run_ids))
+        .join(TestCase, TestCase.id == TestResult.test_case_id)
+        .filter(TestResult.test_run_id.in_(run_ids), TestCase.deleted_at.is_(None))
+        .group_by(TestResult.test_run_id)
+        .all()
+    )
+
+    # 라운드마다 담은 범위가 다를 수 있다. 시트를 골라 만든 런은 프로젝트 전체가
+    # 아니라 그 런의 결과 행 수가 분모다.
+    run_totals = dict(
+        db.query(TestResult.test_run_id, func.count(TestResult.id))
+        .join(TestCase, TestCase.id == TestResult.test_case_id)
+        .filter(TestResult.test_run_id.in_(run_ids), TestCase.deleted_at.is_(None))
         .group_by(TestResult.test_run_id)
         .all()
     )
 
     counts_by_run = {}
     for row in rows:
-        c = _counts_from_row(row, total_tc)
+        c = _counts_from_row(row, run_totals.get(row.test_run_id, 0))
         counts_by_run[row.test_run_id] = c
 
     result = []
     for round_num in sorted(seen_rounds.keys()):
         run = seen_rounds[round_num]
-        c = counts_by_run.get(run.id, {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": total_tc})
+        # ★결과 행이 없는 런은 담은 것이 없다는 뜻이다. 프로젝트 전체 TC 로 되돌리면
+        #   빈 런이 "전부 미실행" 으로 보인다.
+        run_total = run_totals.get(run.id, 0)
+        c = counts_by_run.get(run.id, {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": run_total})
 
         executed = c["pass"] + c["fail"] + c["block"]
         pass_rate = round(c["pass"] / executed * 100, 1) if executed > 0 else 0.0
 
         result.append({
-            "round": round_num, "total": total_tc,
+            "round": round_num, "total": run_total,
             **c, "pass_rate": pass_rate,
         })
 

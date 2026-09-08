@@ -63,19 +63,48 @@ export default function TestRunManager({ projectId, project }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: "", version: "", environment: "", round: 1 });
   const [creating, setCreating] = useState(false);
+  // 새 런에 담을 시트. 모달을 열 때 전체 선택으로 시작하고 체크를 풀어 줄인다.
+  const [newRunSheets, setNewRunSheets] = useState<Set<string>>(new Set());
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [showAllCompleted, setShowAllCompleted] = useState(false);
   const [countTick, setCountTick] = useState(0);
   const gridApiRef = useRef<GridApi | null>(null);
 
   // ── 시트 탭 ──
-  const [sheets, setSheets] = useState<{ name: string; tc_count: number }[]>([]);
+  type SheetNodeLite = { name: string; tc_count: number; is_folder?: boolean; children?: SheetNodeLite[] };
+  const [sheets, setSheets] = useState<SheetNodeLite[]>([]);
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
   const sheetInitRef = useRef(false);
   // 선택된 런에 실제로 들어 있는 시트별 결과 수.
   // 탭 배지를 TC 라이브러리(sheets[].tc_count)가 아니라 이 값으로 표시해야
   // 완료된 런처럼 스냅샷이 고정된 경우에도 배지와 그리드 행 수가 어긋나지 않는다.
   const [runSheetCounts, setRunSheetCounts] = useState<Record<string, number> | null>(null);
+
+  // 런에 담을 수 있는 시트. 목록은 트리로 오므로 펴서 쓴다.
+  // 폴더와 TC 가 없는 시트는 담을 것이 없어 뺀다.
+  const selectableSheets = useMemo(() => {
+    const out: { name: string; tc_count: number }[] = [];
+    const walk = (nodes: SheetNodeLite[]) => {
+      for (const n of nodes) {
+        if (!n.is_folder && (n.tc_count ?? 0) > 0) out.push({ name: n.name, tc_count: n.tc_count });
+        if (n.children?.length) walk(n.children);
+      }
+    };
+    walk(sheets);
+    return out;
+  }, [sheets]);
+
+  // 탭 바에 보여 줄 시트. 시트를 골라 만든 런은 그 범위만 보여 준다.
+  // 담기지 않은 시트를 0 짜리 탭으로 남겨 두면 비어 있는 것인지 제외된 것인지 알 수 없다.
+  // ★고를 때와 같은 목록(펴 놓은 잎 시트)을 쓴다. 트리 루트만 보면 폴더 밑에 있는
+  //   시트로 범위를 잡은 런에서 탭이 하나도 안 나온다.
+  const visibleSheets = useMemo(() => {
+    const scope = selectedRun?.sheet_names;
+    // 범위가 없는(null) 수행은 프로젝트 전체다. 빈 목록은 담은 시트가 없다는 뜻이라
+    // 전체로 되돌리지 않는다.
+    if (!scope) return selectableSheets;
+    return selectableSheets.filter((s) => scope.includes(s.name));
+  }, [selectableSheets, selectedRun]);
 
   // ── Undo 스택 ──
   const undoStackRef = useRef<{ rowId: number; field: string; oldValue: string }[]>([]);
@@ -103,6 +132,21 @@ export default function TestRunManager({ projectId, project }: Props) {
   } = useResultFilters(gridApiRef, results, t);
 
   // ── 여러 행 일괄 저장 ──
+  // 저장 실패 처리에서 쓰려면 loadRunDetail 보다 앞에 있어야 해서 ref 로 잇는다.
+  const selectedRunRef = useRef<TestRun | null>(null);
+  const loadRunDetailRef = useRef<((run: TestRun) => void) | null>(null);
+
+  // 저장이 거부되면 서버가 이유를 준다. "저장 실패" 로 뭉개면 무엇이 막혔는지 알 수 없고,
+  // 화면 값은 이미 바뀐 채로 남아 저장된 것처럼 보인다(SYM-35 와 같은 유형).
+  // 이유를 그대로 띄우고 서버 값으로 되돌린다.
+  const handleSaveError = useCallback((err: unknown) => {
+    const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+    toast.error(detail || t("saveFailed"));
+    const run = selectedRunRef.current;
+    if (run) loadRunDetailRef.current?.(run);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const saveManyResults = useCallback(async (rows: TestResult[]) => {
     if (!selectedRun || rows.length === 0) return;
     const payload = rows.map((r) => ({
@@ -114,10 +158,10 @@ export default function TestRunManager({ projectId, project }: Props) {
     }));
     try {
       await testRunsApi.submitResults(projectId, selectedRun.id, payload);
-    } catch {
-      toast.error(t("saveFailed"));
+    } catch (err) {
+      handleSaveError(err);
     }
-  }, [projectId, selectedRun]);
+  }, [projectId, selectedRun, handleSaveError]);
 
   // ── Shift+Click 범위 채우기용 앵커 ──
   const fillAnchorRef = useRef<{ rowIndex: number; field: string; value: string } | null>(null);
@@ -190,6 +234,17 @@ export default function TestRunManager({ projectId, project }: Props) {
       }
     }).catch(() => {});
   }, [projectId]);
+
+  // 고른 시트 밖의 탭이 활성인 채로 그 런을 열면 그리드가 빈 채로 보인다.
+  // 범위 안의 첫 시트로 옮긴다.
+  useEffect(() => {
+    if (!selectedRun) return;
+    if (activeSheet && visibleSheets.some((s) => s.name === activeSheet)) return;
+    // 시트가 둘 이상이면 "전체" 탭을 그대로 둔다. 하나뿐이면 전체 탭이 없으므로
+    // 그 시트를 활성으로 만들어 어느 탭을 보고 있는지 드러낸다.
+    if (!activeSheet && visibleSheets.length > 1) return;
+    setActiveSheet(visibleSheets[0]?.name ?? null);
+  }, [selectedRun, activeSheet, visibleSheets]);
 
   // 시트 변경 시 선택된 런 다시 로드
   useEffect(() => {
@@ -275,6 +330,9 @@ export default function TestRunManager({ projectId, project }: Props) {
     [projectId, activeSheet, seedAttachments]
   );
 
+  useEffect(() => { loadRunDetailRef.current = loadRunDetail; }, [loadRunDetail]);
+  useEffect(() => { selectedRunRef.current = selectedRun; }, [selectedRun]);
+
   // countTick을 의존성에 넣어 그리드 변경 시 재계산
   const getGridRows = useCallback(() => {
     const rows: TestResult[] = [];
@@ -312,10 +370,10 @@ export default function TestRunManager({ projectId, project }: Props) {
     };
     try {
       await testRunsApi.submitResults(projectId, selectedRun.id, [mapped]);
-    } catch {
-      toast.error(t("saveFailed"));
+    } catch (err) {
+      handleSaveError(err);
     }
-  }, [projectId, selectedRun]);
+  }, [projectId, selectedRun, handleSaveError]);
 
   // ── 키보드 숏컷: P/F/B/N = 결과 빠른 입력, Ctrl+D = 선택 행 채우기 ──
   const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK", n: "N/A" };
@@ -765,7 +823,14 @@ export default function TestRunManager({ projectId, project }: Props) {
     }
     setCreating(true);
     try {
-      const newRun = await testRunsApi.create(projectId, form);
+      // 전부 고른 것은 범위를 두지 않은 것과 같다. 그때는 보내지 않아 프로젝트
+      // 전체를 담는 기존 런과 같게 만든다.
+      const picked = selectableSheets.filter((sh) => newRunSheets.has(sh.name)).map((sh) => sh.name);
+      const scoped = picked.length > 0 && picked.length < selectableSheets.length;
+      const newRun = await testRunsApi.create(projectId, {
+        ...form,
+        ...(scoped ? { sheet_names: picked } : {}),
+      });
       toast.success(t("createSuccess"));
       setShowModal(false);
       setForm({ name: "", version: "", environment: "", round: 1 });
@@ -853,7 +918,7 @@ export default function TestRunManager({ projectId, project }: Props) {
             })()}
           </div>
           {canManageRun && (
-            <button style={styles.newRunBtn} onClick={() => setShowModal(true)}>
+            <button style={styles.newRunBtn} onClick={() => { setNewRunSheets(new Set(selectableSheets.map((sh) => sh.name))); setShowModal(true); }}>
               {t("newRun")}
             </button>
           )}
@@ -891,7 +956,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                       borderRadius: 6,
                       cursor: "pointer",
                     }}
-                    onClick={() => setShowModal(true)}
+                    onClick={() => { setNewRunSheets(new Set(selectableSheets.map((sh) => sh.name))); setShowModal(true); }}
                   >
                     {t("newRun")}
                   </button>
@@ -1137,9 +1202,9 @@ export default function TestRunManager({ projectId, project }: Props) {
         {/* ── 시트 탭 바 (그리드 하단) ── */}
         {/* results.length 조건을 두지 않는다: 결과 0건 시트를 선택했을 때 탭 바가 사라져
             다른 시트로 되돌아갈 수 없게 되는 막다른 길이 생긴다 */}
-        {sheets.length >= 1 && !(sheets.length === 1 && sheets[0].name === "기본") && selectedRun && (
+        {visibleSheets.length >= 1 && !(visibleSheets.length === 1 && visibleSheets[0].name === "기본") && selectedRun && (
           <div style={sheetTabStyles.bar}>
-            {sheets.map((s) => (
+            {visibleSheets.map((s) => (
               <div
                 key={s.name}
                 style={{
@@ -1154,7 +1219,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 </span>
               </div>
             ))}
-            {sheets.length > 1 && (
+            {visibleSheets.length > 1 && (
               <div
                 style={{
                   ...sheetTabStyles.tab,
@@ -1166,7 +1231,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                 <span style={sheetTabStyles.badge}>
                   {runSheetCounts
                     ? Object.values(runSheetCounts).reduce((a, n) => a + n, 0)
-                    : sheets.reduce((a, s) => a + s.tc_count, 0)}
+                    : visibleSheets.reduce((a, s) => a + s.tc_count, 0)}
                 </span>
               </div>
             )}
@@ -1284,6 +1349,55 @@ export default function TestRunManager({ projectId, project }: Props) {
                 <option value={2}>R2</option>
                 <option value={3}>R3</option>
               </select>
+              {selectableSheets.length > 1 && (
+                <>
+                  <div style={runSheetPickStyles.head}>
+                    <label style={styles.label}>{t("runSheets")}</label>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button
+                        type="button"
+                        style={runSheetPickStyles.linkBtn}
+                        onClick={() => setNewRunSheets(new Set(selectableSheets.map((sh) => sh.name)))}
+                      >
+                        {t("common:selectAll")}
+                      </button>
+                      <button
+                        type="button"
+                        style={runSheetPickStyles.linkBtn}
+                        onClick={() => setNewRunSheets(new Set())}
+                      >
+                        {t("common:deselectAll")}
+                      </button>
+                    </div>
+                  </div>
+                  <div style={runSheetPickStyles.list}>
+                    {selectableSheets.map((sh) => (
+                      <label key={sh.name} style={runSheetPickStyles.row}>
+                        <input
+                          type="checkbox"
+                          checked={newRunSheets.has(sh.name)}
+                          onChange={(e) => {
+                            const next = new Set(newRunSheets);
+                            if (e.target.checked) next.add(sh.name); else next.delete(sh.name);
+                            setNewRunSheets(next);
+                          }}
+                          style={{ width: 15, height: 15 }}
+                        />
+                        <span style={runSheetPickStyles.name}>{sh.name}</span>
+                        <span style={runSheetPickStyles.count}>{t("tcCountShort", { count: sh.tc_count })}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div style={runSheetPickStyles.summary}>
+                    {t("runSheetsSummary", {
+                      count: newRunSheets.size,
+                      tcCount: selectableSheets
+                        .filter((sh) => newRunSheets.has(sh.name))
+                        .reduce((a, sh) => a + sh.tc_count, 0),
+                    })}
+                  </div>
+                </>
+              )}
               <div style={styles.modalActions}>
                 <button
                   type="button"
@@ -1294,8 +1408,8 @@ export default function TestRunManager({ projectId, project }: Props) {
                 </button>
                 <button
                   type="submit"
-                  style={styles.submitBtn}
-                  disabled={creating}
+                  style={{ ...styles.submitBtn, opacity: creating || newRunSheets.size === 0 ? 0.5 : 1 }}
+                  disabled={creating || newRunSheets.size === 0}
                 >
                   {creating ? t("common:creating") : t("common:create")}
                 </button>
@@ -1308,6 +1422,30 @@ export default function TestRunManager({ projectId, project }: Props) {
     </div>
   );
 }
+
+const runSheetPickStyles: Record<string, React.CSSProperties> = {
+  head: {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    marginTop: 4,
+  },
+  linkBtn: {
+    background: "none", border: "none", padding: 0,
+    color: "var(--accent)", fontSize: 12, cursor: "pointer",
+  },
+  list: {
+    maxHeight: 168, overflowY: "auto",
+    border: "1px solid var(--border-input)", borderRadius: 6,
+    backgroundColor: "var(--bg-input)",
+  },
+  row: {
+    display: "flex", alignItems: "center", gap: 8,
+    padding: "7px 10px", cursor: "pointer",
+    borderBottom: "1px solid var(--border-color)",
+  },
+  name: { flex: 1, fontSize: 13, color: "var(--text-primary)" },
+  count: { fontSize: 11, color: "var(--text-secondary)" },
+  summary: { fontSize: 12, color: "var(--text-secondary)", marginTop: -4 },
+};
 
 const sheetTabStyles: Record<string, React.CSSProperties> = {
   bar: {
