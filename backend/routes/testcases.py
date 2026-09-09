@@ -321,6 +321,24 @@ _CLONE_FIELDS = [
 ]
 
 
+def _max_no_in_sheet(project_id: int, sheet_name: str, db: Session) -> int:
+    """그 시트에서 쓰인 적 있는 가장 큰 번호.
+
+    ★`no` 는 시트 안 순번이다. 신규 행 추가와 엑셀 임포트는 그렇게 붙이는데
+      복제만 프로젝트 전체 max(no)+1 을 줬다. 다른 시트의 큰 번호가 따라와
+      시트 안 번호에 구멍이 났고, 그 시트로 만든 수행의 No 가 1 부터 시작하지
+      않았다.
+    ★지운 TC 도 센다. 삭제는 soft delete 라 되돌릴 수 있어서, 살아 있는 것만
+      보면 지운 번호를 복제가 다시 쓰고 복원하는 순간 같은 시트에 같은 번호가
+      둘이 된다(실측 재현). 번호에 구멍이 남는 쪽이 낫다. 수행 화면과 내보내기의
+      No 는 어차피 목록 순번이라 구멍이 보이지 않는다.
+    """
+    return db.query(func.max(TestCase.no)).filter(
+        TestCase.project_id == project_id,
+        TestCase.sheet_name == sheet_name,
+    ).scalar() or 0
+
+
 @router.post("/bulk-clone", response_model=List[TestCaseResponse], status_code=201)
 def bulk_clone_testcases(
     project_id: int,
@@ -343,22 +361,26 @@ def bulk_clone_testcases(
     if not originals:
         raise HTTPException(status_code=404, detail="No test cases found")
 
-    max_no = db.query(func.max(TestCase.no)).filter(
-        TestCase.project_id == project_id,
-        TestCase.deleted_at.is_(None),
-    ).scalar() or 0
+    # 여러 시트를 한 번에 복제할 수 있다. 번호는 각자의 시트에서 이어 붙인다.
+    next_no: dict[str, int] = {}
+
+    def alloc_no(sheet_name: str) -> int:
+        if sheet_name not in next_no:
+            next_no[sheet_name] = _max_no_in_sheet(project_id, sheet_name, db)
+        next_no[sheet_name] += 1
+        return next_no[sheet_name]
 
     # "-copy" 를 그대로 쓰면 같은 TC 를 두 번 복제할 때 ID 가 겹친다.
     taken = taken_tc_ids(project_id, db)
 
     cloned = []
-    for i, orig in enumerate(originals):
+    for orig in originals:
         data = {f: getattr(orig, f) for f in _CLONE_FIELDS}
         new_id = allocate_tc_id(f"{orig.tc_id}-copy", taken)
         taken.add(new_id)
         new_tc = TestCase(
             project_id=project_id,
-            no=max_no + 1 + i,
+            no=alloc_no(orig.sheet_name),
             tc_id=new_id,
             created_by=current_user.id,
             **data,
@@ -390,16 +412,11 @@ def clone_testcase(
     if not original:
         raise HTTPException(status_code=404, detail="Test case not found")
 
-    max_no = db.query(func.max(TestCase.no)).filter(
-        TestCase.project_id == project_id,
-        TestCase.deleted_at.is_(None),
-    ).scalar() or 0
-
     data = {f: getattr(original, f) for f in _CLONE_FIELDS}
     new_id = allocate_tc_id(f"{original.tc_id}-copy", taken_tc_ids(project_id, db))
     new_tc = TestCase(
         project_id=project_id,
-        no=max_no + 1,
+        no=_max_no_in_sheet(project_id, original.sheet_name, db) + 1,
         tc_id=new_id,
         created_by=current_user.id,
         **data,
