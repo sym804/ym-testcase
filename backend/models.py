@@ -158,6 +158,15 @@ class TestCase(Base):
             sqlite_where=text("deleted_at IS NULL"),
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        # no 는 시트 안 순번이라 겹치면 안 된다. 규칙만 두면 어긋난다. 신규 생성,
+        # 복제, 임포트, 드래그 정렬 넷이 번호를 넣는데 그중 하나만 새도 무너진다.
+        # 지운 행은 뺀다. 되살릴 때 번호가 겹치면 restore 가 다시 매긴다.
+        Index(
+            "uq_test_cases_sheet_no", "project_id", "sheet_name", "no",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
 
@@ -171,7 +180,9 @@ class TestRun(Base):
     name = Column(String(200), nullable=False)
     version = Column(String(50), nullable=True)
     environment = Column(String(100), nullable=True)
-    round = Column(Integer, default=1)
+    # ★NULL 을 받지 않는다. 응답 스키마가 필수 정수로 읽어서, NULL 이 하나라도
+    #   섞이면 그 프로젝트의 수행 목록 전체가 500 이 됐다(실 DB 에 2건 있었다).
+    round = Column(Integer, nullable=False, server_default="1", default=1)
     status = Column(SAEnum(TestRunStatus), default=TestRunStatus.in_progress)
     # 이 런이 담는 시트. NULL 이면 프로젝트 전체다(이 컬럼이 생기기 전 런과 같다).
     # 생성 시점의 필터가 아니라 런의 범위다. 진행 중 런이 새 TC 를 흡수할 때도

@@ -258,13 +258,10 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
             else:
                 continue
 
-        if "no" not in row_data:
-            row_data["no"] = no_offset + created_count + updated_count + 1
-        else:
-            try:
-                row_data["no"] = int(row_data["no"]) + no_offset
-            except (ValueError, TypeError):
-                row_data["no"] = no_offset + created_count + updated_count + 1
+        # ★파일에 적힌 No 는 차례를 읽는 데만 쓰고 그대로 저장하지 않는다. 띄엄띄엄
+        #   하거나 겹친 값이 들어오면 시트 안 번호 규약이 깨진다. 여기서는 읽은
+        #   차례대로 붙이고, 임포트가 끝난 뒤 renumber_sheet 가 1..N 으로 맞춘다.
+        row_data["no"] = no_offset + created_count + updated_count + 1
 
         tc_id_val = str(row_data.get("tc_id", ""))
         fields = dict(

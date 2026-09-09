@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -21,6 +21,7 @@ from services.import_service import (
     _parse_md_table, _preview_csv, MAX_IMPORT_SIZE,
 )
 from services.export_service import export_testcases_excel
+from services.tc_numbering import park_sheet_numbers, renumber_sheet
 from services.run_sync_service import sync_project_in_progress_runs
 
 logger = logging.getLogger(__name__)
@@ -110,10 +111,16 @@ def create_testcase(
     _get_project_or_404(project_id, db)
     _validate_sheet_name(project_id, payload.sheet_name, db, auto_create_default=True)
 
+    # ★번호는 서버가 정한다. 보낸 값은 쓰지 않는다. 클라이언트가 정하면 같은
+    #   시트에 같은 번호가 들어오거나 구멍이 생겨, 마이그레이션으로 한 번 정리해도
+    #   규약이 다시 깨진다.
+    data = payload.model_dump()
+    data.pop("no", None)
     tc = TestCase(
         project_id=project_id,
         created_by=current_user.id,
-        **payload.model_dump(),
+        no=_next_no_expr(project_id, payload.sheet_name or "기본"),
+        **data,
     )
     db.add(tc)
     db.commit()
@@ -136,6 +143,7 @@ def bulk_update_testcases(
     _get_project_or_404(project_id, db)
 
     updated: list[TestCase] = []
+    touched_sheets: set[str] = set()
     for item in payload.items:
         tc = db.query(TestCase).filter(
             TestCase.id == item.id, TestCase.project_id == project_id
@@ -143,17 +151,28 @@ def bulk_update_testcases(
         if not tc:
             continue
         item_data = item.model_dump(exclude_unset=True, exclude={"id"})
+        # 단건 수정과 같은 이유로 번호는 받지 않는다.
+        item_data.pop("no", None)
         if "sheet_name" in item_data:
             _validate_sheet_name(project_id, item_data["sheet_name"], db)
+        old_sheet = tc.sheet_name
+        moved = "sheet_name" in item_data and item_data["sheet_name"] != old_sheet
         changes = {}
         for key, value in item_data.items():
             old_val = getattr(tc, key)
             if str(old_val) != str(value):
                 changes[key] = (old_val, value)
             setattr(tc, key, value)
+        if moved:
+            tc.no = _max_no_in_sheet(project_id, tc.sheet_name, db) + 1
+            db.flush()
+            touched_sheets.update({old_sheet, tc.sheet_name})
         if changes:
             _record_history(db, tc, changes, current_user.id)
         updated.append(tc)
+
+    for sheet in touched_sheets:
+        renumber_sheet(project_id, sheet, db)
 
     db.commit()
     for tc in updated:
@@ -181,20 +200,63 @@ def reorder_testcases(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
 ):
-    """TC 순서(no)를 일괄 변경한다."""
+    """TC 순서(no)를 일괄 변경한다.
+
+    ★받은 값을 그대로 쓰지 않는다. 화면은 지금 보이는 행만 1..k 로 다시 매겨
+      보내는데(필터를 걸었거나 전체 보기라면 시트 경계도 넘는다), 그대로 저장하면
+      숨은 행과 번호가 겹치거나 시트 안 규약이 무너진다. 한 시트를 통째로,
+      1..N 으로 보낼 때만 받는다.
+    """
     _get_project_or_404(project_id, db)
 
-    count = 0
-    for item in payload.items:
-        updated = (
-            db.query(TestCase)
-            .filter(TestCase.id == item.id, TestCase.project_id == project_id)
-            .update({TestCase.no: item.no}, synchronize_session="fetch")
+    if not payload.items:
+        return {"updated": 0}
+
+    ids = [item.id for item in payload.items]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(status_code=400, detail="같은 TC 가 두 번 들어 있습니다.")
+
+    rows = db.query(TestCase.id, TestCase.sheet_name).filter(
+        TestCase.id.in_(ids),
+        TestCase.project_id == project_id,
+        TestCase.deleted_at.is_(None),
+    ).all()
+    if len(rows) != len(ids):
+        raise HTTPException(status_code=400, detail="이 프로젝트에 없는 TC 가 들어 있습니다.")
+
+    sheets = {sheet for _, sheet in rows}
+    if len(sheets) > 1:
+        raise HTTPException(status_code=400, detail="한 번에 한 시트만 정렬할 수 있습니다.")
+    sheet_name = sheets.pop()
+
+    total = db.query(func.count(TestCase.id)).filter(
+        TestCase.project_id == project_id,
+        TestCase.sheet_name == sheet_name,
+        TestCase.deleted_at.is_(None),
+    ).scalar()
+    if total != len(ids):
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{sheet_name}' 시트의 TC 를 모두 보내야 합니다. ({len(ids)}/{total})",
         )
-        count += updated
+
+    wanted = sorted(item.no for item in payload.items)
+    if wanted != list(range(1, len(ids) + 1)):
+        raise HTTPException(status_code=400, detail="번호는 1 부터 빠짐없이 이어져야 합니다.")
+
+    # ★두 번에 나눠 쓴다. 한 문장이어도 SQLite 는 행 단위로 유니크 인덱스를
+    #   검사해서, 자리를 맞바꾸는 도중에 번호가 겹친다. 먼저 대상 전체를 음수로
+    #   밀어 두면 목표 번호와 부딪칠 것이 없다. 원래 번호가 시트 안에서 유일하므로
+    #   음수끼리도 유일하다.
+    id_list = ",".join(str(i) for i in ids)
+    db.execute(text(f"UPDATE test_cases SET no = -no WHERE id IN ({id_list})"))
+
+    order = {item.id: item.no for item in payload.items}
+    case_sql = " ".join(f"WHEN {tc_id} THEN {no}" for tc_id, no in order.items())
+    db.execute(text(f"UPDATE test_cases SET no = CASE id {case_sql} END WHERE id IN ({id_list})"))
 
     db.commit()
-    return {"updated": count}
+    return {"updated": len(ids)}
 
 
 # ── Update ────────────────────────────────────────────────────────────────────
@@ -216,8 +278,15 @@ def update_testcase(
         raise HTTPException(status_code=404, detail="Test case not found")
 
     update_data = payload.model_dump(exclude_unset=True)
+    # ★번호는 여기서 바꿀 수 없다. 시트 안 순번이라 사람이 정할 값이 아니고,
+    #   임의 값을 넣으면 구멍이 생기거나 유니크 제약에 걸린다. 순서를 바꾸려면
+    #   정렬 API 를 쓴다.
+    update_data.pop("no", None)
     if "sheet_name" in update_data:
         _validate_sheet_name(project_id, update_data["sheet_name"], db)
+
+    old_sheet = tc.sheet_name
+    moved = "sheet_name" in update_data and update_data["sheet_name"] != old_sheet
 
     changes = {}
     for key, value in update_data.items():
@@ -226,8 +295,18 @@ def update_testcase(
             changes[key] = (old_val, value)
         setattr(tc, key, value)
 
+    if moved:
+        # 옮긴 TC 는 도착 시트의 끝으로 보낸다. 번호를 그대로 들고 가면 그 시트에
+        # 이미 있는 번호와 겹친다. 그 뒤 양쪽 시트를 1..N 으로 맞춘다.
+        tc.no = _max_no_in_sheet(project_id, tc.sheet_name, db) + 1
+
     if changes:
         _record_history(db, tc, changes, current_user.id)
+
+    if moved:
+        db.flush()
+        renumber_sheet(project_id, old_sheet, db)
+        renumber_sheet(project_id, tc.sheet_name, db)
 
     db.commit()
     db.refresh(tc)
@@ -299,9 +378,18 @@ def restore_testcase(
     # deleted_at 을 풀기 전에 조회한다. 풀고 나서 조회하면 autoflush 가
     # 이 행까지 살아 있는 것으로 반영해 자기 자신과 충돌한다고 판정한다.
     taken = taken_tc_ids(project_id, db)
+    # 번호도 같다. 지운 자리는 그 시트의 다음 복제나 신규 행이 가져가므로,
+    # 되살릴 때 그대로 쓰면 같은 시트에 같은 번호가 둘이 된다. TC ID 와 같은
+    # 자리에서 함께 본다. deleted_at 을 풀기 전에 조회해야 자기 자신과 충돌하지
+    # 않는다.
+    no_taken = _no_is_taken(project_id, tc.sheet_name, tc.no, db)
+    next_no = _max_no_in_sheet(project_id, tc.sheet_name, db) + 1
+
     tc.deleted_at = None
     if tc.tc_id in taken:
         tc.tc_id = allocate_tc_id(tc.tc_id, taken)
+    if no_taken:
+        tc.no = next_no
     db.commit()
     sync_project_in_progress_runs(project_id, db)
     db.refresh(tc)
@@ -321,22 +409,47 @@ _CLONE_FIELDS = [
 ]
 
 
-def _max_no_in_sheet(project_id: int, sheet_name: str, db: Session) -> int:
-    """그 시트에서 쓰인 적 있는 가장 큰 번호.
+def _next_no_expr(project_id: int, sheet_name: str):
+    """그 시트의 다음 번호를 구하는 SQL 표현식.
 
-    ★`no` 는 시트 안 순번이다. 신규 행 추가와 엑셀 임포트는 그렇게 붙이는데
-      복제만 프로젝트 전체 max(no)+1 을 줬다. 다른 시트의 큰 번호가 따라와
-      시트 안 번호에 구멍이 났고, 그 시트로 만든 수행의 No 가 1 부터 시작하지
-      않았다.
-    ★지운 TC 도 센다. 삭제는 soft delete 라 되돌릴 수 있어서, 살아 있는 것만
-      보면 지운 번호를 복제가 다시 쓰고 복원하는 순간 같은 시트에 같은 번호가
-      둘이 된다(실측 재현). 번호에 구멍이 남는 쪽이 낫다. 수행 화면과 내보내기의
-      No 는 어차피 목록 순번이라 구멍이 보이지 않는다.
+    ★`no` 는 살아 있는 TC 의 시트 안 순번이다. 신규 행 추가와 엑셀 임포트는
+      그렇게 붙이는데 복제만 프로젝트 전체 max(no)+1 을 줬다. 다른 시트의 큰
+      번호가 따라와 시트 안 번호에 구멍이 났고, 그 시트로 만든 수행의 No 가
+      1 부터 시작하지 않았다.
+    ★값이 아니라 표현식을 돌려준다. 파이썬에서 max 를 읽고 +1 해서 넣으면 그
+      사이에 들어온 다른 요청과 같은 번호를 쓸 수 있다. INSERT 문 안에서 세면
+      그 창이 없다.
+    ★지운 TC 는 세지 않는다. 세면 번호에 구멍이 남는다. 대신 되살릴 때 번호가
+      겹치는지 보고 비어 있는 뒤 번호를 준다(restore_testcase).
     """
+    return (
+        select(func.coalesce(func.max(TestCase.no), 0) + 1)
+        .where(
+            TestCase.project_id == project_id,
+            TestCase.sheet_name == sheet_name,
+            TestCase.deleted_at.is_(None),
+        )
+        .scalar_subquery()
+    )
+
+
+def _max_no_in_sheet(project_id: int, sheet_name: str, db: Session) -> int:
+    """그 시트에서 살아 있는 TC 의 가장 큰 번호."""
     return db.query(func.max(TestCase.no)).filter(
         TestCase.project_id == project_id,
         TestCase.sheet_name == sheet_name,
+        TestCase.deleted_at.is_(None),
     ).scalar() or 0
+
+
+def _no_is_taken(project_id: int, sheet_name: str, no: int, db: Session) -> bool:
+    """그 시트에서 살아 있는 TC 가 이미 쓰고 있는 번호인가."""
+    return db.query(TestCase.id).filter(
+        TestCase.project_id == project_id,
+        TestCase.sheet_name == sheet_name,
+        TestCase.no == no,
+        TestCase.deleted_at.is_(None),
+    ).first() is not None
 
 
 @router.post("/bulk-clone", response_model=List[TestCaseResponse], status_code=201)
@@ -361,15 +474,6 @@ def bulk_clone_testcases(
     if not originals:
         raise HTTPException(status_code=404, detail="No test cases found")
 
-    # 여러 시트를 한 번에 복제할 수 있다. 번호는 각자의 시트에서 이어 붙인다.
-    next_no: dict[str, int] = {}
-
-    def alloc_no(sheet_name: str) -> int:
-        if sheet_name not in next_no:
-            next_no[sheet_name] = _max_no_in_sheet(project_id, sheet_name, db)
-        next_no[sheet_name] += 1
-        return next_no[sheet_name]
-
     # "-copy" 를 그대로 쓰면 같은 TC 를 두 번 복제할 때 ID 가 겹친다.
     taken = taken_tc_ids(project_id, db)
 
@@ -380,12 +484,15 @@ def bulk_clone_testcases(
         taken.add(new_id)
         new_tc = TestCase(
             project_id=project_id,
-            no=alloc_no(orig.sheet_name),
+            no=_next_no_expr(project_id, orig.sheet_name),
             tc_id=new_id,
             created_by=current_user.id,
             **data,
         )
         db.add(new_tc)
+        # 여러 시트를 한 번에 복제할 수 있다. 건마다 밀어 넣어야 다음 건이 방금
+        # 넣은 행까지 세고, 같은 시트 다건 복제에서 번호가 겹치지 않는다.
+        db.flush()
         cloned.append(new_tc)
 
     db.commit()
@@ -416,7 +523,7 @@ def clone_testcase(
     new_id = allocate_tc_id(f"{original.tc_id}-copy", taken_tc_ids(project_id, db))
     new_tc = TestCase(
         project_id=project_id,
-        no=_max_no_in_sheet(project_id, original.sheet_name, db) + 1,
+        no=_next_no_expr(project_id, original.sheet_name),
         tc_id=new_id,
         created_by=current_user.id,
         **data,
@@ -498,7 +605,13 @@ def import_testcases(
             ).order_by(TestCaseSheet.sort_order.desc()).first()
             db.add(TestCaseSheet(project_id=project_id, name=sheet_name, sort_order=(max_order[0] + 1) if max_order else 0))
             db.flush()
+        # ★파일은 행에 1..N 을 붙여 들어온다. 그 시트에 이미 1..N 이 있으면 넣는
+        #   도중에 번호가 부딪친다. 먼저 비켜 두고, 끝나면 1..N 으로 맞춘다.
+        park_sheet_numbers(project_id, sheet_name, db)
+        db.flush()
         r = _parse_csv(content, project_id, current_user.id, db, sheet_name=sheet_name)
+        db.flush()
+        renumber_sheet(project_id, sheet_name, db)
         db.commit()
         sync_project_in_progress_runs(project_id, db)
         return {"created": r["created"], "updated": r["updated"], "renamed": r.get("renamed", 0), "imported": r["created"] + r["updated"], "sheets": [{"sheet": sheet_name, "created": r["created"], "updated": r["updated"], "renamed": r.get("renamed", 0)}]}
@@ -535,11 +648,15 @@ def import_testcases(
                 ).order_by(TestCaseSheet.sort_order.desc()).first()
                 db.add(TestCaseSheet(project_id=project_id, name=table["name"], sort_order=(max_order[0] + 1) if max_order else 0))
                 db.flush()
+            park_sheet_numbers(project_id, table["name"], db)
+            db.flush()
             r = _parse_md_table(table, project_id, current_user.id, db, sheet_name=table["name"])
             results.append({"sheet": table["name"], "created": r["created"], "updated": r["updated"], "renamed": r.get("renamed", 0)})
             total_created += r["created"]
             total_updated += r["updated"]
             total_renamed += r.get("renamed", 0)
+            db.flush()
+            renumber_sheet(project_id, table["name"], db)
 
         db.commit()
         sync_project_in_progress_runs(project_id, db)
@@ -583,11 +700,15 @@ def import_testcases(
             db.add(TestCaseSheet(project_id=project_id, name=name, sort_order=(max_order[0] + 1) if max_order else 0))
             db.flush()
 
+        park_sheet_numbers(project_id, name, db)
+        db.flush()
         r = _parse_sheet(ws, project_id, current_user.id, db, no_offset=0, sheet_name=name)
         results.append({"sheet": name, "created": r["created"], "updated": r["updated"], "renamed": r.get("renamed", 0)})
         total_created += r["created"]
         total_updated += r["updated"]
         total_renamed += r.get("renamed", 0)
+        db.flush()
+        renumber_sheet(project_id, name, db)
 
     db.commit()
     sync_project_in_progress_runs(project_id, db)

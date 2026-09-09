@@ -51,6 +51,17 @@ def _server_already_running(port: int) -> bool:
 DEV_DB_SUFFIX = "/tc_manager.db"
 TEST_PORT = int(os.getenv("TEST_PORT", "8008"))
 
+# ★테스트가 실제로 요청을 보내는 곳은 TEST_BASE_URL 이다. 서버를 띄우는 포트와
+#   갈라질 수 있어서(TEST_PORT 는 비어 있는데 요청은 개발 서버로 가는 식), 개발 DB
+#   위험 판정은 이쪽을 본다.
+def _request_port() -> int:
+    from urllib.parse import urlparse
+
+    base = os.getenv("TEST_BASE_URL")
+    if not base:
+        return TEST_PORT
+    return urlparse(base).port or 80
+
 #: 개발 서버가 이미 떠 있으면 HTTP 는 그 서버의 DB 로 간다. 그때 in-process engine 만
 #: 임시 DB 로 돌리면 한 테스트가 두 DB 를 보게 되므로 손대지 않는다.
 USING_RUNNING_DEV_SERVER = _server_already_running(TEST_PORT)
@@ -77,6 +88,19 @@ def _isolate_database_url():
 
 
 TEST_DB_DIR = _isolate_database_url()
+
+# 개발 DB 를 건드릴 위험이 실제로 있는지 알린다. 테스트 파일이 이 값으로 건너뛴다.
+#
+# ★포트 번호로 판정하면 안 된다. 기본 포트가 8008 이라는 이유로 건너뛰던 파일들이
+#   있었는데, 개발 서버가 안 떠 있으면 위 코드가 임시 DB 를 잡고 8008 에 격리 서버를
+#   직접 띄운다. 즉 그 상황은 위험하지 않다. 그런데도 건너뛰는 바람에 CI 에서 40건이
+#   한 줄도 실행되지 않았다(실측: 기본 수집 262건, TEST_PORT=8009 수집 302건).
+#   위험한 것은 "이미 떠 있는 개발 서버를 그대로 쓰는" 경우뿐이다.
+import dev_db_guard
+
+dev_db_guard.DEV_DB_AT_RISK = (
+    _server_already_running(_request_port()) and os.getenv("ALLOW_DEV_DB") != "1"
+)
 
 
 def _wait_for_server(url: str, timeout: float = 15):

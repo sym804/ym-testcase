@@ -16,6 +16,7 @@ from database import get_db
 from models import (
     User, Project, TestRun, TestResult, TestCase, TestResultValue,
 )
+from services.excel_safe import safe_cell
 from services.sheet_order import leaf_sheet_order, sort_results_for_export
 from auth import get_current_user, check_project_access
 
@@ -434,7 +435,7 @@ def report_excel(
     block_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
 
     ws_summary.merge_cells("B1:H1")
-    ws_summary["B1"].value = f"{project.name} - Test Report"
+    ws_summary["B1"].value = safe_cell(f"{project.name} - Test Report")
     ws_summary["B1"].font = title_font
 
     ws_summary["B3"].value = f"Test Run: {run.name}"
@@ -491,7 +492,9 @@ def report_excel(
             r.actual_result, r.issue_link, r.remarks,
         ]
         for col_idx, val in enumerate(row_values, 1):
-            cell = ws_results.cell(row=row_idx, column=col_idx, value=val)
+            # 사용자가 쓴 값은 그대로 넣지 않는다. =, +, -, @ 로 시작하면 여는 쪽에서
+            # 수식으로 실행된다(CWE-1236).
+            cell = ws_results.cell(row=row_idx, column=col_idx, value=safe_cell(val))
             cell.font = cell_font
             cell.border = thin_border
             cell.alignment = Alignment(vertical="center", wrap_text=True)

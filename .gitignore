@@ -104,7 +104,10 @@ docker-compose.yml
 starfort.test.txt
 ym-testcase-credentials.txt
 *-credentials.txt
-*.db.bak-*
+*.db.bak*
+# DB 백업은 이 폴더에만 만든다. 이름 패턴으로 막으면 새 접미사가 나올 때마다
+# 샌다. 9.5MB 짜리가 커밋될 뻔한 적이 있다.
+backups/
 
 # issuelog 가 엑셀 로그를 쓰기 전에 남기는 백업
 .issuelog_backup/
