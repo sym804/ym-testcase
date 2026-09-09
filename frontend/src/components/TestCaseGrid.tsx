@@ -571,29 +571,32 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     const gridApi = gridApiRef.current;
     if (!gridApi) return;
 
-    const items: { id: number; no: number }[] = [];
-    let index = 0;
+    // ★값을 쓰기 전에 먼저 본다. 거절할 상황에서 화면 번호를 미리 바꿔 두면,
+    //   되돌리는 재조회가 실패했을 때 잘못된 번호가 화면에 남는다.
+    //   보이는 행만 다시 매겨 보내면 숨은 행과 번호가 겹친다. rowDrag 를 전체
+    //   보기와 검색 중에 꺼 두지만 컬럼 필터와 정렬은 그것으로 막히지 않는다.
+    //   정렬은 행 수가 그대로라 개수 비교로도 안 걸리므로 따로 본다.
+    const rows: TestCase[] = [];
     gridApi.forEachNodeAfterFilterAndSort((node) => {
-      index++;
-      const data = node.data as TestCase;
-      if (data && data.id > 0) {
-        items.push({ id: data.id, no: index });
-      }
-      if (data) {
-        data.no = index;
-      }
+      if (node.data) rows.push(node.data as TestCase);
     });
-
-    // ★보이는 행만 다시 매겨 보내면 숨은 행과 번호가 겹친다. No 컬럼의 rowDrag 를
-    //   전체 보기와 검색 중에 꺼 두지만 컬럼 필터는 그것으로 막히지 않으므로,
-    //   보내기 직전에 한 번 더 본다. 서버도 같은 조건으로 400 을 내는데, 여기서
-    //   걸러야 화면 번호가 잘못 바뀐 채로 남지 않는다.
-    const partial = !activeSheet || items.length !== rowData.filter((r) => r.id > 0).length;
+    const sorted = (gridApi.getColumnState?.() ?? []).some((c) => c.sort);
+    const partial =
+      !activeSheet ||
+      sorted ||
+      rows.filter((r) => r.id > 0).length !== rowData.filter((r) => r.id > 0).length;
     if (partial) {
       toast.error(t("orderNeedsWholeSheet"));
       loadData();
       return;
     }
+
+    const items: { id: number; no: number }[] = [];
+    rows.forEach((data, i) => {
+      const no = i + 1;
+      if (data.id > 0) items.push({ id: data.id, no });
+      data.no = no;
+    });
 
     gridApi.refreshCells({ columns: ["no"] });
 

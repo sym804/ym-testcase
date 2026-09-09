@@ -344,3 +344,86 @@ def test_import_can_reverse_existing_rows(token, project):
     got = requests.get(f"{BASE}/api/projects/{project}/testcases",
                        headers=auth(token), params={"sheet_name": "결제"}).json()
     assert [t["tc_id"] for t in sorted(got, key=lambda x: x["no"])] == ["TC-3", "TC-2", "TC-1"]
+
+
+def test_csv_import_rejects_negative_numbers(token, project):
+    """파일에 음수 번호가 있어도 저장되지 않는다.
+
+    번호를 옮길 때 쓰는 임시 자리가 음수다. 음수가 실제 데이터로 들어오면 그
+    자리와 부딪친다.
+    """
+    # ★파일의 No 는 저장되지 않으므로 어떤 값이 와도 1..N 이어야 한다. 음수를
+    #   실제로 다루는 것은 park/renumber 쪽이고 그쪽은 test_tc_renumber_service.py
+    #   가 본다.
+    files = {"file": ("t.csv", _csv_bytes([(-5, "TC-N1"), (-1000001, "TC-N2")]), "text/csv")}
+    r = requests.post(f"{BASE}/api/projects/{project}/testcases/import",
+                      headers=auth(token), files=files)
+    assert r.status_code in (200, 201), r.text
+    assert r.json()["imported"] == 2, r.text
+
+    _assert_contract(token, project, "CSV Import", expected=2)
+    got = requests.get(f"{BASE}/api/projects/{project}/testcases",
+                       headers=auth(token), params={"sheet_name": "CSV Import"}).json()
+    assert [t["tc_id"] for t in sorted(got, key=lambda x: x["no"])] == ["TC-N1", "TC-N2"],         "파일에 적힌 차례를 지켜야 한다"
+
+
+def test_markdown_import_rejects_negative_numbers(token, project):
+    """마크다운도 마찬가지다."""
+    files = {"file": ("t.md", _md_bytes([(-3, "TC-N1"), (-9, "TC-N2")]), "text/markdown")}
+    r = requests.post(f"{BASE}/api/projects/{project}/testcases/import",
+                      headers=auth(token), files=files)
+    assert r.status_code in (200, 201), r.text
+    body = r.json()
+    assert body["imported"] == 2, body
+
+    _assert_contract(token, project, body["sheets"][0]["sheet"], expected=2)
+
+
+def test_import_twice_into_same_sheet(token, project):
+    """같은 파일을 두 번 임포트해도 규약이 유지된다.
+
+    두 번째에는 기존 행이 이미 비켜 둔 자리를 거쳐 간다.
+    """
+    files = lambda: {"file": ("t.xlsx", _excel([(1, "TC-A"), (2, "TC-B")]),
+                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    for _ in range(2):
+        r = requests.post(f"{BASE}/api/projects/{project}/testcases/import",
+                          headers=auth(token), files=files())
+        assert r.status_code in (200, 201), r.text
+
+    _assert_contract(token, project, "결제", expected=2)
+
+
+def test_import_file_with_duplicate_numbers(token, project):
+    """파일 안에 같은 번호가 두 번 있어도 받아들인다.
+
+    사람이 만든 엑셀에서 흔하다. 파일의 번호를 그대로 저장하면 넣는 도중에 겹친다.
+    """
+    files = {"file": ("t.xlsx", _excel([(1, "TC-A"), (1, "TC-B"), (2, "TC-C")]),
+                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = requests.post(f"{BASE}/api/projects/{project}/testcases/import",
+                      headers=auth(token), files=files)
+
+    assert r.status_code in (200, 201), r.text
+    _assert_contract(token, project, "결제", expected=3)
+
+
+def test_csv_import_file_with_duplicate_numbers(token, project):
+    """CSV 도 마찬가지다."""
+    files = {"file": ("t.csv", _csv_bytes([(1, "TC-A"), (1, "TC-B")]), "text/csv")}
+    r = requests.post(f"{BASE}/api/projects/{project}/testcases/import",
+                      headers=auth(token), files=files)
+
+    assert r.status_code in (200, 201), r.text
+    _assert_contract(token, project, "CSV Import", expected=2)
+
+
+def test_markdown_import_file_with_duplicate_numbers(token, project):
+    """마크다운 파일 안에 같은 번호가 두 번 있어도 받아들인다."""
+    files = {"file": ("t.md", _md_bytes([(1, "TC-A"), (1, "TC-B")]), "text/markdown")}
+    r = requests.post(f"{BASE}/api/projects/{project}/testcases/import",
+                      headers=auth(token), files=files)
+
+    assert r.status_code in (200, 201), r.text
+    body = r.json()
+    _assert_contract(token, project, body["sheets"][0]["sheet"], expected=2)

@@ -168,3 +168,83 @@ def test_park_then_renumber_keeps_order(session):
     s.flush()
 
     assert _state(s, pid, "결제") == [(new1, 1), (new2, 2), (old1, 3), (old2, 4)]
+
+
+def test_renumber_when_negative_numbers_already_exist(session):
+    """음수 번호가 이미 있어도 비켜 둘 자리와 부딪치지 않는다.
+
+    비켜 두는 자리를 고정 상수로 잡으면 데이터에 그 값이 들어왔을 때 겹친다.
+    """
+    from services.tc_numbering import renumber_sheet
+
+    s, pid, uid = session
+    a = _add(s, pid, uid, "결제", -1000001, "TC-A")
+    b = _add(s, pid, uid, "결제", -1000002, "TC-B")
+    c = _add(s, pid, uid, "결제", 3, "TC-C")
+
+    renumber_sheet(pid, "결제", s)
+    s.flush()
+
+    # 양수가 앞, 음수는 절대값 순으로 뒤
+    assert _state(s, pid, "결제") == [(c, 1), (a, 2), (b, 3)]
+
+
+def test_park_twice_does_not_collide(session):
+    """이미 비켜 둔 시트를 또 비켜 둬도 겹치지 않는다."""
+    from services.tc_numbering import park_sheet_numbers, renumber_sheet
+
+    s, pid, uid = session
+    a = _add(s, pid, uid, "결제", 1, "TC-A")
+    b = _add(s, pid, uid, "결제", 2, "TC-B")
+
+    park_sheet_numbers(pid, "결제", s)
+    s.flush()
+    park_sheet_numbers(pid, "결제", s)   # 남은 양수가 없으므로 아무 일도 없어야 한다
+    s.flush()
+    renumber_sheet(pid, "결제", s)
+    s.flush()
+
+    assert _state(s, pid, "결제") == [(a, 1), (b, 2)]
+
+
+def test_park_does_not_hit_existing_negative(session):
+    """비켜 둘 자리가 이미 쓰이고 있으면 안 된다.
+
+    바닥을 max(abs(no)) 로 잡으면 0 을 비켜 둘 때 -(floor + 0) 이 되어 기존 -floor
+    와 부딪친다.
+    """
+    from services.tc_numbering import park_sheet_numbers, renumber_sheet
+
+    s, pid, uid = session
+    _add(s, pid, uid, "결제", -5, "TC-A")
+    _add(s, pid, uid, "결제", 0, "TC-B")
+    _add(s, pid, uid, "결제", 5, "TC-C")
+
+    park_sheet_numbers(pid, "결제", s)
+    s.flush()
+    renumber_sheet(pid, "결제", s)
+    s.flush()
+
+    assert [n for _, n in _state(s, pid, "결제")] == [1, 2, 3]
+
+
+def test_park_moves_zero_behind_imported_rows(session):
+    """옛 데이터의 0 도 비켜져야 한다.
+
+    비켜 두는 바닥을 max(abs(no)) 로 잡으면, 0 하나뿐인 시트에서 바닥도 0 이라
+    -(0 + 0) = 0 이 되어 park 이 아무 일도 하지 않는다. 그러면 그 행이 임포트한
+    행들보다 앞에 선다.
+    """
+    from services.tc_numbering import park_sheet_numbers, renumber_sheet
+
+    s, pid, uid = session
+    old = _add(s, pid, uid, "결제", 0, "TC-OLD")
+
+    park_sheet_numbers(pid, "결제", s)
+    s.flush()
+    new = _add(s, pid, uid, "결제", 1, "TC-NEW")
+
+    renumber_sheet(pid, "결제", s)
+    s.flush()
+
+    assert _state(s, pid, "결제") == [(new, 1), (old, 2)]

@@ -12,9 +12,12 @@ import userEvent from "@testing-library/user-event";
 
 let lastColumnDefs: any[] = [];
 
+let lastProps: any = null;
+
 vi.mock("ag-grid-react", () => ({
   AgGridReact: (props: any) => {
     lastColumnDefs = props.columnDefs ?? [];
+    lastProps = props;
     return <div data-testid="ag-grid">{props.rowData?.length ?? 0}</div>;
   },
 }));
@@ -122,5 +125,63 @@ describe("No 컬럼 편집", () => {
 
     await waitFor(() => expect(noColumn()).toBeTruthy());
     expect(noColumn()?.editable).toBe(false);
+  });
+});
+
+describe("드래그 저장 직전 검사", () => {
+  /** 화면에 보이는 행과 정렬 상태를 흉내낸 그리드 API. */
+  const fakeApi = (visible: any[], sortState: any[] = []) => ({
+    forEachNodeAfterFilterAndSort: (fn: (n: any) => void) =>
+      visible.forEach((data) => fn({ data })),
+    getColumnState: () => sortState,
+    refreshCells: () => {},
+  });
+
+  const rows = [tc(1, 1, "결제"), tc(2, 2, "결제"), tc(3, 3, "결제")];
+
+  it("한 시트 전체를 보고 있으면 보낸다", async () => {
+    vi.mocked(testCasesApi.reorder).mockResolvedValue({ updated: 3 } as any);
+    await renderGrid([sheet("결제", 3, 1)], rows);
+    await waitFor(() => expect(lastProps).toBeTruthy());
+
+    lastProps.onGridReady({ api: fakeApi([...rows].reverse()) });
+    await lastProps.onRowDragEnd();
+
+    await waitFor(() => expect(testCasesApi.reorder).toHaveBeenCalled());
+    const sent = vi.mocked(testCasesApi.reorder).mock.calls[0][1];
+    expect(sent.map((x: any) => x.no)).toEqual([1, 2, 3]);
+  });
+
+  it("일부만 보이면 보내지 않는다", async () => {
+    await renderGrid([sheet("결제", 3, 1)], rows);
+    await waitFor(() => expect(lastProps).toBeTruthy());
+
+    lastProps.onGridReady({ api: fakeApi(rows.slice(0, 2)) });
+    await lastProps.onRowDragEnd();
+
+    expect(testCasesApi.reorder).not.toHaveBeenCalled();
+  });
+
+  it("정렬이 걸려 있으면 보내지 않는다", async () => {
+    // 행 수는 그대로라 개수 비교로는 안 걸린다.
+    await renderGrid([sheet("결제", 3, 1)], rows);
+    await waitFor(() => expect(lastProps).toBeTruthy());
+
+    lastProps.onGridReady({ api: fakeApi(rows, [{ colId: "tc_id", sort: "asc" }]) });
+    await lastProps.onRowDragEnd();
+
+    expect(testCasesApi.reorder).not.toHaveBeenCalled();
+  });
+
+  it("거절할 때 화면 번호를 미리 바꾸지 않는다", async () => {
+    const local = [tc(1, 1, "결제"), tc(2, 2, "결제"), tc(3, 3, "결제")];
+    await renderGrid([sheet("결제", 3, 1)], local);
+    await waitFor(() => expect(lastProps).toBeTruthy());
+
+    const visible = local.slice(0, 2);
+    lastProps.onGridReady({ api: fakeApi(visible) });
+    await lastProps.onRowDragEnd();
+
+    expect(visible.map((r) => r.no)).toEqual([1, 2]);
   });
 });
