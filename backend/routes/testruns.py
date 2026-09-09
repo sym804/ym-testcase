@@ -21,6 +21,7 @@ from schemas import (
 from auth import get_current_user, role_required, check_project_access, get_project_role
 from routes.attachments import UPLOAD_DIR
 from services.run_sync_service import sync_run_results
+from services.sheet_order import leaf_sheet_order, sort_results_for_export
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/testruns",
@@ -167,9 +168,10 @@ def get_testrun(
     )
 
     # 결과 행은 런에 편입된 순서로 저장되므로, 나중에 추가된 TC는 뒤에 붙는다.
-    # 소비자(그리드, 리포트)가 모두 TC 번호 순을 기대하므로 여기서 정렬을 보장한다.
-    # 세션에서 분리한 뒤 정렬해 ORM 컬렉션 변경으로 잡히지 않게 한다
-    # (엑셀 내보내기도 같은 방식으로 파이썬 정렬을 쓴다).
+    # 소비자는 저마다 다시 세운다(그리드는 시트 순서 + no, 두 엑셀은 leaf_sheet_order).
+    # 그래도 여기서 no 순을 보장한다. 시트를 모르는 소비자(API 를 직접 부르는 쪽)가
+    # 편입 순서를 그대로 받으면 순서가 없는 것이나 마찬가지다.
+    # 세션에서 분리한 뒤 정렬해 ORM 컬렉션 변경으로 잡히지 않게 한다.
     if loaded:
         db.expunge(loaded)
         loaded.results.sort(key=lambda r: r.test_case.no if r.test_case else 0)
@@ -489,6 +491,8 @@ def export_testrun_excel(
                 TestCase.id, TestCase.no, TestCase.tc_id, TestCase.type,
                 TestCase.category, TestCase.depth1, TestCase.depth2,
                 TestCase.priority, TestCase.test_steps, TestCase.expected_result,
+                # 시트 순서로 세우려면 필요하다. 빼면 행마다 지연 로딩이 붙는다.
+                TestCase.sheet_name,
             )
         )
         .filter(TestRun.id == run_id, TestRun.project_id == project_id)
@@ -523,14 +527,18 @@ def export_testrun_excel(
         "NA": PatternFill(start_color="F3F4F6", end_color="F3F4F6", fill_type="solid"),
     }
 
-    # Sort results by test_case.no
-    sorted_results = sorted(run.results, key=lambda r: (r.test_case.no if r.test_case else 0))
+    # ★화면과 같은 차례로 세운다. 시트 순서가 먼저고 그 안에서 no 순이다.
+    #   no 로만 세우면 여러 시트를 담은 수행에서 시트가 뒤섞인다.
+    sorted_results = sort_results_for_export(run.results, leaf_sheet_order(project_id, db))
 
     for row_idx, tr in enumerate(sorted_results, 2):
         tc = tr.test_case
         result_display = "" if tr.result == TestResultValue.NS else ("N/A" if tr.result == TestResultValue.NA else tr.result.value)
 
-        ws.cell(row=row_idx, column=1, value=tc.no if tc else "")
+        # ★No 는 저장된 no 가 아니라 이 목록의 순번이다. 파일은 수행 전체를 담으므로
+        #   화면의 "전체" 탭과 같은 번호가 된다(시트 탭은 그 시트 안에서 다시 1 부터다).
+        #   저장된 no 는 시트 안에서 구멍이 날 수 있어 화면과 파일이 갈렸다.
+        ws.cell(row=row_idx, column=1, value=row_idx - 1)
         ws.cell(row=row_idx, column=2, value=tc.tc_id if tc else "")
         ws.cell(row=row_idx, column=3, value=tc.type if tc else "")
         ws.cell(row=row_idx, column=4, value=tc.category if tc else "")
@@ -557,9 +565,14 @@ def export_testrun_excel(
     wb.save(buf)
     buf.seek(0)
 
+    # ★헤더는 latin-1 만 담는다. 수행 이름에 한글이 있으면 그대로 넣다가 인코딩에서
+    #   터져 500 이 났다(실측: 같은 수행을 영문 이름으로 만들면 200).
+    #   다른 내보내기(리포트, TC 목록)가 쓰는 RFC 5987 방식으로 맞춘다.
+    from urllib.parse import quote
     filename = f"{run.name}_results.xlsx"
+    encoded = quote(filename)
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
     )

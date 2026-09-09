@@ -368,7 +368,7 @@
     "sync_li1": "When you add TCs after creating a run, <strong>in-progress</strong> runs pick them up automatically and show them as <strong>NS (Not Started)</strong>. A run scoped to specific sheets only picks up TCs <strong>added within those sheets</strong>.",
     "sync_li2": "<strong>Completed</strong> runs keep the snapshot taken at completion, so TCs added later are not included. Use \"Reopen\" or create a new run to include them.",
     "sync_li3": "The number on each sheet tab is the count of TCs actually contained in that run. It may differ from the per-sheet count on the TC management screen, which is expected for completed runs.",
-    "sync_li4": "The grid is always sorted by TC number. TCs added later still appear at their numbered position.",
+    "sync_li4": "The grid is sorted by sheet order first, then by TC number within each sheet. TCs added later still appear at their numbered position. The <strong>No</strong> column is the row number of the list you are looking at, so it always starts at 1: within the sheet on a sheet tab, across the whole run on the All tab and in Excel exports. It may differ from the number stored in TC Management.",
     "h3_result": "8-4. Result Input",
     "feat_mouse_title": "Mouse Click",
     "feat_mouse_desc": "Click a result cell to select PASS/FAIL/BLOCK/N/A/NS from the dropdown.",

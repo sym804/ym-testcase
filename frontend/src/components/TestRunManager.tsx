@@ -226,14 +226,21 @@ export default function TestRunManager({ projectId, project }: Props) {
 
   // ── 시트 목록 로드 ──
   useEffect(() => {
-    testCasesApi.listSheets(projectId).then((s) => {
-      setSheets(s);
-      if (s.length > 1 && !sheetInitRef.current) {
-        sheetInitRef.current = true;
-        setActiveSheet(s[0].name);
-      }
-    }).catch(() => {});
+    testCasesApi.listSheets(projectId).then(setSheets).catch(() => {});
   }, [projectId]);
+
+  // ★기본 탭은 트리 루트가 아니라 펴 놓은 잎에서 고른다. 루트 첫 칸이 폴더면
+  //   폴더 이름으로 걸러 그리드가 빈 채로 열리고, 아래 보정이 뒤늦게 잎으로
+  //   옮기면서 상세를 두 번 받는다. 시트를 폴더 하나에 모아 둔 프로젝트는 루트가
+  //   하나라 기본 탭이 전체가 돼, 같은 화면인데 프로젝트 모양에 따라 기본 탭이
+  //   갈렸다. 시트 목록이 런보다 늦게 와도 여기서 탭이 정해지며 상세를 다시 받는다.
+  useEffect(() => {
+    if (sheetInitRef.current) return;
+    if (selectableSheets.length > 1) {
+      sheetInitRef.current = true;
+      setActiveSheet(selectableSheets[0].name);
+    }
+  }, [selectableSheets]);
 
   // 고른 시트 밖의 탭이 활성인 채로 그 런을 열면 그리드가 빈 채로 보인다.
   // 범위 안의 첫 시트로 옮긴다.
@@ -294,32 +301,31 @@ export default function TestRunManager({ projectId, project }: Props) {
           } catch { /* 실패하면 표시만 놓친다. 다음 진입에서 다시 받는다 */ }
         }
         if (isStale()) return;
-        // 시트 필터 적용
-        if (activeSheet) {
-          // 결과 행은 런에 편입된 순서로 오므로, 런 생성 이후 추가된 TC는 뒤에 붙는다.
-          // 화면에는 항상 TC 번호 순으로 보여야 한다.
-          setResults(
-            mapped
-              .filter((r) => r.test_case?.sheet_name === activeSheet)
-              .sort((a, b) => (a.test_case?.no || 0) - (b.test_case?.no || 0))
-          );
-        } else if (sheets.length > 1) {
-          // 전체 보기: 시트 순서대로 정렬 + 연속 번호
-          const sheetOrder = sheets.map((s) => s.name);
-          const sorted = [...mapped].sort((a, b) => {
-            const ai = sheetOrder.indexOf(a.test_case?.sheet_name || "기본");
-            const bi = sheetOrder.indexOf(b.test_case?.sheet_name || "기본");
-            if (ai !== bi) return ai - bi;
-            return (a.test_case?.no || 0) - (b.test_case?.no || 0);
-          });
-          let seq = 1;
-          for (const r of sorted) {
-            if (r.test_case) r.test_case = { ...r.test_case, no: seq++ };
-          }
-          setResults(sorted);
-        } else {
-          setResults(mapped);
-        }
+        // ★No 는 저장된 값이 아니라 지금 보고 있는 목록의 순번이다(매뉴얼 규약).
+        //   재번호가 전체 탭에만 있었는데, 시트가 둘 이상이면 기본 탭이 첫 시트고
+        //   시트를 골라 만든 수행은 전체 탭 자체가 없다. 그래서 실제로 보게 되는
+        //   화면은 대부분 재번호가 없는 쪽이었다.
+        //   ★시트 순서는 펴 놓은 잎 시트에서 가져온다. 트리 루트만 보면 시트를
+        //     폴더 하나에 모아 둔 프로젝트에서 순서도 재번호도 어긋난다.
+        const order = selectableSheets.map((s) => s.name);
+        const rank = (name?: string | null) => {
+          const i = order.indexOf(name || "기본");
+          return i === -1 ? order.length : i; // 목록에 없는 시트는 뒤로 보낸다
+        };
+        // 결과 행은 런에 편입된 순서로 오므로, 런 생성 이후 추가된 TC 는 뒤에 붙는다.
+        const view = (
+          activeSheet
+            ? mapped.filter((r) => r.test_case?.sheet_name === activeSheet)
+            : [...mapped]
+        ).sort((a, b) => {
+          const d = rank(a.test_case?.sheet_name) - rank(b.test_case?.sheet_name);
+          return d !== 0 ? d : (a.test_case?.no || 0) - (b.test_case?.no || 0);
+        });
+        // 이름을 seq 로 두지 않는다. 이 함수의 경합 방어가 걸린 세대 번호가 seq 다.
+        let rowSeq = 1;
+        setResults(
+          view.map((r) => (r.test_case ? { ...r, test_case: { ...r.test_case, no: rowSeq++ } } : r))
+        );
       } catch {
         if (!isStale()) toast.error(t("resultLoadFailed"));
       } finally {
@@ -327,7 +333,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projectId, activeSheet, seedAttachments]
+    [projectId, activeSheet, selectableSheets, seedAttachments]
   );
 
   useEffect(() => { loadRunDetailRef.current = loadRunDetail; }, [loadRunDetail]);

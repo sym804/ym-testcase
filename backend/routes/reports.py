@@ -16,6 +16,7 @@ from database import get_db
 from models import (
     User, Project, TestRun, TestResult, TestCase, TestResultValue,
 )
+from services.sheet_order import leaf_sheet_order, sort_results_for_export
 from auth import get_current_user, check_project_access
 
 logger = logging.getLogger(__name__)
@@ -398,6 +399,8 @@ def report_excel(
                 TestCase.no, TestCase.tc_id, TestCase.type, TestCase.category,
                 TestCase.depth1, TestCase.depth2, TestCase.priority,
                 TestCase.test_steps, TestCase.expected_result,
+                # 시트 순서로 세우려면 필요하다. 빼면 행마다 지연 로딩이 붙는다.
+                TestCase.sheet_name,
             )
         )
         .filter(TestResult.test_run_id == run.id)
@@ -406,6 +409,9 @@ def report_excel(
         .order_by(TestCase.no)
         .all()
     )
+    # ★수행 엑셀과 같은 차례로 세운다. 같은 수행을 두 파일로 뽑을 수 있어서,
+    #   한쪽만 고치면 같은 행이 다른 번호를 단다.
+    results = sort_results_for_export(results, leaf_sheet_order(project_id, db))
 
     wb = Workbook()
 
@@ -479,7 +485,8 @@ def report_excel(
         tc = r.test_case
         result_val = r.result.value if hasattr(r.result, "value") else r.result
         row_values = [
-            tc.no, tc.tc_id, tc.type, tc.category, tc.depth1, tc.depth2,
+            # ★No 는 저장된 no 가 아니라 이 목록의 순번이다(수행 엑셀과 같은 규약).
+            row_idx - 1, tc.tc_id, tc.type, tc.category, tc.depth1, tc.depth2,
             tc.priority, tc.test_steps, tc.expected_result, result_val,
             r.actual_result, r.issue_link, r.remarks,
         ]
