@@ -17,12 +17,10 @@ ADMIN_PW = os.getenv("TEST_ADMIN_PASSWORD", "test1234")
 # 거기에 붙으면 테스트 데이터가 실 데이터에 섞인다. conftest는 포트가 이미 점유돼 있으면
 # 격리 DB 없이 그 서버를 그대로 쓰기 때문에 경고만으로는 막지 못한다.
 # 격리 포트를 명시하거나(TEST_PORT/TEST_BASE_URL), 의도적으로 허용해야 실행된다.
-if BASE.endswith(":8008") and os.getenv("ALLOW_DEV_DB") != "1":
-    pytest.skip(
-        "개발 서버(8008)의 실 DB 오염 방지를 위해 건너뜀. "
-        "격리 실행: TEST_PORT=8009 TEST_BASE_URL=http://127.0.0.1:8009 pytest test_run_tc_sync.py",
-        allow_module_level=True,
-    )
+import dev_db_guard
+
+if dev_db_guard.DEV_DB_AT_RISK:
+    pytest.skip(dev_db_guard.SKIP_REASON, allow_module_level=True)
 
 
 def auth(token):

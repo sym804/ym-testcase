@@ -358,7 +358,15 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const columnDefs = useMemo<ColDef[]>(
     () => {
       const builtIn: (ColDef & { _key?: string })[] = [
-        { _key: "no", field: "no", headerName: "No", width: 70, rowDrag: canEditTC, editable: canEditTC, type: "numericColumn", wrapText: false, autoHeight: false },
+        // ★No 는 읽기 전용이다. 시트 안 순번이라 사람이 정할 값이 아니고, 서버도
+        //   보낸 값을 쓰지 않는다. 편집을 열어 두면 화면에는 새 값이 남고 DB 에는
+        //   옛 값이 남아 새로고침 전까지 갈린다. 순서를 바꾸려면 드래그를 쓴다.
+        // ★드래그 정렬은 한 시트를 통째로 보고 있을 때만 켠다. 정렬은 보이는 행에
+        //   1..N 을 다시 매겨 보내는데, 전체 보기는 시트 경계를 넘고 검색 중에는
+        //   숨은 행이 빠진다. 그대로 저장하면 시트 안 번호 규약이 무너진다.
+        //   서버도 같은 조건으로 거절하지만(400), 끌어 놓고 나서 실패를 보는 것보다
+        //   못 끌게 하는 편이 낫다.
+        { _key: "no", field: "no", headerName: "No", width: 70, rowDrag: canEditTC && !!activeSheet && !searchText, editable: false, type: "numericColumn", wrapText: false, autoHeight: false },
         { _key: "tc_id", field: "tc_id", headerName: fieldDisplay("tc_id", "TC ID").name, width: 110, editable: canEditTC, cellRenderer: HighlightCell },
         {
           _key: "type", field: "type",
@@ -449,7 +457,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     ];
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canEditTC, customFields, project.field_config, priorityRefData, platformRefData]
+    [canEditTC, activeSheet, searchText, customFields, project.field_config, priorityRefData, platformRefData]
   );
 
   const defaultColDef = useMemo<ColDef>(
@@ -576,6 +584,17 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       }
     });
 
+    // ★보이는 행만 다시 매겨 보내면 숨은 행과 번호가 겹친다. No 컬럼의 rowDrag 를
+    //   전체 보기와 검색 중에 꺼 두지만 컬럼 필터는 그것으로 막히지 않으므로,
+    //   보내기 직전에 한 번 더 본다. 서버도 같은 조건으로 400 을 내는데, 여기서
+    //   걸러야 화면 번호가 잘못 바뀐 채로 남지 않는다.
+    const partial = !activeSheet || items.length !== rowData.filter((r) => r.id > 0).length;
+    if (partial) {
+      toast.error(t("orderNeedsWholeSheet"));
+      loadData();
+      return;
+    }
+
     gridApi.refreshCells({ columns: ["no"] });
 
     if (items.length > 0) {
@@ -583,9 +602,11 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         await testCasesApi.reorder(projectId, items);
       } catch {
         toast.error(t("orderSaveFailed"));
+        loadData();
       }
     }
-  }, [projectId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, activeSheet, rowData, loadData]);
 
   const onCellValueChanged = useCallback(
     (event: CellValueChangedEvent) => {

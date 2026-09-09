@@ -15,12 +15,10 @@ import requests
 BASE = os.getenv("TEST_BASE_URL", "http://127.0.0.1:8008")
 ADMIN_PW = os.getenv("TEST_ADMIN_PASSWORD", "test1234")
 
-if BASE.endswith(":8008") and os.getenv("ALLOW_DEV_DB") != "1":
-    pytest.skip(
-        "개발 서버(8008)의 실 DB 오염 방지를 위해 건너뜀. "
-        "격리 실행: TEST_PORT=8009 TEST_BASE_URL=http://127.0.0.1:8009 pytest test_tc_clone_numbering.py",
-        allow_module_level=True,
-    )
+import dev_db_guard
+
+if dev_db_guard.DEV_DB_AT_RISK:
+    pytest.skip(dev_db_guard.SKIP_REASON, allow_module_level=True)
 
 
 def auth(token):
@@ -106,11 +104,11 @@ def test_bulk_clone_same_sheet_increments(token, project):
     assert _nos_of(token, pid, "결제") == [1, 2, 3, 4]
 
 
-def test_clone_skips_numbers_held_by_deleted_tc(token, project):
-    """지운 TC 가 쥐고 있던 번호는 복제가 다시 쓰지 않는다.
+def test_restore_gets_a_free_number(token, project):
+    """되살린 TC 는 그 시트에서 비어 있는 번호를 받는다.
 
-    삭제는 soft delete 라 되돌릴 수 있다. 살아 있는 TC 만 보고 번호를 주면,
-    지운 뒤 복제하고 다시 되살렸을 때 같은 시트에 같은 번호가 둘이 된다.
+    번호는 살아 있는 TC 기준으로 1 부터 이어진다. 그래서 지운 자리를 다음 복제가
+    가져간다. 되살릴 때 그 번호를 그대로 쓰면 같은 시트에 같은 번호가 둘이 된다.
     """
     pid, ids = project
     h = auth(token)
@@ -121,20 +119,41 @@ def test_clone_skips_numbers_held_by_deleted_tc(token, project):
 
     r = requests.post(f"{BASE}/api/projects/{pid}/testcases/{ids[('결제', 1)]}/clone", headers=h)
     assert r.status_code == 201, r.text
-    cloned_no = r.json()["no"]
-    assert cloned_no != 2, "지운 TC 의 번호를 다시 쓰면 복원할 때 겹친다"
+    assert r.json()["no"] == 2, "지운 자리를 메운다. 번호에 구멍을 남기지 않는다"
 
-    assert requests.post(f"{BASE}/api/projects/{pid}/testcases/{victim}/restore",
-                         headers=h).status_code == 200
-    assert _nos_of(token, pid, "결제") == sorted({1, 2, cloned_no})
+    rr = requests.post(f"{BASE}/api/projects/{pid}/testcases/{victim}/restore", headers=h)
+    assert rr.status_code == 200, rr.text
+    assert rr.json()["no"] == 3, "이미 쓰이는 번호면 비어 있는 뒤 번호를 받는다"
+    assert _nos_of(token, pid, "결제") == [1, 2, 3]
+
+
+def test_restore_keeps_number_when_free(token, project):
+    """번호가 비어 있으면 되살릴 때 그대로 쓴다."""
+    pid, ids = project
+    h = auth(token)
+    victim = ids[("결제", 2)]
+
+    assert requests.delete(f"{BASE}/api/projects/{pid}/testcases/{victim}",
+                           headers=h).status_code in (200, 204)
+    rr = requests.post(f"{BASE}/api/projects/{pid}/testcases/{victim}/restore", headers=h)
+
+    assert rr.status_code == 200, rr.text
+    assert rr.json()["no"] == 2
+    assert _nos_of(token, pid, "결제") == [1, 2]
 
 
 def test_clone_ignores_other_sheets(token, project):
-    """다른 시트의 큰 번호는 복제 번호에 영향을 주지 않는다."""
+    """다른 시트의 큰 번호는 복제 번호에 영향을 주지 않는다.
+
+    ★번호는 서버가 정하므로 요청으로 큰 값을 심을 수 없다. 로그인 시트에 TC 를
+      더 넣어 그 시트의 max 를 결제보다 크게 만든다.
+    """
     pid, ids = project
-    _add_tc(token, pid, 500, "TC-로그인-500", "로그인")
+    for i in range(4, 9):
+        _add_tc(token, pid, i, f"TC-로그인-{i:03d}", "로그인")
+    assert _nos_of(token, pid, "로그인") == [1, 2, 3, 4, 5, 6, 7, 8]
 
     r = requests.post(
         f"{BASE}/api/projects/{pid}/testcases/{ids[('결제', 1)]}/clone", headers=auth(token))
     assert r.status_code == 201, r.text
-    assert r.json()["no"] == 3
+    assert r.json()["no"] == 3, "로그인 시트의 8 이 아니라 결제 시트의 max+1 이어야 한다"

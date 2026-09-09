@@ -21,6 +21,7 @@ from schemas import (
 from auth import get_current_user, role_required, check_project_access, get_project_role
 from routes.attachments import UPLOAD_DIR
 from services.run_sync_service import sync_run_results
+from services.excel_safe import safe_cell
 from services.sheet_order import leaf_sheet_order, sort_results_for_export
 
 router = APIRouter(
@@ -195,6 +196,10 @@ def update_testrun(
         raise HTTPException(status_code=404, detail="Test run not found")
 
     for key, value in payload.model_dump(exclude_unset=True).items():
+        # 라운드를 비우면 커밋에서 제약에 걸려 409 가 난다. 무엇이 잘못됐는지
+        # 알 수 없는 메시지라, 여기서 이유를 붙여 거절한다.
+        if key == "round" and value is None:
+            raise HTTPException(status_code=400, detail="라운드는 비울 수 없습니다.")
         setattr(run, key, value)
 
     db.commit()
@@ -539,22 +544,24 @@ def export_testrun_excel(
         #   화면의 "전체" 탭과 같은 번호가 된다(시트 탭은 그 시트 안에서 다시 1 부터다).
         #   저장된 no 는 시트 안에서 구멍이 날 수 있어 화면과 파일이 갈렸다.
         ws.cell(row=row_idx, column=1, value=row_idx - 1)
-        ws.cell(row=row_idx, column=2, value=tc.tc_id if tc else "")
-        ws.cell(row=row_idx, column=3, value=tc.type if tc else "")
-        ws.cell(row=row_idx, column=4, value=tc.category if tc else "")
-        ws.cell(row=row_idx, column=5, value=tc.depth1 if tc else "")
-        ws.cell(row=row_idx, column=6, value=tc.depth2 if tc else "")
-        ws.cell(row=row_idx, column=7, value=tc.priority if tc else "")
-        ws.cell(row=row_idx, column=8, value=tc.test_steps if tc else "").alignment = Alignment(wrap_text=True)
-        ws.cell(row=row_idx, column=9, value=tc.expected_result if tc else "").alignment = Alignment(wrap_text=True)
+        # 사용자가 쓴 값은 그대로 넣지 않는다. =, +, -, @ 로 시작하면 여는 쪽에서
+        # 수식으로 실행된다(CWE-1236). TC 목록 내보내기에만 있던 방어를 여기도 건다.
+        ws.cell(row=row_idx, column=2, value=safe_cell(tc.tc_id if tc else ""))
+        ws.cell(row=row_idx, column=3, value=safe_cell(tc.type if tc else ""))
+        ws.cell(row=row_idx, column=4, value=safe_cell(tc.category if tc else ""))
+        ws.cell(row=row_idx, column=5, value=safe_cell(tc.depth1 if tc else ""))
+        ws.cell(row=row_idx, column=6, value=safe_cell(tc.depth2 if tc else ""))
+        ws.cell(row=row_idx, column=7, value=safe_cell(tc.priority if tc else ""))
+        ws.cell(row=row_idx, column=8, value=safe_cell(tc.test_steps if tc else "")).alignment = Alignment(wrap_text=True)
+        ws.cell(row=row_idx, column=9, value=safe_cell(tc.expected_result if tc else "")).alignment = Alignment(wrap_text=True)
         result_cell = ws.cell(row=row_idx, column=10, value=result_display)
         result_cell.alignment = Alignment(horizontal="center")
         if tr.result.value in result_fills:
             result_cell.fill = result_fills[tr.result.value]
-        ws.cell(row=row_idx, column=11, value=tr.actual_result or "").alignment = Alignment(wrap_text=True)
-        ws.cell(row=row_idx, column=12, value=tr.issue_link or "")
+        ws.cell(row=row_idx, column=11, value=safe_cell(tr.actual_result or "")).alignment = Alignment(wrap_text=True)
+        ws.cell(row=row_idx, column=12, value=safe_cell(tr.issue_link or ""))
         ws.cell(row=row_idx, column=13, value=tr.duration_sec or "")
-        ws.cell(row=row_idx, column=14, value=tr.remarks or "").alignment = Alignment(wrap_text=True)
+        ws.cell(row=row_idx, column=14, value=safe_cell(tr.remarks or "")).alignment = Alignment(wrap_text=True)
 
     # Auto-width (approximate)
     col_widths = [6, 12, 8, 14, 14, 14, 10, 40, 30, 10, 30, 20, 10, 20]

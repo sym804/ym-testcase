@@ -7,19 +7,8 @@ from openpyxl.comments import Comment
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
+from services.excel_safe import safe_cell as _sanitize_cell
 from services.precondition_service import build_index, expand_text, has_ref
-
-
-def _sanitize_cell(value):
-    """엑셀 수식 인젝션(CWE-1236) 방지.
-
-    사용자 입력 TC 필드가 =, +, -, @, 탭, 개행으로 시작하면 openpyxl 이 수식 셀로
-    저장해, 파일을 여는 팀원 PC 에서 =HYPERLINK/DDE 등이 실행될 수 있다.
-    위험 문자로 시작하는 문자열에 앞따옴표(')를 붙여 텍스트로 강제한다.
-    """
-    if isinstance(value, str) and value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
-        return "'" + value
-    return value
 
 
 # 헤더에서 Precondition 이 몇 번째 열인지 (values 리스트 기준 0-based)

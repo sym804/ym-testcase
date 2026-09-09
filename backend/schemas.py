@@ -165,7 +165,10 @@ class ProjectMemberResponse(BaseModel):
 # ── TestCase ──────────────────────────────────────────────────────────────────
 
 class TestCaseCreate(BaseModel):
-    no: int
+    #: 보내지 않아도 된다. `no` 는 시트 안 순번이라 서버가 정한다.
+    #: 보낸 값은 참고하지 않는다. 클라이언트가 정하면 같은 시트에 같은 번호가
+    #: 들어오거나 구멍이 생겨 규약이 다시 깨진다.
+    no: Optional[int] = None
     tc_id: str
     type: Optional[str] = None
     category: Optional[str] = None
@@ -354,6 +357,17 @@ class TestRunResponse(BaseModel):
     created_by: int
     created_at: datetime
     completed_at: Optional[datetime] = None
+
+    @field_validator("round", mode="before")
+    @classmethod
+    def _round_default(cls, v):
+        """비어 있으면 1 라운드로 읽는다.
+
+        ★컬럼은 NOT NULL 로 바꿨지만(e5a83f21c760) 마이그레이션 전 DB 를 보는
+          서버가 있으면 여기서 다시 터진다. 목록 응답 하나가 못 만들어지면 그
+          프로젝트의 수행 목록 전체가 500 이 되므로 읽는 쪽도 견디게 둔다.
+        """
+        return 1 if v is None else v
     results: List[TestResultResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -372,6 +386,17 @@ class TestRunListResponse(BaseModel):
     created_by: int
     created_at: datetime
     completed_at: Optional[datetime] = None
+
+    @field_validator("round", mode="before")
+    @classmethod
+    def _round_default(cls, v):
+        """비어 있으면 1 라운드로 읽는다.
+
+        ★컬럼은 NOT NULL 로 바꿨지만(e5a83f21c760) 마이그레이션 전 DB 를 보는
+          서버가 있으면 여기서 다시 터진다. 목록 응답 하나가 못 만들어지면 그
+          프로젝트의 수행 목록 전체가 500 이 되므로 읽는 쪽도 견디게 둔다.
+        """
+        return 1 if v is None else v
 
     model_config = ConfigDict(from_attributes=True)
 

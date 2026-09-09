@@ -2,6 +2,7 @@
   "loadFailed": "Failed to load test cases.",
   "autoSaveFailed": "Auto-save failed",
   "orderSaveFailed": "Failed to save order",
+  "orderNeedsWholeSheet": "Reordering needs the whole sheet in view. Clear filters and try again.",
   "addRowFailed": "Failed to add row.",
   "addRowPickSheet": "Select a sheet before adding rows.",
   "addRow": "+ Add Row",

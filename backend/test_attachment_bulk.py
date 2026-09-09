@@ -14,12 +14,10 @@ import requests
 BASE = os.getenv("TEST_BASE_URL", "http://127.0.0.1:8008")
 ADMIN_PW = os.getenv("TEST_ADMIN_PASSWORD", "test1234")
 
-if BASE.endswith(":8008") and os.getenv("ALLOW_DEV_DB") != "1":
-    pytest.skip(
-        "개발 서버(8008)의 실 DB 오염 방지를 위해 건너뜀. "
-        "격리 실행: TEST_PORT=8009 TEST_BASE_URL=http://127.0.0.1:8009 pytest test_attachment_bulk.py",
-        allow_module_level=True,
-    )
+import dev_db_guard
+
+if dev_db_guard.DEV_DB_AT_RISK:
+    pytest.skip(dev_db_guard.SKIP_REASON, allow_module_level=True)
 
 
 def auth(token):
