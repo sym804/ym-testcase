@@ -18,8 +18,6 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-#: 번호를 잠시 비켜 둘 자리. 실제 번호와 겹치지 않을 만큼 낮게 둔다.
-_PARK = 1000000
 
 #: 살아 있는 것 먼저. 그 안에서는 양수(이번에 다룬 행)가 앞이고 음수(비켜 둔 채로
 #: 남은 행)가 뒤다. 음수는 절대값이 원래 차례이므로 그 순서를 지킨다.
@@ -31,6 +29,24 @@ _ORDER = (
 )
 
 
+def _park_floor(project_id: int, sheet_name: str, db: Session) -> int:
+    """비켜 둘 자리의 바닥. 그 시트에서 쓰인 어떤 절대값보다 크다.
+
+    ★고정 상수를 쓰지 않는다. 데이터에 그 값이 들어오면 비켜 둔 자리와 부딪친다.
+      지금은 다른 경로가 음수를 막고 있지만, 그 가정에 기대지 않는다.
+    """
+    # +1 을 더한다. 그냥 max 를 쓰면 no = 0 을 비켜 둘 때 -(max + 0) 이 되어
+    # 이미 -max 를 쥔 행과 부딪친다(실측 재현).
+    used = db.execute(
+        text(
+            "SELECT COALESCE(MAX(ABS(no)), 0) FROM test_cases "
+            "WHERE project_id = :pid AND sheet_name = :sheet"
+        ),
+        {"pid": project_id, "sheet": sheet_name},
+    ).scalar() or 0
+    return used + 1
+
+
 def park_sheet_numbers(project_id: int, sheet_name: str, db: Session) -> None:
     """그 시트의 살아 있는 번호를 음수로 비켜 둔다.
 
@@ -38,14 +54,18 @@ def park_sheet_numbers(project_id: int, sheet_name: str, db: Session) -> None:
     파일이 붙인 1..N 이 그 시트에 이미 있는 1..N 과 부딪친다.
 
     부호만 뒤집으므로 원래 차례가 절대값에 남는다. `_ORDER` 가 그것을 읽는다.
+
+    ★0 도 비켜 둔다. 옛 데이터에 0 이 있으면 양수 계층으로 남아, 파일에서 온
+      1..N 보다 앞에 놓인다.
     """
+    floor = _park_floor(project_id, sheet_name, db)
     db.execute(
         text(
-            "UPDATE test_cases SET no = -no "
+            "UPDATE test_cases SET no = -(:floor + no) "
             "WHERE project_id = :pid AND sheet_name = :sheet "
-            "AND deleted_at IS NULL AND no > 0"
+            "AND deleted_at IS NULL AND no >= 0"
         ),
-        {"pid": project_id, "sheet": sheet_name},
+        {"pid": project_id, "sheet": sheet_name, "floor": floor},
     )
 
 
@@ -70,9 +90,9 @@ def renumber_sheet(project_id: int, sheet_name: str, db: Session) -> None:
     #   비켜 두고 그 다음에 쓴다.
     db.execute(text("""
         UPDATE test_cases
-        SET no = -:park - (SELECT rn FROM _tc_rank WHERE _tc_rank.id = test_cases.id)
+        SET no = -:floor - (SELECT rn FROM _tc_rank WHERE _tc_rank.id = test_cases.id)
         WHERE EXISTS (SELECT 1 FROM _tc_rank WHERE _tc_rank.id = test_cases.id)
-    """), {"park": _PARK})
+    """), {"floor": _park_floor(project_id, sheet_name, db)})
     db.execute(text("""
         UPDATE test_cases
         SET no = (SELECT rn FROM _tc_rank WHERE _tc_rank.id = test_cases.id)

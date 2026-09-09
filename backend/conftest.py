@@ -7,7 +7,9 @@ import threading
 import time
 
 # 독립 실행 스크립트를 pytest 수집에서 제외
-collect_ignore = ["test_v060_full.py", "test_v060_edge_cases.py", "test_v103_features.py", "test_v110_features.py"]
+import dev_db_guard as _guard
+
+collect_ignore = list(_guard.STANDALONE_SCRIPTS)
 
 import pytest
 import requests
@@ -55,11 +57,14 @@ TEST_PORT = int(os.getenv("TEST_PORT", "8008"))
 #   갈라질 수 있어서(TEST_PORT 는 비어 있는데 요청은 개발 서버로 가는 식), 개발 DB
 #   위험 판정은 이쪽을 본다.
 def _request_port() -> int:
+    """테스트가 실제로 요청을 보내는 포트. 기본값은 dev_db_guard 가 들고 있다."""
     from urllib.parse import urlparse
+
+    import dev_db_guard as _guard
 
     base = os.getenv("TEST_BASE_URL")
     if not base:
-        return TEST_PORT
+        return _guard.DEFAULT_REQUEST_PORT
     return urlparse(base).port or 80
 
 #: 개발 서버가 이미 떠 있으면 HTTP 는 그 서버의 DB 로 간다. 그때 in-process engine 만

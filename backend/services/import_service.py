@@ -191,7 +191,8 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
     """단일 시트를 파싱하여 TC를 DB에 추가/업데이트한다. {"created": N, "updated": N} 반환."""
     header_row = _detect_header_row(ws)
     if header_row is None:
-        return 0
+        # ★dict 를 돌려준다. 0 을 주면 호출부가 r["created"] 에서 터진다(500).
+        return {"created": 0, "updated": 0, "renamed": 0}
 
     col_map: dict[int, str] = {}
     for col_idx in range(1, ws.max_column + 1):
@@ -417,13 +418,10 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
             else:
                 row_data["tc_id"] = f"CSV-{row_num:04d}"
 
-        if not row_data.get("no"):
-            row_data["no"] = row_num
-
-        try:
-            row_data["no"] = int(row_data["no"])
-        except (ValueError, TypeError):
-            row_data["no"] = row_num
+        # ★파일에 적힌 No 는 차례를 읽는 데만 쓰고 그대로 저장하지 않는다. 겹치거나
+        #   음수이거나 띄엄띄엄하면 시트 안 번호 규약이 깨진다. 엑셀 경로와 같다.
+        #   임포트가 끝나면 renumber_sheet 가 1..N 으로 맞춘다.
+        row_data["no"] = row_num
 
         # depth3 → depth2 병합
         if row_data.get("depth3"):
@@ -668,13 +666,10 @@ def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, she
             else:
                 row_data["tc_id"] = f"MD-{row_num:04d}"
 
-        if not row_data.get("no"):
-            row_data["no"] = row_num
-
-        try:
-            row_data["no"] = int(row_data["no"])
-        except (ValueError, TypeError):
-            row_data["no"] = row_num
+        # ★파일에 적힌 No 는 차례를 읽는 데만 쓰고 그대로 저장하지 않는다. 겹치거나
+        #   음수이거나 띄엄띄엄하면 시트 안 번호 규약이 깨진다. 엑셀 경로와 같다.
+        #   임포트가 끝나면 renumber_sheet 가 1..N 으로 맞춘다.
+        row_data["no"] = row_num
 
         # depth3 → depth2 병합
         if row_data.get("depth3"):

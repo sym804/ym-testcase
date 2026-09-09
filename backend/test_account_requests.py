@@ -10,6 +10,13 @@ import requests
 
 BASE = os.getenv("TEST_BASE_URL", "http://127.0.0.1:8008")
 
+import dev_db_guard
+
+# HTTP 로 실 서버를 친다. 개발 서버가 떠 있으면 실 DB 에 쓰기가 들어간다.
+if dev_db_guard.DEV_DB_AT_RISK:
+    pytest.skip(dev_db_guard.SKIP_REASON, allow_module_level=True)
+
+
 
 @pytest.fixture(autouse=True)
 def _reset_submit_limit():
