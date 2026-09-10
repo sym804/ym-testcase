@@ -219,7 +219,7 @@ export default function Dashboard({ projectId }: Props) {
                 fontSize: 12,
                 borderRadius: 4,
                 border: "1px solid var(--border-color)",
-                backgroundColor: dateFrom === p.from && dateTo === p.to ? "var(--primary-color)" : "var(--bg-secondary)",
+                backgroundColor: dateFrom === p.from && dateTo === p.to ? "var(--accent)" : "var(--bg-card)",
                 color: dateFrom === p.from && dateTo === p.to ? "#fff" : "var(--text-primary)",
                 cursor: "pointer",
               }}
@@ -235,7 +235,7 @@ export default function Dashboard({ projectId }: Props) {
           style={{
             padding: "4px 8px", fontSize: 12,
             border: "1px solid var(--border-color)", borderRadius: 4,
-            backgroundColor: "var(--bg-primary)", color: "var(--text-primary)", marginLeft: 8,
+            backgroundColor: "var(--bg-input)", color: "var(--text-primary)", marginLeft: 8,
           }}
         />
         <span style={{ color: "var(--text-secondary)", margin: "0 4px" }}>~</span>
@@ -246,7 +246,7 @@ export default function Dashboard({ projectId }: Props) {
           style={{
             padding: "4px 8px", fontSize: 12,
             border: "1px solid var(--border-color)", borderRadius: 4,
-            backgroundColor: "var(--bg-primary)", color: "var(--text-primary)",
+            backgroundColor: "var(--bg-input)", color: "var(--text-primary)",
           }}
         />
       </div>
