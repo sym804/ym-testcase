@@ -478,7 +478,7 @@ function BuiltInFieldSettings({ project, onUpdate }: { project: Project; onUpdat
                     type="text"
                     value={c.display_name}
                     onChange={(e) => setConfig({ ...config, [f.key]: { ...c, display_name: e.target.value } })}
-                    style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border-color)", background: "var(--bg-primary)", color: "var(--text-primary)", fontSize: 13 }}
+                    style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border-color)", background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 13 }}
                   />
                 </td>
                 <td style={{ padding: "6px 10px", textAlign: "center" }}>

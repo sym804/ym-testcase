@@ -1658,7 +1658,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                               if (tc) openHistory(tc);
                             }}
                           >
-                            <td style={{...historyStyles.td, fontWeight: 600, color: "var(--color-primary)" }}>{e.tc_id}</td>
+                            <td style={{...historyStyles.td, fontWeight: 600, color: "var(--accent)" }}>{e.tc_id}</td>
                             <td style={historyStyles.td}>
                               {new Date(e.lastDate).toLocaleString(i18n.language === "ko" ? "ko-KR" : "en-US", {
                                 year: "numeric",
@@ -1739,7 +1739,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                     {resultHistory.map((h, i) => (
                       <tr key={h.result_id} style={{
                         borderBottom: "1px solid var(--border-color)",
-                        backgroundColor: i % 2 === 0 ? "var(--bg-secondary)" : "transparent",
+                        backgroundColor: i % 2 === 0 ? "var(--bg-page)" : "transparent",
                       }}>
                         <td style={historyStyles.td}>{h.run_name}</td>
                         <td style={historyStyles.td}>{h.version || "-"}</td>
@@ -1875,10 +1875,10 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 </label>
               </div>
             </div>
-            <div style={{ padding: "12px 20px", display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "1px solid var(--border)" }}>
+            <div style={{ padding: "12px 20px", display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "1px solid var(--border-color)" }}>
               <button
                 onClick={() => setShowExportModal(false)}
-                style={{ padding: "6px 16px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer" }}
+                style={{ padding: "6px 16px", borderRadius: 6, border: "1px solid var(--border-color)", background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer" }}
               >
                 취소
               </button>
