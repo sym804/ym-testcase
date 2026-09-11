@@ -24,5 +24,7 @@
   "relatedJiraIssues": "연관 Jira 이슈",
   "noRelatedIssues": "연관 이슈가 없습니다.",
   "categorySummary": "카테고리별 요약",
-  "category": "카테고리"
+  "category": "카테고리",
+  "notStarted": "미수행",
+  "passRateNote": "PASS / (PASS+FAIL+BLOCK)"
 }

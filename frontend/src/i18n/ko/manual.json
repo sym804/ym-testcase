@@ -467,8 +467,9 @@
     "imgAlt": "리포트 탭",
     "p1": "테스트 런 결과를 요약 리포트로 확인하고, PDF/Excel로 다운로드할 수 있습니다.",
     "li1": "리포트 탭에서 테스트 런을 선택합니다.",
-    "li2": "요약 섹션: 총 TC, 결과별 건수/비율 등을 확인합니다.",
+    "li2": "요약 섹션: 전체 TC와 PASS/FAIL/BLOCK/N/A/미수행 건수, PASS Rate를 확인합니다. PASS Rate 의 분모는 실행 건수(PASS+FAIL+BLOCK)이며 미수행은 빠집니다.",
     "li3": "실패 목록: FAIL 결과의 TC 상세를 확인합니다.",
+    "li3b": "카테고리별 요약: 카테고리마다 Total/PASS/FAIL/BLOCK/N/A/미수행 건수를 확인합니다.",
     "li4": "PDF 다운로드: <strong>PDF</strong> 버튼 클릭으로 서식화된 PDF 리포트를 다운로드합니다.",
     "li5": "Excel 다운로드: <strong>Excel</strong> 버튼 클릭으로 엑셀 리포트를 다운로드합니다."
   },

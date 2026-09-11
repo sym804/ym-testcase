@@ -30,6 +30,10 @@
   --color-fail: #CF222E;
   --color-block: #BF8700;
   --color-na: #6366F1;
+  /* 미수행: 텍스트용(대비 4.76:1)과 악센트용을 나눈다.
+     악센트 값은 Dashboard.tsx CARD_COLORS.not_started 와 같은 값이다. */
+  --color-ns: #64748B;
+  --color-ns-accent: #D1D5DB;
   --color-link: #5B9BD5;
   --bg-header: #111827;
   --bg-header-input: #1F2937;
@@ -71,6 +75,8 @@
   --color-fail: #EF4444;
   --color-block: #EAB308;
   --color-na: #818CF8;
+  --color-ns: #94A3B8;
+  --color-ns-accent: #6B7280;
   --color-link: #7CB9E8;
   --bg-header: #1C1E26;
   --bg-header-input: #23262F;
