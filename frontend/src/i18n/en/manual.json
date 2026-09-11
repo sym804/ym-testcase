@@ -467,8 +467,9 @@
     "imgAlt": "Report tab",
     "p1": "View test run results as a summary report and download as PDF/Excel.",
     "li1": "Select a test run in the Report tab.",
-    "li2": "Summary section: Check total TCs, counts/ratios by result, etc.",
-    "li3": "Failure list: View TC details for FAIL results.",
+    "li2": "Summary section: Shows total TCs, counts for PASS/FAIL/BLOCK/N/A/Not Started, and PASS Rate. The PASS Rate denominator is executed TCs (PASS+FAIL+BLOCK), excluding Not Started.",
+    "li3": "Failure list: Review details of TCs with FAIL results.",
+    "li3b": "Category summary: Shows Total/PASS/FAIL/BLOCK/N/A/Not Started counts per category.",
     "li4": "PDF download: Click the <strong>PDF</strong> button to download a formatted PDF report.",
     "li5": "Excel download: Click the <strong>Excel</strong> button to download an Excel report."
   },

@@ -24,5 +24,7 @@
   "relatedJiraIssues": "Related Jira Issues",
   "noRelatedIssues": "No related issues.",
   "categorySummary": "Category Summary",
-  "category": "Category"
+  "category": "Category",
+  "notStarted": "Not Started",
+  "passRateNote": "PASS / (PASS+FAIL+BLOCK)"
 }

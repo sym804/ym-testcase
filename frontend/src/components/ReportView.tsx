@@ -151,21 +151,34 @@ export default function ReportView({ projectId }: Props) {
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>{t("overallStatus")}</h3>
             <div style={styles.statsGrid}>
-              <div style={{ ...styles.statCard, borderLeftColor: "var(--accent)" }}>
+              <div data-testid="stat-total" style={{ ...styles.statCard, borderLeftColor: "var(--accent)" }}>
                 <div style={styles.statLabel}>{t("totalTC")}</div>
                 <div style={styles.statValue}>{report.summary.total}</div>
               </div>
-              <div style={{ ...styles.statCard, borderLeftColor: "var(--color-pass)" }}>
-                <div style={styles.statLabel}>PASS Rate</div>
-                <div style={styles.statValue}>{report.summary.pass_rate.toFixed(1)}%</div>
+              <div data-testid="stat-pass" style={{ ...styles.statCard, borderLeftColor: "var(--color-pass)" }}>
+                <div style={styles.statLabel}>PASS</div>
+                <div style={styles.statValue}>{report.summary.pass}</div>
               </div>
-              <div style={{ ...styles.statCard, borderLeftColor: "var(--color-fail)" }}>
+              <div data-testid="stat-fail" style={{ ...styles.statCard, borderLeftColor: "var(--color-fail)" }}>
                 <div style={styles.statLabel}>FAIL</div>
                 <div style={styles.statValue}>{report.summary.fail}</div>
               </div>
-              <div style={{ ...styles.statCard, borderLeftColor: "var(--color-block)" }}>
+              <div data-testid="stat-block" style={{ ...styles.statCard, borderLeftColor: "var(--color-block)" }}>
                 <div style={styles.statLabel}>BLOCK</div>
                 <div style={styles.statValue}>{report.summary.block}</div>
+              </div>
+              <div data-testid="stat-na" style={{ ...styles.statCard, borderLeftColor: "var(--color-na)" }}>
+                <div style={styles.statLabel}>N/A</div>
+                <div style={styles.statValue}>{report.summary.na}</div>
+              </div>
+              <div data-testid="stat-not-started" style={{ ...styles.statCard, borderLeftColor: "var(--color-ns-accent)" }}>
+                <div style={styles.statLabel}>{t("notStarted")}</div>
+                <div style={styles.statValue}>{report.summary.not_started}</div>
+              </div>
+              <div data-testid="stat-pass-rate" style={{ ...styles.statCard, borderLeftColor: "var(--color-pass)" }}>
+                <div style={styles.statLabel}>PASS Rate</div>
+                <div style={styles.statValue}>{report.summary.pass_rate.toFixed(1)}%</div>
+                <div style={styles.statNote}>{t("passRateNote")}</div>
               </div>
             </div>
           </div>
@@ -246,17 +259,19 @@ export default function ReportView({ projectId }: Props) {
                   <th style={styles.thNum}>FAIL</th>
                   <th style={styles.thNum}>BLOCK</th>
                   <th style={styles.thNum}>N/A</th>
+                  <th style={styles.thNum}>{t("notStarted")}</th>
                 </tr>
               </thead>
               <tbody>
                 {report.category_summary.map((row) => (
-                  <tr key={row.category}>
+                  <tr key={row.category} data-testid={`category-row-${row.category}`}>
                     <td style={styles.td}>{row.category}</td>
                     <td style={styles.tdNum}>{row.total}</td>
                     <td style={{ ...styles.tdNum, color: "var(--color-pass)" }}>{row.pass}</td>
                     <td style={{ ...styles.tdNum, color: "var(--color-fail)" }}>{row.fail}</td>
                     <td style={{ ...styles.tdNum, color: "var(--color-block)" }}>{row.block}</td>
-                    <td style={{ ...styles.tdNum, color: "#6B7280" }}>{row.na}</td>
+                    <td data-testid={`category-na-${row.category}`} style={{ ...styles.tdNum, color: "var(--color-na)" }}>{row.na}</td>
+                    <td data-testid={`category-ns-${row.category}`} style={{ ...styles.tdNum, color: "var(--color-ns)" }}>{row.not_started}</td>
                   </tr>
                 ))}
               </tbody>
@@ -331,6 +346,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
     gap: 16,
+  },
+  statNote: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "var(--text-secondary)",
   },
   statCard: {
     padding: "16px",

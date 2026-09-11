@@ -103,6 +103,62 @@ describe("ReportView", () => {
     });
   });
 
+  it("전체 현황 카드에 미수행과 N/A 건수를 표시한다", async () => {
+    vi.mocked(reportsApi.getData).mockResolvedValue({
+      ...mockReport,
+      summary: { total: 50, pass: 20, fail: 10, block: 3, na: 2, not_started: 15, pass_rate: 60.6, fail_rate: 20, block_rate: 6, na_rate: 4, not_started_rate: 30 },
+    });
+    render(<ReportView projectId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("전체 현황")).toBeInTheDocument();
+    });
+
+    const nsCard = screen.getByTestId("stat-not-started");
+    expect(nsCard).toHaveTextContent("미수행");
+    expect(nsCard).toHaveTextContent("15");
+
+    const naCard = screen.getByTestId("stat-na");
+    expect(naCard).toHaveTextContent("N/A");
+    expect(naCard).toHaveTextContent("2");
+  });
+
+  it("전체 현황 카드의 PASS/FAIL/BLOCK/N-A/미수행 합이 전체 TC 와 일치한다", async () => {
+    vi.mocked(reportsApi.getData).mockResolvedValue({
+      ...mockReport,
+      summary: { total: 50, pass: 20, fail: 10, block: 3, na: 2, not_started: 15, pass_rate: 60.6, fail_rate: 20, block_rate: 6, na_rate: 4, not_started_rate: 30 },
+    });
+    render(<ReportView projectId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("stat-total")).toHaveTextContent("50");
+    });
+
+    const nums = ["stat-pass", "stat-fail", "stat-block", "stat-na", "stat-not-started"].map(
+      (id) => Number(screen.getByTestId(id).textContent?.replace(/[^0-9]/g, "")),
+    );
+    expect(nums.reduce((a, b) => a + b, 0)).toBe(50);
+  });
+
+  it("카테고리별 요약 표에 미수행 컬럼을 표시한다", async () => {
+    vi.mocked(reportsApi.getData).mockResolvedValue({
+      ...mockReport,
+      category_summary: [{ category: "인증", total: 20, pass: 12, fail: 3, block: 1, na: 1, not_started: 3 }],
+    });
+    render(<ReportView projectId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("카테고리별 요약")).toBeInTheDocument();
+    });
+
+    // FAIL 도 3 이라서 행 전체 텍스트로 단언하면 미수행 칸이 없어도 통과한다. 셀로 좁힌다.
+    expect(screen.getByTestId("category-ns-인증")).toHaveTextContent("3");
+    expect(screen.getByTestId("category-na-인증")).toHaveTextContent("1");
+    const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
+    expect(headers).toContain("미수행");
+    expect(headers).toContain("N/A");
+  });
+
   it("PDF 다운로드 버튼 클릭 시 reportsApi.downloadPdf를 호출한다", async () => {
     vi.stubGlobal("URL", { ...URL, createObjectURL: vi.fn(() => "blob:mock"), revokeObjectURL: vi.fn() });
     const user = userEvent.setup();

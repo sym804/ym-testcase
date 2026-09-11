@@ -318,8 +318,8 @@ def report_pdf(
         pdf.set_font(font_name, "B", 13)
         pdf.cell(0, 10, "Category Breakdown", new_x="LMARGIN", new_y="NEXT")
 
-        cat_headers = ["Category", "Total", "Pass", "Fail", "Block"]
-        cat_widths = [60, 25, 25, 25, 25]
+        cat_headers = ["Category", "Total", "Pass", "Fail", "Block", "NA", "NS"]
+        cat_widths = [50, 22, 22, 22, 22, 22, 22]
 
         pdf.set_font(font_name, "B", 9)
         for h, w in zip(cat_headers, cat_widths):
@@ -329,11 +329,13 @@ def report_pdf(
         pdf.set_font(font_name, "", 9)
         for cat in data["categories"]:
             vals = [
-                str(cat["category"])[:30],
+                str(cat["category"])[:26],
                 str(cat["total"]),
                 str(cat["passed"]),
                 str(cat["failed"]),
                 str(cat["blocked"]),
+                str(cat.get("na", 0)),
+                str(cat.get("not_started", 0)),
             ]
             for v, w in zip(vals, cat_widths):
                 pdf.cell(w, 8, v, border=1, align="C")
