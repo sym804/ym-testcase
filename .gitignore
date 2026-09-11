@@ -65,8 +65,11 @@ Thumbs.db
 Desktop.ini
 
 # ── Claude Code ──
-.claude/
-skills/
+# 개인 설정은 빼고 프로젝트 스킬만 공유한다. 포트, DB 위치, 함정은 프로젝트 지식이라
+# 레포와 함께 버전 관리되어야 한다.
+.claude/*
+!.claude/skills/
+.claude/settings.local.json
 
 # ── Project-specific excludes ──
 blog/
@@ -93,7 +96,8 @@ WORK_PLAN.md
 
 # ── Portfolio (개인 자료) ──
 portfolio/
-skills/
+# 루트의 개인 스킬 메모만 제외한다. 앞에 / 가 없으면 .claude/skills/ 까지 걸린다.
+/skills/
 ui_design/
 CLAUDE.md
 LICENSE_AGPL
