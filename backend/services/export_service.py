@@ -15,6 +15,38 @@ from services.precondition_service import build_index, expand_text, has_ref
 PRECONDITION_OFFSET = 8
 
 
+
+#: 엑셀 시트명 상한. 넘기면 엑셀이 파일을 복구 대상으로 본다.
+SHEET_TITLE_LIMIT = 31
+
+
+def _safe_sheet_title(name: str, used: set) -> str:
+    """엑셀이 받는 시트명으로 바꾼다. 31자 이하, 금지 문자 없음, 중복 없음.
+
+    자르기를 정제보다 먼저 하면 안 된다. 31자까지 같은 이름 둘은 잘린 뒤 충돌하는데,
+    openpyxl 은 중복을 만나면 뒤에 번호를 붙인다. 그 번호가 상한 밖으로 나가 32자짜리
+    탭이 생긴다(실측). 여기서 번호까지 포함해 상한 안에 넣는다.
+    """
+    safe = name or ""
+    for ch in "/\\":
+        safe = safe.replace(ch, "-")
+    for ch in "*?[]:":
+        safe = safe.replace(ch, "")
+    safe = safe.strip() or "기본"
+    safe = safe[:SHEET_TITLE_LIMIT]
+
+    if safe not in used:
+        used.add(safe)
+        return safe
+
+    for i in range(2, 1000):
+        suffix = f"_{i}"
+        candidate = safe[: SHEET_TITLE_LIMIT - len(suffix)] + suffix
+        if candidate not in used:
+            used.add(candidate)
+            return candidate
+    raise ValueError(f"시트명 중복을 풀지 못했다: {name}")
+
 def export_testcases_excel(
     project, testcases, split_sheets: bool, expand_refs: bool = False
 ) -> StreamingResponse:
@@ -130,11 +162,15 @@ def export_testcases_excel(
             name = tc.sheet_name or "기본"
             sheets_map.setdefault(name, []).append(tc)
 
+        if not sheets_map:
+            # TC 가 0건이면 만들 탭이 없다. 기본 시트를 지우면 워크북에 시트가 하나도
+            # 남지 않아 저장이 IndexError 로 죽는다. 통합 모드와 같은 헤더 시트를 둔다.
+            sheets_map["Test Cases"] = []
+
         wb.remove(wb.active)  # 기본 빈 시트 제거
+        used_titles: set[str] = set()
         for sheet_name, tcs in sheets_map.items():
-            # 엑셀 시트명은 31자 제한, 특수문자 제거
-            safe_name = sheet_name[:31].replace("/", "-").replace("\\", "-").replace("*", "").replace("?", "").replace("[", "").replace("]", "").replace(":", "")
-            ws = wb.create_sheet(title=safe_name)
+            ws = wb.create_sheet(title=_safe_sheet_title(sheet_name, used_titles))
             _write_sheet(ws, sheet_name, tcs)
     else:
         # 통합: 단일 시트
@@ -145,7 +181,10 @@ def export_testcases_excel(
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
+    return _xlsx_response(output, project)
 
+
+def _xlsx_response(output, project) -> StreamingResponse:
     filename = f"{project.name}_TestCases.xlsx"
     encoded = quote(filename)
     return StreamingResponse(
