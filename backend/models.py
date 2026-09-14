@@ -110,6 +110,10 @@ class TestCaseSheet(Base):
     __table_args__ = (
         Index("ix_test_case_sheets_project_id", "project_id"),
         Index("ix_test_case_sheets_parent_id", "parent_id"),
+        # ★이름이 겹치면 rename/delete 가 `.first()` 로 한쪽만 건드리고, TC 의
+        #   sheet_name 은 이름으로 잇기 때문에 어느 시트의 것인지 정해지지 않는다.
+        #   조회 후 삽입만으로는 동시 요청과 임포트를 막지 못한다.
+        Index("uq_test_case_sheets_project_name", "project_id", "name", unique=True),
     )
 
 
@@ -274,7 +278,9 @@ class ProjectMember(Base):
     user = relationship("User")
 
     __table_args__ = (
-        Index("ix_project_members_project_user", "project_id", "user_id"),
+        # ★유일해야 한다. 멤버가 둘이면 권한 조회의 `.first()` 가 아무 역할이나
+        #   돌려주어 판정이 비결정적이 되고, 삭제는 한 행만 지워 권한이 남는다.
+        Index("ix_project_members_project_user", "project_id", "user_id", unique=True),
     )
 
 

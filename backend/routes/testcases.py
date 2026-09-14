@@ -21,6 +21,8 @@ from services.import_service import (
     _parse_md_table, _preview_csv, MAX_IMPORT_SIZE,
 )
 from services.export_service import export_testcases_excel
+from services.sheet_order import leaf_sheet_order
+from services.upload_guard import read_limited_sync
 from services.tc_numbering import park_sheet_numbers, renumber_sheet
 from services.run_sync_service import sync_project_in_progress_runs
 
@@ -271,8 +273,12 @@ def update_testcase(
 ):
     _get_project_or_404(project_id, db)
 
+    # ★지운 TC 는 수정 대상이 아니다. 고칠 수 있으면 삭제와 복원의 의미가
+    #   흔들리고, 화면에 없는 행의 TC ID 가 바뀌어 복원했을 때 다른 것이 된다.
     tc = db.query(TestCase).filter(
-        TestCase.id == tc_id, TestCase.project_id == project_id
+        TestCase.id == tc_id,
+        TestCase.project_id == project_id,
+        TestCase.deleted_at.is_(None),
     ).first()
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found")
@@ -325,7 +331,12 @@ def bulk_delete_testcases(
     """여러 TC를 한 번에 소프트 삭제한다."""
     _get_project_or_404(project_id, db)
     from models import now_kst
-    id_list = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    # ★숫자가 아닌 값이 오면 ValueError 가 전역 핸들러까지 올라가 500 이 됐다.
+    #   잘못 보낸 쪽이 고칠 수 있도록 400 으로 돌려준다.
+    try:
+        id_list = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ids 는 쉼표로 구분한 정수여야 합니다.")
     now = now_kst()
     count = (
         db.query(TestCase)
@@ -546,15 +557,13 @@ def preview_import_sheets(
 ):
     """엑셀/CSV/Markdown 파일의 시트 목록과 각 시트의 TC 수, 기존 중복 수를 반환한다."""
     if _is_csv_file(file.filename):
-        content = file.file.read()
-        if len(content) > MAX_IMPORT_SIZE:
-            raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_IMPORT_SIZE // (1024*1024)}MB")
+        # ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온 뒤다.
+        content = read_limited_sync(file.file, MAX_IMPORT_SIZE)
         return {"sheets": _preview_csv(content, project_id, db)}
 
     if _is_md_file(file.filename):
-        content = file.file.read()
-        if len(content) > MAX_IMPORT_SIZE:
-            raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_IMPORT_SIZE // (1024*1024)}MB")
+        # ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온 뒤다.
+        content = read_limited_sync(file.file, MAX_IMPORT_SIZE)
         return {"sheets": _preview_md(content, project_id, db)}
 
     wb = _load_workbook_from_upload(file)
@@ -591,14 +600,18 @@ def import_testcases(
 
     # CSV 파일 처리
     if _is_csv_file(file.filename):
-        content = file.file.read()
-        if len(content) > MAX_IMPORT_SIZE:
-            raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_IMPORT_SIZE // (1024*1024)}MB")
+        # ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온 뒤다.
+        content = read_limited_sync(file.file, MAX_IMPORT_SIZE)
         sheet_name = "CSV Import"
         from models import TestCaseSheet
         sheet_exists = db.query(TestCaseSheet).filter(
             TestCaseSheet.project_id == project_id, TestCaseSheet.name == sheet_name
         ).first()
+        # ★폴더에는 TC 를 넣지 않는다. API 로 만들 때는 _validate_sheet_name 이
+        #   막는데 임포트만 그 검증을 거치지 않았다. 폴더에 들어간 TC 는 시트
+        #   순서에서 빠지고 수행 범위로도 고를 수 없어 담을 방법이 없어진다.
+        if sheet_exists is not None and sheet_exists.is_folder:
+            raise HTTPException(status_code=400, detail="폴더에는 TC 를 직접 추가할 수 없습니다.")
         if not sheet_exists:
             max_order = db.query(TestCaseSheet.sort_order).filter(
                 TestCaseSheet.project_id == project_id
@@ -618,9 +631,8 @@ def import_testcases(
 
     # Markdown 파일 처리
     if _is_md_file(file.filename):
-        content = file.file.read()
-        if len(content) > MAX_IMPORT_SIZE:
-            raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_IMPORT_SIZE // (1024*1024)}MB")
+        # ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온 뒤다.
+        content = read_limited_sync(file.file, MAX_IMPORT_SIZE)
         tables = _parse_md_tables(content)
         if not tables:
             return {"created": 0, "updated": 0, "renamed": 0, "imported": 0, "sheets": []}
@@ -642,6 +654,11 @@ def import_testcases(
             sheet_exists = db.query(TestCaseSheet).filter(
                 TestCaseSheet.project_id == project_id, TestCaseSheet.name == table["name"]
             ).first()
+            # ★폴더에는 TC 를 넣지 않는다. API 로 만들 때는 _validate_sheet_name 이
+            #   막는데 임포트만 그 검증을 거치지 않았다. 폴더에 들어간 TC 는 시트
+            #   순서에서 빠지고 수행 범위로도 고를 수 없어 담을 방법이 없어진다.
+            if sheet_exists is not None and sheet_exists.is_folder:
+                raise HTTPException(status_code=400, detail="폴더에는 TC 를 직접 추가할 수 없습니다.")
             if not sheet_exists:
                 max_order = db.query(TestCaseSheet.sort_order).filter(
                     TestCaseSheet.project_id == project_id
@@ -693,6 +710,11 @@ def import_testcases(
         sheet_exists = db.query(TestCaseSheet).filter(
             TestCaseSheet.project_id == project_id, TestCaseSheet.name == name
         ).first()
+        # ★폴더에는 TC 를 넣지 않는다. API 로 만들 때는 _validate_sheet_name 이
+        #   막는데 임포트만 그 검증을 거치지 않았다. 폴더에 들어간 TC 는 시트
+        #   순서에서 빠지고 수행 범위로도 고를 수 없어 담을 방법이 없어진다.
+        if sheet_exists is not None and sheet_exists.is_folder:
+            raise HTTPException(status_code=400, detail="폴더에는 TC 를 직접 추가할 수 없습니다.")
         if not sheet_exists:
             max_order = db.query(TestCaseSheet.sort_order).filter(
                 TestCaseSheet.project_id == project_id
@@ -729,7 +751,13 @@ def export_testcases(
     testcases = (
         db.query(TestCase)
         .filter(TestCase.project_id == project_id, TestCase.deleted_at.is_(None))
-        .order_by(TestCase.no)
         .all()
     )
+    # ★no 로만 정렬하면 안 된다. no 는 v1.5.0.0 이후 시트 안 순번이라 시트마다
+    #   1 부터 다시 시작해서, 통합 모드에서 시트가 한 줄씩 번갈아 나온다
+    #   (가-1, 나-1, 다-1, 가-2 ...). 시트 차례는 화면과 같아야 하므로 수행
+    #   엑셀·리포트 엑셀이 쓰는 leaf_sheet_order 를 여기서도 쓴다(SYM-44 통일에서
+    #   이 파일만 빠져 있었다).
+    order = leaf_sheet_order(project_id, db)
+    testcases.sort(key=lambda tc: (order.get(tc.sheet_name or "기본", len(order)), tc.no or 0, tc.id))
     return export_testcases_excel(project, testcases, split_sheets, expand_refs)

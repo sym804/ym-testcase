@@ -45,7 +45,14 @@ def _get_run_or_404(project_id: int, test_run_id: int, db: Session) -> TestRun:
 
 
 def _summary_sql(run_id: int, db: Session) -> dict:
-    """SQL 집계로 summary 생성 (Python 루프 대신)."""
+    """SQL 집계로 summary 생성 (Python 루프 대신).
+
+    ★리포트는 그때의 수행 기록이다. 런에 편입된 뒤 지워진 TC 의 결과도 그대로
+      센다. 지금 상태를 보는 대시보드와 기준이 다른 것은 의도다. 두 화면의
+      질문이 다르기 때문이다("그때 몇 건을 수행했나" 대 "지금 몇 건이 남았나").
+      이 기록이 7일 뒤 purge 로 사라지지 않도록 `_purge_old_deleted_testcases`
+      가 결과 행이 있는 TC 를 건너뛴다.
+    """
     row = db.query(
         func.count(TestResult.id).label("total"),
         func.sum(case((TestResult.result == TestResultValue.PASS, 1), else_=0)).label("passed"),

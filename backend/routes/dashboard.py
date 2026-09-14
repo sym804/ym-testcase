@@ -48,6 +48,32 @@ def _result_count_cases():
     }
 
 
+def _active_counts_query(db: Session, project_id: int):
+    """결과 카운트 쿼리의 공통 골격. 분자는 언제나 이 프로젝트의 활성 TC 로 좁힌다.
+
+    ★두 가지를 한 자리에서 건다. 분모(total)는 활성 TC 인데 분자가 결과 행 전체면
+      지운 TC 의 결과가 남아 합격률이 부풀려진다(실측 36.4% -> 40.0%, 많이 지우면
+      pass 가 total 을 넘는다). 그리고 run_id 만 보고 프로젝트를 안 보면 남의
+      프로젝트 런 집계가 그대로 나온다(실측 total=0 인데 pass=504).
+      run_id 분기에만 필터가 있고 전체 모드에 없어서 갈라졌던 자리다. 다시
+      갈라지지 않도록 두 분기가 이 함수를 함께 쓴다.
+    """
+    cases = _result_count_cases()
+    return (
+        db.query(
+            cases["pass"].label("pass_count"),
+            cases["fail"].label("fail_count"),
+            cases["block"].label("block_count"),
+            cases["na"].label("na_count"),
+        )
+        .join(TestCase, TestCase.id == TestResult.test_case_id)
+        .filter(
+            TestCase.project_id == project_id,
+            TestCase.deleted_at.is_(None),
+        )
+    )
+
+
 def _counts_from_row(row, total: int) -> dict:
     """SQL 집계 결과 행을 dict로 변환."""
     c = {
@@ -66,26 +92,6 @@ def _rates(counts: dict, total: int) -> dict:
     if total == 0:
         return {f"{k}_rate": 0.0 for k in counts}
     return {f"{k}_rate": round(v / total * 100, 1) for k, v in counts.items()}
-
-
-def _count_from_results(results: list) -> dict:
-    """Count test results from TestResult records (run_id 지정 시 사용)."""
-    counts = {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": 0}
-    for r in results:
-        val = r.result.value if hasattr(r.result, "value") else str(r.result)
-        if val == "PASS":
-            counts["pass"] += 1
-        elif val == "FAIL":
-            counts["fail"] += 1
-        elif val == "BLOCK":
-            counts["block"] += 1
-        elif val in ("NA", "N/A"):
-            counts["na"] += 1
-        elif val == "NS":
-            counts["not_started"] += 1
-        else:
-            counts["not_started"] += 1
-    return counts
 
 
 # ── Summary ───────────────────────────────────────────────────────────────────
@@ -118,18 +124,11 @@ def dashboard_summary(
     total = total_q.count()
 
     if run_id:
-        cases = _result_count_cases()
-        # ★분모는 활성 TC 로 좁혔다. 분자가 결과 행 전체면 지운 TC 의 결과가 남아
-        #   pass 가 total 을 넘는다. 같은 기준으로 좁힌다.
-        row = db.query(
-            cases["pass"].label("pass_count"),
-            cases["fail"].label("fail_count"),
-            cases["block"].label("block_count"),
-            cases["na"].label("na_count"),
-        ).join(TestCase, TestCase.id == TestResult.test_case_id).filter(
-            TestResult.test_run_id == run_id,
-            TestCase.deleted_at.is_(None),
-        ).first()
+        row = (
+            _active_counts_query(db, project_id)
+            .filter(TestResult.test_run_id == run_id)
+            .first()
+        )
         if row and (row.pass_count or row.fail_count or row.block_count or row.na_count):
             c = _counts_from_row(row, total)
         else:
@@ -138,14 +137,8 @@ def dashboard_summary(
 
     # 전체 모드: SQL 집계로 TC별 최신 결과 카운트
     latest = _latest_run_subquery(project_id, db, date_from, date_to)
-    cases = _result_count_cases()
     row = (
-        db.query(
-            cases["pass"].label("pass_count"),
-            cases["fail"].label("fail_count"),
-            cases["block"].label("block_count"),
-            cases["na"].label("na_count"),
-        )
+        _active_counts_query(db, project_id)
         .join(
             latest,
             and_(
@@ -432,7 +425,11 @@ def assignee_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
-    """assignee 필드가 v1.2.0에서 제거되어 빈 배열 반환. API 호환성 유지용."""
+    """assignee 필드가 v1.2.0에서 제거되어 빈 배열 반환.
+
+    화면은 v1.5.4.0 에서 이 표를 걷어냈다(늘 비어 있어 "데이터가 없나" 로 읽혔다).
+    외부에서 이 엔드포인트를 부르는 쪽이 있을 수 있어 라우트만 남긴다.
+    """
     return []
 
 

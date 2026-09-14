@@ -226,18 +226,41 @@ def submit_results(
     if run.status == TestRunStatus.completed:
         raise HTTPException(status_code=400, detail="완료된 테스트 런은 수정할 수 없습니다. 재오픈 후 수정하세요.")
 
-    # Validate all test_case_ids belong to this project
     tc_ids = [r.test_case_id for r in results]
+
+    # ★이미 이 런에 결과 행이 있는 TC 는 두 검사 모두 통과시킨다.
+    #
+    #   런은 한 번 담은 행을 빼지 않는다(빼면 기록한 결과가 날아간다). 그래서 TC 를
+    #   지우거나 시트를 옮겨도 그 행은 런 상세에 계속 보인다. 그런데 저장만 막으면
+    #   사라지지도 채워지지도 않는 행이 남는다. 게다가 결과 제출은 여러 행을 한
+    #   배열로 보내므로(범위 채우기, Ctrl+D), 그런 행이 하나 섞이면 배치 전체가
+    #   거절되어 같이 입력한 멀쩡한 행까지 날아간다.
+    #
+    #   두 검사가 막아야 하는 것은 "런에 없던 TC 가 제출로 끼어드는 것" 뿐이다.
+    already_in_run = {
+        row[0] for row in db.query(TestResult.test_case_id).filter(
+            TestResult.test_run_id == run_id,
+            TestResult.test_case_id.in_(tc_ids),
+        ).all()
+    }
+    newcomers = [i for i in tc_ids if i not in already_in_run]
+
+    # Validate all test_case_ids belong to this project
+    #
+    # 지운 TC 를 제출로 새로 끌어들이는 것은 막는다. 그 결과는 어느 집계 기준을
+    # 쓰든 어긋나고, 7일 뒤 TC 가 완전히 지워지면 같이 사라진다.
     valid_tc_ids = set(
         row[0] for row in db.query(TestCase.id).filter(
-            TestCase.project_id == project_id, TestCase.id.in_(tc_ids)
+            TestCase.project_id == project_id,
+            TestCase.id.in_(newcomers),
+            TestCase.deleted_at.is_(None),
         ).all()
     )
-    invalid_ids = set(tc_ids) - valid_tc_ids
+    invalid_ids = set(newcomers) - valid_tc_ids
     if invalid_ids:
         raise HTTPException(
             status_code=400,
-            detail="One or more test case IDs are invalid for this project",
+            detail="이 프로젝트에 없거나 이미 삭제된 TC 입니다.",
         )
 
     # ★프로젝트 소속만 보면 시트를 골라 만든 런에 범위 밖 TC 가 들어온다.
@@ -246,7 +269,7 @@ def submit_results(
     if run.sheet_names is not None:
         outside = [
             row[0] for row in db.query(TestCase.tc_id).filter(
-                TestCase.id.in_(tc_ids),
+                TestCase.id.in_(newcomers),
                 ~TestCase.sheet_name.in_(run.sheet_names),
             ).all()
         ]
@@ -309,6 +332,8 @@ def submit_results(
                 existing.duration_sec = r.duration_sec
             saved.append(existing)
         else:
+            # ★새로 만드는 행에도 타이머 값을 넣는다. 갱신 분기에만 넣어 두면
+            #   결과 행이 아직 없는 TC 에 처음 입력할 때 잰 시간이 조용히 버려진다.
             tr = TestResult(
                 test_run_id=run_id,
                 test_case_id=r.test_case_id,
@@ -317,6 +342,9 @@ def submit_results(
                 issue_link=r.issue_link,
                 remarks=r.remarks,
                 executed_by=current_user.id,
+                started_at=started,
+                finished_at=finished,
+                duration_sec=r.duration_sec,
             )
             db.add(tr)
             saved.append(tr)
