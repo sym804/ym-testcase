@@ -24,7 +24,6 @@ vi.mock("../api", () => ({
     priority: vi.fn(),
     category: vi.fn(),
     rounds: vi.fn(),
-    assignee: vi.fn(),
     heatmap: vi.fn(),
   },
   testRunsApi: {
@@ -50,9 +49,6 @@ const mockRounds = [
   { round: 1, total: 100, pass: 50, fail: 30, block: 10, na: 10, pass_rate: 50 },
   { round: 2, total: 100, pass: 60, fail: 20, block: 10, na: 10, pass_rate: 60 },
 ];
-const mockAssignee = [
-  { assignee: "테스터A", total: 50, pass: 40, fail: 5, block: 3, na: 2, not_started: 0, completion_rate: 100 },
-];
 const mockHeatmap = [
   { category: "로그인", priority: "High", fail_count: 3 },
 ];
@@ -66,7 +62,6 @@ beforeEach(() => {
   vi.mocked(dashboardApi.priority).mockResolvedValue(mockPriority);
   vi.mocked(dashboardApi.category).mockResolvedValue(mockCategory);
   vi.mocked(dashboardApi.rounds).mockResolvedValue(mockRounds);
-  vi.mocked(dashboardApi.assignee).mockResolvedValue(mockAssignee);
   vi.mocked(dashboardApi.heatmap).mockResolvedValue(mockHeatmap);
   vi.mocked(testRunsApi.list).mockResolvedValue(mockRuns);
 });
@@ -164,7 +159,6 @@ describe("Dashboard", () => {
     vi.mocked(dashboardApi.priority).mockResolvedValue(mockPriority);
     vi.mocked(dashboardApi.category).mockResolvedValue(mockCategory);
     vi.mocked(dashboardApi.rounds).mockResolvedValue(mockRounds);
-    vi.mocked(dashboardApi.assignee).mockResolvedValue(mockAssignee);
     vi.mocked(dashboardApi.heatmap).mockResolvedValue(mockHeatmap);
     vi.mocked(testRunsApi.list).mockResolvedValue(mockRuns);
 
