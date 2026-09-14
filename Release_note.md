@@ -37,11 +37,35 @@ YM TestCase는 3개 컴포넌트로 구성되며, 각각 독립적으로 버전�
 ## 현재 버전
 
 ```
-YM TestCase System  v1.5.5.0  (2026-09-14)
-├── Frontend       v1.5.3.0
+YM TestCase System  v1.5.5.1  (2026-09-14)
+├── Frontend       v1.5.3.1
 ├── Backend        v1.5.4.0
 └── Database       v0.9.1.0
 ```
+
+---
+
+## v1.5.5.1 (2026-09-14) - [fix] 프로덕션 빌드가 깨지던 타입 오류
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.5.5.0 | **1.5.5.1** | patch +1 |
+| Frontend | 1.5.3.0 | **1.5.3.1** | patch +1 |
+
+### 이슈
+
+- SYM-85 프로덕션 빌드가 타입 오류로 실패한다 (bug/major/frontend)
+
+### 변경
+
+- node API 를 쓰는 i18n 키 검사 테스트를 `tsconfig.node.json` 관할로 이동(cssTokens 와 동일)
+- 지운 `dashboardApi.assignee` 를 모킹하던 테스트 정리, 콜백 대입으로 좁혀지던 타입을 ref 로 우회
+
+### 영향
+
+- 없음. `tsc --noEmit` 만으로는 이 경로를 못 잡으므로 `npm run build` 로 확인한다
 
 ---
 
