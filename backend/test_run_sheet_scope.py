@@ -262,3 +262,52 @@ def test_삭제된_TC의_결과는_대시보드_분자에서_빠진다(token, pr
     assert summary["pass"] <= summary["total"], summary
     assert summary["total"] == len(payload) - 1, summary
     assert summary["not_started"] >= 0, summary
+
+
+def test_시트를_옮긴_TC도_런에_남아_있으면_결과를_저장할_수_있다(token, project):
+    """★런에 이미 들어간 행은 결과를 받아야 한다.
+
+    범위 지정 런은 누락 행을 채우기만 하고 범위를 벗어난 행을 빼지 않는다.
+    그런데 결과 제출은 범위를 다시 검사해서, 시트를 옮긴 TC 는 그리드에 보이는데
+    저장하면 400 이 났다. 사라지지도 않고 채울 수도 없는 행이 남는다.
+    빼는 쪽(결과 삭제)을 고르면 이미 기록한 결과가 날아가므로 받는 쪽으로 맞춘다.
+    """
+    h = auth(token)
+    r = requests.post(f"{BASE}/api/projects/{project}/testruns", headers=h,
+                      json={"name": "로그인만", "round": 1, "sheet_names": ["로그인"]})
+    assert r.status_code == 201, r.text
+    run_id = r.json()["id"]
+
+    detail = requests.get(f"{BASE}/api/projects/{project}/testruns/{run_id}", headers=h).json()
+    moved = detail["results"][0]["test_case_id"]
+
+    mv = requests.put(f"{BASE}/api/projects/{project}/testcases/{moved}", headers=h,
+                      json={"sheet_name": "결제"})
+    assert mv.status_code == 200, mv.text
+
+    # ★skip 으로 두면 이 경로가 조용히 실행되지 않는다. 런이 한 번 담은 행을
+    #   빼지 않는 것은 확정 동작이므로(test_run_tc_sync.py 참고) 단언한다.
+    after = requests.get(f"{BASE}/api/projects/{project}/testruns/{run_id}", headers=h).json()
+    assert moved in {x["test_case_id"] for x in after["results"]}, (
+        "런이 시트를 옮긴 행을 빼 버렸다. 그렇다면 제출 허용이 아니라 행 제거가 맞다"
+    )
+
+    sub = requests.post(f"{BASE}/api/projects/{project}/testruns/{run_id}/results", headers=h,
+                        json=[{"test_case_id": moved, "result": "PASS"}])
+    assert sub.status_code == 200, (
+        f"런에 보이는 행인데 저장이 거부됐다: {sub.status_code} {sub.text}"
+    )
+
+
+def test_범위_밖의_새_TC는_여전히_막는다(token, project):
+    """완화가 지나쳐 아무 TC 나 받으면 런의 범위가 제출 한 번으로 늘어난다."""
+    h = auth(token)
+    r = requests.post(f"{BASE}/api/projects/{project}/testruns", headers=h,
+                      json={"name": "마이페이지만", "round": 1, "sheet_names": ["마이페이지"]})
+    assert r.status_code == 201, r.text
+    run_id = r.json()["id"]
+
+    outsider = _add_tc(token, project, 300, "TC-결제-OUT", "결제")
+    sub = requests.post(f"{BASE}/api/projects/{project}/testruns/{run_id}/results", headers=h,
+                        json=[{"test_case_id": outsider, "result": "PASS"}])
+    assert sub.status_code == 400, f"범위 밖 TC 가 들어왔다: {sub.status_code} {sub.text}"

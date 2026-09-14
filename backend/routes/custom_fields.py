@@ -14,6 +14,18 @@ router = APIRouter(
 )
 
 
+#: 프론트의 선택지(ProjectSettings 의 FIELD_TYPE_KEYS)와 같아야 한다.
+#: 값이 벗어나면 화면이 `fieldType_<값>` 을 못 찾아 raw key 를 그대로 보여 준다.
+VALID_FIELD_TYPES = {"text", "number", "select", "multiselect", "checkbox", "date"}
+
+
+def _validate_field_type(field_type: str) -> None:
+    """★생성과 수정이 같은 검증을 쓰게 한다. 생성에만 걸려 있던 동안 수정 API 로
+    임의 타입을 넣을 수 있었다(실측: PUT 으로 'EVIL_TYPE' 이 그대로 저장됨)."""
+    if field_type not in VALID_FIELD_TYPES:
+        raise HTTPException(status_code=400, detail=f"유효하지 않은 필드 타입: {field_type}")
+
+
 def _get_project_or_404(project_id: int, db: Session) -> Project:
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -55,9 +67,7 @@ def create_custom_field(
     if exists:
         raise HTTPException(status_code=400, detail="이미 존재하는 필드 이름입니다.")
 
-    valid_types = {"text", "number", "select", "multiselect", "checkbox", "date"}
-    if payload.field_type not in valid_types:
-        raise HTTPException(status_code=400, detail=f"유효하지 않은 필드 타입: {payload.field_type}")
+    _validate_field_type(payload.field_type)
 
     max_order = db.query(CustomFieldDef.sort_order).filter(
         CustomFieldDef.project_id == project_id
@@ -106,6 +116,7 @@ def update_custom_field(
         field.field_name = name
 
     if payload.field_type is not None:
+        _validate_field_type(payload.field_type)
         field.field_type = payload.field_type
     if payload.options is not None:
         field.options = payload.options

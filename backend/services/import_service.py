@@ -462,6 +462,8 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
     return {"created": created_count, "updated": updated_count, "renamed": renamed_count}
 
 
+from services.upload_guard import read_limited_sync
+
 MAX_IMPORT_SIZE = 10 * 1024 * 1024  # 10MB
 
 
@@ -470,12 +472,8 @@ def _load_workbook_from_upload(file: UploadFile):
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="Only .xlsx files are supported")
 
-    file_content = file.file.read()
-    if len(file_content) > MAX_IMPORT_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Maximum size is {MAX_IMPORT_SIZE // (1024*1024)}MB",
-        )
+    # ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온 뒤다.
+    file_content = read_limited_sync(file.file, MAX_IMPORT_SIZE)
 
     try:
         return load_workbook(filename=io.BytesIO(file_content), data_only=True)

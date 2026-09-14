@@ -50,6 +50,13 @@ async def lifespan(app: FastAPI):
     inspector = sa_inspect(engine)
     tables = inspector.get_table_names()
     if tables and "alembic_version" not in tables:
+        # ★검증 없이 stamp 하지 않는다. 구버전 스키마가 "최신" 으로 표시되면 그
+        #   사이 마이그레이션이 전부 건너뛰어지고, 그 뒤 요청이 없는 컬럼을 찾다가
+        #   죽거나 중복을 그대로 받는다. 어느 시점인지 모르는 DB 를 자동으로
+        #   맞추려 들면 더 망가지므로, 최신이 아니면 멈추고 사람에게 알린다.
+        from services.schema_guard import assert_schema_is_current
+
+        assert_schema_is_current(inspector)
         logger.info("Pre-Alembic DB detected - stamping head")
         alembic_command.stamp(alembic_cfg, "head")
     else:
@@ -62,7 +69,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YM TestCase API",
     description="Your Method, Your Test Case Manager",
-    version="1.4.0.1",
+    version="1.5.4.0",
     lifespan=lifespan,
 )
 
@@ -149,20 +156,13 @@ app.include_router(account_request_routes.router)
 
 
 def _purge_old_deleted_testcases():
+    """기한이 지난 소프트 삭제 TC 정리. 실제 판정은 purge_service 가 한다."""
     from database import SessionLocal
-    from models import TestCase, now_kst
-    from datetime import timedelta
+    from services.purge_service import purge_deleted_testcases
+
     db = SessionLocal()
     try:
-        cutoff = now_kst() - timedelta(days=7)
-        old = db.query(TestCase).filter(
-            TestCase.deleted_at.isnot(None),
-            TestCase.deleted_at < cutoff,
-        ).all()
-        for tc in old:
-            db.delete(tc)
-        if old:
-            db.commit()
+        purge_deleted_testcases(db)
     finally:
         db.close()
 

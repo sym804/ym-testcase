@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User, TestResult, TestRun, Attachment
 from schemas import AttachmentResponse
+from services.upload_guard import read_limited
 from auth import get_current_user, get_project_role
 
 logger = logging.getLogger(__name__)
@@ -143,13 +144,9 @@ async def upload_attachment(
     # 확장자 검증 (확장자 없으면 거부)
     ext = _validate_extension(file.filename)
 
-    # 파일 크기 제한
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB",
-        )
+    # 파일 크기 제한. ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온
+    #   뒤라 제한이 있으나 마나다. 넘는 순간 끊는다.
+    content = await read_limited(file, MAX_FILE_SIZE)
 
     stored_name = f"{uuid.uuid4().hex}{ext}"
     filepath = _safe_filepath(UPLOAD_DIR, stored_name)
