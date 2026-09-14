@@ -40,7 +40,6 @@ vi.mock("../api", () => ({
     priority: vi.fn(),
     category: vi.fn(),
     rounds: vi.fn(),
-    assignee: vi.fn(),
     heatmap: vi.fn(),
   },
   reportsApi: { getData: vi.fn() },
@@ -80,7 +79,6 @@ beforeEach(() => {
   vi.mocked(dashboardApi.priority).mockResolvedValue([]);
   vi.mocked(dashboardApi.category).mockResolvedValue([]);
   vi.mocked(dashboardApi.rounds).mockResolvedValue([]);
-  vi.mocked(dashboardApi.assignee).mockResolvedValue([]);
   vi.mocked(dashboardApi.heatmap).mockResolvedValue([]);
   vi.mocked(reportsApi.getData).mockResolvedValue(null as any);
   vi.mocked(membersApi.list).mockResolvedValue([]);

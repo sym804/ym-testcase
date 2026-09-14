@@ -55,12 +55,13 @@ beforeEach(() => {
 
 describe("비교 화면의 경쟁 상태", () => {
   it("늦게 도착한 이전 수행의 결과가 지금 고른 수행을 덮지 않는다", async () => {
-    let resolveSlow: ((v: unknown) => void) | null = null;
+    // ★콜백 안에서만 대입하면 TS 가 타입을 never 로 좁혀 호출할 수 없다.
+    const slow: { resolve: (() => void) | null } = { resolve: null };
 
     vi.mocked(testRunsApi.getOne).mockImplementation((_pid: number, runId: number) => {
       if (runId === 2) {
         // 느린 쪽. 나중에 손으로 응답시킨다.
-        return new Promise((res) => { resolveSlow = () => res(detailOf(2, "TC-옛것") as any); }) as any;
+        return new Promise((res) => { slow.resolve = () => res(detailOf(2, "TC-옛것") as any); }) as any;
       }
       return Promise.resolve(detailOf(runId, runId === 3 ? "TC-새것" : "TC-기준") as any);
     });
@@ -81,7 +82,7 @@ describe("비교 화면의 경쟁 상태", () => {
     });
 
     // 이제 2회차 응답이 뒤늦게 도착한다.
-    resolveSlow?.(null);
+    slow.resolve?.();
     await new Promise((r) => setTimeout(r, 60));
 
     expect(

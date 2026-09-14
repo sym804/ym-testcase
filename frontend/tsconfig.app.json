@@ -26,5 +26,5 @@
   },
   "include": ["src"],
   /* node API 를 쓰는 검사 테스트는 tsconfig.node.json 이 맡는다 */
-  "exclude": ["src/test/cssTokens.test.ts"]
+  "exclude": ["src/test/cssTokens.test.ts", "src/test/i18nKeys.test.ts"]
 }

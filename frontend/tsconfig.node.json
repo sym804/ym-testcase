@@ -22,5 +22,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "src/test/cssTokens.test.ts"]
+  "include": ["vite.config.ts", "src/test/cssTokens.test.ts", "src/test/i18nKeys.test.ts"]
 }
