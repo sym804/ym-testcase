@@ -68,6 +68,22 @@ function referencesWithoutFallback(): { token: string; where: string }[] {
   return refs;
 }
 
+/** 폴백 유무와 무관하게 참조된 모든 `var(--토큰)` */
+function allReferences(): { token: string; where: string }[] {
+  const refs: { token: string; where: string }[] = [];
+  for (const file of files) {
+    const rel = path.relative(SRC, file).replace(/\\/g, "/");
+    // 이 파일 자신의 예시 토큰은 대상이 아니다.
+    if (rel.startsWith("test/")) continue;
+    const text = fs.readFileSync(file, "utf-8");
+    for (const m of text.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)\s*[,)]/g)) {
+      const line = text.slice(0, m.index).split("\n").length;
+      refs.push({ token: m[1], where: `${rel}:${line}` });
+    }
+  }
+  return refs;
+}
+
 describe("CSS 커스텀 프로퍼티", () => {
   it("소스가 참조하는 토큰은 모두 선언돼 있다", () => {
     const defined = definedTokens();
@@ -77,6 +93,19 @@ describe("CSS 커스텀 프로퍼티", () => {
     expect(
       missing.map((r) => `${r.where} -> ${r.token}`),
       "선언되지 않은 토큰을 폴백 없이 참조했다. 속성이 통째로 무효가 된다",
+    ).toEqual([]);
+  });
+
+  it("폴백이 달려 있어도 토큰 이름은 선언돼 있다", () => {
+    // ★폴백이 있으면 글자가 사라지지는 않지만, 그 값은 한 테마 전용 고정색이라
+    //   다크모드에서 대비가 무너진다. 실제로 `--danger` 3곳이 라이트 전용
+    //   #DC2626 으로 굳어 있었다(선언된 이름은 `--text-danger` 다).
+    //   이름이 틀렸다는 사실 자체가 폴백에 가려 드러나지 않는다.
+    const defined = definedTokens();
+    const missing = allReferences().filter((r) => !defined.has(r.token));
+    expect(
+      missing.map((r) => `${r.where} -> ${r.token}`),
+      "선언되지 않은 토큰이다. 폴백 값으로만 그려져 테마를 따르지 않는다",
     ).toEqual([]);
   });
 

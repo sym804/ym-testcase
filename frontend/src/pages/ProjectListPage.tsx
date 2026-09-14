@@ -146,15 +146,25 @@ export default function ProjectListPage() {
     if (!confirm(t("deleteConfirm", { count: names.length, names: names.join("\n") }))) return;
     setDeleting(true);
     let deleted = 0;
+    let failed = 0;
     for (const id of selectedIds) {
       try {
         await projectsApi.delete(id);
         deleted++;
       } catch (err) {
+        failed++;
         console.error(`Failed to delete project ${id}`, err);
       }
     }
-    toast.success(t("deleteSuccess", { count: deleted }));
+    // ★개별 실패를 로그로만 삼키고 늘 성공 토스트를 띄우면, 하나도 못 지웠는데
+    //   지워진 줄 안다. 목록을 다시 받아 오므로 화면은 그대로인데 이유는 없다.
+    if (failed > 0 && deleted === 0) {
+      toast.error(t("deleteAllFailed", { count: failed }));
+    } else if (failed > 0) {
+      toast.error(t("deletePartial", { deleted, failed }));
+    } else {
+      toast.success(t("deleteSuccess", { count: deleted }));
+    }
     setSelectedIds(new Set());
     setDeleting(false);
     loadData();

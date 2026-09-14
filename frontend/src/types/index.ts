@@ -185,17 +185,6 @@ export interface RoundComparison {
   pass_rate: number;
 }
 
-export interface AssigneeSummary {
-  assignee: string;
-  total: number;
-  pass: number;
-  fail: number;
-  block: number;
-  na: number;
-  not_started: number;
-  completion_rate: number;
-}
-
 // Forms
 export interface LoginForm {
   username: string;

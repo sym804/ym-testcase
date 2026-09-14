@@ -63,9 +63,13 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
     if (!projectName.trim()) return;
     setNameSaving(true);
     try {
+      // ★빈 문자열을 undefined 로 바꾸지 않는다. axios 가 undefined 키를 통째로
+      //   빼고, 백엔드는 exclude_unset 이라 그 필드를 건드리지 않는다. 그래서
+      //   설명을 지우면 화면은 비어 보이고 성공 토스트까지 뜨는데 DB 값은 그대로
+      //   남아, 탭을 나갔다 들어오면 지운 설명이 되살아났다.
       const updated = await projectsApi.update(project.id, {
         name: projectName.trim(),
-        description: projectDesc.trim() || undefined,
+        description: projectDesc.trim(),
       });
       onUpdate(updated);
       toast.success(t("saved") || "저장되었습니다");

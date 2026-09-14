@@ -141,7 +141,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%", marginTop: 6, padding: "9px 10px", fontSize: 13, boxSizing: "border-box",
     border: "1px solid var(--border-color, #E2E8F0)", borderRadius: 6,
   },
-  error: { color: "var(--danger, #DC2626)", fontSize: 12, marginBottom: 12 },
+  error: { color: "var(--text-danger, #CF222E)", fontSize: 12, marginBottom: 12 },
   submit: {
     width: "100%", padding: "10px 0", fontSize: 14, cursor: "pointer",
     border: "none", borderRadius: 6, backgroundColor: "var(--accent, #2563EB)", color: "#fff",

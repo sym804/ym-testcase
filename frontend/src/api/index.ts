@@ -14,7 +14,6 @@ import type {
   PriorityDistribution,
   CategoryBreakdown,
   RoundComparison,
-  AssigneeSummary,
   ReportData,
   SheetNode,
   CustomFieldDef,
@@ -366,18 +365,6 @@ export const dashboardApi = {
     if (dateTo) params.date_to = dateTo;
     const res = await client.get<RoundComparison[]>(
       `/api/projects/${projectId}/dashboard/rounds`,
-      { params: Object.keys(params).length ? params : undefined }
-    );
-    return res.data;
-  },
-
-  assignee: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string) => {
-    const params: Record<string, string | number> = {};
-    if (runId) params.run_id = runId;
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
-    const res = await client.get<AssigneeSummary[]>(
-      `/api/projects/${projectId}/dashboard/assignee`,
       { params: Object.keys(params).length ? params : undefined }
     );
     return res.data;

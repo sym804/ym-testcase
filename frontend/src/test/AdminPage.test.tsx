@@ -151,6 +151,34 @@ describe("AdminPage", () => {
     });
   });
 
+  it("아이디에 든 HTML 을 태그로 해석하지 않는다", async () => {
+    // ★i18n 설정이 escapeValue:false 라, 사용자명을 dangerouslySetInnerHTML 에
+    //   끼워 넣으면 저장형 XSS 가 된다. 아이디는 가입자가 정하고 백엔드에
+    //   문자 제한이 없다. 관리자가 그 계정 비밀번호를 초기화하는 순간 관리자
+    //   브라우저에서 실행된다.
+    const evil = '<img src=x onerror="window.__xss=1">';
+    vi.mocked(usersApi.list).mockResolvedValue([
+      mockUsers[0],
+      { ...mockUsers[1], username: evil },
+    ]);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+
+    const { container } = renderPage();
+    await waitFor(() => {
+      expect(screen.getByText("초기화")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("초기화"));
+
+    await waitFor(() => {
+      expect(screen.getByText("비밀번호 초기화 완료")).toBeInTheDocument();
+    });
+
+    expect(container.querySelector("img"), "아이디가 HTML 로 해석됐다").toBeNull();
+    // 값 자체는 글자로 보여야 한다.
+    expect(container.textContent).toContain("onerror");
+  });
+
   it("역할을 변경할 수 있다", async () => {
     const user = userEvent.setup();
     renderPage();

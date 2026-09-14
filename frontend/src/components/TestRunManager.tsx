@@ -110,10 +110,17 @@ export default function TestRunManager({ projectId, project }: Props) {
   const undoStackRef = useRef<{ rowId: number; field: string; oldValue: string }[]>([]);
 
   // ── 커스텀 훅 ──
+  // ★타이머가 잰 시간은 stopTimer 시점에만 확정되므로 그 자리에서 저장까지 해야
+  //   한다. 저장 함수는 아래에서 정의되어 여기서는 아직 없으므로 ref 로 잇는다.
+  const saveOneResultRef = useRef<((row: TestResult) => void) | null>(null);
+  const handleTimerElapsed = useCallback((row: { id: number; duration_sec: number }) => {
+    saveOneResultRef.current?.(row as unknown as TestResult);
+  }, []);
+
   const {
     timerEnabled, timerRowId, timerDisplay,
     startTimer, stopTimer, toggleTimer,
-  } = useTestTimer(gridApiRef);
+  } = useTestTimer(gridApiRef, handleTimerElapsed);
 
   const {
     attachmentsMap, previewImage, setPreviewImage, fileInputRef,
@@ -155,6 +162,7 @@ export default function TestRunManager({ projectId, project }: Props) {
       actual_result: r.actual_result || undefined,
       issue_link: r.issue_link || undefined,
       remarks: r.remarks || undefined,
+      duration_sec: r.duration_sec ?? undefined,
     }));
     try {
       await testRunsApi.submitResults(projectId, selectedRun.id, payload);
@@ -363,7 +371,12 @@ export default function TestRunManager({ projectId, project }: Props) {
   }, [timerEnabled, timerRowId, startTimer, loadAttachmentFor]);
 
   // ── 셀 편집 시 즉시 저장 ──
-  const saveResultRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  //
+  // ★타이머는 행마다 따로 둔다. 하나로 두면 0.3초 안에 다른 행을 편집할 때
+  //   앞 행의 저장이 통째로 취소되고, 에러도 토스트도 없이 입력이 사라진다.
+  //   붙여넣기 뒤 Enter 로 다음 행에 바로 넘어가는 조작에서 물린다.
+  //   TC 관리 그리드(TestCaseGrid)는 처음부터 행별 키였고 이쪽만 전역이었다.
+  const saveResultRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const saveOneResult = useCallback(async (row: TestResult) => {
     if (!selectedRun) return;
@@ -373,6 +386,8 @@ export default function TestRunManager({ projectId, project }: Props) {
       actual_result: row.actual_result || undefined,
       issue_link: row.issue_link || undefined,
       remarks: row.remarks || undefined,
+      // 타이머가 잰 시간. 백엔드는 값이 있을 때만 갱신한다.
+      duration_sec: row.duration_sec ?? undefined,
     };
     try {
       await testRunsApi.submitResults(projectId, selectedRun.id, [mapped]);
@@ -380,6 +395,20 @@ export default function TestRunManager({ projectId, project }: Props) {
       handleSaveError(err);
     }
   }, [projectId, selectedRun, handleSaveError]);
+
+  // 타이머가 잰 시간을 저장할 수 있도록 ref 에 최신 함수를 걸어 둔다.
+  useEffect(() => {
+    saveOneResultRef.current = saveOneResult;
+  }, [saveOneResult]);
+
+  // ★언마운트되면 대기 중인 저장 타이머를 거둔다. 남겨 두면 화면을 떠난 뒤에
+  //   발화해 파괴된 그리드 API 를 만지거나 토스트를 띄운다.
+  useEffect(() => {
+    const timers = saveResultRef.current;
+    return () => {
+      Object.values(timers).forEach((t) => clearTimeout(t));
+    };
+  }, []);
 
   // ── 키보드 숏컷: P/F/B/N = 결과 빠른 입력, Ctrl+D = 선택 행 채우기 ──
   const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK", n: "N/A" };
@@ -733,12 +762,21 @@ export default function TestRunManager({ projectId, project }: Props) {
         editable: true,
         wrapText: true,
         autoHeight: true,
+        // ★큰 편집기를 지정하지 않으면 기본 agTextCellEditor(<input type="text">)가
+        //   열리고, HTML input 은 값 설정 단계에서 CR/LF 를 지운다. 여러 줄 메모를
+        //   열었다 Enter/Tab 으로 빠져나오기만 해도 줄바꿈이 사라진다.
+        //   SYM-25 를 고칠 때 TC 그리드만 손대고 이쪽이 빠졌다.
+        cellEditor: "agLargeTextCellEditor",
+        cellEditorParams: LARGE_TEXT_EDITOR_PARAMS,
+        cellEditorPopup: true,
         cellClass: "ag-cell-left",
         cellRenderer: MarkdownCell,
       },
     ],
+    // ★t 를 넣는다. 빼 두면 언어를 바꿔도 헤더가 옛 언어로 남는다. 첨부 맵이
+    //   바뀔 때(다른 런을 열 때) 우연히 갱신되는 것에 기대고 있었다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [attachmentsMap, timerEnabled]
+    [attachmentsMap, timerEnabled, t]
   );
 
   const defaultColDef = useMemo<ColDef>(
@@ -759,9 +797,13 @@ export default function TestRunManager({ projectId, project }: Props) {
     }
     // 카운트 뱃지 갱신
     setCountTick((t) => t + 1);
-    // debounce로 즉시 저장
-    if (saveResultRef.current) clearTimeout(saveResultRef.current);
-    saveResultRef.current = setTimeout(() => saveOneResult(event.data), 300);
+    // debounce로 즉시 저장. 키는 행(TC)이다.
+    const saveKey = String(event.data?.test_case_id ?? event.data?.id ?? "");
+    if (saveResultRef.current[saveKey]) clearTimeout(saveResultRef.current[saveKey]);
+    saveResultRef.current[saveKey] = setTimeout(() => {
+      delete saveResultRef.current[saveKey];
+      saveOneResult(event.data);
+    }, 300);
   }, [saveOneResult]);
 
   const handleDelete = async () => {

@@ -71,5 +71,7 @@
     "removeFailed": "멤버 제거에 실패했습니다.",
     "noMembers": "등록된 멤버가 없습니다.",
     "removeMember": "멤버 제거"
-  }
+  },
+  "saveFailed": "저장에 실패했습니다.",
+  "deleteField": "필드 삭제"
 }

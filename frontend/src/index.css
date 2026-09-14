@@ -297,6 +297,7 @@ select:focus {
   --ag-font-size: 12px;
   --ag-header-background-color: #1E293B;
   --ag-header-foreground-color: #F1F5F9;
+  --ag-header-icon-filtered: #93C5FD;
   --ag-header-cell-hover-background-color: #334155;
   --ag-row-hover-color: var(--primary-light);
   --ag-selected-row-background-color: rgba(37,99,235,0.08);
@@ -359,9 +360,14 @@ select:focus {
   opacity: 1;
 }
 
+/* 필터가 걸린 컬럼의 아이콘. 안 걸린 것(위에서 opacity 0.7)보다 진해야 한다.
+   ★--primary-light 를 쓰면 안 된다. 폴백 #93C5FD 를 의도한 것으로 보이지만 그
+   토큰은 실제로 선언돼 있고 값이 8% 알파라(rgba(37,99,235,0.08)) 폴백이 쓰이지
+   않는다. 어두운 헤더 위 대비가 1.03:1 이라, 필터가 걸린 컬럼이 안 걸린 컬럼보다
+   덜 보였다. 어느 컬럼에 필터가 있는지 알 수 없어지는 것이 SYM-30 의 증상이다. */
 .ag-header-cell.ag-header-cell-filtered .ag-header-icon::before,
 .ag-header-cell.ag-header-cell-filtered .ag-header-icon .ag-icon::before {
-  background-color: var(--primary-light, #93C5FD) !important;
+  background-color: var(--ag-header-icon-filtered) !important;
 }
 
 .ag-cell {

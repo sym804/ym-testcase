@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { testRunsApi } from "../api";
 import type { TestRun, TestResult } from "../types";
@@ -35,14 +35,23 @@ export default function CompareView({ projectId }: Props) {
     testRunsApi.list(projectId).then(setRuns).catch(() => toast.error(t("runLoadFailed")));
   }, [projectId]);
 
+  // ★수행 선택기는 로딩 중에도 떠 있어서 응답 전에 다른 수행을 고를 수 있다.
+  //   세대 번호가 없으면 먼저 보낸 요청이 늦게 도착해 지금 고른 수행의 결과를
+  //   덮는다. 화면은 새 수행이 선택된 채 옛 결과를 보여 주고 에러도 없다.
+  //   TestRunManager 가 v1.3.4.0 에서 쓴 방식과 같다.
+  const loadSeqRef = useRef(0);
+
   const loadResults = useCallback(async () => {
     if (!leftRunId || !rightRunId) return;
+    const seq = ++loadSeqRef.current;
+    const isStale = () => seq !== loadSeqRef.current;
     setLoading(true);
     try {
       const [leftDetail, rightDetail] = await Promise.all([
         testRunsApi.getOne(projectId, leftRunId),
         testRunsApi.getOne(projectId, rightRunId),
       ]);
+      if (isStale()) return;
       const mapResult = (r: TestResult) => ({
         ...r,
         result: r.result === "NS" ? "" : r.result === "NA" ? "N/A" : r.result,
@@ -50,10 +59,12 @@ export default function CompareView({ projectId }: Props) {
       setLeftResults((leftDetail.results || []).map(mapResult));
       setRightResults((rightDetail.results || []).map(mapResult));
     } catch (err) {
+      if (isStale()) return;
       console.error(err);
       toast.error(t("resultLoadFailed"));
     } finally {
-      setLoading(false);
+      // 오래된 요청은 로딩 상태도 건드리지 않는다. 최신 요청이 아직 돌고 있다.
+      if (!isStale()) setLoading(false);
     }
   }, [projectId, leftRunId, rightRunId]);
 

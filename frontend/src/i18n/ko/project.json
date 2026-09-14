@@ -39,5 +39,7 @@
   "table": {
     "project": "프로젝트",
     "progress": "진행"
-  }
+  },
+  "deleteAllFailed": "삭제하지 못했습니다. {{count}}개 모두 실패했습니다.",
+  "deletePartial": "{{deleted}}개 삭제, {{failed}}개 실패했습니다."
 }
