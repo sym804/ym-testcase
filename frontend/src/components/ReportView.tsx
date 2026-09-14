@@ -141,7 +141,9 @@ export default function ReportView({ projectId }: Props) {
               <div style={styles.infoItem}>
                 <span style={styles.infoLabel}>{t("executionDate")}</span>
                 <span style={styles.infoValue}>
-                  {new Date(report.test_run.created_at).toLocaleDateString(i18n.language === "ko" ? "ko-KR" : "en-US")}
+                  {report.test_run.created_at
+                    ? new Date(report.test_run.created_at).toLocaleDateString(i18n.language === "ko" ? "ko-KR" : "en-US")
+                    : "-"}
                 </span>
               </div>
             </div>

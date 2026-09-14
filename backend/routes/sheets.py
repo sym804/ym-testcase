@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -217,9 +218,24 @@ def rename_sheet(
     sheet.name = new_name
 
     # TC의 sheet_name도 업데이트
-    db.query(TestCase).filter(
-        TestCase.project_id == project_id, TestCase.sheet_name == old_name
-    ).update({TestCase.sheet_name: new_name}, synchronize_session="fetch")
+    #
+    # ★번호 충돌은 여기서 난다. `synchronize_session="fetch"` 라 이 UPDATE 는 커밋을
+    #   기다리지 않고 바로 실행되고, (프로젝트, 시트명, 번호) 유니크 제약에 걸린다.
+    #   지운 시트의 이름을 쓰는 TC 가 복원돼 있으면 그 번호와 부딪힌다.
+    #   미리 "그 이름을 쓰는 TC 가 있으면 거절" 로 막지 않는 이유는, 번호가 겹치지
+    #   않으면 실제로는 통과하기 때문이다. 막으면 멀쩡한 이름 변경까지 400 이 된다.
+    #   제약에 판정을 맡기고 전역 핸들러의 "데이터 제약 조건에 걸렸습니다" 대신
+    #   무엇을 고쳐야 하는지 적어 준다.
+    try:
+        db.query(TestCase).filter(
+            TestCase.project_id == project_id, TestCase.sheet_name == old_name
+        ).update({TestCase.sheet_name: new_name}, synchronize_session="fetch")
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{new_name}' 을 쓰는 TC 와 번호가 겹칩니다. 다른 이름으로 바꿔 주세요.",
+        )
 
     # ★시트를 골라 만든 테스트 수행은 그 범위를 시트 이름으로 들고 있다. 여기서 같이
     #   바꾸지 않으면 범위가 아무것도 가리키지 않게 되어, 그 수행은 결과 제출이 전부
@@ -229,7 +245,20 @@ def rename_sheet(
         if run.sheet_names and old_name in run.sheet_names:
             run.sheet_names = [new_name if n == old_name else n for n in run.sheet_names]
 
-    db.commit()
+    # ★번호 충돌은 미리 막지 않고 여기서 이유를 붙여 돌려준다.
+    #   "그 이름을 쓰는 TC 가 있으면 무조건 거절" 로 막으면, 실제로는 부딪히지 않는
+    #   경우(옮겨 갈 시트에 TC 가 없거나 번호가 겹치지 않는 경우)까지 400 이 된다.
+    #   부딪히는 조건은 (프로젝트, 시트명, 번호) 세 값이 모두 같을 때뿐이라
+    #   미리 판정하려면 제약과 같은 계산을 한 번 더 해야 한다. 제약에 맡기고
+    #   전역 핸들러의 "데이터 제약 조건에 걸렸습니다" 대신 할 일을 적어 준다.
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{new_name}' 을 쓰는 TC 와 번호가 겹칩니다. 다른 이름으로 바꿔 주세요.",
+        )
     return {"id": sheet.id, "name": sheet.name, "old_name": old_name}
 
 
@@ -268,7 +297,10 @@ def move_sheet(
         if parent.name in desc_names:
             raise HTTPException(status_code=400, detail="하위 시트를 부모로 설정할 수 없습니다.")
 
-    sheet.parent_id = payload.parent_id
+    # ★보내지 않은 필드는 건드리지 않는다. Optional 기본값이 None 이라 그냥
+    #   대입하면 `{"sort_order": 3}` 만 보낸 요청이 그 시트를 폴더 밖으로 끌어낸다.
+    if "parent_id" in payload.model_fields_set:
+        sheet.parent_id = payload.parent_id
     if payload.sort_order is not None:
         sheet.sort_order = payload.sort_order
     db.commit()

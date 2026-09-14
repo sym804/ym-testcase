@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { daysAgo } from "../utils/localDate";
 import { useTranslation } from "react-i18next";
 import { Doughnut, Bar, Line } from "react-chartjs-2";
 import { dashboardApi, testRunsApi } from "../api";
@@ -203,9 +204,9 @@ export default function Dashboard({ projectId }: Props) {
         <div style={{ display: "flex", gap: 4, marginLeft: 12, alignItems: "center" }}>
           {[
             { label: t("all"), from: "", to: "" },
-            { label: t("days7"), from: new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0], to: "" },
-            { label: t("days30"), from: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0], to: "" },
-            { label: t("days90"), from: new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0], to: "" },
+            { label: t("days7"), from: daysAgo(7), to: "" },
+            { label: t("days30"), from: daysAgo(30), to: "" },
+            { label: t("days90"), from: daysAgo(90), to: "" },
           ].map((p) => (
             <button
               key={p.label}

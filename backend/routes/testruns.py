@@ -383,6 +383,12 @@ def complete_testrun(
     if not run:
         raise HTTPException(status_code=404, detail="Test run not found")
 
+    # ★여기서 동기화하지 않는다. reopen 은 부르는데 complete 는 안 부르는 비대칭이
+    #   빠뜨린 것처럼 보이지만, 완료는 "여기서 끝" 이라는 선언이다. 그 순간에 새 TC 를
+    #   끌어들이면 수행하지 않은 행이 NS 로 들어가 합격률과 총계가 바뀐다.
+    #   reopen 이 부르는 것은 반대로 "다시 연다" 라서 그 사이 늘어난 TC 를 담아야 하기
+    #   때문이다. TC 생성·복제·복원·임포트가 이미 진행 중 수행을 맞추므로
+    #   (sync_project_in_progress_runs) 완료 직전에 누락이 남는 경로는 사실상 없다.
     run.status = TestRunStatus.completed
     run.completed_at = now_kst()
 

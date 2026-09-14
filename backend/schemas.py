@@ -3,6 +3,11 @@ from typing import Optional, List, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+#: TC ID 길이 상한. 컬럼이 String(50) 인데 SQLite 는 길이를 강제하지 않아서,
+#: 검증이 없으면 긴 값이 그대로 쌓이고 PostgreSQL 로 옮길 때 그 데이터를 못 옮긴다.
+#: 값은 채번 쪽(tc_id_service)이 원본이다. 두 벌로 두면 컬럼을 늘릴 때 한쪽만 바뀐다.
+from services.tc_id_service import TC_ID_MAX_LEN  # noqa: E402
+
 
 # ── Auth / User ───────────────────────────────────────────────────────────────
 
@@ -169,7 +174,7 @@ class TestCaseCreate(BaseModel):
     #: 보낸 값은 참고하지 않는다. 클라이언트가 정하면 같은 시트에 같은 번호가
     #: 들어오거나 구멍이 생겨 규약이 다시 깨진다.
     no: Optional[int] = None
-    tc_id: str
+    tc_id: str = Field(..., min_length=1, max_length=TC_ID_MAX_LEN)
     type: Optional[str] = None
     category: Optional[str] = None
     depth1: Optional[str] = None
@@ -189,7 +194,7 @@ class TestCaseCreate(BaseModel):
 
 class TestCaseUpdate(BaseModel):
     no: Optional[int] = None
-    tc_id: Optional[str] = None
+    tc_id: Optional[str] = Field(None, min_length=1, max_length=TC_ID_MAX_LEN)
     type: Optional[str] = None
     category: Optional[str] = None
     depth1: Optional[str] = None
@@ -402,87 +407,13 @@ class TestRunListResponse(BaseModel):
 
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
-
-class DashboardSummary(BaseModel):
-    total: int
-    pass_: int = 0
-    fail: int = 0
-    block: int = 0
-    na: int = 0
-    not_started: int = 0
-    pass_rate: float = 0.0
-    fail_rate: float = 0.0
-    block_rate: float = 0.0
-    na_rate: float = 0.0
-    not_started_rate: float = 0.0
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    def model_dump(self, **kwargs):
-        d = super().model_dump(**kwargs)
-        d["pass"] = d.pop("pass_", 0)
-        return d
-
-
-class PriorityDistribution(BaseModel):
-    priority: str
-    total: int
-    pass_: int = 0
-    fail: int = 0
-    block: int = 0
-    na: int = 0
-    not_started: int = 0
-
-    def model_dump(self, **kwargs):
-        d = super().model_dump(**kwargs)
-        d["pass"] = d.pop("pass_", 0)
-        return d
-
-
-class CategoryBreakdown(BaseModel):
-    category: str
-    total: int
-    pass_: int = 0
-    fail: int = 0
-    block: int = 0
-    na: int = 0
-    not_started: int = 0
-
-    def model_dump(self, **kwargs):
-        d = super().model_dump(**kwargs)
-        d["pass"] = d.pop("pass_", 0)
-        return d
-
-
-class RoundComparison(BaseModel):
-    round: int
-    total: int
-    pass_: int = 0
-    fail: int = 0
-    block: int = 0
-    na: int = 0
-    pass_rate: float = 0.0
-
-    def model_dump(self, **kwargs):
-        d = super().model_dump(**kwargs)
-        d["pass"] = d.pop("pass_", 0)
-        return d
-
-
-class AssigneeSummary(BaseModel):
-    assignee: str
-    total: int
-    pass_: int = 0
-    fail: int = 0
-    block: int = 0
-    na: int = 0
-    not_started: int = 0
-    completion_rate: float = 0.0
-
-    def model_dump(self, **kwargs):
-        d = super().model_dump(**kwargs)
-        d["pass"] = d.pop("pass_", 0)
-        return d
+#
+# 대시보드 응답 스키마는 두지 않는다. 라우트가 dict 로 "pass" 키를 직접 내는데,
+# 예전에 있던 모델들은 `pass_` 로 선언하고 파이썬 `model_dump` 오버라이드로 이름을
+# 바꿔 내는 구조였다. 아무 데서도 쓰이지 않았지만, 누가 `response_model=` 로 붙이는
+# 순간 FastAPI 직렬화가 pydantic-core 를 타서 그 오버라이드를 건너뛴다. 응답 키가
+# `pass_` 가 되고 화면의 카드와 도넛이 조용히 빈다. 고치려고 손대면 터지는 모양이라
+# 지운다. 스키마를 다시 두려면 필드 이름부터 `pass` 로 낼 수 있는 방법을 정해야 한다.
 
 
 # ── Custom Field ─────────────────────────────────────────────────────────────

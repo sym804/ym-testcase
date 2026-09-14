@@ -200,11 +200,62 @@ export interface RegisterForm {
 }
 
 // Report
+// 리포트 응답은 전용 모양이다. Project/TestRun/TestResult 를 그대로 쓰면
+// 실제로 오지 않는 필드까지 있다고 선언하게 되어, 컴파일러가 아무 보호도 못 한다
+// (`is_private`, `project_id`, `created_by` 등이 항상 undefined 였다).
+
+/** 리포트가 싣는 프로젝트 정보 */
+export interface ReportProject {
+  id: number;
+  name: string;
+  description: string | null;
+  jira_base_url: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  created_by: number;
+}
+
+/** 리포트가 싣는 수행 정보 */
+export interface ReportRun {
+  id: number;
+  name: string;
+  version: string | null;
+  environment: string | null;
+  round: number;
+  status: string;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+/** 리포트의 실패 항목. TestResult 전체가 아니라 화면에 쓰는 조각만 온다. */
+export interface ReportFailure {
+  test_case: { tc_id: string };
+  result: string;
+  actual_result: string | null;
+  issue_link: string | null;
+}
+
+/** 리포트 요약. `pass_rate` 의 분모는 `executed`(pass+fail+block)이고 나머지는 `total` 이다. */
+export interface ReportSummary {
+  total: number;
+  executed: number;
+  pass: number;
+  fail: number;
+  block: number;
+  na: number;
+  not_started: number;
+  pass_rate: number;
+  fail_rate: number;
+  block_rate: number;
+  na_rate: number;
+  not_started_rate: number;
+}
+
 export interface ReportData {
-  project: Project;
-  test_run: TestRun;
-  summary: DashboardSummary;
-  top_failures: TestResult[];
+  project: ReportProject;
+  test_run: ReportRun;
+  summary: ReportSummary;
+  top_failures: ReportFailure[];
   jira_issues: string[];
   category_summary: CategoryBreakdown[];
 }

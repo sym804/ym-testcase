@@ -169,5 +169,15 @@
   "resultDate": "Executed",
   "existingOverwrite": "(overwrite {{count}} existing)",
   "addLabel": "Add",
-  "replaceAllBtn": "Replace All"
+  "replaceAllBtn": "Replace All",
+  "exportTitle": "Excel Export",
+  "exportMerged": "Merge sheets (single sheet)",
+  "exportSplitSheets": "Split sheets (tab per sheet)",
+  "exportExpandRefs": "Expand precondition references",
+  "exportExpandRefsHint": "When off, keeps the reference text and attaches the expanded content as a cell note.",
+  "exportDownload": "Download",
+  "refCircular": "(Circular reference: {{id}})",
+  "refNotFound": "(Reference target not found: {{id}})",
+  "refTitle": "{{id}} precondition",
+  "refTitleUpto": "{{id}} precondition 1-{{upto}}"
 }

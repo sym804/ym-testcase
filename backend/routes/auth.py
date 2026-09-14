@@ -16,6 +16,7 @@ from auth import (
     hash_password, verify_password, create_access_token, get_current_user, role_required,
     COOKIE_SECURE, COOKIE_SAMESITE, COOKIE_MAX_AGE, ACCESS_TOKEN_EXPIRE_HOURS,
 )
+from services.first_admin import demote_if_not_first
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,11 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         must_change_password=False,
     )
     db.add(user)
+    # ★관리자 판정을 삽입 뒤에 한 번 더 한다. count()==0 만 보면 같은 순간에 들어온
+    #   두 가입이 둘 다 0 을 보고 둘 다 관리자가 된다. 먼저 만들어진 사용자가
+    #   있으면 경쟁에서 진 쪽이므로 일반 사용자로 돌린다.
+    db.flush()
+    demote_if_not_first(db, user)
     db.commit()
     db.refresh(user)
     return user

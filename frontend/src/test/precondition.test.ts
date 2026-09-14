@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import i18n from "../i18n";
 import { splitItems, parseRef, hasRef, resolveItems, resolveRef } from "../utils/precondition";
 
 // 실제 시트에서 가져온 사전조건 원문
@@ -134,5 +135,26 @@ describe("resolveRef", () => {
     const { title, items } = resolveRef(parseRef("MSK-01 의 사전조건 참조")!, index);
     expect(title).toBe("MSK-01 사전조건");
     expect(items).toHaveLength(3);
+  });
+});
+
+describe("화면에 나가는 문구", () => {
+  afterEach(async () => {
+    await i18n.changeLanguage("ko");
+  });
+
+  it("영어로 바꾸면 참조 안내도 영어로 나온다", async () => {
+    // ★이 문구들은 그리드 셀과 호버 팝업에 그대로 찍힌다. 한글로 고정돼 있으면
+    //   영어 화면에서만 한글이 섞인다.
+    await i18n.changeLanguage("en");
+
+    const loop = new Map([["A-1", "1. A-1 의 사전조건 참조"]]);
+    expect(resolveItems("A-1", loop)[0]).not.toContain("순환 참조");
+
+    const missing = new Map<string, string>();
+    expect(resolveItems("없음", missing)[0]).not.toContain("찾을 수 없음");
+
+    const { title } = resolveRef(parseRef("MSK-01 의 사전조건 1~2 참조")!, index);
+    expect(title).not.toContain("사전조건");
   });
 });
