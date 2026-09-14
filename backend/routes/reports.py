@@ -72,7 +72,7 @@ def _summary_sql(run_id: int, db: Session) -> dict:
     pass_rate = round(passed / executed * 100, 1) if executed > 0 else 0.0
 
     return {
-        "total": total, "passed": passed, "failed": failed,
+        "total": total, "executed": executed, "passed": passed, "failed": failed,
         "blocked": blocked, "na": na, "ns": ns, "pass_rate": pass_rate,
     }
 
@@ -192,6 +192,11 @@ def report_json(
         "test_run": raw["run"],
         "summary": {
             "total": summary["total"],
+            # ★`pass_rate` 의 분모만 수행분(pass+fail+block)이고 나머지 넷은 전체다.
+            #   이름만으로는 알 수 없어 다섯을 더하면 100 이 되리라 기대하게 되므로
+            #   분모를 함께 낸다. 합격률을 전체 기준으로 되돌리면 미수행이 많은
+            #   수행에서 실제보다 낮게 보이던 SYM-57 로 돌아간다.
+            "executed": summary["executed"],
             "pass": summary["passed"],
             "fail": summary["failed"],
             "block": summary["blocked"],
@@ -303,9 +308,10 @@ def report_pdf(
     pdf.set_fill_color(240, 240, 240)
 
     col_w = 27
-    headers = ["Total", "Pass", "Fail", "Block", "NA", "NS", "Pass Rate"]
+    headers = ["Total", "Executed", "Pass", "Fail", "Block", "NA", "NS", "Pass Rate"]
     values = [
-        str(summary["total"]), str(summary["passed"]), str(summary["failed"]),
+        str(summary["total"]), str(summary["executed"]),
+        str(summary["passed"]), str(summary["failed"]),
         str(summary["blocked"]), str(summary["na"]), str(summary["ns"]),
         f"{summary['pass_rate']}%",
     ]
@@ -451,9 +457,10 @@ def report_excel(
     ws_summary["B4"].value = f"Version: {run.version or 'N/A'}  |  Environment: {run.environment or 'N/A'}  |  Round: {run.round}"
 
     # Summary table
-    sum_headers = ["Total", "Pass", "Fail", "Block", "NA", "NS", "Pass Rate"]
+    sum_headers = ["Total", "Executed", "Pass", "Fail", "Block", "NA", "NS", "Pass Rate"]
     sum_values = [
-        summary["total"], summary["passed"], summary["failed"],
+        summary["total"], summary["executed"],
+        summary["passed"], summary["failed"],
         summary["blocked"], summary["na"], summary["ns"],
         f"{summary['pass_rate']}%",
     ]

@@ -1,4 +1,9 @@
 // 사전조건 셀의 "<TC-ID> 의 사전조건 [1~N] 참조" 표기를 해석한다.
+//
+// ★반환 문구 일부가 그리드 셀과 호버 팝업에 그대로 찍힌다. 훅을 쓸 수 없는
+//   순수 모듈이라 i18n 인스턴스를 직접 부른다. 참조 표기(REF_RE)는 DB 에 든
+//   데이터 형식이라 번역 대상이 아니다.
+import i18n from "../i18n";
 // 참조는 체인이 될 수 있어(FS-04 -> FS-02 -> FS-01 -> REC-API-01) 재귀로 펼친다.
 
 /** 참조 문구. 셀 전체이거나 "1. " 로 시작하는 첫 항목으로 나타난다. */
@@ -59,9 +64,9 @@ export function resolveItems(
   index: Map<string, string>,
   seen: Set<string> = new Set(),
 ): string[] {
-  if (seen.has(tcId)) return [`(순환 참조: ${tcId})`];
+  if (seen.has(tcId)) return [i18n.t("testcase:refCircular", { id: tcId })];
   const raw = index.get(tcId);
-  if (raw === undefined) return [`(참조 대상을 찾을 수 없음: ${tcId})`];
+  if (raw === undefined) return [i18n.t("testcase:refNotFound", { id: tcId })];
 
   const next = new Set(seen);
   next.add(tcId);
@@ -86,6 +91,8 @@ export function resolveRef(
 ): { title: string; items: string[] } {
   const all = resolveItems(ref.targetId, index);
   const items = ref.upto !== undefined ? all.slice(0, ref.upto) : all;
-  const title = ref.upto !== undefined ? `${ref.targetId} 사전조건 1~${ref.upto}` : `${ref.targetId} 사전조건`;
+  const title = ref.upto !== undefined
+    ? i18n.t("testcase:refTitleUpto", { id: ref.targetId, upto: ref.upto })
+    : i18n.t("testcase:refTitle", { id: ref.targetId });
   return { title, items };
 }

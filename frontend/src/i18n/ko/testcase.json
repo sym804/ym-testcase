@@ -169,5 +169,15 @@
   "resultDate": "수행일",
   "existingOverwrite": "(기존 {{count}}개 덮어쓰기)",
   "addLabel": "추가",
-  "replaceAllBtn": "모두 바꾸기"
+  "replaceAllBtn": "모두 바꾸기",
+  "exportTitle": "Excel Export",
+  "exportMerged": "시트 통합 (단일 시트)",
+  "exportSplitSheets": "시트 분리 (시트별 탭)",
+  "exportExpandRefs": "사전조건 참조 펼치기",
+  "exportExpandRefsHint": "끄면 참조 문구를 두고 펼친 내용을 셀 메모로 답니다.",
+  "exportDownload": "다운로드",
+  "refCircular": "(순환 참조: {{id}})",
+  "refNotFound": "(참조 대상을 찾을 수 없음: {{id}})",
+  "refTitle": "{{id}} 사전조건",
+  "refTitleUpto": "{{id}} 사전조건 1~{{upto}}"
 }

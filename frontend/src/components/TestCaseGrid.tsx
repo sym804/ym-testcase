@@ -1856,16 +1856,16 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         <div style={sheetModalStyles.overlay} onClick={() => setShowExportModal(false)}>
           <div style={{ ...sheetModalStyles.panel, maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
             <div style={sheetModalStyles.header}>
-              <h3 style={sheetModalStyles.title}>Excel Export</h3>
+              <h3 style={sheetModalStyles.title}>{t("exportTitle")}</h3>
             </div>
             <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
                 <input type="radio" name="exportMode" checked={!exportSplit} onChange={() => setExportSplit(false)} />
-                시트 통합 (단일 시트)
+                {t("exportMerged")}
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
                 <input type="radio" name="exportMode" checked={exportSplit} onChange={() => setExportSplit(true)} />
-                시트 분리 (시트별 탭)
+                {t("exportSplitSheets")}
               </label>
               <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 12, marginTop: 4 }}>
                 <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
@@ -1876,9 +1876,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                     style={{ marginTop: 3 }}
                   />
                   <span>
-                    사전조건 참조 펼치기
+                    {t("exportExpandRefs")}
                     <span style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                      끄면 참조 문구를 두고 펼친 내용을 셀 메모로 답니다.
+                      {t("exportExpandRefsHint")}
                     </span>
                   </span>
                 </label>
@@ -1889,13 +1889,13 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 onClick={() => setShowExportModal(false)}
                 style={{ padding: "6px 16px", borderRadius: 6, border: "1px solid var(--border-color)", background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer" }}
               >
-                취소
+                {t("common:cancel")}
               </button>
               <button
                 onClick={handleExport}
                 style={{ padding: "6px 16px", borderRadius: 6, border: "none", background: "#3182f6", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
               >
-                다운로드
+                {t("exportDownload")}
               </button>
             </div>
           </div>

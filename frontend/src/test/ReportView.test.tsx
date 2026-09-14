@@ -26,11 +26,12 @@ const mockRuns = [
 ];
 
 const mockReport = {
-  project: { id: 1, name: "테스트 프로젝트", description: "", jira_base_url: null, is_private: false, created_by: 1, created_at: "2026-01-01", updated_at: "2026-01-01" },
-  test_run: { id: 1, project_id: 1, name: "R1 수행", version: "1.0", environment: "staging", round: 1, status: TestRunStatus.COMPLETED, created_by: 1, created_at: "2026-01-15T09:00:00" },
-  summary: { total: 50, pass: 35, fail: 10, block: 3, na: 2, not_started: 0, pass_rate: 70, fail_rate: 20, block_rate: 6, na_rate: 4, not_started_rate: 0 },
+  // 리포트 응답은 전용 모양이다. 엔티티 전체가 아니라 화면에 쓰는 조각만 온다.
+  project: { id: 1, name: "테스트 프로젝트", description: "", jira_base_url: null, created_by: 1, created_at: "2026-01-01", updated_at: "2026-01-01" },
+  test_run: { id: 1, name: "R1 수행", version: "1.0", environment: "staging", round: 1, status: TestRunStatus.COMPLETED, created_at: "2026-01-15T09:00:00", completed_at: null },
+  summary: { total: 50, executed: 48, pass: 35, fail: 10, block: 3, na: 2, not_started: 0, pass_rate: 70, fail_rate: 20, block_rate: 6, na_rate: 4, not_started_rate: 0 },
   top_failures: [
-    { id: 1, test_run_id: 1, test_case_id: 1, result: "FAIL", actual_result: "500 에러", issue_link: "https://jira.example.com/TEST-1", remarks: "", executed_by: 1, executed_at: "2026-01-15", test_case: { id: 1, project_id: 1, no: 1, tc_id: "TC-005", type: "", category: "", depth1: "", depth2: "", priority: "", test_type: "", precondition: "", test_steps: "", expected_result: "", r1: "", r2: "", r3: "", issue_link: "", assignee: "", remarks: "", sheet_name: "", created_at: "", updated_at: "" } },
+    { test_case: { tc_id: "TC-005" }, result: "FAIL", actual_result: "500 에러", issue_link: "https://jira.example.com/TEST-1" },
   ],
   jira_issues: ["TEST-1", "TEST-2"],
   category_summary: [
@@ -106,7 +107,7 @@ describe("ReportView", () => {
   it("전체 현황 카드에 미수행과 N/A 건수를 표시한다", async () => {
     vi.mocked(reportsApi.getData).mockResolvedValue({
       ...mockReport,
-      summary: { total: 50, pass: 20, fail: 10, block: 3, na: 2, not_started: 15, pass_rate: 60.6, fail_rate: 20, block_rate: 6, na_rate: 4, not_started_rate: 30 },
+      summary: { total: 50, executed: 33, pass: 20, fail: 10, block: 3, na: 2, not_started: 15, pass_rate: 60.6, fail_rate: 20, block_rate: 6, na_rate: 4, not_started_rate: 30 },
     });
     render(<ReportView projectId={1} />);
 
@@ -126,7 +127,7 @@ describe("ReportView", () => {
   it("전체 현황 카드의 PASS/FAIL/BLOCK/N-A/미수행 합이 전체 TC 와 일치한다", async () => {
     vi.mocked(reportsApi.getData).mockResolvedValue({
       ...mockReport,
-      summary: { total: 50, pass: 20, fail: 10, block: 3, na: 2, not_started: 15, pass_rate: 60.6, fail_rate: 20, block_rate: 6, na_rate: 4, not_started_rate: 30 },
+      summary: { total: 50, executed: 33, pass: 20, fail: 10, block: 3, na: 2, not_started: 15, pass_rate: 60.6, fail_rate: 20, block_rate: 6, na_rate: 4, not_started_rate: 30 },
     });
     render(<ReportView projectId={1} />);
 

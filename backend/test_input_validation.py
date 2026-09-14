@@ -117,3 +117,99 @@ def test_살아있는_TC는_수정할_수_있다(token, project):
                      json={"category": "바뀐값"})
     assert r.status_code == 200, r.text
     assert r.json()["category"] == "바뀐값"
+
+
+# ── TC ID ─────────────────────────────────────────────────────────────────────
+
+def test_빈_TC_ID는_거부한다(token, project):
+    """빈 값은 사전조건 참조 색인에서 어느 TC 도 가리키지 못한다."""
+    r = requests.post(f"{BASE}/api/projects/{project}/testcases", headers=auth(token), json={
+        "no": 1, "tc_id": "", "category": "기본", "test_steps": "1. 실행",
+        "expected_result": "성공", "sheet_name": "기본", "priority": "보통",
+    })
+    assert r.status_code == 422, f"빈 TC ID 가 저장됐다: {r.status_code}"
+
+
+def test_너무_긴_TC_ID는_거부한다(token, project):
+    """컬럼은 50자인데 SQLite 는 길이를 강제하지 않아 그대로 들어간다.
+
+    PostgreSQL 로 옮기면 그때 터지고, 그 사이에 쌓인 데이터는 옮길 수 없다.
+    """
+    r = requests.post(f"{BASE}/api/projects/{project}/testcases", headers=auth(token), json={
+        "no": 1, "tc_id": "T" * 60, "category": "기본", "test_steps": "1. 실행",
+        "expected_result": "성공", "sheet_name": "기본", "priority": "보통",
+    })
+    assert r.status_code == 422, f"50자를 넘는 TC ID 가 저장됐다: {r.status_code}"
+
+
+def test_정상_TC_ID는_받는다(token, project):
+    r = requests.post(f"{BASE}/api/projects/{project}/testcases", headers=auth(token), json={
+        "no": 1, "tc_id": "TC-OK-001", "category": "기본", "test_steps": "1. 실행",
+        "expected_result": "성공", "sheet_name": "기본", "priority": "보통",
+    })
+    assert r.status_code == 201, r.text
+
+
+# ── 시트 이름 ─────────────────────────────────────────────────────────────────
+
+def test_번호가_겹치는_이름으로_바꾸면_이유를_알려_준다(token, project):
+    """★시트를 지워도 TC 의 sheet_name 은 남고, 복원하면 활성 TC 로 돌아온다.
+
+    그 이름으로 다른 시트를 바꾸면 (프로젝트, 시트명, 번호)가 겹쳐 유니크 제약에
+    걸린다. 종전에는 전역 핸들러가 "데이터 제약 조건에 걸렸습니다" 라는 409 만
+    내서 무엇을 어떻게 고쳐야 하는지 알 수 없었다.
+
+    미리 "그 이름을 쓰는 TC 가 있으면 거절" 로 막지는 않는다. 번호가 겹치지 않으면
+    실제로는 부딪히지 않아서, 막으면 멀쩡한 이름 변경까지 400 이 된다.
+    """
+    h = auth(token)
+    # 시트 A: TC 1번
+    rs = requests.post(f"{BASE}/api/projects/{project}/testcases/sheets", headers=h,
+                       json={"name": "결제", "parent_id": None, "is_folder": False})
+    assert rs.status_code in (200, 201), rs.text
+    tc_a = _add_tc(token, project, 1, "TC-PAY-001")
+    requests.put(f"{BASE}/api/projects/{project}/testcases/{tc_a}", headers=h,
+                 json={"sheet_name": "결제"})
+
+    # 시트 A 를 지우면 그 TC 는 소프트 삭제된다. 복원해 활성으로 되돌린다.
+    d = requests.delete(f"{BASE}/api/projects/{project}/testcases/sheets/결제", headers=h)
+    assert d.status_code in (200, 204), d.text
+    restored = requests.post(f"{BASE}/api/projects/{project}/testcases/{tc_a}/restore", headers=h)
+    assert restored.status_code == 200, restored.text
+
+    # 시트 B 에도 TC 를 둔다. 같은 번호라야 실제로 부딪힌다.
+    rs2 = requests.post(f"{BASE}/api/projects/{project}/testcases/sheets", headers=h,
+                        json={"name": "임시", "parent_id": None, "is_folder": False})
+    assert rs2.status_code in (200, 201), rs2.text
+    other_id = rs2.json()["id"]
+    tc_b = _add_tc(token, project, 2, "TC-TMP-001")
+    requests.put(f"{BASE}/api/projects/{project}/testcases/{tc_b}", headers=h,
+                 json={"sheet_name": "임시"})
+
+    r = requests.put(f"{BASE}/api/projects/{project}/testcases/sheets/{other_id}/rename",
+                     headers=h, json={"new_name": "결제"})
+    assert r.status_code == 400, (
+        f"이유를 알 수 없는 실패 대신 400 으로 알려야 한다: {r.status_code} {r.text}"
+    )
+    assert "번호가 겹칩니다" in r.text, f"무엇이 문제인지 적혀 있지 않다: {r.text}"
+
+
+def test_부딪히지_않는_이름_변경은_막지_않는다(token, project):
+    """지운 TC 가 그 이름을 쓰고 있어도 번호가 겹치지 않으면 통과해야 한다."""
+    h = auth(token)
+    rs = requests.post(f"{BASE}/api/projects/{project}/testcases/sheets", headers=h,
+                       json={"name": "보관", "parent_id": None, "is_folder": False})
+    assert rs.status_code in (200, 201), rs.text
+    tc = _add_tc(token, project, 1, "TC-ARC-001")
+    requests.put(f"{BASE}/api/projects/{project}/testcases/{tc}", headers=h,
+                 json={"sheet_name": "보관"})
+    requests.delete(f"{BASE}/api/projects/{project}/testcases/sheets/보관", headers=h)
+
+    # 빈 시트를 그 이름으로 바꾼다. 옮길 TC 가 없으니 부딪히지 않는다.
+    rs2 = requests.post(f"{BASE}/api/projects/{project}/testcases/sheets", headers=h,
+                        json={"name": "빈시트", "parent_id": None, "is_folder": False})
+    other_id = rs2.json()["id"]
+
+    r = requests.put(f"{BASE}/api/projects/{project}/testcases/sheets/{other_id}/rename",
+                     headers=h, json={"new_name": "보관"})
+    assert r.status_code == 200, f"부딪히지 않는데 막았다: {r.status_code} {r.text}"
