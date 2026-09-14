@@ -12,8 +12,6 @@
   "passFailTrend": "Pass/Fail Rate Trend",
   "priorityDistribution": "Priority Distribution",
   "categoryDistribution": "Category Distribution",
-  "assigneeStatus": "Assignee Status",
-  "assignee": "Assignee",
   "completionRate": "Completion Rate",
   "heatmapTitle": "Defect Density Heatmap (Category x Priority)",
   "categoryPriority": "Category \\ Priority"

@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { writeRowField } from "../utils/rowFields";
 import type { GridApi } from "ag-grid-community";
 
 interface UndoEntry {
@@ -44,7 +45,8 @@ export function useUndoRedo(gridApiRef: React.RefObject<GridApi | null>) {
       api.forEachNode((node) => {
         const nodeRowId = node.data?.id ? String(node.data.id) : `new_${node.data?.no}`;
         if (nodeRowId === entry.rowId && node.data) {
-          node.data[entry.field] = value;
+          // 커스텀 필드 컬럼은 최상위 속성이 아니라 custom_fields 에 쓴다.
+          writeRowField(node.data, entry.field, value);
           updatedNodes.add(nodeRowId);
         }
       });

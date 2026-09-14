@@ -8,7 +8,6 @@ import type {
   PriorityDistribution,
   CategoryBreakdown,
   RoundComparison,
-  AssigneeSummary,
   TestRun,
 } from "../types";
 import toast from "react-hot-toast";
@@ -48,7 +47,6 @@ export default function Dashboard({ projectId }: Props) {
   const [priority, setPriority] = useState<PriorityDistribution[]>([]);
   const [category, setCategory] = useState<CategoryBreakdown[]>([]);
   const [rounds, setRounds] = useState<RoundComparison[]>([]);
-  const [assignee, setAssignee] = useState<AssigneeSummary[]>([]);
   const [heatmap, setHeatmap] = useState<{ category: string; priority: string; fail_count: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -57,12 +55,11 @@ export default function Dashboard({ projectId }: Props) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, p, c, r, a, h, runList] = await Promise.all([
+      const [s, p, c, r, h, runList] = await Promise.all([
         dashboardApi.summary(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
         dashboardApi.priority(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
         dashboardApi.category(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
         dashboardApi.rounds(projectId, dateFrom || undefined, dateTo || undefined),
-        dashboardApi.assignee(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
         dashboardApi.heatmap(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
         testRunsApi.list(projectId),
       ]);
@@ -70,7 +67,6 @@ export default function Dashboard({ projectId }: Props) {
       setPriority(p);
       setCategory(c);
       setRounds(r);
-      setAssignee(a);
       setHeatmap(h);
       setRuns(runList);
     } catch (err) {
@@ -371,39 +367,6 @@ export default function Dashboard({ projectId }: Props) {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Assignee table */}
-      <div style={{ ...styles.tableCard, marginTop: 20 }}>
-        <h4 style={styles.tableTitle}>{t("assigneeStatus")}</h4>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>{t("assignee")}</th>
-              <th style={styles.thNum}>Total</th>
-              <th style={styles.thNum}>PASS</th>
-              <th style={styles.thNum}>FAIL</th>
-              <th style={styles.thNum}>BLOCK</th>
-              <th style={styles.thNum}>N/A</th>
-              <th style={styles.thNum}>{t("notStarted")}</th>
-              <th style={styles.thNum}>{t("completionRate")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assignee.map((row) => (
-              <tr key={row.assignee}>
-                <td style={styles.td}>{row.assignee || "-"}</td>
-                <td style={styles.tdNum}>{row.total}</td>
-                <td style={{ ...styles.tdNum, color: CARD_COLORS.pass }}>{row.pass}</td>
-                <td style={{ ...styles.tdNum, color: CARD_COLORS.fail }}>{row.fail}</td>
-                <td style={{ ...styles.tdNum, color: CARD_COLORS.block }}>{row.block}</td>
-                <td style={{ ...styles.tdNum, color: CARD_COLORS.na }}>{row.na}</td>
-                <td style={styles.tdNum}>{row.not_started}</td>
-                <td style={styles.tdNum}>{row.completion_rate.toFixed(1)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
 
       {/* Heatmap */}

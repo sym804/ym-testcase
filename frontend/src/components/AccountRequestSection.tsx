@@ -221,7 +221,7 @@ const s: Record<string, React.CSSProperties> = {
     backgroundColor: "transparent",
   },
   empty: { fontSize: 13, color: "var(--text-secondary, #64748B)" },
-  error: { color: "var(--danger, #DC2626)", fontSize: 12, marginBottom: 8 },
+  error: { color: "var(--text-danger, #CF222E)", fontSize: 12, marginBottom: 8 },
   resultsWrap: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 },
   result: {
     padding: 12, borderRadius: 6,

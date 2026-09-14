@@ -453,16 +453,6 @@ describe("dashboardApi", () => {
     expect(result).toEqual(data);
   });
 
-  it("assignee sends GET with optional runId", async () => {
-    const data = [{ assignee: "user1", count: 5 }];
-    mockGet.mockResolvedValueOnce({ data });
-    const result = await dashboardApi.assignee(1);
-    expect(mockGet).toHaveBeenCalledWith("/api/projects/1/dashboard/assignee", {
-      params: undefined,
-    });
-    expect(result).toEqual(data);
-  });
-
   it("heatmap sends GET with runId", async () => {
     const data = [{ category: "Auth", priority: "High", fail_count: 3 }];
     mockGet.mockResolvedValueOnce({ data });

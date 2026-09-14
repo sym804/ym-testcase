@@ -19,6 +19,7 @@ import { AG_GRID_LOCALE_EN } from "../agGridLocaleEn";
 import toast from "react-hot-toast";
 import { translateError } from "../utils/errorMessage";
 import { LARGE_TEXT_EDITOR_PARAMS } from "../utils/gridEditors";
+import { readRowField, writeRowField } from "../utils/rowFields";
 import { planTcIdFill, dominantTcIdPrefix, findTcIdCollisions } from "../utils/tcId";
 import MarkdownCell from "./MarkdownCell";
 import PreconditionCell from "./PreconditionCell";
@@ -123,7 +124,11 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     const undoGroup: UndoGroup = [];
     const changedRows: TestCase[] = [];
 
-    api.forEachNode((node) => {
+    // ★보이는 행만 바꾼다. forEachNode 는 필터와 무관하게 로드된 모든 행을 도는데,
+    //   모든 컬럼에 필터가 걸려 있고(defaultColDef.filter) 고급 필터도 있어서
+    //   화면에 없는 행까지 바뀌고 토스트의 건수도 보이지 않는 행을 포함했다.
+    //   같은 파일의 handleAutoFillTcId 는 처음부터 이 API 를 쓴다.
+    api.forEachNodeAfterFilterAndSort((node) => {
       if (!node.data) return;
       const rowId = node.data.id ? String(node.data.id) : `new_${node.data.no}`;
       let changed = false;
@@ -659,7 +664,10 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           category: "",
           depth1: "",
           depth2: "",
-          priority: t("priority.normal"),
+          // ★DB 값을 넣는다. t() 는 화면 표기라 영어로 보면 "Normal" 이 저장돼
+          //   값 공간이 로케일마다 갈라진다. 색상 맵과 편집기 선택지가 그 값을
+          //   모르고, 대시보드는 GROUP BY priority 라 따로 집계된다.
+          priority: PRIORITY_OPTIONS[2],
           test_type: "Web",
           precondition: "",
           test_steps: "",
@@ -981,8 +989,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       selectedNodes.forEach((node) => {
         if (node.data && node !== event.node) {
           const rowId = node.data.id ? String(node.data.id) : `new_${node.data.no}`;
-          undoGroup.push({ rowId, field, oldValue: node.data[field], newValue: sourceValue, dataId: node.data.id || 0 });
-          node.data[field] = sourceValue;
+          // 커스텀 필드 컬럼은 값이 data.custom_fields 에 있다. rowFields 가 가른다.
+          undoGroup.push({ rowId, field, oldValue: readRowField(node.data, field), newValue: sourceValue, dataId: node.data.id || 0 });
+          writeRowField(node.data, field, sourceValue);
           filled++;
         }
       });

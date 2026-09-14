@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { usersApi, projectsApi, membersApi } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import type { User, Project, ProjectMember } from "../types";
@@ -284,7 +284,19 @@ export default function AdminPage() {
           <div style={s.overlay} onClick={() => setTempPwInfo(null)}>
             <div style={s.modal} onClick={(e) => e.stopPropagation()}>
               <h3 style={s.modalTitle}>{t("resetPasswordDone")}</h3>
-              <p style={s.modalDesc} dangerouslySetInnerHTML={{ __html: t("resetPasswordDesc", { username: tempPwInfo.username }).replace("<0>", "<strong>").replace("</0>", "</strong>").replace("<br/>", "<br />") }} />
+              {/* ★dangerouslySetInnerHTML 로 넣지 않는다. i18n 이
+                  escapeValue:false 라 아이디에 든 HTML 이 그대로 해석됐다.
+                  아이디는 가입자가 정하고 백엔드에 문자 제한이 없어서, 관리자가
+                  그 계정의 비밀번호를 초기화하는 순간 관리자 브라우저에서
+                  실행되는 저장형 XSS 였다. Trans 는 값을 텍스트 노드로 넣는다. */}
+              <p style={s.modalDesc}>
+                <Trans
+                  t={t}
+                  i18nKey="resetPasswordDesc"
+                  values={{ username: tempPwInfo.username }}
+                  components={[<strong key="0" />]}
+                />
+              </p>
 
               <div style={s.tempPwBox}>{tempPwInfo.password}</div>
               <button

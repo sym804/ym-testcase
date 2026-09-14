@@ -123,12 +123,16 @@ describe("Dashboard", () => {
     });
   });
 
-  it("담당자 테이블을 렌더링한다", async () => {
+  it("담당자별 표를 그리지 않는다", async () => {
+    // ★assignee 필드는 v1.2.0 에서 없어졌고 백엔드 엔드포인트는 빈 배열만
+    //   돌려주는 스텁이다. 그런데 화면은 헤더까지 갖춘 표를 그려서 사용자가
+    //   "아직 데이터가 없나" 로 읽게 된다. 종전 테스트는 가짜 응답을 물려
+    //   그 표를 정상으로 못박고 있었다(실제로는 늘 빈 표다).
     render(<Dashboard projectId={1} />);
     await waitFor(() => {
-      expect(screen.getByText("담당자별 현황")).toBeInTheDocument();
+      expect(screen.getByText("전체 TC")).toBeInTheDocument();
     });
-    expect(screen.getByText("테스터A")).toBeInTheDocument();
+    expect(screen.queryByText("담당자별 현황")).toBeNull();
   });
 
   it("히트맵을 렌더링한다", async () => {

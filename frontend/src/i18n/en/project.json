@@ -39,5 +39,7 @@
   "table": {
     "project": "Project",
     "progress": "Progress"
-  }
+  },
+  "deleteAllFailed": "Delete failed. All {{count}} project(s) failed.",
+  "deletePartial": "{{deleted}} deleted, {{failed}} failed."
 }

@@ -379,6 +379,42 @@ describe("ProjectSettings - Custom Fields CRUD", () => {
     expect(customFieldsApi.delete).not.toHaveBeenCalled();
   });
 
+  it("설명을 비우고 저장하면 빈 값이 서버로 간다", async () => {
+    // ★undefined 로 보내면 axios 가 키를 통째로 빼고, 백엔드는 exclude_unset 이라
+    //   그 필드를 건드리지 않는다. 화면은 비어 보이고 성공 토스트까지 뜨는데
+    //   DB 값은 그대로라, 탭을 나갔다 들어오면 지운 설명이 되살아난다.
+    const user = userEvent.setup();
+    renderSettings();
+
+    await user.clear(screen.getByPlaceholderText("프로젝트 설명 (선택)"));
+    // "저장" 버튼은 이 화면에 둘이다. 프로젝트 정보 쪽이 첫 번째.
+    await user.click(screen.getAllByText("저장")[0]);
+
+    await waitFor(() => {
+      expect(projectsApi.update).toHaveBeenCalledWith(1, {
+        name: "TestProject",
+        description: "",
+      });
+    });
+  });
+
+  it("설명을 적어 저장하면 그 값이 그대로 간다", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+
+    const desc = screen.getByPlaceholderText("프로젝트 설명 (선택)");
+    await user.clear(desc);
+    await user.type(desc, "결제 회귀용");
+    await user.click(screen.getAllByText("저장")[0]);
+
+    await waitFor(() => {
+      expect(projectsApi.update).toHaveBeenCalledWith(1, {
+        name: "TestProject",
+        description: "결제 회귀용",
+      });
+    });
+  });
+
   it("필드 추가 API 실패 시 에러 메시지를 표시한다", async () => {
     vi.mocked(customFieldsApi.create).mockRejectedValue({ response: { data: { detail: "중복된 필드명" } } });
     const user = userEvent.setup();
