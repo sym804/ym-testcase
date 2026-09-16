@@ -37,11 +37,45 @@ YM TestCase는 3개 컴포넌트로 구성되며, 각각 독립적으로 버전�
 ## 현재 버전
 
 ```
-YM TestCase System  v1.5.6.0  (2026-09-14)
-├── Frontend       v1.5.4.0
-├── Backend        v1.5.5.0
+YM TestCase System  v1.5.7.0  (2026-09-16)
+├── Frontend       v1.5.5.0
+├── Backend        v1.5.6.0
 └── Database       v0.9.1.0
 ```
+
+---
+
+## v1.5.7.0 (2026-09-16) - [fix] 프론트·백엔드 의존성 취약점 8건 해소
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.5.6.0 | **1.5.7.0** | fix +1 |
+| Frontend | 1.5.4.0 | **1.5.5.0** | fix +1 |
+| Backend | 1.5.5.0 | **1.5.6.0** | fix +1 |
+
+### 이슈
+
+- SYM-95 프론트 의존성에 axios SSRF, react-router RCE 등 취약점 6건 (bug/major/frontend)
+- SYM-96 python-multipart 에 버전 핀이 없어 헤더 무제한 DoS 버전이 설치된다 (bug/major/backend)
+
+### 변경
+
+- axios, react-router-dom, dompurify 를 최신으로 갱신. 하위 form-data, follow-redirects 도 함께 올라감
+- `requirements.txt` 의 `python-multipart` 에 `==0.0.32` 핀 추가. 이 파일에서 유일하게 버전 지정이 없던 항목
+- 핀 사유를 주석으로 남김
+
+### 영향
+
+- 사용자 동작 변화 없음. 의존성만 교체
+- 프론트 high 4 / moderate 2 -> 0건, 백엔드 python-multipart 12건 -> 0건
+- `routes/attachments.py` 의 `UploadFile` 경로가 이 파서를 직접 탐
+- 검증: 프론트 빌드 + vitest 482건, 백엔드 테스트 184건 통과
+
+### 조치
+
+- 배포 환경에서 `pip install -r requirements.txt` 재실행 필요. 핀을 추가해도 기존 환경의 0.0.22 는 자동으로 교체되지 않음
 
 ---
 
