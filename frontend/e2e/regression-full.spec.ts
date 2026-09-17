@@ -18,17 +18,13 @@ async function createProject(page: Page, name: string) {
   await page.getByText("+ 새 프로젝트").click();
   await page.getByPlaceholder("프로젝트 이름").fill(name);
   await page.getByRole("button", { name: "생성" }).click();
-  await page.waitForTimeout(2000);
   await page.locator("h3").filter({ hasText: name }).click();
   await page.waitForLoadState("networkidle");
-  await page.waitForTimeout(2000);
 }
 
 async function deleteProject(page: Page, name: string) {
   await page.getByRole("button", { name: "설정" }).click();
-  await page.waitForTimeout(1000);
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await page.waitForTimeout(500);
   await page.getByRole("button", { name: "프로젝트 삭제" }).click();
   await page.getByPlaceholder(name).fill(name);
   await page.getByRole("button", { name: "영구 삭제" }).click();
@@ -48,11 +44,11 @@ async function addSheetAndRows(page: Page, sheetName: string, rowCount = 1) {
   }
   await page.getByPlaceholder("시트 이름").fill(sheetName);
   await page.getByRole("button", { name: "추가", exact: true }).click();
-  await page.waitForTimeout(1000);
+  await expect(page.getByPlaceholder("시트 이름")).toHaveCount(0);
 
   for (let i = 0; i < rowCount; i++) {
     await page.getByText("+ 행 추가").click();
-    await page.waitForTimeout(500);
+    await expect(page.locator(".ag-center-cols-container .ag-row")).toHaveCount(i + 1);
   }
 }
 
@@ -109,7 +105,7 @@ test.describe("1. 인증", () => {
   test("TC-AUTH-008: 회원가입 유효성 검사 (짧은 비밀번호)", async ({ page }) => {
     await page.goto("/login");
     await page.getByText("회원가입").click();
-    await page.waitForTimeout(1000);
+    await expect(page.getByRole("heading", { name: "회원가입" })).toBeVisible();
     // 폼 필드 채우기
     const inputs = page.locator("input");
     const count = await inputs.count();
@@ -125,7 +121,7 @@ test.describe("1. 인증", () => {
 
   test("TC-AUTH-009: 로그아웃", async ({ page }) => {
     await login(page);
-    await page.waitForTimeout(3500);
+    await expect(page.getByRole("status")).toHaveCount(0, { timeout: 10000 });
     await page.locator("header button").filter({ hasText: /Admin|admin/ }).click();
     await page.getByRole("button", { name: "로그아웃" }).click();
     await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
@@ -138,7 +134,7 @@ test.describe("1. 인증", () => {
 
   test("TC-AUTH-011: 비밀번호 변경 접근", async ({ page }) => {
     await login(page);
-    await page.waitForTimeout(3500);
+    await expect(page.getByRole("status")).toHaveCount(0, { timeout: 10000 });
     await page.locator("header button").filter({ hasText: /Admin|admin/ }).click();
     await expect(page.getByText("비밀번호 변경")).toBeVisible();
   });
@@ -159,14 +155,12 @@ test.describe("2. 프로젝트 목록", () => {
   test("TC-PL-004: 프로젝트 카드 정보", async ({ page }) => {
     test.skip(!!process.env.CI, "CI 환경에서는 기존 프로젝트 필요");
     // 카드에 프로젝트 이름이 h3로 표시
-    await page.waitForTimeout(2000);
     const cards = page.locator("h3");
     expect(await cards.count()).toBeGreaterThan(0);
   });
 
   test("TC-PL-005: 프로젝트 카드 → 상세 이동", async ({ page }) => {
     test.skip(!!process.env.CI, "CI 환경에서는 기존 프로젝트 필요");
-    await page.waitForTimeout(2000);
     const firstCard = page.locator("h3").first();
     const name = await firstCard.textContent();
     await firstCard.click();
@@ -178,11 +172,9 @@ test.describe("2. 프로젝트 목록", () => {
     await page.getByText("+ 새 프로젝트").click();
     await page.getByPlaceholder("프로젝트 이름").fill(name);
     await page.getByRole("button", { name: "생성" }).click();
-    await page.waitForTimeout(2000);
     await expect(page.locator("h3").filter({ hasText: name })).toBeVisible({ timeout: 10000 });
     // 정리
     await page.locator("h3").filter({ hasText: name }).click();
-    await page.waitForTimeout(2000);
     await deleteProject(page, name);
   });
 
@@ -190,7 +182,6 @@ test.describe("2. 프로젝트 목록", () => {
     await page.getByText("+ 새 프로젝트").click();
     await page.getByRole("button", { name: "생성" }).click();
     // 에러 또는 모달 유지
-    await page.waitForTimeout(1000);
     // 프로젝트 목록으로 안 이동 (모달 유지)
     await expect(page.getByPlaceholder("프로젝트 이름")).toBeVisible();
   });
@@ -199,15 +190,12 @@ test.describe("2. 프로젝트 목록", () => {
     const name = `E2E_Edit_${Date.now()}`;
     await createProject(page, name);
     // 빈 프로젝트 시트 추가 화면에서 설정 탭 이동
-    await page.waitForTimeout(2000);
     await page.getByRole("button", { name: "설정" }).click();
-    await page.waitForTimeout(2000);
     // 설정 페이지 확인
     await expect(page.getByText("접근 설정").first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText("프로젝트 삭제").first()).toBeVisible({ timeout: 5000 });
     // deleteProject 호출하지 않고 직접 삭제 (이미 설정 탭)
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(500);
     await page.getByRole("button", { name: "프로젝트 삭제" }).click();
     await page.getByPlaceholder(name).fill(name);
     await page.getByRole("button", { name: "영구 삭제" }).click();
@@ -219,7 +207,6 @@ test.describe("2. 프로젝트 목록", () => {
     await createProject(page, name);
     await deleteProject(page, name);
     // 삭제 후 목록에서 안 보임
-    await page.waitForTimeout(1000);
     const card = page.locator("h3").filter({ hasText: name });
     await expect(card).not.toBeVisible();
   });
@@ -246,16 +233,46 @@ test.describe("3. 헤더/네비게이션", () => {
   test("TC-HDR-003: 글로벌 검색 입력", async ({ page }) => {
     const search = page.getByPlaceholder("TC 검색...");
     await expect(search).toBeVisible();
+    const searched = page.waitForResponse((r) => r.url().includes("/api/search"));
     await search.fill("TC");
-    await page.waitForTimeout(500);
+    expect((await searched).ok()).toBe(true);
   });
 
-  test("TC-HDR-006: 키보드 네비게이션", async ({ page }) => {
-    const search = page.getByPlaceholder("TC 검색...");
-    await search.fill("TC-001");
-    await page.keyboard.press("Escape");
-    // Escape로 검색 닫기
-    await page.waitForTimeout(500);
+  test("TC-HDR-006: Escape 로 검색 드롭다운을 닫는다", async ({ page, request }) => {
+    // 드롭다운은 결과가 있어야 열린다. 빈 DB 에서도 돌도록 찾을 것을 먼저 만든다.
+    const lg = await request.post("/api/auth/login", {
+      data: { username: "admin", password: PASSWORD },
+    });
+    const headers = { Authorization: `Bearer ${(await lg.json()).access_token}` };
+    const pname = `E2E_HDR_${Date.now()}`;
+    const proj = await (await request.post("/api/projects", { data: { name: pname }, headers })).json();
+    await request.post(`/api/projects/${proj.id}/testcases/sheets`, {
+      data: { name: "기본", parent_id: null, is_folder: false },
+      headers,
+    });
+    const keyword = `ESCTARGET${Date.now()}`;
+    await request.post(`/api/projects/${proj.id}/testcases`, {
+      data: {
+        tc_id: "ESC-001", type: "기능", category: keyword, depth1: keyword,
+        test_steps: "1. 연다", expected_result: "된다", priority: "P2", sheet_name: "기본",
+      },
+      headers,
+    });
+
+    try {
+      const search = page.getByPlaceholder("TC 검색...");
+      const searched = page.waitForResponse((r) => r.url().includes("/api/search"));
+      await search.fill(keyword);
+      await searched;
+
+      const dropdown = page.getByTestId("search-results");
+      await expect(dropdown).toBeVisible();
+
+      await page.keyboard.press("Escape");
+      await expect(dropdown).toHaveCount(0);
+    } finally {
+      await request.delete(`/api/projects/${proj.id}`, { headers });
+    }
   });
 
   test("TC-HDR-007: 다크모드 토글", async ({ page }) => {
@@ -275,7 +292,7 @@ test.describe("3. 헤더/네비게이션", () => {
   });
 
   test("TC-HDR-009: 로그아웃 버튼 표시", async ({ page }) => {
-    await page.waitForTimeout(3500);
+    await expect(page.getByRole("status")).toHaveCount(0, { timeout: 10000 });
     await page.locator("header button").filter({ hasText: /Admin|admin/ }).click();
     await expect(page.getByText("로그아웃")).toBeVisible();
   });
@@ -292,9 +309,9 @@ test.describe("4. 프로젝트 상세", () => {
     await createProject(page, projectName);
   });
   test.afterEach(async ({ page }) => {
-    try { await page.goto("/projects"); await page.waitForTimeout(1000);
+    try { await page.goto("/projects");
       await page.locator("h3").filter({ hasText: projectName }).click();
-      await page.waitForTimeout(1000); await deleteProject(page, projectName);
+      await deleteProject(page, projectName);
     } catch { /* ignore */ }
   });
 
@@ -305,7 +322,9 @@ test.describe("4. 프로젝트 상세", () => {
   test("TC-PD-002: 테스트 수행 탭", async ({ page }) => {
     await expect(page.getByRole("button", { name: "테스트 수행" })).toBeVisible({ timeout: 10000 });
     await page.getByRole("button", { name: "테스트 수행" }).click();
-    await page.waitForTimeout(1000);
+    // 수행 화면에는 만들기 버튼이 둘 있다(상단 툴바와 빈 화면 안내)
+    await expect(page.getByRole("button", { name: "+ 새 테스트 수행 만들기" }).first())
+      .toBeVisible({ timeout: 10000 });
   });
 
   test("TC-PD-003: 비교 탭", async ({ page }) => {
@@ -314,7 +333,7 @@ test.describe("4. 프로젝트 상세", () => {
 
   test("TC-PD-004: 대시보드 탭", async ({ page }) => {
     await page.getByRole("button", { name: "대시보드" }).click();
-    await page.waitForTimeout(2000);
+    await expect(page.getByText("전체 TC")).toBeVisible({ timeout: 15000 });
   });
 
   test("TC-PD-005: 리포트 탭", async ({ page }) => {
@@ -323,13 +342,20 @@ test.describe("4. 프로젝트 상세", () => {
   });
 
   test("TC-PD-006: 검색 하이라이트", async ({ page }) => {
-    // 시트+행 추가
-    await addSheetAndRows(page, "SearchTest", 2);
-    await page.waitForTimeout(1000);
-    // 검색
+    await addSheetAndRows(page, "SearchTest", 1);
+
+    // 빈 행에는 걸릴 글자가 없다. 셀에 값을 넣고 저장된 뒤에 검색한다.
+    const saved = page.waitForResponse(
+      (r) => /\/testcases\/\d+$/.test(r.url()) && r.request().method() === "PUT"
+    );
+    await page.locator(".ag-cell[col-id='category']").first().dblclick();
+    await page.keyboard.type("하이라이트대상");
+    await page.keyboard.press("Tab");
+    await saved;
+
     const searchInput = page.locator("input[placeholder='검색...']");
-    await searchInput.fill("TC-");
-    await page.waitForTimeout(500);
+    await searchInput.fill("하이라이트대상");
+    await expect(page.locator("mark.search-hl").first()).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -344,9 +370,9 @@ test.describe("5. TC 관리", () => {
     await createProject(page, projectName);
   });
   test.afterEach(async ({ page }) => {
-    try { await page.goto("/projects"); await page.waitForTimeout(1000);
+    try { await page.goto("/projects");
       await page.locator("h3").filter({ hasText: projectName }).click();
-      await page.waitForTimeout(1000); await deleteProject(page, projectName);
+      await deleteProject(page, projectName);
     } catch { /* ignore */ }
   });
 
@@ -358,91 +384,91 @@ test.describe("5. TC 관리", () => {
   test("TC-TCM-003: TC 생성 (행 추가)", async ({ page }) => {
     await addSheetAndRows(page, "Create", 1);
     // 그리드에 행이 추가됨
-    await page.waitForTimeout(1000);
     const rows = page.locator(".ag-row");
     expect(await rows.count()).toBeGreaterThanOrEqual(1);
   });
 
   test("TC-TCM-005: TC 수정 (셀 편집)", async ({ page }) => {
     await addSheetAndRows(page, "Edit", 1);
-    await page.waitForTimeout(1000);
     // category 셀 더블클릭 편집
     const cell = page.locator(".ag-cell[col-id='category']").first();
     await cell.dblclick();
     await page.keyboard.type("Auth");
+    const saved = page.waitForResponse(
+      (r) => /\/testcases\/\d+$/.test(r.url()) && r.request().method() === "PUT"
+    );
     await page.keyboard.press("Tab");
-    await page.waitForTimeout(500);
+    await saved;
+    await expect(page.locator(".ag-cell[col-id='category']").first()).toHaveText("Auth");
   });
 
   test("TC-TCM-007: TC 삭제", async ({ page }) => {
-    await addSheetAndRows(page, "Delete", 2);
-    await page.waitForTimeout(1000);
-    // 체크박스로 선택
-    const checkbox = page.locator(".ag-selection-checkbox").first();
-    await checkbox.click();
-    await page.waitForTimeout(500);
-    // 삭제 버튼
-    const delBtn = page.locator("button").filter({ hasText: "삭제" });
-    if (await delBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      page.on("dialog", (d) => d.accept());
-      await delBtn.click();
-      await page.waitForTimeout(1000);
-    }
+    // 행 하나로 검증한다. 행이 여럿일 때 체크박스 한 칸만 켜는 것이 ag-grid 에서
+    // 안정적으로 재현되지 않아(2건 선택되거나 0건이 됨) 조건을 단순하게 둔다.
+    await addSheetAndRows(page, "Delete", 1);
+
+    await page.locator('.ag-row[row-index="0"] input[type="checkbox"]').first().check();
+    await expect(page.locator(".ag-row-selected")).toHaveCount(1);
+
+    const delBtn = page.getByRole("button", { name: /선택 삭제/ });
+    await expect(delBtn).toBeEnabled();
+
+    page.on("dialog", (d) => d.accept());
+    await delBtn.click();
+    await expect(page.locator(".ag-center-cols-container .ag-row")).toHaveCount(0);
   });
 
-  test("TC-TCM-008: TC 복사 (선택 복사)", async ({ page }) => {
+  test("TC-TCM-008: 선택 복제가 행을 하나 늘린다", async ({ page }) => {
+    // 예전에는 try/catch 로 전부 삼키고 expect(true).toBe(true) 로 끝났다.
+    // 복제가 통째로 고장 나도 통과하는 테스트였다.
     await addSheetAndRows(page, "Copy", 1);
-    await page.waitForTimeout(1000);
-    // 행 선택 후 복사
-    try {
-      const row = page.locator(".ag-row").first();
-      await row.click();
-      await page.waitForTimeout(500);
-      const copyBtn = page.locator("button").filter({ hasText: /선택 복사/ }).first();
-      if (await copyBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await copyBtn.click();
-        await page.waitForTimeout(1000);
-      }
-    } catch {
-      // 선택/복사 실패해도 PASS
-    }
-    expect(true).toBe(true);
+
+    // 래퍼(.ag-selection-checkbox)를 누르면 포커스만 가고 체크가 안 걸리는 경우가 있다.
+    // 실제 input 을 check() 로 눌러 상태를 보장한다.
+    await page.locator('.ag-row[row-index="0"] input[type="checkbox"]').first().check();
+    await expect(page.locator(".ag-row-selected")).toHaveCount(1);
+
+    const cloneBtn = page.getByRole("button", { name: /선택 복제/ });
+    await expect(cloneBtn).toBeEnabled();
+    await cloneBtn.click();
+
+    await expect(page.locator(".ag-center-cols-container .ag-row")).toHaveCount(2);
   });
 
   test("TC-TCM-013: TC 필터링 (우선순위별)", async ({ page }) => {
     await addSheetAndRows(page, "Filter", 1);
-    await page.waitForTimeout(1000);
     // ag-grid 필터 존재 확인
     await expect(page.locator(".ag-theme-alpine")).toBeVisible();
   });
 
   test("TC-TCM-015: TC 검색", async ({ page }) => {
     await addSheetAndRows(page, "Search", 1);
-    await page.waitForTimeout(1000);
     const searchInput = page.locator("input[placeholder='검색...']");
-    await searchInput.fill("TC-001");
-    await page.waitForTimeout(500);
+
+    // 없는 값으로 거르면 남는 행이 없다
+    await searchInput.fill("__없는값__");
+    await expect(page.locator(".ag-center-cols-container .ag-row")).toHaveCount(0);
+
+    // 지우면 되돌아온다
+    await searchInput.fill("");
+    await expect(page.locator(".ag-center-cols-container .ag-row")).toHaveCount(1);
   });
 
   test("TC-TCM-016: TC 정렬", async ({ page }) => {
     await addSheetAndRows(page, "Sort", 3);
-    await page.waitForTimeout(1000);
     // No 헤더 클릭으로 정렬
     const noHeader = page.locator(".ag-header-cell").filter({ hasText: "No" });
     await noHeader.click();
-    await page.waitForTimeout(500);
+    await expect(noHeader).toHaveAttribute("aria-sort", /ascending|descending/);
   });
 
   test("TC-TCM-018: 찾기/바꾸기", async ({ page }) => {
     await addSheetAndRows(page, "Replace", 1);
-    await page.waitForTimeout(1000);
     // 바꾸기 버튼
-    const replaceBtn = page.locator("button").filter({ hasText: "바꾸기" });
-    if (await replaceBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await replaceBtn.click();
-      await page.waitForTimeout(500);
-      await expect(page.locator("input[placeholder='바꿀 내용...']")).toBeVisible();
-    }
+    const replaceBtn = page.getByRole("button", { name: "바꾸기", exact: true });
+    await expect(replaceBtn).toBeVisible();
+    await replaceBtn.click();
+    await expect(page.locator("input[placeholder='바꿀 내용...']")).toBeVisible();
   });
 });
 
@@ -618,7 +644,6 @@ test.describe("10. 관리자", () => {
   test("TC-ADM-002: 사용자 목록 표시", async ({ page }) => {
     await login(page);
     await page.locator("header button").filter({ hasText: /^관리$/ }).click();
-    await page.waitForTimeout(2000);
     // admin 사용자 표시
     await expect(page.getByText("admin").first()).toBeVisible();
   });
@@ -628,11 +653,11 @@ test.describe("10. 관리자", () => {
 // 12. 에러 처리 (TC-ERR-001 ~ 010)
 // ============================================================================
 test.describe("12. 에러 처리", () => {
-  test("TC-ERR-003: 404 페이지", async ({ page }) => {
+  test("TC-ERR-003: 없는 주소는 프로젝트 목록으로 되돌린다", async ({ page }) => {
     await login(page);
     await page.goto("/nonexistent-page-xyz");
-    await page.waitForTimeout(1000);
-    // 404 또는 리다이렉트
+    // App.tsx 의 catch-all 라우트가 /projects 로 보낸다
+    await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
   });
 
   test("TC-ERR-005: TC 필드 특수문자", async ({ request }) => {

@@ -29,6 +29,8 @@ if not SECRET_KEY:
     logger.warning("SECRET_KEY not set - using random key (dev only)")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("TOKEN_EXPIRE_HOURS", "72"))
+#: 로그인 유지를 켰을 때의 만료. 예전 값 3650일은 유출을 되돌릴 수 없다는 뜻이었다.
+REMEMBER_ME_DAYS = int(os.getenv("REMEMBER_ME_DAYS", "30"))
 
 # Cookie 설정
 COOKIE_SECURE = _ENV == "production"
@@ -119,6 +121,16 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
+
+    # ★토큰 버전 대조. 이 줄이 유일한 폐기 경로다.
+    #   `ver` 가 없는 토큰은 이 기능 이전에 발급된 것이다. 서명은 유효하므로
+    #   여기서 막지 않으면 10년짜리 옛 토큰이 그대로 통한다.
+    #   DB 값을 0 으로 정규화한다. NULL 인 행이 있으면 `None != None` 이 거짓이 되어
+    #   `ver` 없는 토큰이 통과한다. 마이그레이션상 NULL 은 없어야 하지만, 이 비교가
+    #   폐기의 유일한 관문이라 열려 있는 쪽으로 틀리게 두지 않는다.
+    if payload.get("ver") != (user.token_version or 0):
+        raise credentials_exception
+
     return user
 
 

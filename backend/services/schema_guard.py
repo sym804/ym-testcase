@@ -19,7 +19,8 @@ REQUIRED_COLUMNS = {
     "test_runs": ["sheet_names", "round", "test_plan_id"],
     "test_cases": ["deleted_at", "sheet_name", "custom_fields"],
     "test_case_sheets": ["parent_id", "is_folder"],
-    "users": ["must_change_password"],
+    #: token_version 은 요청마다 읽힌다. 없는 채로 head 로 표시되면 인증이 통째로 죽는다.
+    "users": ["must_change_password", "token_version"],
     "projects": ["is_private", "field_config"],
 }
 

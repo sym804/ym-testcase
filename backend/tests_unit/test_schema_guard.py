@@ -56,3 +56,19 @@ def test_어떤_컬럼이_없는지_알려_준다(tmp_path):
         assert_schema_is_current(sa_inspect(engine))
     msg = str(exc.value)
     assert "test_cases" in msg and "custom_fields" in msg
+
+
+def test_token_version_이_없으면_멈춘다(tmp_path):
+    """폐기 수단이 없는 DB 를 head 로 표시하면 인증이 통째로 죽는다.
+
+    `users.token_version` 은 요청마다 읽힌다. 마이그레이션을 건너뛴 채 stamp 되면
+    그 컬럼이 없어 모든 인증 요청이 SQL 오류로 떨어진다.
+    """
+    engine = _engine(tmp_path, "no_token_version.db")
+    Base.metadata.create_all(engine)
+    with engine.begin() as conn:
+        conn.exec_driver_sql("ALTER TABLE users DROP COLUMN token_version")
+
+    with pytest.raises(SchemaMismatch) as exc:
+        assert_schema_is_current(sa_inspect(engine))
+    assert "token_version" in str(exc.value)

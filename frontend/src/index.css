@@ -28,13 +28,15 @@
   --accent-text: #FFFFFF;
   --color-pass: #1A7F37;
   --color-fail: #CF222E;
-  --color-block: #BF8700;
+  /* 흰 배경에서 4.5:1 을 넘겨야 한다. 앞의 #BF8700 은 3.14 였다. */
+  --color-block: #A16207;
   --color-na: #6366F1;
   /* 미수행: 텍스트용(대비 4.76:1)과 악센트용을 나눈다.
      악센트 값은 Dashboard.tsx CARD_COLORS.not_started 와 같은 값이다. */
   --color-ns: #64748B;
   --color-ns-accent: #D1D5DB;
-  --color-link: #5B9BD5;
+  /* 흰 배경에서 4.5:1 을 넘겨야 한다. 앞의 #5B9BD5 는 2.96 이었다(axe serious). */
+  --color-link: #1D4ED8;
   --bg-header: #111827;
   --bg-header-input: #1F2937;
   --text-header: #FFFFFF;

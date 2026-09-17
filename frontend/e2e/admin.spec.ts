@@ -37,19 +37,25 @@ test.describe("검색 기능", () => {
     await login(page);
   });
 
-  test("헤더 검색 입력", async ({ page }) => {
+  test("검색어가 1자면 드롭다운이 열리지 않는다", async ({ page }) => {
     const searchInput = page.getByPlaceholder("TC 검색...");
     await expect(searchInput).toBeVisible();
-    // 1자 입력 → 결과 없음
+
+    // 1자로는 서버를 부르지 않는다. 부르면 여기서 응답이 잡힌다.
+    let called = false;
+    page.on("response", (r) => {
+      if (r.url().includes("/api/search")) called = true;
+    });
     await searchInput.fill("a");
-    await page.waitForTimeout(500);
-    // 검색 드롭다운이 안 보여야 함 (2자 미만)
+    await expect(page.getByRole("button", { name: /TC-/ })).toHaveCount(0);
+    expect(called).toBe(false);
   });
 
-  test("글로벌 검색 2자 이상", async ({ page }) => {
+  test("검색어가 2자 이상이면 서버를 부른다", async ({ page }) => {
     const searchInput = page.getByPlaceholder("TC 검색...");
+    const searched = page.waitForResponse((r) => r.url().includes("/api/search"));
     await searchInput.fill("TC");
-    await page.waitForTimeout(500);
-    // 검색 결과가 있으면 드롭다운 표시 (TC가 있는 경우)
+    const res = await searched;
+    expect(res.ok()).toBe(true);
   });
 });

@@ -26,16 +26,13 @@ test.describe("프로젝트 관리", () => {
     await page.getByText("+ 새 프로젝트").click();
     await page.getByPlaceholder("프로젝트 이름").fill(projectName);
     await page.getByRole("button", { name: "생성" }).click();
-    await page.waitForTimeout(2000);
 
     // 프로젝트 카드가 렌더링될 때까지 대기 후 클릭
     const card = page.locator("h3").filter({ hasText: projectName });
     await expect(card).toBeVisible({ timeout: 10000 });
     await card.click();
-    await page.waitForTimeout(2000);
 
     // 설정 탭 → 삭제
-    await page.waitForTimeout(2000);
     await page.getByRole("button", { name: "설정" }).click();
     await expect(page.getByText("접근 설정")).toBeVisible({ timeout: 5000 });
     await page.getByRole("button", { name: "프로젝트 삭제" }).click();
@@ -49,7 +46,6 @@ test.describe("프로젝트 관리", () => {
   test("프로젝트 상세 탭 전환", async ({ page }) => {
     test.skip(!!process.env.CI, "CI 환경에서는 기존 프로젝트 필요");
     // 테이블 첫 행 클릭으로 프로젝트 진입
-    await page.waitForTimeout(2000);
     const firstRow = page.locator("tr[style*='cursor']").first();
     await firstRow.click();
 
