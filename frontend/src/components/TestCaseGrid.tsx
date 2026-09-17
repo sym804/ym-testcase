@@ -1186,6 +1186,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               </button>
               <select
                 style={styles.btnGhost}
+                aria-label={t("common:addRowCount")}
                 disabled={!activeSheet}
                 title={!activeSheet ? t("addRowPickSheet") : undefined}
                 defaultValue="5"

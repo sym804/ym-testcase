@@ -14,17 +14,14 @@ async function createProject(page: Page, name: string) {
   await page.getByText("+ 새 프로젝트").click();
   await page.getByPlaceholder("프로젝트 이름").fill(name);
   await page.getByRole("button", { name: "생성" }).click();
-  await page.waitForTimeout(2000);
   const card = page.locator("h3").filter({ hasText: name });
   await expect(card).toBeVisible({ timeout: 10000 });
   await card.click();
   await page.waitForLoadState("networkidle");
-  await page.waitForTimeout(2000);
 }
 
 async function deleteProject(page: Page, name: string) {
   await page.getByRole("button", { name: "설정" }).click();
-  await page.waitForTimeout(1000);
   await page.getByRole("button", { name: "프로젝트 삭제" }).click();
   await page.getByPlaceholder(name).fill(name);
   await page.getByRole("button", { name: "영구 삭제" }).click();
@@ -47,11 +44,9 @@ test.describe("시트 트리 구조", () => {
     try {
       // 프로젝트 목록으로 이동 후 삭제
       await page.goto("/projects");
-      await page.waitForTimeout(1000);
       const card = page.locator("h3").filter({ hasText: projectName });
       if (await card.isVisible()) {
         await card.click();
-        await page.waitForTimeout(1000);
         await deleteProject(page, projectName);
       }
     } catch {
@@ -79,14 +74,14 @@ test.describe("시트 트리 구조", () => {
     await addBtn.click();
     await page.getByPlaceholder("시트 이름").fill("기능");
     await page.getByRole("button", { name: "추가", exact: true }).click();
-    await page.waitForTimeout(1000);
+    await expect(page.getByPlaceholder("시트 이름")).toHaveCount(0);
 
     // 사이드바에서 + 버튼으로 두 번째 시트 추가
     const sidebarPlus = page.locator("[title='+ 시트 추가']");
     await sidebarPlus.click();
     await page.getByPlaceholder("시트 이름").fill("UI");
     await page.getByRole("button", { name: "추가", exact: true }).click();
-    await page.waitForTimeout(1000);
+    await expect(page.getByPlaceholder("시트 이름")).toHaveCount(0);
 
     // 사이드바에 전체 탭 표시
     await expect(page.getByText("전체").first()).toBeVisible({ timeout: 10000 });
@@ -104,7 +99,8 @@ test.describe("시트 트리 구조", () => {
     page.on("dialog", (d) => d.accept());
     const closeBtn = page.locator("[title='시트 삭제']").first();
     await closeBtn.click();
-    await page.waitForTimeout(2000);
+    // 지워진 시트는 사이드바에서 사라진다
+    await expect(page.getByText("삭제할시트")).toHaveCount(0, { timeout: 10000 });
   });
 
   test("사이드바에서 시트 클릭으로 활성화", async ({ page }) => {
@@ -115,22 +111,20 @@ test.describe("시트 트리 구조", () => {
     await addBtn.click();
     await page.getByPlaceholder("시트 이름").fill("Sheet-A");
     await page.getByRole("button", { name: "추가", exact: true }).click();
-    await page.waitForTimeout(1000);
+    await expect(page.getByPlaceholder("시트 이름")).toHaveCount(0);
 
     // 사이드바에서 두 번째 시트 추가
     const sidebarPlus = page.locator("[title='+ 시트 추가']");
     await sidebarPlus.click();
     await page.getByPlaceholder("시트 이름").fill("Sheet-B");
     await page.getByRole("button", { name: "추가", exact: true }).click();
-    await page.waitForTimeout(1000);
+    await expect(page.getByPlaceholder("시트 이름")).toHaveCount(0);
 
     // 사이드바에서 Sheet-A 클릭
     await page.getByText("Sheet-A").first().click();
-    await page.waitForTimeout(500);
 
     // 사이드바에서 Sheet-B 클릭
     await page.getByText("Sheet-B").first().click();
-    await page.waitForTimeout(500);
   });
 });
 
@@ -349,7 +343,7 @@ test.describe("CSV Import", () => {
     await addBtn.click();
     await page.getByPlaceholder("시트 이름").fill("CSVTest");
     await page.getByRole("button", { name: "추가", exact: true }).click();
-    await page.waitForTimeout(1000);
+    await expect(page.getByPlaceholder("시트 이름")).toHaveCount(0);
 
     // file input이 .csv 확장자를 허용하는지 확인
     const fileInput = page.locator('input[type="file"]').first();
@@ -486,7 +480,7 @@ test.describe("고급 필터", () => {
     await addBtn.click();
     await page.getByPlaceholder("시트 이름").fill("FilterTest");
     await page.getByRole("button", { name: "추가", exact: true }).click();
-    await page.waitForTimeout(1000);
+    await expect(page.getByPlaceholder("시트 이름")).toHaveCount(0);
 
     // 필터 버튼 존재 확인
     const filterBtn = page.locator("button").filter({ hasText: /^필터/ });
@@ -499,7 +493,6 @@ test.describe("고급 필터", () => {
 
     // 조건 추가
     await page.getByText("+ 조건 추가").click();
-    await page.waitForTimeout(500);
 
     // 필드 선택 드롭다운, 연산자 드롭다운, 값 입력 확인
     const selects = page.locator(".ag-theme-alpine").locator("..").locator("select");
@@ -591,7 +584,7 @@ test.describe("다중 행 추가", () => {
     await addBtn.click();
     await page.getByPlaceholder("시트 이름").fill("MultiRowTest");
     await page.getByRole("button", { name: "추가", exact: true }).click();
-    await page.waitForTimeout(1000);
+    await expect(page.getByPlaceholder("시트 이름")).toHaveCount(0);
 
     // 다중 추가 드롭다운 버튼 확인 (▼ 또는 드롭다운 트리거)
     const multiAddBtn = page.locator("button").filter({ hasText: /행 추가|다중/ }).first();

@@ -319,6 +319,28 @@ def test_reset_with_code_changes_password(admin_headers, normal_user):
         assert back.status_code == 200, back.text
 
 
+def test_reset_with_code_kills_old_tokens(admin_headers, normal_user):
+    """복구는 계정을 되찾는 국면이다. 옛 토큰이 살아 있으면 되찾은 것이 아니다."""
+    old = _login(normal_user["username"], "origin1234")
+    assert requests.get(f"{BASE}/api/auth/me", headers=old).status_code == 200
+
+    _, code = _issue_code(admin_headers, normal_user["username"], normal_user["id"])
+    r = requests.post(f"{BASE}/api/auth/reset-password/verify", json={
+        "username": normal_user["username"], "code": code, "new_password": "changed1234",
+    })
+    assert r.status_code == 200, r.text
+
+    try:
+        after = requests.get(f"{BASE}/api/auth/me", headers=old)
+        assert after.status_code == 401, f"복구했는데 옛 토큰이 아직 통한다: {after.status_code}"
+    finally:
+        _, code2 = _issue_code(admin_headers, normal_user["username"], normal_user["id"])
+        back = requests.post(f"{BASE}/api/auth/reset-password/verify", json={
+            "username": normal_user["username"], "code": code2, "new_password": "origin1234",
+        })
+        assert back.status_code == 200, back.text
+
+
 def test_code_cannot_be_reused(admin_headers, normal_user):
     req_id, code = _issue_code(admin_headers, normal_user["username"], normal_user["id"])
     first = requests.post(f"{BASE}/api/auth/reset-password/verify", json={

@@ -4,6 +4,7 @@
 """
 import io
 import os
+import secrets
 
 import pytest
 import requests
@@ -361,6 +362,70 @@ class TestProjectAccess:
 # ── 4. 멤버 관리 ────────────────────────────────────────────
 
 
+@pytest.fixture(scope="module")
+def outsider_and_private_project():
+    """비멤버 계정과 그가 속하지 않은 private 프로젝트.
+
+    공용 `project_pair` 와 `store.viewer` 를 쓰면 앞선 테스트가 남긴 멤버십에
+    얹혀 간다. 실제로 `test_private_accessible_after_member_add` 가 viewer 를
+    tester 로 추가한 뒤 제거하지 않아, 순서에 따라 403 이 200 으로 뒤집혔다.
+    """
+    h = auth(store.admin)
+    uniq = secrets.token_hex(4)
+
+    username = f"__outsider_{uniq}__"
+    requests.post(f"{BASE}/api/auth/register", json={
+        "username": username, "password": "outsider1234", "display_name": "Outsider",
+    })
+    token = requests.post(f"{BASE}/api/auth/login", json={
+        "username": username, "password": "outsider1234",
+    }).json()["access_token"]
+
+    r = requests.post(f"{BASE}/api/projects", headers=h, json={
+        "name": f"__sec_outsider_{uniq}__", "is_private": True,
+    })
+    pid = r.json()["id"]
+
+    yield token, pid
+
+    requests.delete(f"{BASE}/api/projects/{pid}", headers=h)
+
+
+class TestNonMemberIsBlockedFromReadEndpoints:
+    """비멤버가 private 프로젝트의 집계 화면을 못 보는지 실제로 친다.
+
+    예전에는 `routes/dashboard.py` 소스에 "check_project_access" 라는 글자가
+    있는지 읽어서 판정했다. 그 방식은 의존성 이름을 바꾸거나 한 엔드포인트만
+    빠뜨려도 통과한다. 반대로 권한이 멀쩡해도 리팩터링하면 빨개진다.
+    """
+
+    def test_dashboard_summary_blocked(self, outsider_and_private_project):
+        token, pid = outsider_and_private_project
+        r = requests.get(f"{BASE}/api/projects/{pid}/dashboard/summary", headers=auth(token))
+        assert r.status_code == 403, f"비멤버가 대시보드를 본다: {r.status_code}"
+
+    def test_dashboard_summary_allowed_for_owner(self, outsider_and_private_project):
+        _, pid = outsider_and_private_project
+        r = requests.get(f"{BASE}/api/projects/{pid}/dashboard/summary", headers=auth(store.admin))
+        assert r.status_code == 200, r.text
+
+    def test_report_blocked(self, outsider_and_private_project):
+        token, pid = outsider_and_private_project
+        r = requests.get(f"{BASE}/api/projects/{pid}/reports", headers=auth(token))
+        assert r.status_code == 403, f"비멤버가 리포트를 본다: {r.status_code}"
+
+    def test_report_not_blocked_for_owner(self, outsider_and_private_project):
+        """소유자는 권한에서 막히지 않는다. run_id 가 없어 400 이 나는 것은 별개다."""
+        _, pid = outsider_and_private_project
+        r = requests.get(f"{BASE}/api/projects/{pid}/reports", headers=auth(store.admin))
+        assert r.status_code != 403, r.text
+
+    def test_report_pdf_blocked(self, outsider_and_private_project):
+        token, pid = outsider_and_private_project
+        r = requests.get(f"{BASE}/api/projects/{pid}/reports/pdf", headers=auth(token))
+        assert r.status_code == 403, f"비멤버가 리포트 PDF 를 받는다: {r.status_code}"
+
+
 class TestMembers:
     def test_add_and_remove(self, project_pair):
         pub_id, _ = project_pair
@@ -621,16 +686,6 @@ class TestCodeSecurity:
 
     def test_pinned_dependencies(self):
         assert "fastapi==" in self._read("requirements.txt")
-
-    def test_dashboard_uses_check_project_access(self):
-        code = self._read("routes/dashboard.py")
-        assert "check_project_access" in code
-        assert 'Depends(get_current_user)' not in code
-
-    def test_reports_uses_check_project_access(self):
-        code = self._read("routes/reports.py")
-        assert "check_project_access" in code
-        assert 'current_user: User = Depends(get_current_user)' not in code
 
     def test_search_filters_by_project_access(self):
         code = self._read("routes/search.py")

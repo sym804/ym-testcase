@@ -127,6 +127,7 @@ export default function Header() {
         {projects.length > 0 && (
           <select
             style={styles.projectSelect}
+            aria-label={t("common:selectProject")}
             value={currentProjectId ?? ""}
             onChange={(e) => {
               const id = e.target.value;
@@ -149,9 +150,14 @@ export default function Header() {
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             onFocus={() => searchResults.length > 0 && setShowSearch(true)}
+            // 열린 목록은 Escape 로 닫을 수 있어야 한다. 키보드만 쓰는 사용자는
+            // 목록이 덮인 화면에서 빠져나갈 다른 방법이 없다.
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setShowSearch(false);
+            }}
           />
           {showSearch && searchResults.length > 0 && (
-            <div style={styles.searchDropdown}>
+            <div style={styles.searchDropdown} data-testid="search-results">
               {searchResults.slice(0, 15).map((tc) => (
                 <div
                   key={tc.id}
@@ -187,10 +193,18 @@ export default function Header() {
       </div>
 
       <div style={styles.right}>
-        <button style={styles.themeBtn} onClick={toggleTheme} title={theme === "light" ? t("darkMode") : t("lightMode")}>
+        {/* 버튼 안이 이모지뿐이라 그 이모지가 접근 가능한 이름이 된다.
+            title 은 다른 이름이 없을 때만 쓰이므로 여기서는 무시된다. */}
+        <button
+          style={styles.themeBtn}
+          onClick={toggleTheme}
+          title={theme === "light" ? t("darkMode") : t("lightMode")}
+          aria-label={theme === "light" ? t("darkMode") : t("lightMode")}
+        >
           {theme === "light" ? "\u{1F319}" : "\u{2600}\u{FE0F}"}
         </button>
         <button onClick={toggleLang} title={i18n.language === "ko" ? "Switch to English" : "Switch to Korean"}
+          aria-label={i18n.language === "ko" ? "Switch to English" : "Switch to Korean"}
           style={styles.adminBtn}>
           {i18n.language === "ko" ? "EN" : "KO"}
         </button>
@@ -277,15 +291,21 @@ function ChangePasswordInline({ onClose }: { onClose: () => void }) {
 
   return (
     <div style={modalStyles.overlay} onClick={onClose}>
-      <div style={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
-        <h3 style={modalStyles.title}>{t("changePasswordTitle")}</h3>
+      <div
+        style={modalStyles.modal}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="change-password-title"
+      >
+        <h3 id="change-password-title" style={modalStyles.title}>{t("changePasswordTitle")}</h3>
         <form onSubmit={handleSubmit} style={modalStyles.form}>
-          <label style={modalStyles.label}>{t("currentPassword")}</label>
-          <PasswordInput style={modalStyles.input} value={currentPw} onChange={(e) => { setCurrentPw(e.target.value); setError(""); }} autoFocus />
-          <label style={modalStyles.label}>{t("newPassword")}</label>
-          <PasswordInput style={modalStyles.input} value={newPw} onChange={(e) => { setNewPw(e.target.value); setError(""); }} placeholder={t("newPasswordPlaceholder")} />
-          <label style={modalStyles.label}>{t("newPasswordConfirm")}</label>
-          <PasswordInput style={modalStyles.input} value={confirmPw} onChange={(e) => { setConfirmPw(e.target.value); setError(""); }} />
+          <label style={modalStyles.label} htmlFor="pw-current">{t("currentPassword")}</label>
+          <PasswordInput id="pw-current" style={modalStyles.input} value={currentPw} onChange={(e) => { setCurrentPw(e.target.value); setError(""); }} autoFocus />
+          <label style={modalStyles.label} htmlFor="pw-new">{t("newPassword")}</label>
+          <PasswordInput id="pw-new" style={modalStyles.input} value={newPw} onChange={(e) => { setNewPw(e.target.value); setError(""); }} placeholder={t("newPasswordPlaceholder")} />
+          <label style={modalStyles.label} htmlFor="pw-confirm">{t("newPasswordConfirm")}</label>
+          <PasswordInput id="pw-confirm" style={modalStyles.input} value={confirmPw} onChange={(e) => { setConfirmPw(e.target.value); setError(""); }} />
           {newPw && newPw.length < 8 && <div style={modalStyles.hint}>{t("minLengthHint")}</div>}
           {newPw && confirmPw && newPw !== confirmPw && <div style={modalStyles.hint}>{t("passwordMismatch")}</div>}
           {error && <div style={modalStyles.errorMsg}>{error}</div>}

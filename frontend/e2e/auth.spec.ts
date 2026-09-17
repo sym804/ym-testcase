@@ -45,8 +45,8 @@ test.describe("인증 플로우", () => {
     await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
 
     // 사용자 메뉴 → 로그아웃
-    // 토스트가 사라질 때까지 대기
-    await page.waitForTimeout(3500);
+    // 로그인 성공 토스트가 메뉴를 가린다. 시간을 재지 말고 사라지는 것을 본다.
+    await expect(page.getByRole("status")).toHaveCount(0, { timeout: 10000 });
     await page.locator("header button").filter({ hasText: "Admin" }).click();
     await page.getByRole("button", { name: "로그아웃" }).click();
     await expect(page).toHaveURL(/\/login/, { timeout: 5000 });

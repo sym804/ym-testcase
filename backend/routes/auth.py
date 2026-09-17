@@ -15,6 +15,7 @@ from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, 
 from auth import (
     hash_password, verify_password, create_access_token, get_current_user, role_required,
     COOKIE_SECURE, COOKIE_SAMESITE, COOKIE_MAX_AGE, ACCESS_TOKEN_EXPIRE_HOURS,
+    REMEMBER_ME_DAYS,
 )
 from services.first_admin import demote_if_not_first
 
@@ -140,15 +141,21 @@ def login(payload: UserLogin, request: Request, response: Response, db: Session 
     _clear_failures(request, payload.username)
     logger.info("User logged in: %s (remember_me=%s)", user.username, payload.remember_me)
 
-    # remember_me: 10년(실질적 무기한), 일반: 기본 만료
+    # remember_me: 30일, 일반: 기본 만료
+    # ★예전에는 3650일이었다. JWT 는 발급 후 만료까지 서버가 막을 수 없으므로
+    #   그 값은 유출된 토큰을 10년간 되돌릴 수 없다는 뜻이었다. 기간을 줄이고
+    #   token_version 으로 폐기 경로를 따로 뒀다.
     if payload.remember_me:
-        expire_delta = timedelta(days=3650)
-        cookie_max_age = 3650 * 24 * 3600
+        expire_delta = timedelta(days=REMEMBER_ME_DAYS)
+        cookie_max_age = REMEMBER_ME_DAYS * 24 * 3600
     else:
         expire_delta = timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
         cookie_max_age = COOKIE_MAX_AGE
 
-    token = create_access_token(data={"sub": str(user.id), "role": user.role.value}, expires_delta=expire_delta)
+    token = create_access_token(
+        data={"sub": str(user.id), "role": user.role.value, "ver": user.token_version or 0},
+        expires_delta=expire_delta,
+    )
 
     # httpOnly 쿠키에 JWT 설정
     response.set_cookie(
@@ -176,9 +183,18 @@ def login(payload: UserLogin, request: Request, response: Response, db: Session 
 
 
 @router.post("/logout")
-def logout(response: Response, current_user: User = Depends(get_current_user)):
+def logout(
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("csrf_token", path="/")
+    # ★쿠키만 지우면 같은 토큰을 Authorization 헤더에 실어 계속 쓸 수 있다.
+    #   이 제품은 헤더 인증도 받으므로(`_extract_token`) 그쪽이 그대로 열린다.
+    #   버전을 올려 실제로 끊는다. 그 계정의 다른 기기 세션도 함께 끊긴다.
+    current_user.token_version = (current_user.token_version or 0) + 1
+    db.commit()
     logger.info("User logged out: %s", current_user.username)
     return {"message": "로그아웃 되었습니다."}
 
@@ -202,6 +218,8 @@ def change_password(
 
     current_user.password_hash = hash_password(payload.new_password)
     current_user.must_change_password = False
+    # 비밀번호를 바꾼 이유가 유출이면, 옛 토큰이 살아 있는 한 바꾼 의미가 없다
+    current_user.token_version = (current_user.token_version or 0) + 1
     db.commit()
     db.refresh(current_user)
     logger.info("Password changed: %s", current_user.username)
@@ -255,6 +273,8 @@ def reset_password(
 
     user.password_hash = hash_password(temp_pw)
     user.must_change_password = True
+    # 관리자가 초기화하는 상황은 계정을 되찾는 국면이다. 옛 토큰을 같이 끊는다
+    user.token_version = (user.token_version or 0) + 1
     db.commit()
     logger.info("Password reset by admin for user: %s", user.username)
     return {"temp_password": temp_pw}

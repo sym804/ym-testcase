@@ -24,9 +24,12 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # tsc --noEmit 은 루트 tsconfig(files: [])를 보기 때문에 아무것도 검사하지 않는다.
+      # 실제 컴파일 대상은 프로젝트 참조를 타는 tsc -b 다. v1.5.5.1 에서 프로덕션
+      # 빌드만 깨졌던 것도 이 차이 때문이었다.
       - name: TypeScript type check
         working-directory: frontend
-        run: npx tsc --noEmit
+        run: npx tsc -b --force
 
       - name: ESLint
         working-directory: frontend
@@ -103,6 +106,7 @@ jobs:
           TEST_ADMIN_PASSWORD: test1234
         run: >-
           npx playwright test
+          e2e/accessibility.spec.ts
           e2e/admin.spec.ts
           e2e/auth.spec.ts
           e2e/project.spec.ts

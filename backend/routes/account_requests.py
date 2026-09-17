@@ -276,6 +276,8 @@ def reset_password_with_code(
 
     user.password_hash = hash_password(payload.new_password)
     user.must_change_password = False
+    # 복구는 계정을 되찾는 국면이다. 옛 토큰이 살아 있으면 되찾은 것이 아니다
+    user.token_version = (user.token_version or 0) + 1
     # 살아 있는 approved 요청을 전부 닫는다. 중복 억제가 pending 만 보기 때문에 한
     # 사용자가 approved 를 여러 건 들고 있을 수 있고, 쓴 한 건만 닫으면 나머지 코드가
     # 최대 24시간 동안 그대로 유효하다. 이미 메신저로 흘러간 코드가 남는다.

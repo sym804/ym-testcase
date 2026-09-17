@@ -44,23 +44,26 @@ export default function ChangePasswordModal() {
             ))}
           </p>
           <form onSubmit={handleSubmit} style={s.form}>
-            <label style={s.label}>{t("currentPassword")}</label>
+            <label style={s.label} htmlFor="force-pw-current">{t("currentPassword")}</label>
             <PasswordInput
+              id="force-pw-current"
               style={s.input}
               value={currentPw}
               onChange={(e) => { setCurrentPw(e.target.value); setError(""); }}
               placeholder={t("currentPasswordPlaceholder")}
               autoFocus
             />
-            <label style={s.label}>{t("newPassword")}</label>
+            <label style={s.label} htmlFor="force-pw-new">{t("newPassword")}</label>
             <PasswordInput
+              id="force-pw-new"
               style={s.input}
               value={newPw}
               onChange={(e) => { setNewPw(e.target.value); setError(""); }}
               placeholder={t("newPasswordPlaceholder")}
             />
-            <label style={s.label}>{t("newPasswordConfirm")}</label>
+            <label style={s.label} htmlFor="force-pw-confirm">{t("newPasswordConfirm")}</label>
             <PasswordInput
+              id="force-pw-confirm"
               style={s.input}
               value={confirmPw}
               onChange={(e) => { setConfirmPw(e.target.value); setError(""); }}

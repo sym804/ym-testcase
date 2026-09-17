@@ -28,7 +28,7 @@
     "goToProjects": "Go to Projects"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v1.5.7.0 | AGPL-3.0",
+  "version": "YM TestCase v1.6.0.0 | AGPL-3.0",
   "copy": "Copy",
   "copiedToClipboard": "Copied to clipboard.",
   "undo": "Undo",
@@ -67,5 +67,8 @@
     "invalidFilterLogic": "Logic must be AND or OR.",
     "filterNotFound": "Filter not found.",
     "tcIdTaken": "That TC ID is already in use. Please pick another."
-  }
+  },
+  "selectProject": "Select project",
+  "selectRow": "Select this project",
+  "addRowCount": "Rows to add"
 }

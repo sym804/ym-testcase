@@ -43,8 +43,9 @@ export default function LoginPage() {
         <div style={styles.card}>
           <h2 style={styles.heading}>{t("title")}</h2>
           <form onSubmit={handleSubmit} style={styles.form}>
-            <label style={styles.label}>{t("username")}</label>
+            <label style={styles.label} htmlFor="login-username">{t("username")}</label>
             <input
+              id="login-username"
               style={styles.input}
               type="text"
               value={username}
@@ -52,8 +53,9 @@ export default function LoginPage() {
               placeholder={t("usernamePlaceholder")}
               autoFocus
             />
-            <label style={styles.label}>{t("password")}</label>
+            <label style={styles.label} htmlFor="login-password">{t("password")}</label>
             <PasswordInput
+              id="login-password"
               style={styles.input}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -197,7 +199,8 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 8,
     textAlign: "center" as const,
     fontSize: 12,
+    // opacity 로 흐리게 하면 대비가 같이 죽는다. 이 자리는 0.7 을 곱해 2.76:1 이었다.
+    // 톤은 색으로만 낮춘다.
     color: "var(--text-secondary)",
-    opacity: 0.7,
   },
 };

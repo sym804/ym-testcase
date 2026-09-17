@@ -210,7 +210,7 @@ export default function ProjectListPage() {
                 <span style={{ ...s.legend, color: RESULT_COLORS.fail }}>FAIL {sm.fail}</span>
                 <span style={{ ...s.legend, color: RESULT_COLORS.block }}>BLOCK {sm.block}</span>
                 <span style={{ ...s.legend, color: RESULT_COLORS.na }}>N/A {sm.na}</span>
-                <span style={{ ...s.legend, color: "#94A3B8" }}>{t("notStarted")} {sm.not_started}</span>
+                <span style={{ ...s.legend, color: "var(--text-secondary)" }}>{t("notStarted")} {sm.not_started}</span>
               </div>
               <ProgressBar data={{ ...sm, total: sm.total_tc }} noTcLabel={t("noTC")} />
             </div>
@@ -240,6 +240,7 @@ export default function ProjectListPage() {
                         <th style={{ ...s.th, width: 36, textAlign: "center" }}>
                           <input
                             type="checkbox"
+                            aria-label={t("common:selectAll")}
                             checked={overview.projects.length > 0 && overview.projects.every((p) => selectedIds.has(p.id))}
                             onChange={(e) => {
                               if (e.target.checked) {
@@ -277,6 +278,7 @@ export default function ProjectListPage() {
                           <td style={{ ...s.td, textAlign: "center" as const }} onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }}>
                             <input
                               type="checkbox"
+                              aria-label={t("common:selectRow")}
                               checked={selectedIds.has(p.id)}
                               onChange={() => {}}
                               style={{ width: 15, height: 15, cursor: "pointer" }}
@@ -473,7 +475,7 @@ const s: Record<string, React.CSSProperties> = {
     overflow: "hidden",
     backgroundColor: "var(--border-color)",
   },
-  barEmpty: { fontSize: 12, color: "#94A3B8" },
+  barEmpty: { fontSize: 12, color: "var(--text-secondary)" },
 
   /* Table */
   tableWrap: {
@@ -579,9 +581,9 @@ const s: Record<string, React.CSSProperties> = {
     marginTop: 6,
     fontSize: 11,
     fontWeight: 600,
-    color: "#94A3B8",
+    color: "var(--text-secondary)",
   },
-  cardDate: { fontSize: 11, color: "#94A3B8" },
+  cardDate: { fontSize: 11, color: "var(--text-secondary)" },
 
   /* Modal */
   overlay: {

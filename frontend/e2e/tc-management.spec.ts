@@ -17,7 +17,6 @@ test.describe("TC 관리", () => {
     await page.getByText("+ 새 프로젝트").click();
     await page.getByPlaceholder("프로젝트 이름").fill(projectName);
     await page.getByRole("button", { name: "생성" }).click();
-    await page.waitForTimeout(2000);
 
     // 2. 프로젝트 진입
     const card = page.locator("h3").filter({ hasText: projectName });
@@ -25,9 +24,6 @@ test.describe("TC 관리", () => {
     await card.click();
 
     // 3. 빈 프로젝트 시트 추가 화면
-    // 페이지 로드 완료 대기
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
     const addSheetBtn = page.locator("button").filter({ hasText: "시트 추가" }).first();
     await expect(addSheetBtn).toBeVisible({ timeout: 15000 });
 
@@ -39,7 +35,7 @@ test.describe("TC 관리", () => {
 
     // 5. 행 추가 (자동저장)
     await page.getByText("+ 행 추가").click();
-    await page.waitForTimeout(2000);
+    await expect(page.locator(".ag-center-cols-container .ag-row")).toHaveCount(1);
 
     // 6. 저장 버튼 없음 확인
     const saveButtons = page.locator("button").filter({ hasText: /^저장$/ });
@@ -47,7 +43,6 @@ test.describe("TC 관리", () => {
 
     // 7. 정리: 프로젝트 삭제
     await page.getByRole("button", { name: "설정" }).click();
-    await page.waitForTimeout(1000);
     await page.getByRole("button", { name: "프로젝트 삭제" }).click();
     await page.getByPlaceholder(projectName).fill(projectName);
     await page.getByRole("button", { name: "영구 삭제" }).click();
@@ -62,7 +57,6 @@ test.describe("TC 관리", () => {
     await page.getByText("+ 새 프로젝트").click();
     await page.getByPlaceholder("프로젝트 이름").fill(projectName);
     await page.getByRole("button", { name: "생성" }).click();
-    await page.waitForTimeout(2000);
     const card = page.locator("h3").filter({ hasText: projectName });
     await expect(card).toBeVisible({ timeout: 10000 });
     await card.click();
@@ -72,7 +66,6 @@ test.describe("TC 관리", () => {
 
     // 정리
     await page.getByRole("button", { name: "설정" }).click();
-    await page.waitForTimeout(1000);
     await page.getByRole("button", { name: "프로젝트 삭제" }).click();
     await page.getByPlaceholder(projectName).fill(projectName);
     await page.getByRole("button", { name: "영구 삭제" }).click();
@@ -114,14 +107,13 @@ test.describe("자동 저장 거부 처리", () => {
     await expect(card).toBeVisible({ timeout: 15000 });
     await card.click();
     await expect(page.locator(".ag-header-cell").first()).toBeVisible({ timeout: 20000 });
-    await page.waitForTimeout(1500);
+    await expect(page.locator('.ag-row[row-index="1"]')).toBeVisible({ timeout: 20000 });
 
     // 두 번째 행의 TC ID 를 첫 행과 같은 값으로 바꾼다 (서버가 409 로 거부한다)
     await page.locator('.ag-row[row-index="1"] [col-id="tc_id"]').dblclick();
     await page.locator(".ag-cell-inline-editing input.ag-input-field-input")
       .first().fill("REV-001");
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(2500);
 
     // 거부된 값이 화면에 남으면 안 된다
     await expect(page.locator('.ag-row[row-index="1"] [col-id="tc_id"]'))
@@ -131,8 +123,11 @@ test.describe("자동 저장 거부 처리", () => {
     await page.locator('.ag-row[row-index="1"] [col-id="category"]').dblclick();
     await page.locator(".ag-cell-inline-editing input.ag-input-field-input")
       .first().fill("수정됨");
+    const saved = page.waitForResponse(
+      (r) => /\/testcases\/\d+$/.test(r.url()) && r.request().method() === "PUT" && r.ok()
+    );
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(2500);
+    await saved;
 
     const list = await (await request.get(
       `/api/projects/${proj.id}/testcases`, { headers })).json();
@@ -177,14 +172,19 @@ test.describe("자동 저장 거부 처리", () => {
     await expect(card).toBeVisible({ timeout: 15000 });
     await card.click();
     await expect(page.locator(".ag-header-cell").first()).toBeVisible({ timeout: 20000 });
-    await page.waitForTimeout(1500);
+    await expect(page.locator('.ag-row[row-index="1"]')).toBeVisible({ timeout: 20000 });
 
     // BLK-002 를 BLK-001 로 모두 바꾼다 (서버가 409 로 거부한다)
     await page.getByPlaceholder("검색...", { exact: true }).fill("BLK-002");
     await page.getByRole("button", { name: "바꾸기" }).click();
     await page.getByPlaceholder("바꿀 내용...").fill("BLK-001");
+    // 모두 바꾸기도 행 단위 autoSaveRow 로 저장한다. 중복 TC ID 라 서버가 409 로 거부한다.
+    // 상태를 보지 않으면 500 이 떨어져도 이 테스트가 통과한다.
+    const replaced = page.waitForResponse(
+      (r) => /\/testcases\/\d+$/.test(r.url()) && r.request().method() === "PUT"
+    );
     await page.getByRole("button", { name: "모두 바꾸기" }).click();
-    await page.waitForTimeout(3000);
+    expect((await replaced).status()).toBe(409);
 
     const list = await (await request.get(
       `/api/projects/${proj.id}/testcases`, { headers })).json();
@@ -194,7 +194,6 @@ test.describe("자동 저장 거부 처리", () => {
 
     // 검색어가 걸린 채면 행이 걸러져 보이지 않는다. 풀고 화면 값을 본다.
     await page.getByPlaceholder("검색...", { exact: true }).fill("");
-    await page.waitForTimeout(800);
 
     // 거부된 값이 화면에 남으면 안 된다
     await expect(page.locator('.ag-row[row-index="1"] [col-id="tc_id"]'))

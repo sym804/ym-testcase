@@ -62,6 +62,10 @@ class User(Base):
     display_name = Column(String(100), nullable=False)
     role = Column(SAEnum(UserRole), default=UserRole.user, nullable=False)
     must_change_password = Column(Boolean, default=False, nullable=False)
+    #: 발급한 JWT 를 되돌리는 수단. 토큰에 이 값을 실어 두고 요청마다 대조한다.
+    #: 비밀번호가 바뀌면 1 올려서 그 사용자의 옛 토큰을 한 번에 막는다.
+    #: JWT 는 발급하면 서버가 손댈 수 없으므로 이 대조가 유일한 폐기 경로다.
+    token_version = Column(Integer, default=0, nullable=False, server_default="0")
     created_at = Column(DateTime, default=now_kst)
 
     projects = relationship("Project", back_populates="creator")
