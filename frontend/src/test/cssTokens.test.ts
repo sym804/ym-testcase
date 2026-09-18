@@ -119,3 +119,126 @@ describe("CSS 커스텀 프로퍼티", () => {
     expect(referencesWithoutFallback().length).toBeGreaterThan(50);
   });
 });
+
+
+/**
+ * 토큰 값끼리의 명암비. jsdom 은 CSS 변수를 풀어 주지 않아 axe 가 이 조합을 못 본다.
+ * 그래서 index.css 를 직접 읽어 WCAG 상대휘도로 잰다.
+ *
+ * ★한계: 토큰 값이 `#RRGGBB` 인 것만 읽는다. 다크의 `--bg-*-light` 는 rgba() 라
+ *   배경으로 쓸 수 없고, 토큰을 거치지 않고 하드코딩한 색(ag-grid 오버라이드 등)도
+ *   대상 밖이다. "검사가 있으니 됐다" 고 읽지 말 것.
+ *
+ * 실측 2026-09-18: 다크의 선택 상태(--accent 에 --accent-text)가 4.31:1 로 일반
+ * 텍스트 AA(4.5:1)에 못 미쳤고(SYM-55), 오류 문구(--text-danger)는 카드 배경에서
+ * 4.42:1, 입력 배경에서 4.02:1 이었다(SYM-56). 두 이슈 모두 "검사가 없어서" 남아
+ * 있었다. 값만 고치면 다음에 또 어긋나므로 여기서 막는다.
+ */
+const THEME_BLOCKS = {
+  라이트: /:root\s*\{([\s\S]*?)\}/,
+  다크: /\[data-theme="dark"\]\s*\{([\s\S]*?)\}/,
+} as const;
+
+/** 텍스트 색과 배경 색의 조합. 일반 텍스트라 4.5:1 이 기준이다. */
+const TEXT_ON_BG: { fg: string; bg: string; 설명: string }[] = [
+  { fg: "accent-text", bg: "accent", 설명: "선택 상태 버튼과 탭" },
+  { fg: "text-danger", bg: "bg-card", 설명: "카드 위 오류 문구" },
+  { fg: "text-danger", bg: "bg-input", 설명: "입력 옆 오류 문구" },
+  { fg: "text-primary", bg: "bg-card", 설명: "카드 본문" },
+  { fg: "text-secondary", bg: "bg-card", 설명: "카드 보조 문구" },
+  // ReportView 의 결과 건수 셀(:266-276)이 이 넷을 글자색으로 쓴다.
+  { fg: "color-fail", bg: "bg-card", 설명: "FAIL 건수와 위험 문구" },
+  { fg: "color-fail", bg: "bg-input", 설명: "입력 영역의 FAIL 표시" },
+  { fg: "color-pass", bg: "bg-card", 설명: "PASS 건수" },
+  { fg: "color-block", bg: "bg-card", 설명: "BLOCK 건수" },
+  { fg: "color-na", bg: "bg-card", 설명: "N/A 건수" },
+  { fg: "color-ns", bg: "bg-card", 설명: "미수행 건수" },
+  { fg: "color-link", bg: "bg-card", 설명: "본문 링크" },
+  { fg: "text-success", bg: "bg-card", 설명: "성공 안내" },
+  { fg: "text-warning", bg: "bg-card", 설명: "주의 안내" },
+  { fg: "text-info", bg: "bg-card", 설명: "정보 안내" },
+  { fg: "text-badge-gray", bg: "bg-card", 설명: "회색 배지 글자" },
+  // 헤더는 배경이 따로다. 카드 기준으로 재면 흰 글자가 늘 미달로 나온다.
+  { fg: "text-header", bg: "bg-header", 설명: "헤더 글자" },
+  { fg: "text-header-secondary", bg: "bg-header", 설명: "헤더 보조 글자" },
+];
+
+/**
+ * 글자색으로 쓰이지 않는 토큰. 여기에 없고 TEXT_ON_BG 에도 없는 `--text-*` /
+ * `--color-*` 토큰이 생기면 아래 인벤토리 단언이 실패한다.
+ *
+ * ★목록을 손으로 관리하면 새 토큰이 조용히 검사 밖으로 빠진다. SYM-54 가 넣은
+ *   미선언 토큰 검사가 "폴백 있는 참조" 를 놓쳐 SYM-56 이 살아남았고, 그 SYM-56 을
+ *   고치면서도 같은 값을 쓰던 --color-fail 을 놓쳤다. 같은 실수를 세 번 하지
+ *   않으려고 목록 자체를 강제한다.
+ */
+const NOT_TEXT_TOKENS = new Set([
+  "color-ns-accent",   // 악센트 막대 전용. CSS 주석에 그렇게 적혀 있다
+]);
+
+function themeTokens(theme: keyof typeof THEME_BLOCKS): Record<string, string> {
+  const css = fs.readFileSync(path.join(SRC, "index.css"), "utf-8");
+  const m = css.match(THEME_BLOCKS[theme]);
+  expect(m, `${theme} 테마 블록을 못 찾았다`).toBeTruthy();
+  const out: Record<string, string> = {};
+  for (const d of m![1].matchAll(/--([A-Za-z0-9_-]+):\s*(#[0-9A-Fa-f]{6})/g)) out[d[1]] = d[2];
+  return out;
+}
+
+function relativeLuminance(hex: string): number {
+  const v = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const lin = v.map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+}
+
+function contrast(a: string, b: string): number {
+  const [la, lb] = [relativeLuminance(a), relativeLuminance(b)];
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+describe("테마 토큰의 명암비", () => {
+  it.each(Object.keys(THEME_BLOCKS) as (keyof typeof THEME_BLOCKS)[])(
+    "%s 테마의 글자와 배경이 AA(4.5:1)를 넘는다",
+    (theme) => {
+      const t = themeTokens(theme);
+      const 미달: string[] = [];
+
+      for (const { fg, bg, 설명 } of TEXT_ON_BG) {
+        const f = t[fg];
+        const b = t[bg];
+        expect(f, `${theme} 에 --${fg} 가 없다`).toBeTruthy();
+        expect(b, `${theme} 에 --${bg} 가 없다`).toBeTruthy();
+        const r = contrast(f, b);
+        if (r < 4.5) 미달.push(`${설명}: --${fg} ${f} on --${bg} ${b} = ${r.toFixed(2)}:1`);
+      }
+
+      expect(미달, "AA 4.5:1 에 못 미치는 조합 - " + 미달.join(" / ")).toEqual([]);
+    },
+  );
+
+  it("글자색 토큰이 검사 목록 밖으로 새지 않는다", () => {
+    // 새 토큰이 늘면 사람이 목록을 고치도록 강제한다. 값이 맞는지가 아니라
+    // "누가 검사 대상인지" 를 정하는 일을 잊지 않게 하는 것이 목적이다.
+    const covered = new Set(TEXT_ON_BG.map((c) => c.fg));
+    const 샌_것: string[] = [];
+
+    for (const theme of Object.keys(THEME_BLOCKS) as (keyof typeof THEME_BLOCKS)[]) {
+      for (const name of Object.keys(themeTokens(theme))) {
+        if (!/^(text|color)-/.test(name)) continue;
+        if (covered.has(name) || NOT_TEXT_TOKENS.has(name)) continue;
+        샌_것.push(`${theme}:--${name}`);
+      }
+    }
+
+    expect(
+      [...new Set(샌_것)],
+      "글자색으로 쓰는 토큰이면 TEXT_ON_BG 에, 아니면 NOT_TEXT_TOKENS 에 넣어라",
+    ).toEqual([]);
+  });
+
+  it("검사기가 실제로 미달을 잡는다", () => {
+    // 이 계산이 맞는지 확인한다. 회색 위 회색은 어느 기준으로도 미달이다.
+    expect(contrast("#777777", "#888888")).toBeLessThan(4.5);
+    expect(contrast("#000000", "#FFFFFF")).toBeCloseTo(21, 0);
+  });
+});
