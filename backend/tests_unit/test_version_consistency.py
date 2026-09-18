@@ -1,16 +1,22 @@
 """버전 표기 정합
 
-버전이 네 곳에 흩어져 있다. 릴리즈 노트가 정본이고 나머지 셋은 사본이다.
+버전이 다섯 곳에 흩어져 있다. 릴리즈 노트가 정본이고 나머지 넷은 사본이다.
 
-    Release_note.md "현재 버전" 블록   <- 정본
-    backend/main.py     version=       <- Backend 축
-    frontend/package.json "version"    <- Frontend 축
-    frontend/src/i18n/*/common.json    <- 화면 푸터, System 축
+    Release_note.md "현재 버전" 블록      <- 정본
+    backend/main.py     version=          <- Backend 축
+    frontend/package.json "version"       <- Frontend 축
+    frontend/package-lock.json "version"  <- Frontend 축, 자리가 둘
+    frontend/src/i18n/*/common.json       <- 화면 푸터, System 축
 
 사본을 손으로 맞추는 한 어긋난다. 실측 2026-09-14 기준 릴리즈는 v1.5.3.0 인데
 main.py 와 package.json 은 1.4.0.1 에 멈춰 있었고(일곱 번의 릴리즈 동안), 푸터는
 1.5.2.0 이었다. 푸터는 SYM-59 로 한 번 고쳤던 자리가 다시 어긋난 것이다.
 규칙만 두고 확인이 없으면 또 어긋나므로 여기서 막는다.
+
+lock 은 이 파일이 감시하지 않아 v1.6.0.0 시점까지 혼자 1.5.5.0 에 남아 있었고
+v1.6.0.1 에서 맞췄다.
+감시 안에 든 사본은 맞고 감시 밖의 사본만 어긋났으므로, 사본을 늘릴 때는
+여기에 케이스부터 붙인다.
 """
 import json
 import os
@@ -76,4 +82,36 @@ def test_화면_푸터_버전이_릴리즈_노트와_같다(lang):
     assert m, f"{lang} common.json 의 version 문구에서 버전을 못 읽었다"
     assert m.group(1) == VERSIONS["system"], (
         f"{lang} 푸터 {m.group(1)} != 릴리즈 노트 System {VERSIONS['system']}"
+    )
+
+
+def test_프론트_lock_버전이_릴리즈_노트와_같다():
+    """lock 의 version 은 npm 이 그 시점 package.json 을 보고 박제하는 값이다.
+
+    그래서 "npm install 먼저, 버전 업 나중" 순서면 한 발 뒤처진 채로 커밋된다.
+    2026-09-18 에 발견했을 때 릴리즈는 v1.6.0.0 인데 lock 은 1.5.5.0 이었다.
+
+    축을 섞어 읽지 않도록 커밋 해시로 적는다. package.json 은 Frontend 축이고
+    커밋 메시지의 버전은 System 축이다.
+
+        cfa6316  (System v1.5.5.0)  FE 1.5.3.0  lock 1.4.0.1  <- 벌어지기 시작
+        10f10d8  (System v1.5.7.0)  FE 1.5.4.0  lock 1.5.4.0  <- 의존성 수정으로
+                                                                 install 이 돌아 일치
+        6d19b9c  (System v1.5.7.0)  FE 1.5.5.0  lock 1.5.4.0  <- 같은 릴리즈의
+                                                                 다음 커밋에서 재발
+        a8d2063  (System v1.6.0.0)  FE 1.6.0.0  lock 1.5.5.0
+
+    위 네 사본은 이 파일이 막고 있어 전부 맞아 있었고, 감시 밖의 lock 만 어긋났다.
+
+    자리가 둘이다. 최상위 version 과 packages[""] 의 version 을 따로 본다.
+    npm 이 둘을 같이 쓰므로 한쪽만 손으로 고치면 다음 install 에서 되돌아간다.
+    """
+    path = os.path.join(ROOT, "frontend", "package-lock.json")
+    lock = json.load(open(path, encoding="utf-8"))
+    assert lock["version"] == VERSIONS["frontend"], (
+        f"package-lock.json 최상위 {lock['version']} != 릴리즈 노트 Frontend {VERSIONS['frontend']}"
+    )
+    root_pkg = lock["packages"][""]
+    assert root_pkg["version"] == VERSIONS["frontend"], (
+        f"package-lock.json packages[''] {root_pkg['version']} != 릴리즈 노트 Frontend {VERSIONS['frontend']}"
     )

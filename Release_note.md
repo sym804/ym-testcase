@@ -37,11 +37,37 @@ YM TestCase는 3개 컴포넌트로 구성되며, 각각 독립적으로 버전�
 ## 현재 버전
 
 ```
-YM TestCase System  v1.6.0.0  (2026-09-17)
-├── Frontend       v1.6.0.0
-├── Backend        v1.6.0.0
+YM TestCase System  v1.6.0.1  (2026-09-18)
+├── Frontend       v1.6.0.1
+├── Backend        v1.6.0.1
 └── Database       v0.9.2.0
 ```
+
+---
+
+## v1.6.0.1 (2026-09-18) - [fix] 감시 밖에 있던 package-lock 버전 사본
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.6.0.0 | **1.6.0.1** | patch +1 |
+| Frontend | 1.6.0.0 | **1.6.0.1** | patch +1 |
+| Backend | 1.6.0.0 | **1.6.0.1** | patch +1 |
+
+### 이슈
+
+- SYM-104 package-lock.json 의 버전만 다른 사본과 어긋난다 (bug/minor/frontend)
+
+### 변경
+
+- `frontend/package-lock.json` 의 version 두 자리(최상위, `packages[""]`)를 정본과 맞춤
+- `test_version_consistency.py` 에 lock 검사 추가. 감시하는 사본 4곳 -> 5곳
+- `rules/` 에 사본 위치와 "버전 업 후 `npm install`" 순서, 대조 통과 체크 추가. 이력 표는 참고용으로 명시(SYM-105)
+
+### 영향
+
+- 없음. 버전 표기만 바뀌고 의존성 트리는 그대로
 
 ---
 
