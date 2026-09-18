@@ -50,6 +50,10 @@ def run_with_formula(token):
 
     rt = requests.post(f"{BASE}/api/projects/{pid}/testcases", headers=h, json={
         "no": 1, "tc_id": "TC-SEC-001", "category": DANGEROUS,
+        # ★사전조건도 태운다. _cells 가 전 셀을 훑어도 픽스처가 값을 안 넣으면
+        #   그 열은 검사되지 않는다. 실제로 이 칸이 비어 있어서 사전조건 열에서
+        #   safe_cell 을 빼도 세 건 모두 통과했다(SYM-108 QA 에서 확인).
+        "precondition": DANGEROUS,
         "test_steps": DANGEROUS, "expected_result": "성공",
         "sheet_name": "보안", "priority": "High",
     })

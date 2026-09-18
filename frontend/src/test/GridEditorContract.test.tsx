@@ -7,6 +7,8 @@ import i18n from "../i18n";
 // - 여러 줄 텍스트 컬럼에 큰 편집기를 안 달면 기본 input 이 열려 줄바꿈이 지워진다(SYM-25).
 //   그때 TC 그리드만 고치고 수행 그리드가 빠졌다.
 // - 찾기/바꾸기가 forEachNode 를 쓰면 필터로 숨은 행까지 바꾼다.
+// - 사전조건 열이 TC 그리드에만 있었다(SYM-108). 수행자가 실행 직전에 갖춰야 할
+//   상태를 보려고 TC 관리 화면을 따로 열어야 했다.
 let gridProps: any = null;
 
 vi.mock("ag-grid-react", () => ({
@@ -27,6 +29,7 @@ vi.mock("react-hot-toast", () => ({
 
 vi.mock("../components/MarkdownCell", () => ({ default: (p: any) => <span>{p.value}</span> }));
 vi.mock("../components/HighlightCell", () => ({ default: (p: any) => <span>{p.value}</span> }));
+vi.mock("../components/PreconditionCell", () => ({ default: (p: any) => <span>{p.value}</span> }));
 
 vi.mock("../api", () => ({
   testRunsApi: {
@@ -48,6 +51,8 @@ import { testRunsApi, testCasesApi, attachmentsApi } from "../api";
 import { TestRunStatus } from "../types";
 import TestRunManager from "../components/TestRunManager";
 import TestCaseGrid from "../components/TestCaseGrid";
+import PreconditionCell from "../components/PreconditionCell";
+import { resolveItems } from "../utils/precondition";
 
 const adminProject = {
   id: 1, name: "P", description: "", jira_base_url: null, is_private: false,
@@ -172,5 +177,93 @@ describe("찾기/바꾸기 범위", () => {
 
     expect(hidden.data.remarks, "필터로 숨은 행까지 바뀌었다").toBe("바꿀값");
     expect(visible.data.remarks).toBe("새값");
+  });
+});
+
+describe("수행 그리드의 사전조건", () => {
+  // 사전조건은 실행 직전에 갖춰야 하는 상태라 수행자가 봐야 한다.
+  // TC 그리드에만 있어서 수행 중에 화면을 옮겨다녀야 했다(SYM-108).
+  const REFERRING = `1. 로그인한 상태
+2. TC-002 의 사전조건 참조`;
+
+  async function openRunWithPrecondition() {
+    vi.mocked(testRunsApi.getOne).mockResolvedValue({
+      ...run,
+      results: [
+        {
+          id: 71, test_run_id: 7, test_case_id: 1, result: "NS", actual_result: "",
+          issue_link: "", remarks: "", executed_by: 1, executed_at: "2026-01-01",
+          test_case: { ...mockTC, id: 1, tc_id: "TC-001", precondition: REFERRING },
+        },
+        {
+          id: 72, test_run_id: 7, test_case_id: 2, result: "NS", actual_result: "",
+          issue_link: "", remarks: "", executed_by: 1, executed_at: "2026-01-01",
+          test_case: { ...mockTC, id: 2, tc_id: "TC-002", precondition: "1. 결제 수단이 등록되어 있다" },
+        },
+      ],
+    } as any);
+    const user = userEvent.setup();
+    render(<TestRunManager projectId={1} project={adminProject as any} />);
+    await waitFor(() => expect(screen.getByText("결제 회귀")).toBeInTheDocument());
+    await user.click(screen.getByText("결제 회귀"));
+    await waitFor(() => expect(gridProps?.columnDefs).toBeTruthy());
+  }
+
+  it("사전조건 열이 있다", async () => {
+    await openRunWithPrecondition();
+    const col = colById(gridProps.columnDefs, "test_case.precondition");
+    expect(col, "수행 그리드에 사전조건 열이 없다").toBeTruthy();
+  });
+
+  it("값은 그 행의 TC 사전조건이다", async () => {
+    await openRunWithPrecondition();
+    const col = colById(gridProps.columnDefs, "test_case.precondition");
+    const got = col.valueGetter({ data: { test_case: { precondition: "준비 상태" } } });
+    expect(got).toBe("준비 상태");
+    // test_case 가 비어도 터지지 않아야 한다. 삭제된 TC 의 결과 행이 그렇다.
+    expect(col.valueGetter({ data: {} })).toBe("");
+  });
+
+  it("읽기 전용이다", async () => {
+    // 수행 중에 TC 원문이 고쳐지면 다른 런의 기준까지 바뀐다.
+    await openRunWithPrecondition();
+    const col = colById(gridProps.columnDefs, "test_case.precondition");
+    expect(col.editable, "사전조건이 편집 가능하면 TC 원문이 수행 중에 바뀐다").toBe(false);
+  });
+
+  it("참조를 푸는 렌더러를 쓴다", async () => {
+    await openRunWithPrecondition();
+    const col = colById(gridProps.columnDefs, "test_case.precondition");
+    expect(col.cellRenderer, "참조가 원문 그대로 보인다").toBe(PreconditionCell);
+  });
+
+  it("참조 색인이 context 로 간다", async () => {
+    // 색인이 없으면 렌더러가 참조를 못 풀고 툴팁이 비어 보인다.
+    await openRunWithPrecondition();
+    const index = gridProps.context?.preconditionIndex as Map<string, string> | undefined;
+    expect(index, "preconditionIndex 가 context 에 없다").toBeTruthy();
+    expect(index!.get("TC-002")).toBe("1. 결제 수단이 등록되어 있다");
+  });
+
+  it("색인은 런에 담긴 TC 로만 만든다", async () => {
+    // 프로젝트 전체 TC 를 따로 받지 않는다. 수행 화면을 열 때마다 조회가 한 번 더
+    // 붙기 때문이다. 대신 시트를 골라 만든 런에서 다른 시트를 참조하면 색인에 없다.
+    // 그때 조용히 비면 사용자는 툴팁이 고장난 줄 안다. 안내 문구가 나와야 한다.
+    await openRunWithPrecondition();
+    const index = gridProps.context.preconditionIndex as Map<string, string>;
+
+    const items = resolveItems("TC-다른시트", index);
+    expect(items, "안내가 한 줄로 오지 않는다").toHaveLength(1);
+    expect(items[0], "어느 TC 를 못 찾았는지 알려주지 않는다").toContain("TC-다른시트");
+
+    // 런에 있는 TC 는 정상으로 펼쳐진다.
+    // 번호 접두사는 splitItems 가 떼어 낸다. 화면에서 다시 붙이는 몫이다.
+    expect(resolveItems("TC-002", index)).toEqual(["결제 수단이 등록되어 있다"]);
+  });
+
+  it("검색어 하이라이트 context 는 그대로 간다", async () => {
+    // preconditionIndex 를 넣으면서 기존 키를 덮어쓴 적이 있다.
+    await openRunWithPrecondition();
+    expect(gridProps.context).toHaveProperty("searchKeyword");
   });
 });

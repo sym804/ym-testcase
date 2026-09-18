@@ -21,6 +21,7 @@ import { AG_GRID_LOCALE_EN } from "../agGridLocaleEn";
 import toast from "react-hot-toast";
 import MarkdownCell from "./MarkdownCell";
 import HighlightCell from "./HighlightCell";
+import PreconditionCell from "./PreconditionCell";
 import { useTestTimer } from "../hooks/useTestTimer";
 import { useAttachments } from "../hooks/useAttachments";
 import { useResultFilters } from "../hooks/useResultFilters";
@@ -546,6 +547,20 @@ export default function TestRunManager({ projectId, project }: Props) {
     return counts;
   }, [countTick, getGridRows]);
 
+  // 사전조건이 다른 TC 를 참조할 때("TC-002 의 사전조건 참조") 그것을 풀 색인이다.
+  // ★런에 담긴 TC 로만 만든다. 프로젝트 전체를 따로 받지 않는 이유는, 런은 기본이
+  //   프로젝트 전체라 대개 이것으로 충분하고, 시트를 골라 만든 런에서 다른 시트를
+  //   참조하는 경우에만 못 푸는데 그때는 resolveItems 가 안내 문구를 돌려주기 때문이다.
+  //   여기서 목록을 더 받으면 수행 화면을 열 때마다 TC 전체 조회가 한 번 더 붙는다.
+  const preconditionIndex = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of results) {
+      const tc = r.test_case;
+      if (tc?.tc_id) map.set(tc.tc_id, tc.precondition || "");
+    }
+    return map;
+  }, [results]);
+
   const columnDefs = useMemo<ColDef[]>(
     () => [
       {
@@ -587,6 +602,20 @@ export default function TestRunManager({ projectId, project }: Props) {
         headerName: "Priority",
         width: 80,
         valueGetter: (params) => params.data?.test_case?.priority || "",
+      },
+      {
+        field: "test_case.precondition",
+        headerName: "Precondition",
+        minWidth: 260, flex: 1.5,
+        wrapText: true,
+        autoHeight: true,
+        cellClass: "ag-cell-left",
+        // ★읽기 전용이다. 수행 화면에서 고치면 TC 원문이 바뀌어 같은 TC 를 담은
+        //   다른 런의 기준까지 흔들린다. TC 원문은 TC 관리 화면에서만 고친다.
+        editable: false,
+        // 참조는 셀 안에 펼치지 않고 PreconditionCell 이 띄우는 툴팁으로만 보인다.
+        cellRenderer: PreconditionCell,
+        valueGetter: (params) => params.data?.test_case?.precondition || "",
       },
       {
         field: "test_case.test_steps",
@@ -1235,7 +1264,7 @@ export default function TestRunManager({ projectId, project }: Props) {
                       if (node?.data?.id) onRowFocused(node.data.id);
                     }
                   }}
-                  context={{ searchKeyword: filterText }}
+                  context={{ searchKeyword: filterText, preconditionIndex }}
                   singleClickEdit={true}
                   stopEditingWhenCellsLoseFocus={true}
                   suppressRowClickSelection={true}
