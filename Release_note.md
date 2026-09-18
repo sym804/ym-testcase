@@ -2,46 +2,49 @@
 
 ## 버전 체계
 
-### 형식: `system.feature.major.minor`
+**정본은 `rules/versioning.md` 다.** 자리 이름은 `system.feature.fix.patch` 이고
+자리별 판정 기준과 분량 상한이 거기에 있다. 여기에 사본을 두지 않는다.
 
-| 자리 | 의미 | 변경 기준 |
-|---|---|---|
-| **system** | 시스템 구조 변경 | 대규모 리팩토링, 아키텍처 변경, 하위 호환 불가 |
-| **feature** | 기능 변경 | 신규 기능 추가, 기존 기능 대규모 수정 |
-| **major** | 중요 버그 수정 | 빌드 실패, 데이터 정합성, 보안 취약점 등 |
-| **minor** | 사소한 버그 수정 | UI 텍스트, 스타일, 미미한 동작 수정 |
-
-### 컴포넌트별 버전 관리
-
-YM TestCase는 3개 컴포넌트로 구성되며, 각각 독립적으로 버전을 관리합니다.
-
-| 컴포넌트 | 설명 | 버전 변경 시점 |
-|---|---|---|
-| **Frontend** | React + TypeScript + Vite | UI/UX 변경, 페이지 추가, 컴포넌트 수정 |
-| **Backend** | FastAPI + SQLAlchemy | API 변경, 비즈니스 로직, 보안 수정 |
-| **Database** | SQLite (SQLAlchemy 모델) | 테이블/컬럼 추가·변경·삭제, 마이그레이션 |
-
-**System Version**은 전체 릴리즈 단위의 태그 역할이며, 컴포넌트 중 하나라도 변경되면 함께 올립니다.
-
-### 버전 변경 규칙
-
-| 변경 대상 | 올리는 버전 |
-|---|---|
-| Frontend만 수정 | Frontend + System |
-| Backend만 수정 | Backend + System |
-| DB 스키마 변경 | Database + Backend + System |
-| 전체 변경 | Frontend + Backend + Database(해당 시) + System |
-
----
+예전에는 이 자리에 같은 표가 있었으나 정본과 어긋나 있었다. 자리 이름이
+`major`/`minor` 로 달랐고, `system` 을 "대규모 리팩토링"으로 정의해 정본의
+"리팩토링은 B 다. A 가 아니다" 와 정반대를 지시했다(SYM-107).
 
 ## 현재 버전
 
 ```
-YM TestCase System  v1.6.0.1  (2026-09-18)
+YM TestCase System  v1.6.1.0  (2026-09-18)
 ├── Frontend       v1.6.0.1
 ├── Backend        v1.6.0.1
 └── Database       v0.9.2.0
 ```
+
+---
+
+## v1.6.1.0 (2026-09-18) - [fix] 정본과 어긋난 버전 문서 사본 제거
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.6.0.1 | **1.6.1.0** | fix +1 |
+
+### 이슈
+
+- SYM-105 rules/versioning.md 의 버전 이력 표가 릴리즈 절반만 담고 있다 (bug/minor/etc)
+- SYM-106 문서 절을 범위로 대체하다 사이에 낀 절을 같이 지웠다 (bug/minor/etc)
+- SYM-107 릴리즈 노트의 버전 체계 표가 정본과 반대되는 판정을 지시한다 (bug/major/etc)
+
+### 변경
+
+- 릴리즈 노트 상단 "버전 체계" 표 제거. 자리 이름이 `major`/`minor` 로 정본과 달랐고, `system` 을 "대규모 리팩토링"으로 규정해 정본의 "리팩토링은 B 다. A 가 아니다" 와 반대를 지시했다
+- `rules/versioning.md` 의 이력 표 제거. 릴리즈 노트 절 44개 중 22개가 빠져 있었고 v0.5.0.0 의 Database 값은 릴리즈 노트와 달랐다(0.2.0.0 대 0.3.0.0). 표에만 있던 릴리즈는 0건
+- 분량 상한이 `- ` 항목 줄을 센다는 것을 명시. 전체 줄로 세면 기존 절이 전부 위반이 된다
+- 트래커 표기를 Linear 로, `git push origin master` 를 `main` 으로 정정(`rules/` 4개 파일 10곳)
+
+### 영향
+
+- 문서만. 런타임 동작과 버전 사본 다섯 곳은 그대로
+- 버전 자리 판정 기준을 찾는 곳이 `rules/versioning.md` 한 곳으로 줄었다
 
 ---
 
