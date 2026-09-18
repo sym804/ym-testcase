@@ -357,3 +357,201 @@ def test_dedupe_in_file_직접(db):
     assert tc_id_from_file_no("abc", used2) == (None, False)
     # 숫자가 아니면 점유를 건드리지 않는다
     assert used2 == {"TC-000", "TC-007", "TC-001"}
+
+
+# ── 시트를 가로지르는 재임포트 (SYM-112) ─────────────────────────────────────
+# existing_map 은 시트 단위인데 채번은 프로젝트 전체를 본다. 그래서 두 번째
+# 시트의 TC-001 은 첫 시트와 부딪쳐 TC-001-2 로 저장되는데, 다음 임포트에서
+# 파서는 여전히 TC-001 을 계산한다. 기존 행을 못 찾아 새로 만들고 행이 불어난다.
+
+def _route(db, sheet_name, rows):
+    """라우트와 같은 차례: park -> parse -> renumber."""
+    from services.tc_numbering import park_sheet_numbers, renumber_sheet
+
+    park_sheet_numbers(1, sheet_name, db)
+    db.flush()
+    r = _parse_sheet(_sheet(sheet_name, rows), 1, 1, db, no_offset=0, sheet_name=sheet_name)
+    db.flush()
+    renumber_sheet(1, sheet_name, db)
+    db.commit()
+    return r
+
+
+def test_시트가_여럿이어도_재임포트가_행을_늘리지_않는다(db):
+    """실측으로 2건이 4건, 6건이 됐다. 임포트할 때마다 두 배가 된다."""
+    S1 = [[1, "", "a1", "e"], [2, "", "a2", "e"]]
+    S2 = [[1, "", "b1", "e"], [2, "", "b2", "e"]]
+
+    _route(db, "S1", S1)
+    _route(db, "S2", S2)
+    assert len(_ids(db)) == 4
+
+    r1 = _route(db, "S1", S1)
+    r2 = _route(db, "S2", S2)
+
+    assert (r1["created"], r1["updated"]) == (0, 2)
+    assert (r2["created"], r2["updated"]) == (0, 2), "두 번째 시트가 행을 새로 만들었다"
+    assert len(_ids(db)) == 4, f"행이 늘었다: {_ids(db)}"
+
+
+def test_세_번_넣어도_그대로다(db):
+    """되짚기가 한 번만 맞고 마는 것이 아닌지 본다."""
+    rows = [[1, "", "b1", "e"], [2, "", "b2", "e"]]
+    _route(db, "S1", [[1, "", "a1", "e"], [2, "", "a2", "e"]])
+    for _ in range(3):
+        _route(db, "S2", rows)
+    assert len(_ids(db, "S2")) == 2
+    assert _steps(db, "S2") == {"TC-001-2": "b1", "TC-002-2": "b2"}
+
+
+def test_되짚기가_파일이_적은_ID_를_가로채지_않는다(db):
+    """S2 에 TC-001-2 가 있고, 파일이 그 ID 를 직접 적은 다른 행을 담고 있다.
+    되짚기가 먼저 가져가면 엉뚱한 행을 덮는다."""
+    _route(db, "S1", [[1, "", "a1", "e"]])
+    _route(db, "S2", [[1, "", "b1", "e"]])
+    assert _steps(db, "S2") == {"TC-001-2": "b1"}
+
+    # 1번 행은 ID 를 안 적었고 2번 행이 TC-001-2 를 직접 적었다
+    r = _route(db, "S2", [[1, "", "새행", "e"], [2, "TC-001-2", "b1x", "e"]])
+
+    assert _steps(db, "S2")["TC-001-2"] == "b1x", "명시 ID 행이 제 행을 못 이었다"
+    assert r["created"] == 1, "새 행이 하나 생겨야 한다"
+
+
+def test_CSV_도_되짚어_찾는다(db):
+    """세 파서가 같은 코드를 베껴 쓴다. 엑셀만 검증하면 나머지가 갈린다."""
+    db.add(TestCaseSheet(project_id=1, name="CSV Import", sort_order=2))
+    db.commit()
+    # 다른 시트가 TC-001 을 먼저 차지하게 만든다
+    _import(db, "S1", [[1, "", "a", "e"]])
+    _csv(db, [[1, "", "b", "e"]])
+    db.commit()
+    assert _ids(db, "CSV Import") == ["TC-001-2"]
+
+    r = _csv(db, [[1, "", "bx", "e"]])
+    db.commit()
+
+    assert (r["created"], r["updated"]) == (0, 1), "되짚지 못해 새로 만들었다"
+    assert _steps(db, "CSV Import") == {"TC-001-2": "bx"}
+
+
+def test_Markdown_도_되짚어_찾는다(db):
+    db.add(TestCaseSheet(project_id=1, name="MD Import", sort_order=3))
+    db.commit()
+    _import(db, "S1", [[1, "", "a", "e"]])
+    _md(db, [[1, "", "b", "e"]])
+    db.commit()
+    assert _ids(db, "MD Import") == ["TC-001-2"]
+
+    r = _md(db, [[1, "", "bx", "e"]])
+    db.commit()
+
+    assert (r["created"], r["updated"]) == (0, 1)
+    assert _steps(db, "MD Import") == {"TC-001-2": "bx"}
+
+
+def test_빈_시트_첫_임포트는_되짚기의_영향을_받지_않는다(db):
+    """되짚기는 재임포트에서만 동작해야 한다. 빈 시트에서는 existing_map 이
+    비어 있어 첫 후보에서 바로 끝난다."""
+    r = _import(db, "S1", [[1, "", "a", "e"], [2, "", "b", "e"]])
+    assert (r["created"], r["updated"], r["renamed"]) == (2, 0, 0)
+    assert _ids(db, "S1") == ["TC-001", "TC-002"]
+
+
+def test_되짚기_후보가_연달아_있어도_끝난다(db):
+    """base-2, base-3 이 모두 파일이 적은 ID 면 더 볼 것이 없다. 무한 루프가
+    아니라 새로 만드는 쪽으로 끝나야 한다."""
+    _import(db, "S1", [[1, "TC-001-2", "x", "e"], [2, "TC-001-3", "y", "e"]])
+    assert _ids(db, "S1") == ["TC-001-2", "TC-001-3"]
+
+    # 같은 파일에 No 1 짜리 행을 더한다. TC-001 은 없고 -2, -3 은 파일이 적었다
+    r = _import(db, "S1", [[1, "TC-001-2", "x", "e"], [2, "TC-001-3", "y", "e"], [1, "", "새행", "e"]])
+
+    assert r["created"] == 1, "되짚기가 남의 행을 가져갔다"
+    assert _steps(db, "S1")["TC-001-2"] == "x"
+    assert _steps(db, "S1")["TC-001-3"] == "y"
+
+
+def test_세_번째_시트도_되짚는다(db):
+    """S3 의 파킹 ID 는 TC-001-3 인데 TC-001-2 는 S2 소유라 이 시트 맵에 없다.
+    접미사를 2, 3 으로 세어 올라가면 첫 구멍에서 끊긴다."""
+    db.add(TestCaseSheet(project_id=1, name="S3", sort_order=4))
+    db.commit()
+    data = {n: [[1, "", f"{n}-a", "e"]] for n in ("S1", "S2", "S3")}
+    for n in ("S1", "S2", "S3"):
+        _route(db, n, data[n])
+    assert len(_ids(db)) == 3
+
+    for n in ("S1", "S2", "S3"):
+        r = _route(db, n, data[n])
+        assert (r["created"], r["updated"]) == (0, 1), f"{n} 가 행을 새로 만들었다"
+    assert len(_ids(db)) == 3, f"행이 늘었다: {_ids(db)}"
+
+
+def test_사람이_붙인_ID_를_덮지_않는다(db):
+    """되짚기가 만든 회귀를 막는다. base 가 프로젝트 어디에도 없으면 그 base-2 는
+    채번이 만든 것이 아니라 사람이 손으로 붙인 것이다.
+
+    ★파일이 그 ID 를 적지 않았으므로 explicit 가드로는 못 막는다. HEAD 는 새 행을
+      만들어 둘 다 살렸다. 덮어쓰면 회귀다.
+    """
+    db.add(TestCase(project_id=1, no=9, tc_id="TC-005-2", test_steps="사람이 붙인 행",
+                    expected_result="e", sheet_name="S1", created_by=1))
+    db.commit()
+
+    r = _route(db, "S1", [[5, "", "전혀 다른 새 행", "e"]])
+
+    assert r["created"] == 1, "기존 행을 덮었다"
+    assert _steps(db, "S1") == {"TC-005": "전혀 다른 새 행", "TC-005-2": "사람이 붙인 행"}
+
+
+def test_되짚기_단위_동작(db):
+    """라우트를 태우지 않고 경계값을 직접 본다."""
+    from services.import_service import find_parked_by_base
+    from services.tc_id_service import allocate_tc_id
+
+    taken = {"TC-001"}
+    # base 가 taken 에 있어야 되짚는다
+    assert find_parked_by_base("TC-001", {"TC-001-2": 1}, set(), taken) == "TC-001-2"
+    assert find_parked_by_base("TC-001", {"TC-001-2": 1}, set(), set()) is None
+    # 비연속 후보도 찾는다(세 번째 시트)
+    assert find_parked_by_base("TC-001", {"TC-001-3": 1}, set(), taken) == "TC-001-3"
+    # 접미사가 작은 것을 고른다
+    assert find_parked_by_base("TC-001", {"TC-001-5": 1, "TC-001-2": 1}, set(), taken) == "TC-001-2"
+    # 파일이 적은 ID 는 건너뛴다
+    assert find_parked_by_base("TC-001", {"TC-001-2": 1}, {"TC-001-2"}, taken) is None
+    # 빈 맵
+    assert find_parked_by_base("TC-001", {}, set(), taken) is None
+    # 다른 base 의 것은 가져가지 않는다
+    assert find_parked_by_base("TC-001", {"TC-002-2": 1}, set(), taken) is None
+
+    # 길이 상한을 넘으면 채번이 잘라 저장한다. 되짚기도 같은 규칙을 알아야 한다.
+    long_base = "L" * 49
+    stored = allocate_tc_id(long_base, {long_base})
+    assert find_parked_by_base(long_base, {stored: 1}, set(), {long_base}) == stored
+
+
+def test_서식만_있는_빈_구간이_임포트를_느리게_하지_않는다(db):
+    """explicit_ids 스캔이 ws.max_row 까지 훑으면서 셀마다 병합 범위를 전부
+    보면, 서식 때문에 max_row 가 부푼 워크북에서 임포트가 멈춘 것처럼 느려진다.
+    실측으로 0.16초가 109초가 됐다."""
+    import time
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "S1"
+    ws.append(["No", "TC ID", "Test Steps", "Expected Result"])
+    for i in range(1, 201):
+        ws.append([i, "", f"s{i}", "e"])
+    ws.cell(row=20000, column=8).value = " "          # max_row 를 부풀린다
+    for m in range(300):                               # 병합을 많이 둔다
+        r = 2 + (m % 200)
+        ws.merge_cells(start_row=r, start_column=6, end_row=r, end_column=7)
+
+    t = time.perf_counter()
+    r = _parse_sheet(ws, 1, 1, db, no_offset=0, sheet_name="S1")
+    elapsed = time.perf_counter() - t
+
+    assert r["created"] == 200
+    assert elapsed < 3.0, f"{elapsed:.1f}초 걸렸다. 빈 구간이나 병합 훑기가 되살아났다"

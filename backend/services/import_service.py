@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from openpyxl import load_workbook
 
 from models import TestCase
-from services.tc_id_service import allocate_tc_id, taken_tc_ids
+from services.tc_id_service import allocate_tc_id, fit_tc_id, taken_tc_ids
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +187,60 @@ def _count_tc_rows(ws, header_row: int) -> int:
     return count
 
 
+def find_parked_by_base(base: str, existing_map: dict, explicit: set, taken: set) -> str | None:
+    """채번이 접미사를 붙여 저장해 둔 행을 이 시트에서 되짚는다.
+
+    파서는 `base` 까지만 계산할 수 있다. 저장할 때 다른 시트의 TC 와 부딪치면
+    채번(allocate_tc_id)이 `-2` 를 붙이는데, 그 결과는 다음 임포트에서 재계산해
+    낼 수 없다. 그래서 두 번째 시트부터 재임포트가 기존 행을 못 찾아 새로 만들고,
+    임포트할 때마다 행이 불어난다(SYM-112). 실측으로 2건이 4건, 6건이 됐다.
+
+    ★`base` 가 프로젝트 어디에도 없으면 되짚지 않는다. 접미사는 "누가 base 를
+      이미 쓰고 있어서" 붙는 것이라, base 가 없다면 그 `base-2` 는 채번이 만든
+      것이 아니라 사람이 손으로 붙인 ID 다. 이 가드가 없으면 사람이 만든 행을
+      파일의 새 행이 조용히 덮는다. HEAD 는 새 행을 만들어 둘 다 살렸는데 이쪽이
+      덮어쓰면 회귀다. 실측으로 확인했다.
+
+    ★접미사를 2, 3, ... 으로 세어 올라가지 않는다. 세 번째 시트의 파킹 ID 는
+      `base-3` 인데 `base-2` 는 다른 시트 소유라 이 시트 맵에 없어서, 세어 올라가는
+      방식은 첫 구멍에서 끊긴다. 맵에 있는 것 중 접미사가 가장 작은 것을 고른다.
+
+    ★파일이 직접 적은 ID(`explicit`)는 그 행이 스스로 이을 것이라 건드리지 않는다.
+
+    "이미 이은 ID 인가" 는 보지 않는다. 호출부가 `dedupe_in_file` 을 거친 값을
+    `base` 로 넘기고 그 함수는 호출마다 다른 값을 돌려주므로, 같은 base 로 두 번
+    되짚는 일이 없다. 도달하지 않는 방어를 두면 이빨 없는 코드가 된다.
+
+    :return: 이을 기존 ID. 없으면 None.
+    """
+    if base not in taken:
+        return None
+
+    best: tuple[int, str] | None = None
+    for key in existing_map:
+        if key in explicit:
+            continue
+        n = _parked_suffix(base, key)
+        if n is not None and (best is None or n < best[0]):
+            best = (n, key)
+    return best[1] if best else None
+
+
+def _parked_suffix(base: str, key: str) -> int | None:
+    """`key` 가 `base` 의 파킹 ID 면 접미사 숫자를, 아니면 None 을 돌려준다.
+
+    채번은 길이 상한(50)을 넘으면 앞부분을 잘라 붙이므로(`fit_tc_id`) 긴 base 는
+    저장된 값과 글자가 다르다. 같은 방식으로 잘라 비교한다.
+    """
+    m = re.match(rf"^{re.escape(base)}-(\d+)$", key)
+    if m:
+        return int(m.group(1))
+    m = re.match(r"^(.*)-(\d+)$", key)
+    if m and fit_tc_id(base, f"-{m.group(2)}") == key:
+        return int(m.group(2))
+    return None
+
+
 def dedupe_in_file(base: str, used: set) -> tuple[str, bool]:
     """한 파일 안에서 같은 TC ID 가 두 번 나오면 `-2`, `-3` 을 붙인다.
 
@@ -277,6 +331,28 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
     existing_map = {tc.tc_id: tc for tc in existing_tcs}
     #: 이 파일에서 이미 쓴 TC ID. 파일에 적힌 것과 No 로 만든 것을 같이 담는다.
     seen_bases: set[str] = set()
+    #: 파일이 직접 적은 TC ID. 되짚기가 이것을 가로채지 않게 한다.
+    #
+    # ★_resolve_merged 를 쓰지 않는다. 그 함수는 셀마다 ws.merged_cells.ranges 를
+    #   전부 훑는데, 서식 때문에 ws.max_row 가 부푼 워크북에서 (행 수 x 병합 수)
+    #   곱이 되어 임포트가 멈춘 것처럼 느려진다. 실측으로 데이터 300행에 max_row
+    #   30301, 병합 400개인 파일에서 0.16초가 109초가 됐다.
+    #   TC ID 칸은 행마다 값이 달라 병합되는 일이 없으므로 직접 읽어도 된다.
+    # ★본 루프와 같은 규칙으로 빈 행이 이어지면 멈춘다. 그러지 않으면 데이터가
+    #   끝난 뒤의 빈 구간을 max_row 까지 훑는다.
+    tc_id_cols = [c for c, f in col_map.items() if f == "tc_id"]
+    explicit_ids: set[str] = set()
+    if tc_id_cols:
+        blank_run = 0
+        for r in range(header_row + 1, ws.max_row + 1):
+            values = [ws.cell(row=r, column=c).value for c in tc_id_cols]
+            if all(v is None or str(v).strip() == "" for v in values):
+                blank_run += 1
+                if blank_run >= 10:
+                    break
+                continue
+            blank_run = 0
+            explicit_ids.update(str(v).strip() for v in values if v is not None and str(v).strip())
     # existing_map 은 시트 단위지만 TC ID 유일성은 프로젝트 단위다.
     # 새로 만드는 행은 프로젝트 전체에서 빈 번호를 찾아 붙인다.
     taken = taken_tc_ids(project_id, db)
@@ -347,6 +423,14 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
         )
 
         existing = existing_map.get(tc_id_val)
+        if existing is None:
+            # 채번이 접미사를 붙여 저장한 행일 수 있다. 이 시트에서 되짚는다.
+            parked = find_parked_by_base(tc_id_val, existing_map, explicit_ids, taken)
+            if parked:
+                tc_id_val = parked
+                row_data["tc_id"] = parked
+                seen_bases.add(parked)
+                existing = existing_map[parked]
         if existing:
             # 덮어쓰기
             for key, val in fields.items():
@@ -434,6 +518,7 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
     if not reader.fieldnames:
         return {"created": 0, "updated": 0}
 
+
     # 컬럼 매핑 (HEADER_MAP + JIRA_HEADER_MAP 모두 사용)
     combined_map = {**HEADER_MAP, **JIRA_HEADER_MAP}
     col_map = {}
@@ -456,6 +541,17 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
     existing_map = {tc.tc_id: tc for tc in existing_tcs}
     #: 이 파일에서 이미 쓴 TC ID. 파일에 적힌 것과 No 로 만든 것을 같이 담는다.
     seen_bases: set[str] = set()
+    #: 파일이 직접 적은 TC ID. 되짚기가 이것을 가로채지 않게 한다.
+    # ★행 전체를 리스트로 들고 있지 않는다. 10MB 상한 파일이면 상주 142MB 가 된다.
+    #   tc_id 칸만 모으고 본 루프는 StringIO 를 다시 열어 흘려 읽는다.
+    tc_id_headers = [h for h, f in col_map.items() if f == "tc_id"]
+    explicit_ids: set[str] = set()
+    if tc_id_headers:
+        for row in csv.DictReader(io.StringIO(text)):
+            for h in tc_id_headers:
+                v = (row.get(h) or "").strip()
+                if v:
+                    explicit_ids.add(v)
     # existing_map 은 시트 단위지만 TC ID 유일성은 프로젝트 단위다.
     # 새로 만드는 행은 프로젝트 전체에서 빈 번호를 찾아 붙인다.
     taken = taken_tc_ids(project_id, db)
@@ -464,7 +560,7 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
     updated_count = 0
     renamed_count = 0
 
-    for row_num, row in enumerate(reader, start=1):
+    for row_num, row in enumerate(csv.DictReader(io.StringIO(text)), start=1):
         row_data = {}
         for csv_header, field in col_map.items():
             val = row.get(csv_header, "").strip()
@@ -506,6 +602,14 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
         ] if row_data.get(k) is not None}
 
         existing = existing_map.get(tc_id_val)
+        if existing is None:
+            # 채번이 접미사를 붙여 저장한 행일 수 있다. 이 시트에서 되짚는다.
+            parked = find_parked_by_base(tc_id_val, existing_map, explicit_ids, taken)
+            if parked:
+                tc_id_val = parked
+                row_data["tc_id"] = parked
+                seen_bases.add(parked)
+                existing = existing_map[parked]
         if existing:
             for key, val in fields.items():
                 if val is not None:
@@ -704,6 +808,13 @@ def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, she
     existing_map = {tc.tc_id: tc for tc in existing_tcs}
     #: 이 파일에서 이미 쓴 TC ID. 파일에 적힌 것과 No 로 만든 것을 같이 담는다.
     seen_bases: set[str] = set()
+    #: 파일이 직접 적은 TC ID. 되짚기가 이것을 가로채지 않게 한다.
+    explicit_ids = {
+        cells[i].strip()
+        for cells in table["rows"]
+        for i, f in col_map.items()
+        if f == "tc_id" and i < len(cells) and cells[i].strip()
+    }
     # existing_map 은 시트 단위지만 TC ID 유일성은 프로젝트 단위다.
     # 새로 만드는 행은 프로젝트 전체에서 빈 번호를 찾아 붙인다.
     taken = taken_tc_ids(project_id, db)
@@ -755,6 +866,14 @@ def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, she
         ] if row_data.get(k) is not None}
 
         existing = existing_map.get(tc_id_val)
+        if existing is None:
+            # 채번이 접미사를 붙여 저장한 행일 수 있다. 이 시트에서 되짚는다.
+            parked = find_parked_by_base(tc_id_val, existing_map, explicit_ids, taken)
+            if parked:
+                tc_id_val = parked
+                row_data["tc_id"] = parked
+                seen_bases.add(parked)
+                existing = existing_map[parked]
         if existing:
             for key, val in fields.items():
                 if val is not None:
