@@ -53,6 +53,8 @@
 - [ ] 롤백 계획 수립 (이전 버전 복구 절차 확인)
 - [ ] Release_note.md 최상단에 새 버전 추가
 - [ ] 컴포넌트별 버전 번호 갱신 (rules/versioning.md)
+- [ ] 버전 사본 다섯 곳 갱신. lock 은 버전 업 **다음에** `npm install` (rules/versioning.md 의 사본 위치)
+- [ ] 사본 대조 통과 확인 (`python -m pytest backend/tests_unit/test_version_consistency.py -q`)
 
 ### 커밋 & 푸시
 - [ ] 변경 파일 스테이징 (소스 + Issue_list.xlsx + Release_note.md + rules/)
