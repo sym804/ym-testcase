@@ -9,6 +9,10 @@ import i18n from "../i18n";
 // - 찾기/바꾸기가 forEachNode 를 쓰면 필터로 숨은 행까지 바꾼다.
 // - 사전조건 열이 TC 그리드에만 있었다(SYM-108). 수행자가 실행 직전에 갖춰야 할
 //   상태를 보려고 TC 관리 화면을 따로 열어야 했다.
+// - Platform(test_type)도 같은 모양으로 빠져 있었다(SYM-109).
+// - 프로젝트의 필드 표시 설정을 TC 그리드만 따랐다(SYM-111). 이름을 바꾸거나
+//   숨겨도 수행 그리드는 영문 기본값을 그대로 보여 줬다.
+// - Ctrl+D 가 읽기 전용 TC 열에서도 "채웠다" 고 알렸다(SYM-110).
 let gridProps: any = null;
 
 vi.mock("ag-grid-react", () => ({
@@ -53,6 +57,7 @@ import TestRunManager from "../components/TestRunManager";
 import TestCaseGrid from "../components/TestCaseGrid";
 import PreconditionCell from "../components/PreconditionCell";
 import { resolveItems } from "../utils/precondition";
+import toast from "react-hot-toast";
 
 const adminProject = {
   id: 1, name: "P", description: "", jira_base_url: null, is_private: false,
@@ -265,5 +270,192 @@ describe("수행 그리드의 사전조건", () => {
     // preconditionIndex 를 넣으면서 기존 키를 덮어쓴 적이 있다.
     await openRunWithPrecondition();
     expect(gridProps.context).toHaveProperty("searchKeyword");
+  });
+});
+
+
+describe("수행 그리드의 Platform", () => {
+  // 사전조건(SYM-108)과 같은 모양의 누락이다. TC 그리드와 TC 목록 엑셀에는 있고
+  // 프로젝트 설정에 숨김 가능 필드로 등록돼 있는데 수행 화면에만 없었다.
+  async function openRun() {
+    const user = userEvent.setup();
+    render(<TestRunManager projectId={1} project={adminProject as any} />);
+    await waitFor(() => expect(screen.getByText("결제 회귀")).toBeInTheDocument());
+    await user.click(screen.getByText("결제 회귀"));
+    await waitFor(() => expect(gridProps?.columnDefs).toBeTruthy());
+  }
+
+  it("Platform 열이 있다", async () => {
+    await openRun();
+    expect(colById(gridProps.columnDefs, "test_case.test_type"), "Platform 열이 없다").toBeTruthy();
+  });
+
+  it("읽기 전용이다", async () => {
+    await openRun();
+    expect(colById(gridProps.columnDefs, "test_case.test_type").editable).toBe(false);
+  });
+
+  it("값은 그 행의 TC Platform 이다", async () => {
+    await openRun();
+    const col = colById(gridProps.columnDefs, "test_case.test_type");
+    expect(col.valueGetter({ data: { test_case: { test_type: "Android" } } })).toBe("Android");
+    expect(col.valueGetter({ data: {} })).toBe("");
+  });
+});
+
+describe("수행 그리드와 프로젝트 필드 설정", () => {
+  // TC 그리드만 field_config 를 따랐다. 이름을 "사전조건 / 테스트 데이터" 로 바꾼
+  // 프로젝트에서 두 화면의 헤더가 다르게 보였다(SYM-111).
+  const configured = {
+    ...adminProject,
+    field_config: {
+      tc_id: { display_name: "케이스 번호", visible: true },
+      precondition: { display_name: "사전조건 / 테스트 데이터", visible: true },
+      test_type: { display_name: "플랫폼", visible: true },
+      priority: { display_name: "우선순위", visible: false },
+      remarks: { display_name: "TC 비고", visible: false },
+    },
+  };
+
+  async function openRunWith(project: any) {
+    const user = userEvent.setup();
+    render(<TestRunManager projectId={1} project={project} />);
+    await waitFor(() => expect(screen.getByText("결제 회귀")).toBeInTheDocument());
+    await user.click(screen.getByText("결제 회귀"));
+    await waitFor(() => expect(gridProps?.columnDefs).toBeTruthy());
+  }
+
+  it("바꾼 표시 이름을 쓴다", async () => {
+    await openRunWith(configured);
+    expect(colById(gridProps.columnDefs, "test_case.precondition").headerName).toBe("사전조건 / 테스트 데이터");
+    expect(colById(gridProps.columnDefs, "test_case.test_type").headerName).toBe("플랫폼");
+    // tc_id 는 숨길 수 없지만 이름은 바꿀 수 있다. 그 열만 하드코딩으로 남아 있었다.
+    expect(colById(gridProps.columnDefs, "test_case.tc_id").headerName).toBe("케이스 번호");
+  });
+
+  it("숨긴 필드는 수행 그리드에서도 빠진다", async () => {
+    await openRunWith(configured);
+    expect(colById(gridProps.columnDefs, "test_case.priority"), "숨긴 필드가 그대로 있다").toBeUndefined();
+  });
+
+  it("설정이 없으면 기본 이름을 쓴다", async () => {
+    await openRunWith(adminProject);
+    expect(colById(gridProps.columnDefs, "test_case.precondition").headerName).toBe("Precondition");
+    expect(colById(gridProps.columnDefs, "test_case.priority")).toBeTruthy();
+  });
+
+  it("수행 전용 Remarks 는 TC 의 remarks 설정에 휘둘리지 않는다", async () => {
+    // ★이름만 같고 다른 값이다. 수행 그리드의 Remarks 는 TestResult.remarks 이고
+    //   field_config 의 remarks 는 TestCase.remarks 다. 위 설정은 remarks 를
+    //   숨김으로 뒀는데, 그것 때문에 수행 결과 비고가 사라지면 결과를 못 적는다.
+    await openRunWith(configured);
+    const col = colById(gridProps.columnDefs, "remarks");
+    expect(col, "수행 결과 비고 열이 사라졌다").toBeTruthy();
+    expect(col.headerName).toBe("Remarks");
+  });
+});
+
+describe("읽기 전용 열에서의 Ctrl+D", () => {
+  // 읽기 전용 TC 열에서 Ctrl+D 를 누르면 값은 안 바뀌는데 "채웠다" 토스트가 뜨고
+  // 저장 요청이 나갔다(SYM-110). node.data["test_case.precondition"] 처럼 점 찍힌
+  // 키가 평평하게 새로 생겨서 화면 값은 그대로였다.
+  async function openRun() {
+    const user = userEvent.setup();
+    render(<TestRunManager projectId={1} project={adminProject as any} />);
+    await waitFor(() => expect(screen.getByText("결제 회귀")).toBeInTheDocument());
+    await user.click(screen.getByText("결제 회귀"));
+    await waitFor(() => expect(gridProps?.onCellKeyDown).toBeTruthy());
+  }
+
+  // ★colDef 를 손으로 만들지 않고 실제 columnDefs 에서 찾아 쓴다. 손으로 만들면
+  //   테스트가 구현과 같은 가정을 공유해, editable 을 아예 안 쓴 열(undefined)이
+  //   있다는 사실 자체를 못 본다.
+  function ctrlD(colId: string, targets: any[]) {
+    const colDef = gridProps.columnDefs.find(
+      (c: any) => c.field === colId || c.colId === colId,
+    );
+    expect(colDef, `${colId} 열이 그리드에 없다`).toBeTruthy();
+
+    const source = { data: { id: 71, result: "원본", test_case: { precondition: "원본" } } };
+    const api = {
+      getSelectedNodes: () => [source, ...targets],
+      refreshCells: vi.fn(),
+      forEachNode: vi.fn(),
+      setGridOption: vi.fn(),
+    };
+    // ★핸들러는 event.api 가 아니라 gridApiRef.current 를 쓴다. 이것을 안 채우면
+    //   `if (!api) return` 에서 조용히 빠져나가, 읽기 전용 테스트가 거짓으로
+    //   통과한다(처음에 그렇게 썼다가 짝 테스트가 실패해서 알았다).
+    gridProps.onGridReady?.({ api });
+    gridProps.onCellKeyDown({
+      event: { key: "d", ctrlKey: true, preventDefault: () => {} },
+      column: { getColId: () => colId, getColDef: () => colDef },
+      value: "원본",
+      node: source,
+      api,
+    });
+  }
+
+  it("읽기 전용 TC 열에서는 아무 일도 하지 않는다", async () => {
+    await openRun();
+    const target = { data: { id: 72, test_case: { precondition: "대상" } } };
+
+    ctrlD("test_case.precondition", [target]);
+
+    expect(toast.success, "채웠다고 알렸다").not.toHaveBeenCalled();
+    expect(
+      Object.prototype.hasOwnProperty.call(target.data, "test_case.precondition"),
+      "점 찍힌 평평한 키가 생겼다",
+    ).toBe(false);
+    expect(testRunsApi.submitResults, "저장 요청이 나갔다").not.toHaveBeenCalled();
+  });
+
+  it("editable 을 안 쓴 읽기 전용 열도 막힌다", async () => {
+    // ★editable 이 undefined 인 열이 아홉이다(No, TC ID, Category, Depth 1/2,
+    //   Priority, 절차, 기대 결과, 소요). "editable !== false 면 통과" 로
+    //   판정하면 이것들이 전부 새어 나간다.
+    await openRun();
+    const target = { data: { id: 72, test_case: { tc_id: "TC-002" } } };
+
+    ctrlD("test_case.tc_id", [target]);
+
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(Object.prototype.hasOwnProperty.call(target.data, "test_case.tc_id")).toBe(false);
+  });
+
+  it("소요(초) 는 채우지 않는다", async () => {
+    // 타이머가 잰 값이라 사람이 퍼뜨릴 값이 아니다. 게다가 저장 본문
+    // 화이트리스트에 있어서 그냥 두면 측정값이 실제로 덮어써진다.
+    await openRun();
+    const target = { data: { id: 72, duration_sec: 42 } };
+
+    ctrlD("duration_sec", [target]);
+
+    expect(target.data.duration_sec, "측정된 수행 시간이 덮어써졌다").toBe(42);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("Result 열은 그대로 채워진다", async () => {
+    // ★Ctrl+D 의 주 용도다. 매뉴얼이 "동일 결과 반복 시" 라고 적고 있다.
+    //   Result 는 커스텀 렌더러를 쓰느라 editable:false 라서, 편집 가능 여부로
+    //   판정하면 이 기능이 죽는다.
+    await openRun();
+    const target = { data: { id: 72, test_case_id: 2, result: "NS" } };
+
+    ctrlD("result", [target]);
+
+    expect(target.data.result, "결과가 채워지지 않았다").toBe("원본");
+    expect(toast.success).toHaveBeenCalled();
+    expect(testRunsApi.submitResults, "저장 요청이 나가지 않았다").toHaveBeenCalled();
+  });
+
+  it("실제 결과 열도 그대로 채워진다", async () => {
+    await openRun();
+    const target = { data: { id: 72, test_case_id: 2, actual_result: "" } };
+
+    ctrlD("actual_result", [target]);
+
+    expect(target.data.actual_result).toBe("원본");
+    expect(toast.success).toHaveBeenCalled();
   });
 });

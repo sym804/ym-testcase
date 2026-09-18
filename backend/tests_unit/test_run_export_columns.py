@@ -66,7 +66,7 @@ def seeded(db):
 
     tc = TestCase(
         project_id=project.id, no=1, tc_id="TC-001", category="결제",
-        priority="High", precondition=PRECONDITION,
+        priority="High", test_type="Android", precondition=PRECONDITION,
         test_steps="1. 결제한다", expected_result="성공",
         sheet_name="결제", created_by=user.id,
     )
@@ -118,11 +118,23 @@ def test_사전조건_값이_실린다(db, seeded):
     assert ws.cell(row=2, column=col).value == PRECONDITION
 
 
-def test_사전조건은_우선순위와_절차_사이다(db, seeded):
-    """화면 열 차례와 같게 둔다. 두 곳이 갈라지면 눈으로 대조할 수 없다."""
+def test_열_차례가_의도대로다(db, seeded):
+    """이름으로만 찾는 검사는 순서가 뒤바뀌어도 통과한다. 차례를 못박는다.
+
+    ★절대 인덱스(headers[7] == ...)로 적지 않는다. 열을 하나 더할 때마다 고쳐야
+      해서, 고치다 보면 검사가 의도가 아니라 현재 구현을 베끼게 된다.
+      실제로 Platform 을 넣을 때 그 형태였던 검사가 깨졌다.
+    """
     ws = _sheet(db, seeded)
-    headers = [c.value for c in ws[1]]
-    assert headers.index("Priority") < headers.index("Precondition") < headers.index("Test Steps")
+    h = [c.value for c in ws[1]]
+    pos = {name: i for i, name in enumerate(h)}
+
+    # TC 에서 오는 열은 TC 관리 화면 차례를 따른다
+    assert pos["Priority"] < pos["Platform"] < pos["Precondition"] < pos["Test Steps"] < pos["Expected Result"]
+    # 수행 결과는 TC 정보 뒤에 온다
+    assert pos["Expected Result"] < pos["Result"] < pos["Actual Result"] < pos["Issue Link"]
+    assert h[0] == "No"
+    assert h[-1] == "Remarks"
 
 
 def test_기존_열이_밀려나지_않는다(db, seeded):
@@ -165,7 +177,7 @@ def _build_run(db, tc_count):
     return project, run, user
 
 
-def _count_selects(db, tc_count):
+def _count_selects(db, tc_count, exporter=export_testrun_excel):
     project, run, user = _build_run(db, tc_count)
     seen = []
 
@@ -178,7 +190,7 @@ def _count_selects(db, tc_count):
     event.listen(engine, "before_cursor_execute", _rec)
     try:
         db.expire_all()   # 캐시된 객체가 있으면 쿼리가 안 나가 비교가 무의미해진다
-        _read_body(export_testrun_excel(
+        _read_body(exporter(
             project_id=project.id, run_id=run.id, db=db, current_user=user,
         ))
     finally:
@@ -203,7 +215,7 @@ def test_행이_늘어도_조회_횟수가_같다(db, seeded):
 
 # 긴 글이 들어가는 열과 짧은 값만 들어가는 열. 폭이 밀리면 이 성질이 뒤집힌다.
 WIDE_COLUMNS = {"Precondition", "Test Steps", "Expected Result", "Actual Result", "Remarks"}
-NARROW_COLUMNS = {"No", "Type", "Result", "Duration(sec)"}
+NARROW_COLUMNS = {"No", "Type", "Result", "Duration(sec)", "Platform"}
 
 
 def test_긴_열은_넓고_짧은_열은_좁다(db, seeded):
@@ -224,16 +236,6 @@ def test_긴_열은_넓고_짧은_열은_좁다(db, seeded):
         assert width[h] >= 20, f"{h} 이 좁다({width[h]}). col_widths 가 밀렸다"
     for h in sorted(NARROW_COLUMNS):
         assert width[h] <= 15, f"{h} 이 넓다({width[h]}). col_widths 가 밀렸다"
-
-
-def test_헤더_자리가_고정이다(db, seeded):
-    """헤더와 값이 함께 밀리면 이름으로 찾는 검사는 통과한다. 자리까지 못박는다."""
-    ws = _sheet(db, seeded)
-    headers = [c.value for c in ws[1]]
-    assert headers[7] == "Precondition"
-    assert headers[8] == "Test Steps"
-    assert headers[10] == "Result"
-    assert headers[14] == "Remarks"
 
 
 def test_결과_색이_결과_열에_칠해진다(db, seeded):
@@ -332,3 +334,28 @@ def test_리포트도_결과_열에_색을_칠한다(db, seeded):
     assert cell.value == "PASS"
     assert cell.fill.patternType == "solid", "결과 칸이 칠해지지 않았다"
     assert ws.cell(row=2, column=col - 1).fill.start_color.rgb != cell.fill.start_color.rgb
+
+
+def test_런_엑셀에_Platform_이_있다(db, seeded):
+    """사전조건과 같은 모양의 누락이었다(SYM-109)."""
+    ws = _sheet(db, seeded)
+    headers = [c.value for c in ws[1]]
+    assert "Platform" in headers, f"런 엑셀에 Platform 이 없다: {headers}"
+    assert ws.cell(row=2, column=headers.index("Platform") + 1).value == "Android"
+
+
+def test_리포트에도_Platform_이_있다(db, seeded):
+    ws = _report_sheet(db, seeded)
+    headers = [c.value for c in ws[1]]
+    assert "Platform" in headers, f"리포트에 Platform 이 없다: {headers}"
+    assert ws.cell(row=2, column=headers.index("Platform") + 1).value == "Android"
+
+
+def test_리포트도_행이_늘어도_조회_횟수가_같다(db, seeded):
+    """런 엑셀과 대칭으로 건다. 한쪽에만 걸어 두면 다른 쪽 load_only 가 새어도 모른다."""
+    few = _count_selects(db, 2, report_excel)
+    many = _count_selects(db, 6, report_excel)
+    assert few == many, (
+        f"행이 2개일 때 {few}회, 6개일 때 {many}회 조회했다. "
+        "reports.py 의 load_only 에서 빠진 칸이 있다"
+    )
