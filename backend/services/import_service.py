@@ -187,6 +187,66 @@ def _count_tc_rows(ws, header_row: int) -> int:
     return count
 
 
+def dedupe_in_file(base: str, used: set) -> tuple[str, bool]:
+    """한 파일 안에서 같은 TC ID 가 두 번 나오면 `-2`, `-3` 을 붙인다.
+
+    ★채번(allocate_tc_id)에 맡기면 안 된다. 채번은 저장할 때 충돌을 푸는 것이라
+      다음 임포트에서 파서가 같은 값을 다시 계산해 내지 못한다. 그래서 두 행이
+      모두 `TC-001` 을 찾아 앞 행을 두 번 덮고, 뒤 행의 내용이 영영 반영되지
+      않는다(SYM-51). 결과는 updated 2 로 보고되지만 실제로 갱신된 행은 하나다.
+
+      단위 테스트만 보면 시트 안 no 유니크 제약에 걸려 IntegrityError 가 나는데,
+      실제 앱은 그렇지 않다. 라우트가 `_parse_sheet` 앞에 `park_sheet_numbers` 로
+      기존 번호를 음수로 비켜 두기 때문이다. 조용히 덮어쓰는 쪽이 에러보다 나쁘다.
+
+      여기서 붙이면 결정적이라 재임포트에서도 같은 값이 나와 각 행이 제 자리에
+      갱신된다. 만들어지는 ID 자체는 채번이 붙이던 것과 같다.
+
+      ★단, 다른 시트가 이미 그 ID 를 쓰고 있으면 채번이 그 위에 한 번 더 붙어
+        `TC-001-2-2` 가 된다. 그 경우 옛 코드의 `TC-001-4` 와 문자열이 달라진다.
+        시트를 가로지르는 매칭은 SYM-112 범위다.
+
+    ★파일에 적힌 ID 와 No 로 만든 ID 를 한 이름공간에서 센다. 나누면 둘이 부딪칠
+      때 같은 증상이 남는다. 실측: `[1,"TC-001","a"], [1,"","b"]` 를 두 번 넣으면
+      둘째 행이 첫 행을 덮어 "a" 의 갱신이 사라졌다.
+
+    :return: (ID, 접미사를 붙였는지). 뒤쪽은 호출부가 renamed 로 세어 사용자에게
+             "번호를 붙여 넣었다" 고 알리는 데 쓴다.
+
+    ★만들어 낸 값도 점유로 표시한다. 세기만 하면 파생 ID(`TC-001-2`)와 나중에
+      나오는 명시 ID(`TC-001-2`)가 서로를 모르고 같은 값을 낸다. 실측으로
+      한 행의 갱신이 사라지는 것을 확인했다.
+    """
+    if base not in used:
+        used.add(base)
+        return base, False
+
+    # 빈 자리를 찾는다. 접미사 모양을 allocate_tc_id 와 맞춘다. 두 번째가 -2 다.
+    n = 2
+    while f"{base}-{n}" in used:
+        n += 1
+    out = f"{base}-{n}"
+    used.add(out)
+    return out, True
+
+
+def tc_id_from_file_no(file_no, used: set) -> tuple[str | None, bool]:
+    """TC ID 칸이 빈 행에 붙일 ID 를 파일의 No 로 만든다.
+
+    재임포트로 내용을 갱신하는 흐름이라 매칭 키는 파일의 No 다. 행을 가운데
+    끼워 넣어도 No 를 유지하면 같은 TC 를 따라간다.
+
+    No 가 숫자가 아니면 (None, False) 를 돌려준다. 이때 `used` 는 건드리지 않는다.
+    """
+    if file_no in (None, ""):
+        return None, False
+    try:
+        base = f"TC-{int(file_no):03d}"
+    except (ValueError, TypeError):
+        return None, False
+    return dedupe_in_file(base, used)
+
+
 def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int = 0, sheet_name: str = "기본") -> dict:
     """단일 시트를 파싱하여 TC를 DB에 추가/업데이트한다. {"created": N, "updated": N} 반환."""
     header_row = _detect_header_row(ws)
@@ -215,6 +275,8 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
         .all()
     )
     existing_map = {tc.tc_id: tc for tc in existing_tcs}
+    #: 이 파일에서 이미 쓴 TC ID. 파일에 적힌 것과 No 로 만든 것을 같이 담는다.
+    seen_bases: set[str] = set()
     # existing_map 은 시트 단위지만 TC ID 유일성은 프로젝트 단위다.
     # 새로 만드는 행은 프로젝트 전체에서 빈 번호를 찾아 붙인다.
     taken = taken_tc_ids(project_id, db)
@@ -250,14 +312,16 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
         row_data.pop("depth3", None)
 
         if "tc_id" not in row_data or not row_data.get("tc_id"):
-            if "no" in row_data:
-                try:
-                    no_val = int(row_data["no"])
-                    row_data["tc_id"] = f"TC-{no_val:03d}"
-                except (ValueError, TypeError):
-                    continue
-            else:
+            made, deduped = tc_id_from_file_no(row_data.get("no"), seen_bases)
+            if made is None:
                 continue
+            row_data["tc_id"] = made
+        else:
+            # 파일에 적힌 ID 도 같은 이름공간에서 센다. 나누면 둘이 부딪칠 때
+            # 재임포트가 한 행을 두 번 덮는다.
+            row_data["tc_id"], deduped = dedupe_in_file(str(row_data["tc_id"]), seen_bases)
+        if deduped:
+            renamed_count += 1
 
         # ★파일에 적힌 No 는 차례를 읽는 데만 쓰고 그대로 저장하지 않는다. 띄엄띄엄
         #   하거나 겹친 값이 들어오면 시트 안 번호 규약이 깨진다. 여기서는 읽은
@@ -390,6 +454,8 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
         .all()
     )
     existing_map = {tc.tc_id: tc for tc in existing_tcs}
+    #: 이 파일에서 이미 쓴 TC ID. 파일에 적힌 것과 No 로 만든 것을 같이 담는다.
+    seen_bases: set[str] = set()
     # existing_map 은 시트 단위지만 TC ID 유일성은 프로젝트 단위다.
     # 새로 만드는 행은 프로젝트 전체에서 빈 번호를 찾아 붙인다.
     taken = taken_tc_ids(project_id, db)
@@ -408,15 +474,16 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
         if not row_data or all(not v for v in row_data.values()):
             continue
 
-        # tc_id 없으면 no 기반 생성
+        # tc_id 없으면 no 기반 생성. 같은 No 가 겹치면 파서가 접미사를 붙인다.
         if not row_data.get("tc_id"):
-            if row_data.get("no"):
-                try:
-                    row_data["tc_id"] = f"TC-{int(row_data['no']):03d}"
-                except (ValueError, TypeError):
-                    row_data["tc_id"] = f"CSV-{row_num:04d}"
-            else:
-                row_data["tc_id"] = f"CSV-{row_num:04d}"
+            made, deduped = tc_id_from_file_no(row_data.get("no"), seen_bases)
+            if made is None:
+                made, deduped = dedupe_in_file(f"CSV-{row_num:04d}", seen_bases)
+            row_data["tc_id"] = made
+        else:
+            row_data["tc_id"], deduped = dedupe_in_file(str(row_data["tc_id"]), seen_bases)
+        if deduped:
+            renamed_count += 1
 
         # ★파일에 적힌 No 는 차례를 읽는 데만 쓰고 그대로 저장하지 않는다. 겹치거나
         #   음수이거나 띄엄띄엄하면 시트 안 번호 규약이 깨진다. 엑셀 경로와 같다.
@@ -635,6 +702,8 @@ def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, she
         .all()
     )
     existing_map = {tc.tc_id: tc for tc in existing_tcs}
+    #: 이 파일에서 이미 쓴 TC ID. 파일에 적힌 것과 No 로 만든 것을 같이 담는다.
+    seen_bases: set[str] = set()
     # existing_map 은 시트 단위지만 TC ID 유일성은 프로젝트 단위다.
     # 새로 만드는 행은 프로젝트 전체에서 빈 번호를 찾아 붙인다.
     taken = taken_tc_ids(project_id, db)
@@ -654,15 +723,16 @@ def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, she
         if not row_data or all(not v for v in row_data.values()):
             continue
 
-        # tc_id 없으면 no 기반 생성
+        # tc_id 없으면 no 기반 생성. 같은 No 가 겹치면 파서가 접미사를 붙인다.
         if not row_data.get("tc_id"):
-            if row_data.get("no"):
-                try:
-                    row_data["tc_id"] = f"TC-{int(row_data['no']):03d}"
-                except (ValueError, TypeError):
-                    row_data["tc_id"] = f"MD-{row_num:04d}"
-            else:
-                row_data["tc_id"] = f"MD-{row_num:04d}"
+            made, deduped = tc_id_from_file_no(row_data.get("no"), seen_bases)
+            if made is None:
+                made, deduped = dedupe_in_file(f"MD-{row_num:04d}", seen_bases)
+            row_data["tc_id"] = made
+        else:
+            row_data["tc_id"], deduped = dedupe_in_file(str(row_data["tc_id"]), seen_bases)
+        if deduped:
+            renamed_count += 1
 
         # ★파일에 적힌 No 는 차례를 읽는 데만 쓰고 그대로 저장하지 않는다. 겹치거나
         #   음수이거나 띄엄띄엄하면 시트 안 번호 규약이 깨진다. 엑셀 경로와 같다.
