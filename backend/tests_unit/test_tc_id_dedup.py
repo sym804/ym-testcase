@@ -17,7 +17,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from models import Base, Project, TestCase, TestCaseSheet, User
-from services.import_service import _parse_sheet
+from services.import_service import _parse_csv, _parse_md_table, _parse_md_tables, _parse_sheet
 from services.tc_id_service import TC_ID_MAX_LEN, allocate_tc_id
 
 
@@ -107,6 +107,8 @@ def test_한_파일_안의_중복은_번호를_붙여_넣는다(db):
 def test_TC_ID_가_비고_no_가_전부_같아도_겹치지_않는다(db):
     """대량 행 추가 버그가 만들어 낸 파일 모양. 예전에는 TC-001 이 세 건 생겼다."""
     r = _import(db, "S2", [[1, "", "s", "e"], [1, "", "s", "e"], [1, "", "s", "e"]])
+    # ★renamed 는 2 그대로다. 접미사를 붙이는 주체가 채번에서 파서로 바뀌었을 뿐
+    #   (SYM-51), 사용자에게는 여전히 "번호를 붙여 넣었다" 고 알려야 한다.
     assert (r["created"], r["renamed"]) == (3, 2)
     assert _ids(db, "S2") == ["TC-001", "TC-001-2", "TC-001-3"]
 
@@ -136,3 +138,222 @@ def test_임포트_후_프로젝트_전체_ID_가_유일하다(db):
     _import(db, "S2", [[1, "", "s", "e"], [1, "", "s", "e"], [3, "A-001", "s", "e"]])
     ids = _ids(db)
     assert len(ids) == len(set(ids))
+
+
+# ── 재임포트로 내용을 갱신하는 흐름 (SYM-51) ─────────────────────────────────
+# 이 앱의 임포트 계약은 "동일한 TC ID 는 덮어쓰기" 다(화면 안내 문구).
+# TC ID 칸이 비면 파일의 No 로 ID 를 만들어 그 계약에 태운다. 그래서 파일 안에
+# 같은 No 가 두 번 나오면 두 행이 한 기존 행을 덮으려 들었다.
+
+def _steps(db, sheet_name):
+    q = db.query(TestCase.tc_id, TestCase.test_steps).filter(
+        TestCase.project_id == 1,
+        TestCase.sheet_name == sheet_name,
+        TestCase.deleted_at.is_(None),
+    )
+    return {tid: steps for tid, steps in q.all()}
+
+
+def test_No_가_겹치는_파일을_다시_넣어도_각_행이_제_자리에_갱신된다(db):
+    """SYM-51 본체. 예전에는 두 행이 모두 TC-001 을 찾아 앞 행을 두 번 덮었다.
+    뒤 행의 내용은 영영 반영되지 않는데 결과는 updated 2 로 보고된다.
+
+    ★단위 테스트만 보면 IntegrityError 가 나서 그것이 증상인 줄 알았는데 아니다.
+      라우트는 _parse_sheet 앞에 park_sheet_numbers 로 기존 번호를 음수로 비켜
+      두므로 실제 앱에서는 유니크 제약에 안 걸린다. 조용히 덮어쓰는 쪽이 에러보다
+      나쁘다. 아래 test_라우트_차례로도_제_자리에_갱신된다 가 그 경로를 태운다.
+    """
+    first = _import(db, "S1", [[1, "", "s1", "e"], [1, "", "s2", "e"]])
+    assert (first["created"], first["updated"]) == (2, 0)
+    assert _steps(db, "S1") == {"TC-001": "s1", "TC-001-2": "s2"}
+
+    second = _import(db, "S1", [[1, "", "s1x", "e"], [1, "", "s2x", "e"]])
+
+    assert (second["created"], second["updated"]) == (0, 2), "기존 행을 못 찾았다"
+    assert _steps(db, "S1") == {"TC-001": "s1x", "TC-001-2": "s2x"}
+
+
+def test_만들어지는_ID_는_예전과_같다(db):
+    """★호환성의 핵심. ID 생성 규칙을 바꾸면 이미 임포트해 둔 데이터를 재임포트가
+    못 찾아 새 행을 만들고, 그것도 no 유니크 제약에 걸린다. 파일 No 기반이라는
+    규칙은 그대로 두고, 파일 안 중복만 파서가 접미사로 가른다."""
+    _import(db, "S2", [[1, "", "a", "e"], [1, "", "b", "e"], [1, "", "c", "e"]])
+    assert _ids(db, "S2") == ["TC-001", "TC-001-2", "TC-001-3"]
+
+
+def test_No_가_띄엄띄엄하면_그_번호를_따른다(db):
+    """행을 가운데 끼워 넣어도 No 를 유지하면 같은 TC 를 따라가야 한다.
+    읽은 차례로 만들면 이 성질이 깨진다."""
+    _import(db, "S1", [[10, "", "s1", "e"], [20, "", "s2", "e"]])
+    assert _steps(db, "S1") == {"TC-010": "s1", "TC-020": "s2"}
+
+    _import(db, "S1", [[10, "", "s1x", "e"], [15, "", "새행", "e"], [20, "", "s2x", "e"]])
+
+    assert _steps(db, "S1") == {"TC-010": "s1x", "TC-015": "새행", "TC-020": "s2x"}
+
+
+def test_이미_저장된_행을_재임포트가_찾아낸다(db):
+    """옛 코드가 만든 데이터를 흉내낸다. 이 테스트가 호환성 회귀를 막는다."""
+    for i, (tid, steps) in enumerate([("TC-010", "옛1"), ("TC-020", "옛2")], start=1):
+        db.add(TestCase(project_id=1, no=i, tc_id=tid, test_steps=steps,
+                        expected_result="e", sheet_name="S1", created_by=1))
+    db.commit()
+
+    r = _import(db, "S1", [[10, "", "새1", "e"], [20, "", "새2", "e"]])
+
+    assert (r["created"], r["updated"]) == (0, 2)
+    assert _steps(db, "S1") == {"TC-010": "새1", "TC-020": "새2"}
+
+
+# ── CSV 와 Markdown 파서도 같은 규칙을 따르는가 ──────────────────────────────
+# 세 파서가 같은 코드를 베껴 쓰고 있어 한쪽만 고쳐 온 이력이 있다(SYM-25).
+# 엑셀만 검증하면 나머지 둘은 조용히 갈린다.
+
+def _csv(db, rows, sheet_name="CSV Import"):
+    head = "No,TC ID,Test Steps,Expected Result"
+    body = chr(10).join(",".join(str(c) for c in r) for r in rows)
+    return _parse_csv((head + chr(10) + body).encode("utf-8"), 1, 1, db, sheet_name=sheet_name)
+
+
+def _md(db, rows, sheet_name="MD Import"):
+    lines = ["| No | TC ID | Test Steps | Expected Result |",
+             "|---|---|---|---|"]
+    for r in rows:
+        lines.append("| " + " | ".join(str(c) for c in r) + " |")
+    tables = _parse_md_tables(chr(10).join(lines).encode("utf-8"))
+    assert tables, "표를 못 읽었다"
+    return _parse_md_table(tables[0], 1, 1, db, sheet_name=sheet_name)
+
+
+def test_CSV_도_같은_No_를_접미사로_가른다(db):
+    db.add(TestCaseSheet(project_id=1, name="CSV Import", sort_order=2))
+    db.commit()
+
+    _csv(db, [[1, "", "a", "e"], [1, "", "b", "e"], [1, "", "c", "e"]])
+    db.commit()
+
+    assert _ids(db, "CSV Import") == ["TC-001", "TC-001-2", "TC-001-3"]
+
+
+def test_CSV_재임포트가_각_행을_제_자리에_갱신한다(db):
+    db.add(TestCaseSheet(project_id=1, name="CSV Import", sort_order=2))
+    db.commit()
+    _csv(db, [[1, "", "a", "e"], [1, "", "b", "e"]])
+    db.commit()
+
+    r = _csv(db, [[1, "", "ax", "e"], [1, "", "bx", "e"]])
+    db.commit()
+
+    assert (r["created"], r["updated"]) == (0, 2)
+    assert _steps(db, "CSV Import") == {"TC-001": "ax", "TC-001-2": "bx"}
+
+
+def test_CSV_는_No_가_없으면_폴백을_쓴다(db):
+    """엑셀은 행을 버리지만 CSV 는 행 번호로 폴백한다. 예전 동작 그대로다."""
+    db.add(TestCaseSheet(project_id=1, name="CSV Import", sort_order=2))
+    db.commit()
+
+    _csv(db, [["", "", "a", "e"], ["abc", "", "b", "e"]])
+    db.commit()
+
+    assert _ids(db, "CSV Import") == ["CSV-0001", "CSV-0002"]
+
+
+def test_Markdown_도_같은_No_를_접미사로_가른다(db):
+    db.add(TestCaseSheet(project_id=1, name="MD Import", sort_order=3))
+    db.commit()
+
+    _md(db, [[1, "", "a", "e"], [1, "", "b", "e"]])
+    db.commit()
+
+    assert _ids(db, "MD Import") == ["TC-001", "TC-001-2"]
+
+
+def test_파서마다_카운터가_따로다(db):
+    """seen_bases 를 공유하면 CSV 를 넣은 뒤 MD 의 첫 행이 TC-001-2 가 된다."""
+    for name, order in (("CSV Import", 2), ("MD Import", 3)):
+        db.add(TestCaseSheet(project_id=1, name=name, sort_order=order))
+    db.commit()
+
+    _csv(db, [[1, "", "a", "e"]])
+    db.commit()
+    _md(db, [[1, "", "b", "e"]])
+    db.commit()
+
+    # 시트가 다르므로 TC ID 는 프로젝트 유일성 때문에 채번이 갈라 준다.
+    # 여기서 보는 것은 "MD 의 첫 행이 파서 안에서 1번째로 세어졌는가" 다.
+    assert _steps(db, "CSV Import") == {"TC-001": "a"}
+    assert list(_steps(db, "MD Import").values()) == ["b"]
+    md_id = list(_steps(db, "MD Import"))[0]
+    assert md_id.startswith("TC-001"), f"MD 의 첫 행이 다른 base 로 갔다: {md_id}"
+
+
+def test_No_가_0_이어도_행을_버리지_않는다(db):
+    """0 은 유효한 No 다. `not file_no` 로 판정하면 조용히 버려진다."""
+    _import(db, "S1", [[0, "", "a", "e"], [1, "", "b", "e"]])
+    assert _ids(db, "S1") == ["TC-000", "TC-001"]
+
+
+def test_파일에_적힌_ID_와_만들어_낸_ID_가_한_이름공간이다(db):
+    """TC ID 칸을 일부만 채운 파일. 두 이름공간이 나뉘면 재임포트에서 한 행이
+    다른 행을 덮어 내용이 사라진다. 실측으로 확인했다."""
+    _import(db, "S1", [[1, "TC-001", "a", "e"], [1, "", "b", "e"]])
+    assert _steps(db, "S1") == {"TC-001": "a", "TC-001-2": "b"}
+
+    _import(db, "S1", [[1, "TC-001", "a2", "e"], [1, "", "b2", "e"]])
+
+    assert _steps(db, "S1") == {"TC-001": "a2", "TC-001-2": "b2"}, "한 행이 다른 행을 덮었다"
+
+
+def test_명시_ID_가_파생_ID_와_부딪쳐도_갈린다(db):
+    """3번 행의 명시 ID 가 2번 행이 만들어 낸 ID 와 같다."""
+    rows = [[1, "", "a", "e"], [1, "", "b", "e"], [2, "TC-001-2", "c", "e"]]
+    _import(db, "S1", rows)
+    assert _ids(db, "S1") == ["TC-001", "TC-001-2", "TC-001-2-2"]
+
+    _import(db, "S1", [[1, "", "a2", "e"], [1, "", "b2", "e"], [2, "TC-001-2", "c2", "e"]])
+
+    assert _steps(db, "S1") == {"TC-001": "a2", "TC-001-2": "b2", "TC-001-2-2": "c2"}
+
+
+def test_라우트_차례로도_제_자리에_갱신된다(db):
+    """단위 테스트는 라우트가 하는 일의 절반만 재현한다. park -> parse -> renumber
+    전체를 태워야 실제 증상(조용한 덮어쓰기)을 본다."""
+    from services.tc_numbering import park_sheet_numbers, renumber_sheet
+
+    def route(rows):
+        park_sheet_numbers(1, "S1", db)
+        db.flush()
+        r = _parse_sheet(_sheet("S1", rows), 1, 1, db, no_offset=0, sheet_name="S1")
+        db.flush()
+        renumber_sheet(1, "S1", db)
+        db.commit()
+        return r
+
+    route([[1, "", "a", "e"], [1, "", "b", "e"]])
+    r = route([[1, "", "a2", "e"], [1, "", "b2", "e"]])
+
+    assert (r["created"], r["updated"]) == (0, 2)
+    assert _steps(db, "S1") == {"TC-001": "a2", "TC-001-2": "b2"}
+
+
+def test_dedupe_in_file_직접(db):
+    """allocate_tc_id 와 짝이 되는 함수라 경계값을 직접 본다."""
+    from services.import_service import dedupe_in_file, tc_id_from_file_no
+
+    used: set = set()
+    assert dedupe_in_file("A-1", used) == ("A-1", False)
+    assert dedupe_in_file("A-1", used) == ("A-1-2", True)
+    assert dedupe_in_file("A-1", used) == ("A-1-3", True)
+    # 만들어 낸 값도 점유된다. 같은 값을 명시 ID 로 넣으면 비켜 간다.
+    assert dedupe_in_file("A-1-2", used) == ("A-1-2-2", True)
+
+    used2: set = set()
+    assert tc_id_from_file_no(0, used2) == ("TC-000", False)
+    assert tc_id_from_file_no("007", used2) == ("TC-007", False)
+    assert tc_id_from_file_no(1.9, used2) == ("TC-001", False)
+    assert tc_id_from_file_no("", used2) == (None, False)
+    assert tc_id_from_file_no(None, used2) == (None, False)
+    assert tc_id_from_file_no("abc", used2) == (None, False)
+    # 숫자가 아니면 점유를 건드리지 않는다
+    assert used2 == {"TC-000", "TC-007", "TC-001"}
