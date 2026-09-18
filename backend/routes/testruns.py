@@ -529,7 +529,8 @@ def export_testrun_excel(
             .load_only(
                 TestCase.id, TestCase.no, TestCase.tc_id, TestCase.type,
                 TestCase.category, TestCase.depth1, TestCase.depth2,
-                TestCase.priority, TestCase.test_steps, TestCase.expected_result,
+                TestCase.priority, TestCase.precondition,
+                TestCase.test_steps, TestCase.expected_result,
                 # 시트 순서로 세우려면 필요하다. 빼면 행마다 지연 로딩이 붙는다.
                 TestCase.sheet_name,
             )
@@ -549,9 +550,12 @@ def export_testrun_excel(
     header_fill = PatternFill(start_color="1A2744", end_color="1A2744", fill_type="solid")
     header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
+    # ★TC 에서 가져오는 열은 TC 관리 화면 차례를 따른다. 파일과 화면이 완전히 같지는
+    #   않다. Type 은 파일에만, 첨부는 화면에만 있고 소요(초)는 타이머를 켠 화면에만
+    #   나오는데 파일에는 늘 실린다. 사전조건 자리는 수행 화면과 맞춰 두었다.
     headers = ["No", "TC ID", "Type", "Category", "Depth1", "Depth2", "Priority",
-               "Test Steps", "Expected Result", "Result", "Actual Result",
-               "Issue Link", "Duration(sec)", "Remarks"]
+               "Precondition", "Test Steps", "Expected Result", "Result",
+               "Actual Result", "Issue Link", "Duration(sec)", "Remarks"]
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col, value=h)
         cell.font = header_font
@@ -586,19 +590,25 @@ def export_testrun_excel(
         ws.cell(row=row_idx, column=5, value=safe_cell(tc.depth1 if tc else ""))
         ws.cell(row=row_idx, column=6, value=safe_cell(tc.depth2 if tc else ""))
         ws.cell(row=row_idx, column=7, value=safe_cell(tc.priority if tc else ""))
-        ws.cell(row=row_idx, column=8, value=safe_cell(tc.test_steps if tc else "")).alignment = Alignment(wrap_text=True)
-        ws.cell(row=row_idx, column=9, value=safe_cell(tc.expected_result if tc else "")).alignment = Alignment(wrap_text=True)
-        result_cell = ws.cell(row=row_idx, column=10, value=result_display)
+        ws.cell(row=row_idx, column=8, value=safe_cell(tc.precondition if tc else "")).alignment = Alignment(wrap_text=True)
+        ws.cell(row=row_idx, column=9, value=safe_cell(tc.test_steps if tc else "")).alignment = Alignment(wrap_text=True)
+        ws.cell(row=row_idx, column=10, value=safe_cell(tc.expected_result if tc else "")).alignment = Alignment(wrap_text=True)
+        result_cell = ws.cell(row=row_idx, column=11, value=result_display)
         result_cell.alignment = Alignment(horizontal="center")
         if tr.result.value in result_fills:
             result_cell.fill = result_fills[tr.result.value]
-        ws.cell(row=row_idx, column=11, value=safe_cell(tr.actual_result or "")).alignment = Alignment(wrap_text=True)
-        ws.cell(row=row_idx, column=12, value=safe_cell(tr.issue_link or ""))
-        ws.cell(row=row_idx, column=13, value=tr.duration_sec or "")
-        ws.cell(row=row_idx, column=14, value=safe_cell(tr.remarks or "")).alignment = Alignment(wrap_text=True)
+        ws.cell(row=row_idx, column=12, value=safe_cell(tr.actual_result or "")).alignment = Alignment(wrap_text=True)
+        ws.cell(row=row_idx, column=13, value=safe_cell(tr.issue_link or ""))
+        ws.cell(row=row_idx, column=14, value=tr.duration_sec or "")
+        ws.cell(row=row_idx, column=15, value=safe_cell(tr.remarks or "")).alignment = Alignment(wrap_text=True)
 
     # Auto-width (approximate)
-    col_widths = [6, 12, 8, 14, 14, 14, 10, 40, 30, 10, 30, 20, 10, 20]
+    # ★headers 와 길이가 같아야 한다. 열을 끼우고 이 배열을 안 고치면 폭이 한 칸씩
+    #   밀려 엉뚱한 열이 넓어진다(SYM-108 때 Precondition 을 넣고 놓쳤다).
+    col_widths = [6, 12, 8, 14, 14, 14, 10, 35, 40, 30, 10, 30, 20, 10, 20]
+    assert len(col_widths) == len(headers), (
+        f"열 폭 {len(col_widths)}개 != 헤더 {len(headers)}개"
+    )
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 

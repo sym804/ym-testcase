@@ -414,7 +414,7 @@ def report_excel(
             joinedload(TestResult.test_case).load_only(
                 TestCase.no, TestCase.tc_id, TestCase.type, TestCase.category,
                 TestCase.depth1, TestCase.depth2, TestCase.priority,
-                TestCase.test_steps, TestCase.expected_result,
+                TestCase.precondition, TestCase.test_steps, TestCase.expected_result,
                 # 시트 순서로 세우려면 필요하다. 빼면 행마다 지연 로딩이 붙는다.
                 TestCase.sheet_name,
             )
@@ -482,12 +482,17 @@ def report_excel(
     # ── Results sheet ─────────────────────────────────────────────────────
     ws_results = wb.create_sheet("Results")
 
+    # ★같은 런을 뽑는 수행 엑셀(routes/testruns.py)과 열 집합이 같아야 한다.
+    #   한쪽에만 열을 더하면 두 파일이 조용히 갈라진다.
     res_headers = [
         "No", "TC ID", "Type", "Category", "Depth1", "Depth2",
-        "Priority", "Steps", "Expected Result", "Result",
+        "Priority", "Precondition", "Steps", "Expected Result", "Result",
         "Actual Result", "Issue Link", "Remarks",
     ]
-    res_widths = [6, 10, 10, 15, 18, 18, 10, 35, 35, 10, 35, 20, 20]
+    res_widths = [6, 10, 10, 15, 18, 18, 10, 30, 35, 35, 10, 35, 20, 20]
+    assert len(res_headers) == len(res_widths), (
+        f"헤더 {len(res_headers)}개 != 폭 {len(res_widths)}개. zip 이 조용히 잘라 낸다"
+    )
 
     for i, (h, w) in enumerate(zip(res_headers, res_widths)):
         col = i + 1
@@ -504,9 +509,10 @@ def report_excel(
         row_values = [
             # ★No 는 저장된 no 가 아니라 이 목록의 순번이다(수행 엑셀과 같은 규약).
             row_idx - 1, tc.tc_id, tc.type, tc.category, tc.depth1, tc.depth2,
-            tc.priority, tc.test_steps, tc.expected_result, result_val,
-            r.actual_result, r.issue_link, r.remarks,
+            tc.priority, tc.precondition, tc.test_steps, tc.expected_result,
+            result_val, r.actual_result, r.issue_link, r.remarks,
         ]
+        assert len(row_values) == len(res_headers), "값 개수가 헤더와 다르다"
         for col_idx, val in enumerate(row_values, 1):
             # 사용자가 쓴 값은 그대로 넣지 않는다. =, +, -, @ 로 시작하면 여는 쪽에서
             # 수식으로 실행된다(CWE-1236).
@@ -516,7 +522,8 @@ def report_excel(
             cell.alignment = Alignment(vertical="center", wrap_text=True)
 
             # Color the result column
-            if col_idx == 10:
+            # ★열 번호를 박지 않는다. 앞에 열을 끼우면 조용히 엉뚱한 칸이 칠해진다.
+            if col_idx == res_headers.index("Result") + 1:
                 cell.alignment = center
                 if result_val == "PASS":
                     cell.fill = pass_fill
