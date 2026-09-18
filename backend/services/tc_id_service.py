@@ -37,20 +37,24 @@ def allocate_tc_id(base: str, taken: Iterable[str]) -> str:
 
     # 길이를 먼저 맞춘 뒤에 충돌을 본다. 순서를 바꾸면 잘린 결과가
     # 이미 쓰이는 ID 와 같아도 통과해 버린다.
-    candidate = _fit(base)
+    candidate = fit_tc_id(base)
     if candidate not in taken_set:
         return candidate
 
     n = 2
     while True:
-        candidate = _fit(base, suffix=f"-{n}")
+        candidate = fit_tc_id(base, suffix=f"-{n}")
         if candidate not in taken_set:
             return candidate
         n += 1
 
 
-def _fit(base: str, suffix: str = "") -> str:
-    """길이 상한(50)을 넘으면 접미사를 살리고 앞부분을 줄인다."""
+def fit_tc_id(base: str, suffix: str = "") -> str:
+    """길이 상한(50)을 넘으면 접미사를 살리고 앞부분을 줄인다.
+
+    임포트의 되짚기도 이 규칙을 알아야 한다. 채번이 잘라 저장한 값을 찾으려면
+    같은 방식으로 잘라 봐야 하기 때문이다(import_service.find_parked_by_base).
+    """
     if len(base) + len(suffix) <= TC_ID_MAX_LEN:
         return base + suffix
     return base[: TC_ID_MAX_LEN - len(suffix)] + suffix
