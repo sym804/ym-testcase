@@ -30,7 +30,7 @@
   --color-fail: #CF222E;
   /* 흰 배경에서 4.5:1 을 넘겨야 한다. 앞의 #BF8700 은 3.14 였다. */
   --color-block: #A16207;
-  --color-na: #6366F1;
+  --color-na: #6164ED;   /* 리포트에서 글자색으로 쓴다. #6366F1 은 4.47 로 AA 미달 */
   /* 미수행: 텍스트용(대비 4.76:1)과 악센트용을 나눈다.
      악센트 값은 Dashboard.tsx CARD_COLORS.not_started 와 같은 값이다. */
   --color-ns: #64748B;
@@ -43,7 +43,7 @@
   --text-header-secondary: #CBD5E1;
   --border-header: #374151;
   --bg-danger-light: #FEE2E2;
-  --text-danger: #CF222E;
+  --text-danger: #C41E2A;   /* 연분홍 배경에서 4.82:1. #CF222E 는 4.38 로 AA 미달이었다 */
   --bg-success-light: #DCFCE7;
   --text-success: #1A7F37;
   --bg-warning-light: #FEF3C7;
@@ -70,11 +70,11 @@
   --primary: #3B82F6;
   --primary-hover: #2563EB;
   --primary-light: rgba(59,130,246,0.12);
-  --accent: #4B7BBE;
+  --accent: #4876B6;   /* 흰 글자 대비 4.62:1. #4B7BBE 는 4.31 로 AA 미달이었다 (SYM-55) */
   --accent-hover: #3A6AAD;
   --accent-text: #FFFFFF;
   --color-pass: #22C55E;
-  --color-fail: #EF4444;
+  --color-fail: #F87171;   /* 본문 글자색으로 쓰인다. #EF4444 는 카드 4.42 입력 4.02 로 미달 */
   --color-block: #EAB308;
   --color-na: #818CF8;
   --color-ns: #94A3B8;
@@ -86,7 +86,7 @@
   --text-header-secondary: #9CA3AF;
   --border-header: #3B3F4F;
   --bg-danger-light: rgba(239,68,68,0.15);
-  --text-danger: #EF4444;
+  --text-danger: #F87171;   /* 카드 6.01:1 입력 5.46:1. #EF4444 는 4.42 / 4.02 였다 (SYM-56) */
   --bg-success-light: rgba(34,197,94,0.15);
   --text-success: #22C55E;
   --bg-warning-light: rgba(234,179,8,0.15);
