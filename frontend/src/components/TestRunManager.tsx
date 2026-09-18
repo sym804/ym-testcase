@@ -412,7 +412,12 @@ export default function TestRunManager({ projectId, project }: Props) {
   }, []);
 
   // ── 키보드 숏컷: P/F/B/N = 결과 빠른 입력, Ctrl+D = 선택 행 채우기 ──
-  const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK", n: "N/A" };
+  // Ctrl+D 로 아래 행에 퍼뜨려도 되는 열. 수행자가 손으로 적는 값만 담는다.
+// 저장 본문(saveManyResults)의 화이트리스트에서 duration_sec 를 뺀 것이다.
+// 소요(초)는 타이머가 잰 값이라 사람이 퍼뜨릴 값이 아니다.
+const FILLABLE_FIELDS = new Set(["result", "actual_result", "issue_link", "remarks"]);
+
+const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK", n: "N/A" };
 
   const onCellKeyDown = useCallback((event: CellKeyDownEvent) => {
     const e = event.event as KeyboardEvent;
@@ -457,6 +462,16 @@ export default function TestRunManager({ projectId, project }: Props) {
       e.preventDefault();
       if (!event.column) return;
       const field = event.column.getColId();
+      // ★채워도 되는 열만 통과시킨다. 그냥 두면 node.data[field] 가
+      //   "test_case.precondition" 같은 점 찍힌 평평한 키를 새로 만들어, 화면 값은
+      //   그대로인데 "채웠다" 토스트가 뜨고 저장 요청까지 나갔다(SYM-110).
+      //
+      //   ★"editable 이 false 가 아니면 통과" 로 판정하면 안 된다. 판정이 반대로
+      //     걸린다. editable 을 아예 안 쓴 열(No, TC ID, Category, Depth, 절차,
+      //     기대 결과, 소요)은 undefined 라 통과하고, 정작 Ctrl+D 의 주 용도인
+      //     Result 는 커스텀 렌더러를 쓰느라 editable:false 라서 막힌다.
+      //     소요(초)는 저장 본문 화이트리스트에도 있어 실제로 측정값이 덮어써진다.
+      if (!FILLABLE_FIELDS.has(field)) return;
       const sourceValue = event.value;
       const selectedNodes = api.getSelectedNodes();
       if (selectedNodes.length === 0) return;
@@ -561,8 +576,33 @@ export default function TestRunManager({ projectId, project }: Props) {
     return map;
   }, [results]);
 
+  // 수행 화면이 TC 에서 가져오는 열은 category, depth1, depth2, priority,
+  // test_type, precondition, test_steps, expected_result 여덟이다.
+  //
+  // ★TestCase.remarks 는 일부러 넣지 않는다. 이 그리드에는 이미 "Remarks" 열이
+  //   있는데 그것은 TestResult.remarks(수행 결과 비고)다. 둘을 나란히 두면 같은
+  //   이름의 열이 둘이 되어 수행자가 어느 칸에 적어야 할지 헷갈린다. TC 비고는
+  //   수행에 쓰는 정보도 아니다. 필요하면 TC 관리 화면에서 본다.
+  // ★custom_fields 도 넣지 않는다. 프로젝트마다 열이 달라 동적 생성이 필요한데,
+  //   읽기 전용 열 하나를 더하는 이번 범위를 넘는다.
+  //
+  // 프로젝트의 기본 필드 설정. TC 그리드(TestCaseGrid)와 같은 규칙을 쓴다.
+  // ★TC 에서 가져오는 열에만 건다. 수행 전용 열(Result, Actual Result, 첨부,
+  //   소요, 그리고 TestResult.remarks)은 이 설정의 대상이 아니다. 특히 remarks 는
+  //   이름만 같고 다른 값이라(여기는 TestResult, 설정은 TestCase) 섞으면 결과 비고가
+  //   TC 비고 설정에 휘둘려 사라진다.
+  const fc = project.field_config;
+  const fieldDisplay = useCallback(
+    (key: string, defaultName: string) => ({
+      name: fc?.[key]?.display_name || defaultName,
+      visible: fc?.[key]?.visible !== false,
+    }),
+    [fc],
+  );
+
   const columnDefs = useMemo<ColDef[]>(
-    () => [
+    () => {
+      const cols: (ColDef & { _key?: string })[] = [
       {
         field: "test_case.no",
         headerName: "No",
@@ -570,42 +610,51 @@ export default function TestRunManager({ projectId, project }: Props) {
         valueGetter: (params) => params.data?.test_case?.no ?? "",
       },
       {
-        field: "test_case.tc_id",
-        headerName: "TC ID",
+        _key: "tc_id", field: "test_case.tc_id",
+        headerName: fieldDisplay("tc_id", "TC ID").name,
         width: 100,
         valueGetter: (params) => params.data?.test_case?.tc_id || "",
         cellRenderer: HighlightCell,
       },
       {
-        field: "test_case.category",
-        headerName: "Category",
+        _key: "category", field: "test_case.category",
+        headerName: fieldDisplay("category", "Category").name,
         width: 100,
         valueGetter: (params) => params.data?.test_case?.category || "",
         cellRenderer: HighlightCell,
       },
       {
-        field: "test_case.depth1",
-        headerName: "Depth 1",
+        _key: "depth1", field: "test_case.depth1",
+        headerName: fieldDisplay("depth1", "Depth 1").name,
         width: 120,
         valueGetter: (params) => params.data?.test_case?.depth1 || "",
         cellRenderer: HighlightCell,
       },
       {
-        field: "test_case.depth2",
-        headerName: "Depth 2",
+        _key: "depth2", field: "test_case.depth2",
+        headerName: fieldDisplay("depth2", "Depth 2").name,
         width: 120,
         valueGetter: (params) => params.data?.test_case?.depth2 || "",
         cellRenderer: HighlightCell,
       },
       {
-        field: "test_case.priority",
-        headerName: "Priority",
+        _key: "priority", field: "test_case.priority",
+        headerName: fieldDisplay("priority", "Priority").name,
         width: 80,
         valueGetter: (params) => params.data?.test_case?.priority || "",
       },
       {
-        field: "test_case.precondition",
-        headerName: "Precondition",
+        _key: "test_type", field: "test_case.test_type",
+        headerName: fieldDisplay("test_type", "Platform").name,
+        width: 110,
+        cellClass: "ag-cell-center",
+        // 사전조건과 같다. TC 원문은 TC 관리 화면에서만 고친다.
+        editable: false,
+        valueGetter: (params) => params.data?.test_case?.test_type || "",
+      },
+      {
+        _key: "precondition", field: "test_case.precondition",
+        headerName: fieldDisplay("precondition", "Precondition").name,
         minWidth: 260, flex: 1.5,
         wrapText: true,
         autoHeight: true,
@@ -618,8 +667,8 @@ export default function TestRunManager({ projectId, project }: Props) {
         valueGetter: (params) => params.data?.test_case?.precondition || "",
       },
       {
-        field: "test_case.test_steps",
-        headerName: "Test Steps",
+        _key: "test_steps", field: "test_case.test_steps",
+        headerName: fieldDisplay("test_steps", "Test Steps").name,
         minWidth: 350, flex: 2,
         wrapText: true,
         autoHeight: true,
@@ -628,8 +677,8 @@ export default function TestRunManager({ projectId, project }: Props) {
         valueGetter: (params) => params.data?.test_case?.test_steps || "",
       },
       {
-        field: "test_case.expected_result",
-        headerName: "Expected",
+        _key: "expected_result", field: "test_case.expected_result",
+        headerName: fieldDisplay("expected_result", "Expected").name,
         minWidth: 300, flex: 2,
         wrapText: true,
         autoHeight: true,
@@ -801,11 +850,19 @@ export default function TestRunManager({ projectId, project }: Props) {
         cellClass: "ag-cell-left",
         cellRenderer: MarkdownCell,
       },
-    ],
+      ];
+
+      // _key 가 붙은 것은 TC 에서 가져오는 열이라 프로젝트 설정을 따른다.
+      // 없는 것은 수행 전용 열이라 늘 보인다.
+      return cols
+        .filter((c) => !c._key || fieldDisplay(c._key, "").visible)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        .map(({ _key, ...rest }) => rest);
+    },
     // ★t 를 넣는다. 빼 두면 언어를 바꿔도 헤더가 옛 언어로 남는다. 첨부 맵이
     //   바뀔 때(다른 런을 열 때) 우연히 갱신되는 것에 기대고 있었다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [attachmentsMap, timerEnabled, t]
+    [attachmentsMap, timerEnabled, t, fieldDisplay]
   );
 
   const defaultColDef = useMemo<ColDef>(
