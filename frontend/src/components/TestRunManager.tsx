@@ -133,7 +133,7 @@ export default function TestRunManager({ projectId, project }: Props) {
     filterText, setFilterText,
     filterResult, setFilterResult,
     filterCategory, setFilterCategory,
-    filterPriority, setFilterPriority,
+    filterPriorities, togglePriority,
     categoryOptions, priorityOptions,
     isExternalFilterPresent, doesExternalFilterPass,
     clearFilters,
@@ -544,6 +544,42 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // ── 우선순위 멀티 선택 드롭다운 ──
+  const [priorityMenuOpen, setPriorityMenuOpen] = useState(false);
+  const priorityMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (priorityMenuRef.current && !priorityMenuRef.current.contains(e.target as Node)) {
+        setPriorityMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPriorityMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
+
+  // 런이나 시트를 옮기면 그 아래 그리드가 통째로 바뀐다. 열린 메뉴를 그대로 두면
+  // 옛 화면에 띄운 것이 새 화면 위에 남는다.
+  useEffect(() => {
+    setPriorityMenuOpen(false);
+  }, [selectedRun, activeSheet]);
+
+  // 버튼에 적는 말. 안 고르면 "전체", 하나면 그 값, 둘 이상이면 개수다.
+  // 값을 늘어놓으면 필터바 폭이 값 길이에 따라 들쭉날쭉해진다.
+  const priorityLabel =
+    filterPriorities.length === 0
+      ? t("priorityFilter")
+      : filterPriorities.length === 1
+        ? t("priorityFilterSelected", { value: filterPriorities[0] || t("priorityUnset") })
+        : t("priorityFilterCount", { count: filterPriorities.length });
 
   // ── 결과 카운트 ──
   const resultCounts = useMemo(() => {
@@ -1265,13 +1301,38 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                   <option key={v} value={v}>{v}</option>
                 ))}
               </select>
-              <select style={styles.filterSelect} value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
-                <option value="">{t("priorityFilter")}</option>
-                {priorityOptions.map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </select>
-              {(filterText || filterResult || filterCategory || filterPriority) && (
+              <div style={{ position: "relative" }} ref={priorityMenuRef}>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.filterSelect,
+                    ...(filterPriorities.length > 0 ? styles.filterSelectActive : null),
+                  }}
+                  aria-haspopup="true"
+                  aria-expanded={priorityMenuOpen}
+                  onClick={() => setPriorityMenuOpen((v) => !v)}
+                >
+                  {priorityLabel} ▾
+                </button>
+                {priorityMenuOpen && (
+                  <div style={styles.priorityMenu}>
+                    {priorityOptions.length === 0 && (
+                      <span style={styles.priorityMenuEmpty}>{t("priorityFilterEmpty")}</span>
+                    )}
+                    {priorityOptions.map((v) => (
+                      <label key={v || "__unset__"} style={styles.priorityMenuItem}>
+                        <input
+                          type="checkbox"
+                          checked={filterPriorities.includes(v)}
+                          onChange={() => togglePriority(v)}
+                        />
+                        {v || t("priorityUnset")}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {(filterText || filterResult || filterCategory || filterPriorities.length > 0) && (
                 <button
                   style={styles.filterClearBtn}
                   onClick={clearFilters}
@@ -1740,6 +1801,48 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     fontWeight: 500,
     cursor: "pointer",
+  },
+  // accent 를 글자색으로 쓰면 다크 테마에서 대비가 3.27:1 로 AA(4.5:1) 에 못 미친다.
+  // --accent 는 흰 글자를 얹는 배경색 기준으로 보정된 값이다(index.css 주석, SYM-55).
+  // 그래서 TC 관리 화면의 필터 버튼과 같이 배경을 채우고 흰 글자를 올린다.
+  filterSelectActive: {
+    borderColor: "var(--accent)",
+    backgroundColor: "var(--accent)",
+    color: "var(--accent-text)",
+    fontWeight: 700,
+  },
+  priorityMenu: {
+    position: "absolute" as const,
+    top: "100%",
+    left: 0,
+    marginTop: 4,
+    minWidth: 130,
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border-color)",
+    borderRadius: 8,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+    padding: 6,
+    zIndex: 100,
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 2,
+  },
+  priorityMenuItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "4px 6px",
+    borderRadius: 4,
+    fontSize: 12,
+    color: "var(--text-primary)",
+    cursor: "pointer",
+    whiteSpace: "nowrap" as const,
+  },
+  priorityMenuEmpty: {
+    padding: "4px 6px",
+    fontSize: 12,
+    color: "var(--text-secondary)",
+    whiteSpace: "nowrap" as const,
   },
   bulkMenu: {
     position: "absolute" as const,

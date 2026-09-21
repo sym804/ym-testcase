@@ -400,6 +400,13 @@
     "timer_li1": "Turn on the <strong>timer toggle</strong> at the top of the run results grid to display a timer for each TC row.",
     "timer_li2": "The timer starts automatically when TC execution begins, and elapsed time is recorded when results are entered.",
     "timer_li3": "Recorded time is included in reports and exports.",
+    "h3_filter": "8-8. Result Filters",
+    "filter_li1": "The <strong>search box</strong> above the grid matches TC ID, category, depth, test steps, expected result, actual result, and remarks.",
+    "filter_li2": "<strong>Result</strong> and <strong>Category</strong> accept one value each.",
+    "filter_li3": "<strong>Priority</strong> accepts several values at once. Click the button to open the checkboxes; rows matching any checked value remain. The button shows the chosen value, or the count when more than one is checked.",
+    "filter_li4": "If some test cases have no priority, an (Unset) entry appears at the bottom of the list so you can isolate those rows.",
+    "filter_li5": "Filters apply within the active sheet tab. Switch to the All tab to reach test cases in other sheets. Reset clears the search box and all three filters at once.",
+    "imgAlt_filter": "Priority multi-select filter on the test run screen",
     "tip1": "<strong>TIP:</strong> The timer is optional. Turn off the toggle to enter results without time recording.",
     "create_li4": "TCs from the picked sheets are included with <strong>NS (Not Started)</strong> status. Picking every sheet covers the whole project.",
     "imgAlt_create": "Sheet picker in the New Test Run modal"
