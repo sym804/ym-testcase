@@ -521,7 +521,7 @@ describe("TestRunManager", () => {
       });
     });
 
-    it("Result, Category, Priority 필터 드롭다운이 있다", async () => {
+    it("Result, Category 셀렉트와 Priority 멀티 선택 버튼이 있다", async () => {
       const user = userEvent.setup();
       renderComponent();
 
@@ -532,9 +532,104 @@ describe("TestRunManager", () => {
       await user.click(screen.getByText("Sprint 1 테스트"));
 
       await waitFor(() => {
+        // Priority 는 select 가 아니라 체크박스 드롭다운이므로 combobox 는 Result, Category 둘이다
         const selects = screen.getAllByRole("combobox");
-        // Result, Category, Priority + Round (modal is closed)
-        expect(selects.length).toBeGreaterThanOrEqual(3);
+        expect(selects.length).toBeGreaterThanOrEqual(2);
+      });
+      expect(screen.getByText(/Priority: 전체/)).toBeInTheDocument();
+    });
+  });
+
+  describe("우선순위 멀티 선택", () => {
+    it("버튼을 누르면 우선순위 체크박스 목록이 열린다", async () => {
+      const user = userEvent.setup();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText("Sprint 1 테스트")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Sprint 1 테스트"));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Priority: 전체/)).toBeInTheDocument();
+      });
+      expect(screen.queryByLabelText("High")).not.toBeInTheDocument();
+
+      await user.click(screen.getByText(/Priority: 전체/));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("High")).toBeInTheDocument();
+        expect(screen.getByLabelText("Medium")).toBeInTheDocument();
+      });
+    });
+
+    it("둘을 고르면 버튼에 개수가 표시되고 초기화로 풀린다", async () => {
+      const user = userEvent.setup();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText("Sprint 1 테스트")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Sprint 1 테스트"));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Priority: 전체/)).toBeInTheDocument();
+      });
+      await user.click(screen.getByText(/Priority: 전체/));
+
+      await user.click(await screen.findByLabelText("High"));
+      await waitFor(() => {
+        expect(screen.getByText(/Priority: High/)).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByLabelText("Medium"));
+      await waitFor(() => {
+        expect(screen.getByText(/Priority: 2개/)).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("초기화"));
+      await waitFor(() => {
+        expect(screen.getByText(/Priority: 전체/)).toBeInTheDocument();
+      });
+    });
+
+    it("Esc 를 누르면 드롭다운이 닫힌다", async () => {
+      const user = userEvent.setup();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText("Sprint 1 테스트")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Sprint 1 테스트"));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Priority: 전체/)).toBeInTheDocument();
+      });
+      await user.click(screen.getByText(/Priority: 전체/));
+      expect(await screen.findByLabelText("High")).toBeInTheDocument();
+
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => {
+        expect(screen.queryByLabelText("High")).not.toBeInTheDocument();
+      });
+    });
+
+    it("드롭다운 열림 상태가 aria-expanded 에 반영된다", async () => {
+      const user = userEvent.setup();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText("Sprint 1 테스트")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Sprint 1 테스트"));
+
+      const btn = await screen.findByText(/Priority: 전체/);
+      expect(btn).toHaveAttribute("aria-expanded", "false");
+
+      await user.click(btn);
+      await waitFor(() => {
+        expect(screen.getByText(/Priority: 전체/)).toHaveAttribute("aria-expanded", "true");
       });
     });
   });

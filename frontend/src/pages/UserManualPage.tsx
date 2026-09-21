@@ -581,6 +581,17 @@ export default function UserManualPage() {
               <li>{t("testrun.timer_li2")}</li>
               <li>{t("testrun.timer_li3")}</li>
             </ul>
+
+            <h3 style={s.h3}>{t("testrun.h3_filter")}</h3>
+            <ul style={s.ul}>
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.filter_li1") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.filter_li2") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.filter_li3") }} />
+              <li>{t("testrun.filter_li4")}</li>
+              <li>{t("testrun.filter_li5")}</li>
+            </ul>
+            <img src="/manual-images/43_testrun_priority_filter.png" alt={t("testrun.imgAlt_filter")} style={s.img} />
+
             <div style={s.tipBox} dangerouslySetInnerHTML={{ __html: t("testrun.tip1") }} />
           </section>
 

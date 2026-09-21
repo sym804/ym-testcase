@@ -11,7 +11,8 @@ export function useResultFilters(
   const [filterText, setFilterText] = useState("");
   const [filterResult, setFilterResult] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
-  const [filterPriority, setFilterPriority] = useState("");
+  // 우선순위는 여러 개를 동시에 고른다. 빈 배열이 "전체"다.
+  const [filterPriorities, setFilterPriorities] = useState<string[]>([]);
 
   const categoryOptions = useMemo(() => {
     const set = new Set<string>();
@@ -19,15 +20,35 @@ export function useResultFilters(
     return Array.from(set).sort();
   }, [results]);
 
+  // 빈 문자열은 "우선순위 미지정" 을 뜻하는 정식 선택지다. 값이 없는 행을 골라낼 방법이
+  // 없으면, 하나라도 고른 순간 그 행들이 이유 없이 사라진 것처럼 보인다.
   const priorityOptions = useMemo(() => {
     const set = new Set<string>();
-    results.forEach((r) => { if (r.test_case?.priority) set.add(r.test_case.priority); });
-    return Array.from(set).sort();
-  }, [results]);
+    let hasUnset = false;
+    results.forEach((r) => {
+      if (!r.test_case) return;
+      if (r.test_case.priority) set.add(r.test_case.priority);
+      else hasUnset = true;
+    });
+    // 고른 값이 지금 결과 집합에 없어도 목록에 남긴다. 시트나 런을 옮기면 그 값이 사라지는데,
+    // 목록에서 빠지면 체크를 풀 수단이 없어져 그리드가 빈 채로 잠긴다.
+    filterPriorities.forEach((p) => {
+      if (p) set.add(p);
+      else hasUnset = true;
+    });
+    const sorted = Array.from(set).sort();
+    return hasUnset ? [...sorted, ""] : sorted;
+  }, [results, filterPriorities]);
+
+  const togglePriority = useCallback((value: string) => {
+    setFilterPriorities((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
+  }, []);
 
   const isExternalFilterPresent = useCallback(() => {
-    return filterText !== "" || filterResult !== "" || filterCategory !== "" || filterPriority !== "";
-  }, [filterText, filterResult, filterCategory, filterPriority]);
+    return filterText !== "" || filterResult !== "" || filterCategory !== "" || filterPriorities.length > 0;
+  }, [filterText, filterResult, filterCategory, filterPriorities]);
 
   const doesExternalFilterPass = useCallback((node: { data?: TestResult }) => {
     const row = node.data;
@@ -46,8 +67,10 @@ export function useResultFilters(
     // Category 필터
     if (filterCategory && row.test_case?.category !== filterCategory) return false;
 
-    // Priority 필터
-    if (filterPriority && row.test_case?.priority !== filterPriority) return false;
+    // Priority 필터: 고른 것 중 하나라도 맞으면 통과. 아무것도 안 골랐으면 전체 통과.
+    if (filterPriorities.length > 0 && !filterPriorities.includes(row.test_case?.priority || "")) {
+      return false;
+    }
 
     // 텍스트 검색
     if (filterText) {
@@ -67,25 +90,25 @@ export function useResultFilters(
     }
 
     return true;
-  }, [filterText, filterResult, filterCategory, filterPriority, t]);
+  }, [filterText, filterResult, filterCategory, filterPriorities, t]);
 
   // 필터 변경 시 그리드 재필터링
   useEffect(() => {
     gridApiRef.current?.onFilterChanged();
-  }, [filterText, filterResult, filterCategory, filterPriority, gridApiRef]);
+  }, [filterText, filterResult, filterCategory, filterPriorities, gridApiRef]);
 
   const clearFilters = useCallback(() => {
     setFilterText("");
     setFilterResult("");
     setFilterCategory("");
-    setFilterPriority("");
+    setFilterPriorities([]);
   }, []);
 
   return {
     filterText, setFilterText,
     filterResult, setFilterResult,
     filterCategory, setFilterCategory,
-    filterPriority, setFilterPriority,
+    filterPriorities, setFilterPriorities, togglePriority,
     categoryOptions,
     priorityOptions,
     isExternalFilterPresent,
