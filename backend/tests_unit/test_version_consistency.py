@@ -21,6 +21,7 @@ v1.6.0.1 에서 맞췄다.
 import json
 import os
 import re
+import subprocess
 
 import pytest
 
@@ -114,4 +115,53 @@ def test_프론트_lock_버전이_릴리즈_노트와_같다():
     root_pkg = lock["packages"][""]
     assert root_pkg["version"] == VERSIONS["frontend"], (
         f"package-lock.json packages[''] {root_pkg['version']} != 릴리즈 노트 Frontend {VERSIONS['frontend']}"
+    )
+
+
+# ── 릴리즈 태그 ──────────────────────────────────────────────────────────────
+#
+# rules/release_process.md 는 커밋 뒤에 `git tag vX.X.X` 와 `git push --tags` 를
+# 지시한다. 그런데 2026-09-22 에 세어 보니 릴리즈 노트 절 52개 중 태그가 달린 것은
+# 7개뿐이었다. v1.2.1.0 이후로 45개가 통째로 빠져 있었다.
+# 사본 검사와 같은 이유다. 규칙만 두고 확인이 없으면 어긋난다.
+#
+# 그날 34개는 커밋 메시지의 `(vX.X.X.X` 표기로 되찾아 소급했다. 아래 11개는
+# 커밋을 특정하지 못했다. 초기 버전이라 메시지에 버전을 적는 관행이 없었다.
+# 틀린 태그는 없는 태그보다 나쁘므로 추정으로 달지 않고 예외로 둔다.
+UNTAGGABLE = {
+    "v1.2.2.0",
+    "v0.7.0.0", "v0.6.0.0", "v0.5.0.0", "v0.4.1.0", "v0.4.0.0",
+    "v0.3.0.0", "v0.2.1.1", "v0.2.1.0", "v0.2.0.0", "v0.1.0.0",
+}
+
+
+def _local_tags() -> set:
+    r = subprocess.run(
+        ["git", "tag"], cwd=ROOT, capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
+    )
+    if r.returncode != 0:
+        return set()
+    return set(r.stdout.split())
+
+
+def test_지난_릴리즈에_전부_태그가_달려_있다():
+    """최신 절 하나만 면제한다. 태그는 커밋 뒤에 다는 것이라 아직 없을 수 있다.
+
+    바꿔 말하면 이 테스트는 한 박자 늦게 잡는다. 이번 릴리즈에서 태그를
+    빠뜨리면 다음 릴리즈를 준비할 때 빨간불이 난다. 그때 소급해서 달면 된다.
+    """
+    tags = _local_tags()
+    if not tags:
+        pytest.skip("태그를 읽을 수 없다(얕은 클론이거나 git 이 없다)")
+
+    text = open(RELEASE_NOTE, encoding="utf-8").read()
+    versions = re.findall(r"^## (v[\d.]+) ", text, re.M)
+    assert versions, "릴리즈 노트에서 버전 절을 찾지 못했다"
+
+    past = versions[1:]  # 맨 앞(최신)은 면제
+    missing = [v for v in past if v not in tags and v not in UNTAGGABLE]
+    assert not missing, (
+        "태그가 없는 릴리즈: " + ", ".join(missing)
+        + "  ->  git tag <버전> <릴리즈 커밋> 후 git push origin --tags"
     )
