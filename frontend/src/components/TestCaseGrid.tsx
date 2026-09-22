@@ -1509,7 +1509,14 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             animateRows={true}
             rowDragManaged={true}
             onRowDragEnd={handleRowDragEnd}
-            singleClickEdit={true}
+            // ★클릭 한 번에 편집기를 열지 않는다(더블클릭 · F2 · 바로 타이핑으로 연다).
+            //   TC 를 눈으로 훑는 동안 값이 바뀔 수 있었고, 편집기가 떠 있는 칸은
+            //   텍스트를 끌어서 복사할 수 없었다. 두 값은 한 쌍이다. singleClickEdit 을
+            //   되살리면 아래 텍스트 선택이 사실상 무효가 된다.
+            enableCellTextSelection={true}
+            // AG Grid 가 텍스트 선택과 함께 켜라고 요구한다. 없으면 DOM 순서가
+            // 화면 순서와 달라져 여러 행에 걸친 선택 범위가 엉뚱하게 잡힌다.
+            ensureDomOrder={true}
             stopEditingWhenCellsLoseFocus={true}
             getRowId={(params) =>
               params.data.id ? String(params.data.id) : `new_${params.data.no}`

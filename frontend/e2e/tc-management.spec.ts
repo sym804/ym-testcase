@@ -201,3 +201,82 @@ test.describe("자동 저장 거부 처리", () => {
 
     await request.delete(`/api/projects/${proj.id}`, { headers });
   });
+
+// ============================================================================
+// 셀 선택과 편집 진입
+//
+// 이 파일의 다른 테스트는 모두 dblclick 으로 편집기를 연다. 더블클릭은
+// singleClickEdit 이 켜져 있든 꺼져 있든 편집기를 열기 때문에, 그 테스트들은
+// 단일 클릭이 편집기를 여는지 여부를 전혀 검증하지 못한다.
+// 유닛 테스트도 AgGridReact 를 모킹해 props 만 단언하므로 실제 DOM 동작은 못 본다.
+// 그 구멍을 여기서 메운다.
+// ============================================================================
+test.describe("셀 선택과 편집 진입", () => {
+  test("단일 클릭은 편집기를 열지 않고 더블클릭은 연다", async ({ page }) => {
+    await login(page);
+    const projectName = `E2E_Sel_${Date.now()}`;
+
+    await page.getByText("+ 새 프로젝트").click();
+    await page.getByPlaceholder("프로젝트 이름").fill(projectName);
+    await page.getByRole("button", { name: "생성" }).click();
+
+    const card = page.locator("h3").filter({ hasText: projectName });
+    await expect(card).toBeVisible({ timeout: 10000 });
+    await card.click();
+
+    const addSheetBtn = page.locator("button").filter({ hasText: "시트 추가" }).first();
+    await expect(addSheetBtn).toBeVisible({ timeout: 15000 });
+    await addSheetBtn.click();
+    await page.getByPlaceholder("시트 이름").fill("선택시트");
+    await page.getByRole("button", { name: "추가" }).click();
+    await page.getByText("+ 행 추가").click();
+    await expect(page.locator(".ag-center-cols-container .ag-row")).toHaveCount(1);
+
+    const cell = page.locator(".ag-cell[col-id='category']").first();
+    const editor = page.locator(".ag-cell-inline-editing");
+
+    // 셀에 값을 넣어 둔다. 빈 칸은 끌어서 선택할 글자가 없다.
+    await cell.dblclick();
+    await page.keyboard.type("결제");
+    await page.keyboard.press("Tab");
+    await expect(cell).toHaveText("결제", { timeout: 10000 });
+
+    // ★본론 1: 클릭 한 번으로는 편집기가 열리면 안 된다.
+    //   singleClickEdit 이 되살아나면 여기서 잡힌다.
+    await cell.click();
+    await expect(editor).toHaveCount(0);
+
+    // ★본론 2: 그래도 더블클릭으로는 열려야 한다. 편집 자체를 막은 것이 아니다.
+    await cell.dblclick();
+    await expect(editor).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(editor).toHaveCount(0);
+
+    // ★본론 3: 셀 텍스트를 마우스로 끌어 선택할 수 있어야 한다.
+    //   enableCellTextSelection 이 빠지면 AG Grid 가 user-select:none 을 걸어
+    //   드래그 선택도 복사도 안 된다. 그것이 이 변경 전의 상태였다.
+    await expect
+      .poll(() => cell.evaluate((el) => getComputedStyle(el).userSelect))
+      .toBe("text");
+
+    // 실제로 끌어서 선택했을 때 글자가 잡히는지까지 본다.
+    const selected = await cell.evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      const text = sel?.toString() ?? "";
+      sel?.removeAllRanges();
+      return text;
+    });
+    expect(selected).toContain("결제");
+
+    // 정리
+    await page.getByRole("button", { name: "설정" }).click();
+    await page.getByRole("button", { name: "프로젝트 삭제" }).click();
+    await page.getByPlaceholder(projectName).fill(projectName);
+    await page.getByRole("button", { name: "영구 삭제" }).click();
+    await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
+  });
+});

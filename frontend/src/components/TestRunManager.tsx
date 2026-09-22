@@ -183,7 +183,12 @@ export default function TestRunManager({ projectId, project }: Props) {
     const api = gridApiRef.current;
     if (!api || event.rowIndex == null) return;
 
-    // 일반 클릭은 앵커만 저장하고 AG Grid singleClickEdit에 맡김
+    // 일반 클릭은 Shift+클릭 범위 채우기의 앵커만 저장한다.
+    // ★Result 열은 편집기를 쓰지 않는다. editable:false 에 커스텀 select 렌더러라
+    //   값 변경은 그 select 의 onChange 가 처리한다. 그래서 그리드의 편집 진입
+    //   방식(더블클릭이든 단일 클릭이든)과 이 로직은 무관하다.
+    //   예전 주석은 "singleClickEdit 에 맡긴다" 고 적혀 있었으나 그 옵션은
+    //   Result 열에 적용된 적이 없고, 지금은 그리드에서 아예 제거됐다.
     if (!browserEvent?.shiftKey) {
       fillAnchorRef.current = {
         rowIndex: event.rowIndex,
@@ -1383,7 +1388,14 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                     }
                   }}
                   context={{ searchKeyword: filterText, preconditionIndex }}
-                  singleClickEdit={true}
+                  // ★클릭 한 번에 편집기를 열지 않는다(더블클릭 · F2 · 바로 타이핑으로 연다).
+                  //   절차나 기대 결과를 복사하려는데 편집기가 열려 막혔다. 읽기 전용
+                  //   열이라 편집도 안 되면서 복사도 안 되는 상태였다. 두 값은 한 쌍이라
+                  //   singleClickEdit 을 되살리면 아래 텍스트 선택이 사실상 무효가 된다.
+                  enableCellTextSelection={true}
+                  // AG Grid 가 텍스트 선택과 함께 켜라고 요구한다. 없으면 DOM 순서가
+                  // 화면 순서와 달라져 여러 행에 걸친 선택 범위가 엉뚱하게 잡힌다.
+                  ensureDomOrder={true}
                   stopEditingWhenCellsLoseFocus={true}
                   suppressRowClickSelection={true}
                   getRowId={(params) => String(params.data.id)}
