@@ -459,3 +459,61 @@ describe("읽기 전용 열에서의 Ctrl+D", () => {
     expect(toast.success).toHaveBeenCalled();
   });
 });
+
+describe("셀 선택과 편집 진입", () => {
+  // 클릭 한 번에 편집기가 열리면 TC 를 눈으로 훑는 동안 값이 바뀔 수 있고,
+  // 편집기가 떠 있는 칸은 텍스트를 끌어서 복사할 수 없다. 수행 시트에서
+  // 절차나 기대 결과를 복사하려던 것이 매번 막혔다.
+  // 두 그리드가 같은 규칙을 따라야 화면을 옮길 때 조작이 달라지지 않는다.
+
+  async function openRunGrid() {
+    const user = userEvent.setup();
+    render(<TestRunManager projectId={1} project={adminProject as any} />);
+    await waitFor(() => expect(screen.getByText("결제 회귀")).toBeInTheDocument());
+    await user.click(screen.getByText("결제 회귀"));
+    await waitFor(() => expect(gridProps?.columnDefs).toBeTruthy());
+    return gridProps;
+  }
+
+  async function openTcGrid() {
+    render(<TestCaseGrid projectId={1} project={adminProject as any} />);
+    await waitFor(() => expect(testCasesApi.list).toHaveBeenCalled());
+    await waitFor(() => expect(gridProps?.columnDefs).toBeTruthy());
+    return gridProps;
+  }
+
+  it("수행 그리드는 클릭 한 번으로 편집기를 열지 않는다", async () => {
+    const p = await openRunGrid();
+    expect(p.singleClickEdit, "클릭만 해도 편집기가 열린다").not.toBe(true);
+  });
+
+  it("수행 그리드는 셀 텍스트를 끌어서 선택할 수 있다", async () => {
+    const p = await openRunGrid();
+    expect(p.enableCellTextSelection, "셀 텍스트를 선택할 수 없다").toBe(true);
+    // ensureDomOrder 가 없으면 DOM 순서가 화면 순서와 달라져 여러 행에 걸친
+    // 선택 범위가 엉뚱하게 잡힌다. AG Grid 가 둘을 함께 켜라고 요구한다.
+    expect(p.ensureDomOrder, "DOM 순서를 맞추지 않아 선택 범위가 어긋난다").toBe(true);
+  });
+
+  it("TC 그리드는 클릭 한 번으로 편집기를 열지 않는다", async () => {
+    const p = await openTcGrid();
+    expect(p.singleClickEdit, "클릭만 해도 편집기가 열린다").not.toBe(true);
+  });
+
+  it("TC 그리드는 셀 텍스트를 끌어서 선택할 수 있다", async () => {
+    const p = await openTcGrid();
+    expect(p.enableCellTextSelection, "셀 텍스트를 선택할 수 없다").toBe(true);
+    expect(p.ensureDomOrder, "DOM 순서를 맞추지 않아 선택 범위가 어긋난다").toBe(true);
+  });
+
+  it("수행 그리드에서 편집 가능한 열은 셋뿐이다", async () => {
+    // ★수행 화면에서 TC 원문을 고치면 같은 TC 를 담은 다른 런의 기준까지 흔들린다.
+    //   편집 진입 방식을 바꾸다가 읽기 전용이 풀리지 않았는지 여기서 잡는다.
+    const p = await openRunGrid();
+    const editable = p.columnDefs
+      .filter((c: any) => c.editable === true)
+      .map((c: any) => c.field)
+      .sort();
+    expect(editable).toEqual(["actual_result", "issue_link", "remarks"]);
+  });
+});
