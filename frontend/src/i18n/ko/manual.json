@@ -186,7 +186,7 @@
     "fs_li2": "<strong>폴더 추가:</strong> 사이드바 상단의 <strong>📁+</strong> 버튼으로 루트 폴더를 추가합니다. 폴더 노드의 <strong>📁+</strong> 버튼으로 하위 폴더를 추가할 수 있습니다.",
     "fs_li3": "<strong>시트 추가:</strong> 사이드바 상단의 <strong>📄+</strong> 버튼으로 루트 시트를 추가합니다. 폴더 노드의 <strong>📄+</strong> 버튼으로 폴더 안에 시트를 추가할 수 있습니다.",
     "fs_li4": "<strong>시트 전환:</strong> 사이드바에서 시트(📄)를 클릭하면 해당 시트의 TC만 표시됩니다.",
-    "fs_li5": "<strong>전체 보기:</strong> 시트가 2개 이상일 때 사이드바 상단에 \"전체\" 항목이 나타나며, 모든 시트의 TC를 한 번에 볼 수 있습니다.",
+    "fs_li5": "<strong>전체 보기:</strong> 시트가 2개 이상일 때 사이드바 상단에 \"전체\" 항목이 나타나며, 모든 시트의 TC를 한 번에 볼 수 있습니다. 시트가 여럿인 프로젝트는 TC 관리를 열면 \"전체\" 가 선택된 상태로 열립니다. 행 추가와 드래그 정렬은 시트를 고른 뒤에 쓸 수 있습니다.",
     "fs_li6": "<strong>삭제:</strong> 폴더/시트의 인라인 <strong>×</strong> 버튼으로 삭제합니다. 폴더 삭제 시 하위 항목과 TC가 모두 함께 삭제됩니다.",
     "fs_li7": "<strong>Import 시</strong> 엑셀 파일의 시트 이름이 그대로 사이드바 트리에 시트로 생성됩니다.",
     "fs_li8": "<strong>사이드바 접기/펼치기:</strong> ◀/▶ 토글 버튼으로 사이드바를 접거나 펼칠 수 있습니다.",
@@ -220,7 +220,7 @@
     "field_depth2": "소분류",
     "field_depth2_ex": "타이틀",
     "field_priority": "우선순위",
-    "field_priority_ex": "매우 높음, 높음, 보통, 낮음",
+    "field_priority_ex": "매우 높음(빨강), 높음(주황), 보통(파랑), 낮음(초록). 이 넷이 아닌 값은 색 없이 표시됩니다",
     "field_platform": "플랫폼",
     "field_platform_ex": "WEB, Mobile, iOS, Android, API, 공통",
     "field_precondition": "사전 조건",
@@ -410,7 +410,8 @@
     "tip1": "<strong>TIP:</strong> 타이머는 선택 사항입니다. 토글을 끄면 시간 기록 없이 결과만 입력할 수 있습니다.",
     "create_li4": "고른 시트의 TC가 <strong>NS(미실행)</strong> 상태로 포함됩니다. 전부 고르면 프로젝트 전체를 담습니다.",
     "imgAlt_create": "새 테스트 수행 모달의 포함할 시트 선택",
-    "issueLink_li": "Issue Link 칸에 주소(http/https)를 적으면 옆에 ↗ 가 붙습니다. 이슈 키(예: PROJ-123)는 설정 탭에 이슈 관리 도구 주소를 넣은 경우에 붙습니다. ↗ 를 누르면 해당 이슈가 새 탭으로 열리고, 글자를 더블클릭하면 편집됩니다."
+    "issueLink_li": "Issue Link 칸에 주소(http/https)를 적으면 옆에 ↗ 가 붙습니다. 이슈 키(예: PROJ-123)는 설정 탭에 이슈 관리 도구 주소를 넣은 경우에 붙습니다. ↗ 를 누르면 해당 이슈가 새 탭으로 열리고, 글자를 더블클릭하면 편집됩니다.",
+    "priorityColor_p": "Priority 칸은 TC 관리 화면과 같은 색으로 표시됩니다(매우 높음 빨강, 높음 주황, 보통 파랑, 낮음 초록)."
   },
   "testPlans": {
     "title": "9. 테스트 플랜 / 마일스톤",

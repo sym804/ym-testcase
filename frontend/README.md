@@ -14,7 +14,7 @@ npm run dev          # → http://localhost:5173
 ## 테스트
 
 ```bash
-npm run test         # Vitest 단위 테스트 (357 tests)
+npm run test         # Vitest 단위 테스트 (570+ tests)
 npx playwright test  # E2E 테스트
 ```
 

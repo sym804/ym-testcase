@@ -106,8 +106,10 @@ cd frontend && npm install                # 프론트엔드 의존성 변경 시
 | 테스트 런 | 실행 결과 기록, 진행률 추적, 재실행 |
 | 테스트 플랜 | 릴리즈 단위 수행 관리, 마일스톤별 진행률 |
 | 대시보드 | 프로젝트별 통계 차트 (Chart.js) |
+| 리포트 | 웹 · PDF · 엑셀. 우선순위별 · 분류별 PASS Rate, 직전 수행 대비 퇴보/개선, 실패·차단 항목 |
+| 이슈 관리 도구 연동 | Jira, Linear 주소 설정. 이슈 키를 테스트 수행 시트와 리포트에서 링크 |
 | 고급 필터 | AND/OR 다중 조건, 필터 저장/불러오기 |
-| Import/Export | Excel(xlsx), Jira CSV, PDF 리포트 |
+| Import/Export | Excel(xlsx), Jira CSV, Markdown |
 | 접근 제어 | 시스템 역할 + 프로젝트 역할 이중 구조 |
 | 보안 | httpOnly 쿠키 인증, CSRF 보호, Rate Limiting, bcrypt |
 
@@ -142,7 +144,7 @@ cd frontend && npm install                # 프론트엔드 의존성 변경 시
 |---|---|
 | Frontend | React 19, TypeScript, Vite, ag-grid, Chart.js |
 | Backend | Python 3.11 ~ 3.14, FastAPI, SQLAlchemy, SQLite |
-| Test | Vitest 360+ (프론트 단위), pytest (백엔드 API·보안·통합), Playwright (E2E) |
+| Test | Vitest 570+ (프론트 단위), pytest 470+ (백엔드 API·보안·통합), Playwright 99 (E2E) |
 | Deploy | 셀프호스팅 (로컬 실행) |
 
 ## 테스트
@@ -159,8 +161,8 @@ cd ../frontend && npx playwright install chromium
 # Frontend 단위 테스트
 cd frontend && npm run test
 
-# Backend API 테스트 (서버 실행 상태에서)
-cd backend && python -m pytest -v
+# Backend 테스트. 테스트용 서버를 8009 에 따로 띄운다(8008 개발 DB 를 건드리지 않는다)
+cd backend && TEST_PORT=8009 TEST_BASE_URL=http://127.0.0.1:8009 python -m pytest -q
 
 # E2E 테스트 (서버 실행 상태에서)
 cd frontend && npx playwright test
@@ -173,7 +175,7 @@ ym-testcase/
 ├── backend/          # FastAPI 백엔드
 │   ├── main.py       # 앱 엔트리포인트
 │   ├── models.py     # SQLAlchemy 모델
-│   ├── routes/       # API 라우터 (15 모듈)
+│   ├── routes/       # API 라우터 (17 모듈)
 ├── frontend/         # React 프론트엔드
 │   ├── src/
 │   │   ├── pages/    # 페이지 컴포넌트

@@ -96,12 +96,13 @@ fix/xxx         ← 버그 수정
 
 ### PR 제출 전 체크리스트
 
-- [ ] TypeScript 타입 체크 통과 (`cd frontend && npx tsc --noEmit`)
+- [ ] TypeScript 타입 체크 통과 (`cd frontend && npx tsc -b --force`)
 - [ ] ESLint 통과 (`cd frontend && npx eslint src/ --quiet`)
-- [ ] Vitest 통과 (`cd frontend && npx vitest run`) - 358+ 테스트
-- [ ] Playwright E2E 통과 (`cd frontend && npx playwright test`) - 93+ 테스트
-- [ ] pytest 통과 (`cd backend && pytest -q`) - 169+ 테스트
-- [ ] **전체 567+ 테스트 ALL PASS**
+- [ ] 프로덕션 빌드 통과 (`cd frontend && npm run build`)
+- [ ] Vitest 통과 (`cd frontend && npx vitest run`) - 570+ 테스트
+- [ ] Playwright E2E 통과 (`cd frontend && npx playwright test`) - 99 테스트
+- [ ] pytest 통과 (`cd backend && TEST_PORT=8009 TEST_BASE_URL=http://127.0.0.1:8009 python -m pytest -q`) - 470+ 테스트
+- [ ] **전체 테스트 ALL PASS**
 - [ ] 새 기능이면 테스트 추가
 - [ ] 사용자 매뉴얼 업데이트 (해당 시)
 
@@ -153,10 +154,10 @@ GitHub Issues에서 템플릿을 선택하여 등록합니다.
 
 ```bash
 # 전체 테스트
-cd frontend && npx tsc --noEmit      # TypeScript
-cd frontend && npx vitest run         # Unit (358)
-cd frontend && npx playwright test    # E2E (93)
-cd backend && pytest -q                   # API + 환경설정 (169+)
+cd frontend && npx tsc -b --force    # TypeScript (--noEmit 은 검사 대상이 0개라 쓰지 않는다)
+cd frontend && npx vitest run         # Unit (570+)
+cd frontend && npx playwright test    # E2E (99)
+cd backend && TEST_PORT=8009 TEST_BASE_URL=http://127.0.0.1:8009 python -m pytest -q   # API + 보안 + 단위 (470+)
 ```
 
 ### 테스트 작성 규칙
