@@ -40,5 +40,6 @@
   "prioritySummary": "Priority Summary",
   "unsetPriority": "(unset)",
   "passRate": "PASS Rate",
-  "issueLink": "Issue Link"
+  "issueLink": "Issue Link",
+  "unsetCategory": "(uncategorized)"
 }

@@ -94,11 +94,13 @@ def _category_summary_sql(run_id: int, db: Session) -> list:
         .group_by(TestCase.category)
         .all()
     )
-    # NULL 과 빈 문자열이 둘 다 Uncategorized 가 되므로 한 줄로 합친다. 따로 두면 같은
-    # 이름의 행이 두 번 나온다.
+    # NULL 과 빈 문자열을 한 줄(None)로 합친다. 따로 두면 같은 이름의 행이 두 번 나온다.
+    # ★이름을 여기서 정하지 않는다. 예전에는 "Uncategorized" 로 박아서 요약 표는
+    #   "Uncategorized", 실패·차단 목록은 "-" 로 같은 TC 가 다르게 불렸다.
+    #   JSON 은 null 로 보내 화면이 번역하고, PDF/엑셀은 UNSET_CATEGORY 를 쓴다.
     merged: dict = {}
     for r in rows:
-        name = (r.category or "").strip() or "Uncategorized"
+        name = (r.category or "").strip() or None
         m = merged.setdefault(name, {"category": name, "total": 0, "passed": 0, "failed": 0,
                                      "blocked": 0, "na": 0, "not_started": 0})
         m["total"] += r.total or 0
@@ -127,6 +129,8 @@ _PRIORITY_RANK = {
 # 우선순위를 비운 TC 를 PDF/엑셀에 적을 때의 이름. 파일의 다른 머리글이 영문이라 맞춘다.
 # JSON 에는 null 로 보내고 화면이 번역한다.
 UNSET_PRIORITY = "(none)"
+# 분류를 비운 TC. 우선순위와 같은 규칙이다.
+UNSET_CATEGORY = "(none)"
 
 
 def priority_sort_key(priority) -> tuple:
@@ -174,8 +178,9 @@ def _issue_items(run: TestRun, db: Session) -> list:
         {
             "tc_id": r.test_case.tc_id,
             "result": r.result.value if hasattr(r.result, "value") else r.result,
-            "priority": r.test_case.priority,
-            "category": r.test_case.category,
+            # 빈 문자열과 공백만 있는 값은 None 이다. 요약 표(_category_summary_sql)와 같은 규칙.
+            "priority": (r.test_case.priority or "").strip() or None,
+            "category": (r.test_case.category or "").strip() or None,
             "depth1": r.test_case.depth1,
             "depth2": r.test_case.depth2,
             "test_steps": r.test_case.test_steps,
@@ -582,7 +587,7 @@ def report_pdf(
         heading("Category Breakdown")
         table(
             ["Category", "Total", "Pass", "Fail", "Block", "NA", "NS", "PASS Rate"],
-            [[c["category"], c["total"], c["passed"], c["failed"], c["blocked"],
+            [[c["category"] or UNSET_CATEGORY, c["total"], c["passed"], c["failed"], c["blocked"],
               c.get("na", 0), c.get("not_started", 0), rate(c["pass_rate"])] for c in data["categories"]],
             first_col_ratio=0.22,
         )
@@ -808,7 +813,7 @@ def report_excel(
         row = write_table(
             row, "Category Breakdown",
             ["Category", "Total", "Pass", "Fail", "Block", "NA", "NS", "PASS Rate"],
-            [[c["category"], c["total"], c["passed"], c["failed"], c["blocked"],
+            [[c["category"] or UNSET_CATEGORY, c["total"], c["passed"], c["failed"], c["blocked"],
               c.get("na", 0), c.get("not_started", 0), c["pass_rate"]] for c in data["categories"]],
             rate_col=7,
         )

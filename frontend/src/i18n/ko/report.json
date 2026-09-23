@@ -40,5 +40,6 @@
   "prioritySummary": "우선순위별 요약",
   "unsetPriority": "(미지정)",
   "passRate": "PASS Rate",
-  "issueLink": "이슈 링크"
+  "issueLink": "이슈 링크",
+  "unsetCategory": "(미분류)"
 }

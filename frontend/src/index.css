@@ -54,9 +54,21 @@
   --text-badge-gray: #374151;
   --radius: 8px;
   --radius-lg: 12px;
+  /* 우선순위 글자색. 그리드 글자는 12px 굵은 글씨라 큰 글씨 기준(3:1)이 아니라 4.5:1 을
+     넘겨야 한다. 카드 배경, 행 hover, 선택 행, 선택+hover 모두에서 확인한다(cssTokens.test.ts).
+     라이트 "높음" 은 선택+hover 에서 4.53 으로 여유가 가장 적다. 그리드의 hover/선택
+     불투명도를 올리면 이 색부터 깨진다. 더 어둡게 하면 "매우 높음" 빨강과 구분이 안 된다. */
+  --priority-critical: #B91C1C;
+  --priority-high: #B54200;
+  --priority-normal: #1D4ED8;
+  --priority-low: #166534;
 }
 
 [data-theme="dark"] {
+  --priority-critical: #F87C7C;
+  --priority-high: #FB923C;
+  --priority-normal: #60A5FA;
+  --priority-low: #4ADE80;
   --bg-page: #111318;
   --bg-card: #1C1E26;
   --bg-input: #23262F;

@@ -262,13 +262,37 @@ def test_직전_런의_미수행은_변경으로_세지_않는다(db):
     assert [i["tc_id"] for i in comp["regressions"]] == ["B"]
 
 
+def test_실패_항목의_빈_분류와_우선순위는_null_이다(db):
+    """요약 표와 같은 규칙이다. 공백만 있는 값을 목록만 빈 칸으로 보이면 이름이 갈린다."""
+    made = _make(db, [("A", "  ", "", R.FAIL, None, None, "t1")])
+    tc = _json(db, made)["top_failures"][0]["test_case"]
+    assert tc["category"] is None
+    assert tc["priority"] is None
+
+
 def test_분류가_NULL_과_빈_문자열이면_한_줄로_합친다(db):
     made = _make(db, [
         ("A", "High", None, R.PASS, None, None, "t1"),
         ("B", "High", "", R.FAIL, None, None, "t1"),
     ])
     rows = _json(db, made)["category_summary"]
-    assert [(r["category"], r["total"]) for r in rows] == [("Uncategorized", 2)]
+    # 이름은 화면과 파일이 정한다. JSON 은 null 이다(우선순위 미지정과 같은 규칙)
+    assert [(r["category"], r["total"]) for r in rows] == [(None, 2)]
+
+    # 파일에서는 우선순위 미지정과 같은 "(none)" 이다. "Uncategorized" 가 남으면 안 된다
+    project, run, user = made
+    ws = load_workbook(io.BytesIO(_body(
+        report_excel(project_id=project.id, run_id=run.id, db=db, current_user=user)
+    )))["Summary"]
+    values = [c.value for row in ws.iter_rows() for c in row]
+    assert "(none)" in values
+    assert "Uncategorized" not in values
+    # PDF 도 같은 이름이다. 폰트는 레포에 들어 있어 항상 검사한다
+    from pypdf import PdfReader
+    text = "".join(pg.extract_text() for pg in PdfReader(io.BytesIO(_body(
+        report_pdf(project_id=project.id, run_id=run.id, db=db, current_user=user)
+    ))).pages)
+    assert "(none)" in text and "Uncategorized" not in text
 
 
 # ── 파일 ────────────────────────────────────────────────────────────────────
