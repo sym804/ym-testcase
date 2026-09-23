@@ -26,15 +26,16 @@
 배포 전 확인 사항:
 
 ### Frontend
-- [ ] TypeScript 컴파일 통과 (`npx tsc --noEmit`)
+- [ ] TypeScript 컴파일 통과 (`npx tsc -b --force`). `--noEmit` 은 루트 tsconfig 의 검사 대상이 0개라 항상 통과한다(SYM-103)
 - [ ] Vite 프로덕션 빌드 통과 (`npm run build`)
-- [ ] Vitest 단위 테스트 전체 통과 (`npx vitest run`) - 현재 358개
-- [ ] Playwright E2E 테스트 전체 통과 (`npx playwright test`) - 현재 93개
+- [ ] ESLint 통과 (`npx eslint src/ --quiet`)
+- [ ] Vitest 단위 테스트 전체 통과 (`npx vitest run`) - 2026-09-23 기준 574개
+- [ ] Playwright E2E 테스트 전체 통과 (`npx playwright test`) - 2026-09-23 기준 99개. 로컬에서는 빈 DB 와 admin/test1234 시드로 돌린다
 - [ ] 주요 화면 스모크 테스트 (로그인 → 프로젝트 목록 → TC 탭 → 테스트 수행)
 
 ### Backend
 - [ ] 서버 정상 시작 확인 (`uvicorn main:app --port 8008`)
-- [ ] pytest 전체 통과 (`pytest test_security.py`) - 현재 116개
+- [ ] pytest 전체 통과 (`cd backend && TEST_PORT=8009 TEST_BASE_URL=http://127.0.0.1:8009 python -m pytest -q`) - 2026-09-23 기준 475개
 - [ ] 핵심 API 스모크 테스트 (로그인, TC 조회, 런 생성, 결과 저장)
 
 ### Database
