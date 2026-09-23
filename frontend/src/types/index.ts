@@ -227,12 +227,50 @@ export interface ReportRun {
   completed_at: string | null;
 }
 
-/** 리포트의 실패 항목. TestResult 전체가 아니라 화면에 쓰는 조각만 온다. */
+/** 리포트의 FAIL/BLOCK 항목. TestResult 전체가 아니라 화면에 쓰는 조각만 온다.
+ *  이름은 호환 때문에 Failure 지만 BLOCK 도 온다. `result` 가 실제 값이다. */
 export interface ReportFailure {
-  test_case: { tc_id: string };
+  test_case: { tc_id: string; priority?: string | null; category?: string | null };
   result: string;
   actual_result: string | null;
   issue_link: string | null;
+  executed_by?: string | null;
+}
+
+/** 분류별/우선순위별 집계 한 줄. `pass_rate` 는 수행분이 없으면 null 이다. */
+export interface ReportBreakdownRow {
+  total: number;
+  pass: number;
+  fail: number;
+  block: number;
+  na: number;
+  not_started: number;
+  pass_rate: number | null;
+}
+
+export interface ReportCategoryRow extends ReportBreakdownRow {
+  category: string;
+}
+
+/** `priority` 가 null 이면 우선순위를 비워 둔 TC 들이다. */
+export interface ReportPriorityRow extends ReportBreakdownRow {
+  priority: string | null;
+}
+
+export interface ReportChangeItem {
+  tc_id: string;
+  priority: string | null;
+  before: string;
+  after: string;
+}
+
+/** 직전 수행 대비. 판정 기준은 수행 비교 화면과 같다(회귀 PASS->FAIL, 해결 FAIL->PASS). */
+export interface ReportComparison {
+  previous_run: { id: number; name: string; round: number };
+  common: number;
+  changed: number;
+  regressions: ReportChangeItem[];
+  fixed: ReportChangeItem[];
 }
 
 /** 리포트 요약. `pass_rate` 의 분모는 `executed`(pass+fail+block)이고 나머지는 `total` 이다. */
@@ -257,7 +295,11 @@ export interface ReportData {
   summary: ReportSummary;
   top_failures: ReportFailure[];
   jira_issues: string[];
-  category_summary: CategoryBreakdown[];
+  category_summary: ReportCategoryRow[];
+  priority_summary: ReportPriorityRow[];
+  comparison: ReportComparison | null;
+  executors: { name: string; count: number }[];
+  total_duration_sec: number | null;
 }
 
 // Custom Field Definition

@@ -69,7 +69,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YM TestCase API",
     description="Your Method, Your Test Case Manager",
-    version="1.6.4.0",
+    version="1.6.5.0",
     lifespan=lifespan,
 )
 
@@ -81,6 +81,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
+    # 교차 출처로 배포하면 브라우저가 이 헤더를 스크립트에 감춘다. 리포트 다운로드가
+    # 서버가 정한 파일 이름을 읽으려면 열어 둬야 한다.
+    expose_headers=["Content-Disposition"],
 )
 
 # ── Security headers middleware ──────────────────────────────────────────────

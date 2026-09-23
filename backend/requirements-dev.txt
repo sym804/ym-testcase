@@ -3,3 +3,5 @@
 # Test-only dependencies (not needed to run the server)
 pytest==9.1.1
 requests==2.34.2
+# PDF 리포트 테스트가 글자 좌표를 읽는다. 순수 파이썬이라 --only-binary 설치와 3.14 에서도 깨지지 않는다
+pypdf==6.18.1

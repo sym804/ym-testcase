@@ -401,22 +401,45 @@ export const reportsApi = {
     return res.data;
   },
 
-  downloadPdf: async (projectId: number, runId: number) => {
+  // 파일 이름은 서버가 정한다(`{프로젝트}_Report_R{회차}`). 예전에는 화면이
+  // `report_{id}` 로 덮어써서 받은 파일로는 어느 수행인지 알 수 없었다.
+  downloadPdf: async (projectId: number, runId: number): Promise<ReportFile> => {
     const res = await client.get(
       `/api/projects/${projectId}/reports/pdf`,
       { params: { run_id: runId }, responseType: "blob" }
     );
-    return res.data;
+    return { blob: res.data, filename: filenameFromDisposition(res.headers?.["content-disposition"]) };
   },
 
-  downloadExcel: async (projectId: number, runId: number) => {
+  downloadExcel: async (projectId: number, runId: number): Promise<ReportFile> => {
     const res = await client.get(
       `/api/projects/${projectId}/reports/excel`,
       { params: { run_id: runId }, responseType: "blob" }
     );
-    return res.data;
+    return { blob: res.data, filename: filenameFromDisposition(res.headers?.["content-disposition"]) };
   },
 };
+
+export interface ReportFile {
+  blob: Blob;
+  /** 헤더가 없거나 읽지 못하면 null. 부르는 쪽이 대신할 이름을 정한다. */
+  filename: string | null;
+}
+
+/** `attachment; filename*=UTF-8''...` 또는 `filename="..."` 에서 이름을 꺼낸다. */
+export function filenameFromDisposition(header: unknown): string | null {
+  if (typeof header !== "string") return null;
+  const star = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      return null;
+    }
+  }
+  const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(header);
+  return plain ? plain[1].trim() : null;
+}
 
 // ─── Attachments ──────────────────────────────────────
 export const attachmentsApi = {

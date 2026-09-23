@@ -691,6 +691,9 @@ export default function UserManualPage() {
               <li>{t("report.li2")}</li>
               <li>{t("report.li3")}</li>
               <li>{t("report.li3b")}</li>
+              <li>{t("report.li3c")}</li>
+              <li>{t("report.li3d")}</li>
+              <li dangerouslySetInnerHTML={{ __html: t("report.li3e") }} />
               <li dangerouslySetInnerHTML={{ __html: t("report.li4") }} />
               <li dangerouslySetInnerHTML={{ __html: t("report.li5") }} />
             </ol>
