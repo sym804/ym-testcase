@@ -18,6 +18,7 @@ import {
   testRunsApi,
   dashboardApi,
   reportsApi,
+  filenameFromDisposition,
   overviewApi,
   attachmentsApi,
   searchApi,
@@ -478,13 +479,17 @@ describe("reportsApi", () => {
 
   it("downloadPdf sends GET with blob responseType", async () => {
     const blob = new Blob(["pdf"]);
-    mockGet.mockResolvedValueOnce({ data: blob });
+    mockGet.mockResolvedValueOnce({
+      data: blob,
+      headers: { "content-disposition": "attachment; filename*=UTF-8''%ED%85%8C%EC%8A%A4%ED%8A%B8_Report_R2.pdf" },
+    });
     const result = await reportsApi.downloadPdf(1, 5);
     expect(mockGet).toHaveBeenCalledWith("/api/projects/1/reports/pdf", {
       params: { run_id: 5 },
       responseType: "blob",
     });
-    expect(result).toBe(blob);
+    expect(result.blob).toBe(blob);
+    expect(result.filename).toBe("테스트_Report_R2.pdf");
   });
 
   it("downloadExcel sends GET with blob responseType", async () => {
@@ -495,7 +500,16 @@ describe("reportsApi", () => {
       params: { run_id: 5 },
       responseType: "blob",
     });
-    expect(result).toBe(blob);
+    expect(result.blob).toBe(blob);
+    // 헤더가 없으면(교차 출처에서 감춰진 경우 포함) null 이고 화면이 대신할 이름을 쓴다
+    expect(result.filename).toBeNull();
+  });
+
+  it("filenameFromDisposition 은 두 모양을 읽고 깨진 인코딩은 null", () => {
+    expect(filenameFromDisposition('attachment; filename="a b.xlsx"')).toBe("a b.xlsx");
+    expect(filenameFromDisposition("attachment; filename*=UTF-8''%E2%9C%93.pdf")).toBe("✓.pdf");
+    expect(filenameFromDisposition("attachment; filename*=UTF-8''%E0%A4%A.pdf")).toBeNull();
+    expect(filenameFromDisposition(undefined)).toBeNull();
   });
 });
 

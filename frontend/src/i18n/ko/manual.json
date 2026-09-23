@@ -399,7 +399,7 @@
     "h3_timer": "8-7. 타이머 기능",
     "timer_li1": "런 결과 그리드 상단의 <strong>타이머 토글</strong>을 켜면 각 TC 행에 타이머가 표시됩니다.",
     "timer_li2": "TC 수행 시작 시 타이머가 자동으로 시작되고, 결과 입력 시 경과 시간이 기록됩니다.",
-    "timer_li3": "기록된 시간은 리포트 및 내보내기에 포함됩니다.",
+    "timer_li3": "기록된 시간은 테스트 수행 엑셀 내보내기의 Duration 열에 들어가고, 리포트 화면에는 기록된 시간의 합계가 표시됩니다.",
     "h3_filter": "8-8. 결과 필터",
     "filter_li1": "그리드 위 <strong>검색창</strong>에 넣은 말은 TC ID, 분류, Depth, 테스트 절차, 기대 결과, 실제 결과, 비고에서 찾습니다.",
     "filter_li2": "<strong>Result</strong>와 <strong>Category</strong>는 하나만 고릅니다.",
@@ -475,10 +475,13 @@
     "p1": "테스트 런 결과를 요약 리포트로 확인하고, PDF/Excel로 다운로드할 수 있습니다.",
     "li1": "리포트 탭에서 테스트 런을 선택합니다.",
     "li2": "요약 섹션: 전체 TC와 PASS/FAIL/BLOCK/N/A/미수행 건수, PASS Rate를 확인합니다. PASS Rate 의 분모는 실행 건수(PASS+FAIL+BLOCK)이며 미수행은 빠집니다.",
-    "li3": "실패 목록: FAIL 결과의 TC 상세를 확인합니다.",
-    "li3b": "카테고리별 요약: 카테고리마다 Total/PASS/FAIL/BLOCK/N/A/미수행 건수를 확인합니다.",
-    "li4": "PDF 다운로드: <strong>PDF</strong> 버튼 클릭으로 서식화된 PDF 리포트를 다운로드합니다.",
-    "li5": "Excel 다운로드: <strong>Excel</strong> 버튼 클릭으로 엑셀 리포트를 다운로드합니다."
+    "li3": "실패·차단 항목: FAIL 과 BLOCK 결과의 TC 를 우선순위 높은 것부터 보여 줍니다. 결과, 실제 결과, 수행자, 이슈 링크가 함께 나옵니다.",
+    "li3b": "카테고리별 요약: 카테고리마다 Total/PASS/FAIL/BLOCK/N/A/미수행 건수와 PASS Rate을 확인합니다. 수행한 TC 가 없는 카테고리의 PASS Rate은 - 로 표시됩니다.",
+    "li4": "PDF 다운로드: <strong>PDF</strong> 버튼 클릭으로 서식화된 PDF 리포트를 다운로드합니다. 파일 이름은 <code>프로젝트명_Report_R라운드.pdf</code> 입니다. 긴 본문은 잘리며 전문은 엑셀에 있습니다.",
+    "li5": "Excel 다운로드: <strong>Excel</strong> 버튼 클릭으로 엑셀 리포트를 다운로드합니다. Summary 시트에 요약, 직전 수행 대비, 우선순위별, 카테고리별 표가 있고 Results 시트에 전체 결과가 있습니다.",
+    "li3c": "우선순위별 요약: 우선순위마다 같은 건수와 PASS Rate을 확인합니다. 우선순위를 비워 둔 TC 는 (미지정) 한 줄로 모입니다.",
+    "li3d": "직전 수행 대비: 같은 프로젝트에서 바로 앞에 만든 테스트 런과 비교합니다. 퇴보(PASS -> FAIL)와 개선(FAIL -> PASS) 판정은 수행 비교 화면과 같습니다. 다만 결과가 바뀐 TC 수는 두 런에서 모두 수행한(미수행이 아닌) TC 만 세므로, 비교 화면의 변경 건수와 다를 수 있습니다.",
+    "li3e": "이슈 링크: 주소(http/https)는 그대로 열리고, <code>PROJ-123</code> 같은 이슈 키는 프로젝트 설정의 Jira Base URL 로 연결됩니다. Base URL 이 없으면 링크 없이 글자로만 표시됩니다."
   },
   "settings": {
     "title": "13. 설정",

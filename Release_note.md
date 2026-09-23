@@ -12,11 +12,45 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v1.6.7.1  (2026-09-23)
-├── Frontend       v1.6.4.0
-├── Backend        v1.6.4.0
+YM TestCase System  v1.6.8.0  (2026-09-23)
+├── Frontend       v1.6.5.0
+├── Backend        v1.6.5.0
 └── Database       v0.9.2.0
 ```
+
+---
+
+## v1.6.8.0 (2026-09-23) - [fix] 리포트 BLOCK 상세, PDF 표 폭, 우선순위별 요약
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.6.7.1 | **1.6.8.0** | fix +1 |
+| Frontend | 1.6.4.0 | **1.6.5.0** | fix +1 |
+| Backend | 1.6.4.0 | **1.6.5.0** | fix +1 |
+
+### 이슈
+
+- SYM-118 리포트에 BLOCK 결과의 상세가 빠진다 (bug/major/backend)
+- SYM-119 PDF 리포트 요약 표의 합격률 칸이 페이지 밖으로 잘린다 (bug/major/backend)
+- SYM-120 한글 폰트가 없는 서버에서 PDF 리포트가 500 오류를 낸다 (bug/major/backend)
+- SYM-121 리포트 다운로드 파일 이름과 날짜, 이슈 링크 표기가 틀리다 (bug/minor/frontend)
+- SYM-122 리포트에 우선순위별 요약과 직전 수행 대비를 싣는다 (enhancement/minor/backend)
+
+### 변경
+
+- 상세 목록에 FAIL 과 BLOCK 을 함께, 우선순위 높은 순으로 싣는다. 연관 이슈 목록도 두 결과에서 모은다
+- PDF 표 폭을 본문 폭(`epw`)에서 계산. 페이지를 넘는 표는 머리행 반복. 굵은체, `Version: N/A`, 날짜, 말줄임 표기 수정
+- PDF 폰트로 Pretendard(OFL-1.1) Regular/Bold 를 `backend/fonts/` 에 포함
+- 우선순위별 요약, 분류별 PASS Rate, 직전 수행 대비 퇴보/개선, 수행자를 웹/PDF/엑셀에 추가
+- 파일 이름은 서버 `Content-Disposition` 을 따른다. 엑셀 PASS Rate 는 숫자 셀. 이슈 키는 Jira Base URL 로 링크
+
+### 영향
+
+- 리포트 API 에 `priority_summary`, `comparison`, `executors`, `total_duration_sec` 추가. `top_failures` 에 BLOCK 이 섞인다
+- 직전 수행 대비의 변경 건수는 두 런 모두 수행한 TC 만 센다. 수행 비교 화면 건수와 다를 수 있다
+- 미해결: SYM-123 수행 그리드의 이슈 키 링크
 
 ---
 
