@@ -19,6 +19,7 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
   const [isPrivate, setIsPrivate] = useState(project.is_private);
   const [projectName, setProjectName] = useState(project.name);
   const [projectDesc, setProjectDesc] = useState(project.description || "");
+  const [trackerUrl, setTrackerUrl] = useState(project.jira_base_url || "");
   const [saving, setSaving] = useState(false);
   const [nameSaving, setNameSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -70,6 +71,9 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
       const updated = await projectsApi.update(project.id, {
         name: projectName.trim(),
         description: projectDesc.trim(),
+        // 필드 이름은 호환 때문에 jira_base_url 이지만 Jira 전용이 아니다(Linear 등).
+        // 예전에는 프로젝트를 만들 때만 넣을 수 있어 나중에 바꿀 길이 없었다.
+        jira_base_url: trackerUrl.trim(),
       });
       onUpdate(updated);
       toast.success(t("saved") || "저장되었습니다");
@@ -103,6 +107,17 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
               onChange={(e) => setProjectDesc(e.target.value)}
               placeholder={t("projectDescPlaceholder") || "프로젝트 설명 (선택)"}
             />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={s.label}>{t("trackerUrl")}</div>
+            <input
+              data-testid="tracker-url"
+              style={{ ...s.input, width: "100%", marginTop: 4 }}
+              value={trackerUrl}
+              onChange={(e) => setTrackerUrl(e.target.value)}
+              placeholder={t("trackerUrlPlaceholder")}
+            />
+            <div style={{ ...s.desc, marginTop: 4 }}>{t("trackerUrlHelp")}</div>
           </div>
           <button
             style={{

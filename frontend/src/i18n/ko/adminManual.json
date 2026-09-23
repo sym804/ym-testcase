@@ -164,10 +164,10 @@
     "deleteLi3": "모든 테스트 런 및 결과",
     "deleteLi4": "모든 첨부파일 (DB 레코드 + 물리 파일)",
     "deleteLi5": "프로젝트 멤버 연결",
-    "jiraTitle": "7-2. Jira 연동",
-    "jiraLi1": "프로젝트 설정에서 <strong>Jira Base URL</strong>을 설정합니다.",
-    "jiraLi2": "예: <code>https://your-domain.atlassian.net/browse/</code>",
-    "jiraLi3": "TC 또는 테스트 결과의 Issue Link 필드에 이슈 키(예: PROJ-123)를 입력하면 자동으로 링크가 생성됩니다."
+    "jiraTitle": "7-2. 이슈 관리 도구 연동",
+    "jiraLi1": "프로젝트 설정에서 <strong>이슈 관리 도구 주소</strong>를 설정합니다. Jira 와 Linear 를 지원합니다.",
+    "jiraLi2": "예: <code>https://your-domain.atlassian.net</code>(Jira), <code>https://linear.app/워크스페이스</code>(Linear). 다른 도구는 <code>https://tracker.example.com/items/{key}</code> 처럼 <code>{key}</code> 자리를 넣습니다.",
+    "jiraLi3": "리포트의 이슈 링크에 이슈 키(예: PROJ-123)가 있으면 해당 이슈로 연결됩니다."
   },
   "fileMgmt": {
     "title": "8. 파일/첨부 관리",

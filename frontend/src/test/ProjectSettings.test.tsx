@@ -394,6 +394,7 @@ describe("ProjectSettings - Custom Fields CRUD", () => {
       expect(projectsApi.update).toHaveBeenCalledWith(1, {
         name: "TestProject",
         description: "",
+        jira_base_url: "",
       });
     });
   });
@@ -411,6 +412,27 @@ describe("ProjectSettings - Custom Fields CRUD", () => {
       expect(projectsApi.update).toHaveBeenCalledWith(1, {
         name: "TestProject",
         description: "결제 회귀용",
+        jira_base_url: "",
+      });
+    });
+  });
+
+  it("이슈 관리 도구 주소를 설정 탭에서 바꿔 저장한다", async () => {
+    // 예전에는 프로젝트를 만들 때만 넣을 수 있어, 만든 뒤에는 바꿀 길이 없었다.
+    const user = userEvent.setup();
+    renderSettings({ ...adminProject, jira_base_url: "https://x.atlassian.net" } as any);
+
+    const input = screen.getByTestId("tracker-url");
+    expect(input).toHaveValue("https://x.atlassian.net");
+    await user.clear(input);
+    await user.type(input, "https://linear.app/sym");
+    await user.click(screen.getAllByText("저장")[0]);
+
+    await waitFor(() => {
+      expect(projectsApi.update).toHaveBeenCalledWith(1, {
+        name: "TestProject",
+        description: "테스트",
+        jira_base_url: "https://linear.app/sym",
       });
     });
   });

@@ -164,10 +164,10 @@
     "deleteLi3": "All test runs and results",
     "deleteLi4": "All attachments (DB records + physical files)",
     "deleteLi5": "Project member associations",
-    "jiraTitle": "7-2. Jira Integration",
-    "jiraLi1": "Set the <strong>Jira Base URL</strong> in project settings.",
-    "jiraLi2": "Example: <code>https://your-domain.atlassian.net/browse/</code>",
-    "jiraLi3": "Enter an issue key (e.g., PROJ-123) in the Issue Link field of a TC or test result to automatically generate a link."
+    "jiraTitle": "7-2. Issue Tracker Integration",
+    "jiraLi1": "Set the <strong>issue tracker URL</strong> in project settings. Jira and Linear are supported.",
+    "jiraLi2": "Example: <code>https://your-domain.atlassian.net</code> (Jira), <code>https://linear.app/your-workspace</code> (Linear). For other tools, include a <code>{key}</code> placeholder, e.g. <code>https://tracker.example.com/items/{key}</code>.",
+    "jiraLi3": "Issue keys (e.g., PROJ-123) in report issue links open the matching issue."
   },
   "fileMgmt": {
     "title": "8. File / Attachment Management",

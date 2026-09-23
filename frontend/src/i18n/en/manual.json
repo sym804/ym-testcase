@@ -129,7 +129,7 @@
     "tab_report": "Report",
     "tab_report_desc": "View result summary, PDF/Excel download",
     "tab_settings": "Settings",
-    "tab_settings_desc": "Edit project info, Jira integration, member management"
+    "tab_settings_desc": "Edit project info, issue tracker integration, member management"
   },
   "tcManage": {
     "title": "4. TC Management",
@@ -220,7 +220,7 @@
     "field_depth2": "Minor classification",
     "field_depth2_ex": "Title",
     "field_priority": "Priority",
-    "field_priority_ex": "Critical, High, Medium, Low, Very Low",
+    "field_priority_ex": "Critical, High, Medium, Low",
     "field_platform": "Platform",
     "field_platform_ex": "WEB, Mobile, iOS, Android, API, Common",
     "field_precondition": "Precondition",
@@ -229,7 +229,7 @@
     "field_steps_ex": "1. Click the menu. 2. ...",
     "field_expected": "Expected result",
     "field_expected_ex": "1. The page is displayed.",
-    "field_issueLink": "Jira issue key. Enter the Jira Base URL in the Settings tab, then clicking will navigate to the issue page (e.g., https://jira.example.com/browse/PROJ-123)",
+    "field_issueLink": "Issue key or URL recorded on a test result. The report links it through the issue tracker URL (e.g., PROJ-123)",
     "field_issueLink_ex": "PROJ-123",
     "field_assignee": "Assignee",
     "field_assignee_ex": "John Doe",
@@ -481,14 +481,14 @@
     "li5": "Excel download: Click the <strong>Excel</strong> button to download an Excel report. The Summary sheet has the summary, previous-run comparison, priority and category tables; the Results sheet has every result.",
     "li3c": "Priority summary: Shows the same counts and pass rate per priority. TCs without a priority are grouped as (unset).",
     "li3d": "Compared to previous run: Compares with the run created just before in the same project. Regression (PASS -> FAIL) and Improved (FAIL -> PASS) follow the Compare screen. The changed count only includes TCs executed (not Not Started) in both runs, so it can differ from the Compare screen.",
-    "li3e": "Issue links: http/https addresses open as-is, and issue keys such as <code>PROJ-123</code> link through the Jira Base URL in project settings. Without a Base URL they are shown as plain text."
+    "li3e": "Issue links: http/https addresses open as-is, and issue keys such as <code>PROJ-123</code> link through the issue tracker URL in project settings. Without it they are shown as plain text."
   },
   "settings": {
     "title": "13. Settings",
     "imgAlt": "Settings tab",
     "h3_projectInfo": "13-1. Project Information",
     "pi_li1": "You can edit the project name and description.",
-    "pi_li2": "<strong>Jira Base URL:</strong> Enter the Jira server address (e.g., <code>https://jira.example.com</code>). Once set, clicking an issue key (e.g., PROJ-123) in the TC's Issue Link field navigates to <code>Jira Base URL/browse/PROJ-123</code>.",
+    "pi_li2": "<strong>Issue tracker URL:</strong> Enter the address of your issue tracker such as Jira or Linear (e.g., <code>https://your-domain.atlassian.net</code> (Jira), <code>https://linear.app/your-workspace</code> (Linear)). Issue keys (e.g., PROJ-123) link to <code>URL/browse/PROJ-123</code> for Jira and <code>URL/issue/PROJ-123</code> for Linear. For other tools, put <code>{key}</code> in the URL where the issue key should go.",
     "pi_li3": "<strong>Public/Private:</strong> Public projects are viewable by all logged-in users (edits require membership). Private projects are accessible only to project members and the creator. Default is <strong>Public</strong>.",
     "h3_defaultFields": "13-2. Default Field Settings",
     "df_p1": "You can <strong>rename display names</strong> and <strong>hide</strong> default TC fields (TC ID, Type, Category, etc.) for the project.",

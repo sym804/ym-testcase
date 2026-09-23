@@ -299,7 +299,7 @@ describe("ProjectListPage - New Project Modal Submission", () => {
     await user.click(screen.getByText("+ 새 프로젝트"));
     await user.type(screen.getByPlaceholderText("프로젝트 이름"), "NewProject");
     await user.type(screen.getByPlaceholderText("프로젝트 설명"), "설명입니다");
-    await user.type(screen.getByPlaceholderText("https://your-domain.atlassian.net"), "https://jira.example.com");
+    await user.type(screen.getByPlaceholderText(/Jira 또는 Linear/), "https://jira.example.com");
     await user.click(screen.getByText("생성"));
     await waitFor(() => {
       expect(projectsApi.create).toHaveBeenCalledWith({

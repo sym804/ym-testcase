@@ -54,6 +54,7 @@ vi.mock("../api", () => ({
 import { testRunsApi, testCasesApi, attachmentsApi } from "../api";
 import { TestRunStatus } from "../types";
 import TestRunManager from "../components/TestRunManager";
+import { PRIORITY_COLORS, priorityCellStyle } from "../utils/priority";
 import TestCaseGrid from "../components/TestCaseGrid";
 import PreconditionCell from "../components/PreconditionCell";
 import { resolveItems } from "../utils/precondition";
@@ -234,6 +235,16 @@ describe("수행 그리드의 사전조건", () => {
     await openRunWithPrecondition();
     const col = colById(gridProps.columnDefs, "test_case.precondition");
     expect(col.editable, "사전조건이 편집 가능하면 TC 원문이 수행 중에 바뀐다").toBe(false);
+  });
+
+  it("우선순위 칸은 TC 관리 그리드와 같은 색을 쓴다", async () => {
+    await openRunWithPrecondition();
+    const col = colById(gridProps.columnDefs, "test_case.priority");
+    // 같은 함수여야 한다. 따로 들고 있으면 한쪽만 고쳤을 때 두 화면 색이 갈라진다.
+    expect(col.cellStyle, "수행 그리드 우선순위에 색이 없다").toBe(priorityCellStyle);
+    expect(col.cellStyle({ value: "매우 높음" })).toEqual({ color: PRIORITY_COLORS["매우 높음"], fontWeight: 600 });
+    // 표시 이름은 testcase 네임스페이스의 priorityDisplay 를 따른다. 목록 밖의 값은 원문이다.
+    expect(col.valueFormatter({ value: "High" })).toBe("High");
   });
 
   it("참조를 푸는 렌더러를 쓴다", async () => {

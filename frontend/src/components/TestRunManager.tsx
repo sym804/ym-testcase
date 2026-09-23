@@ -21,6 +21,7 @@ import { AG_GRID_LOCALE_EN } from "../agGridLocaleEn";
 import toast from "react-hot-toast";
 import MarkdownCell from "./MarkdownCell";
 import HighlightCell from "./HighlightCell";
+import { priorityCellStyle, priorityDisplayMap } from "../utils/priority";
 import PreconditionCell from "./PreconditionCell";
 import { useTestTimer } from "../hooks/useTestTimer";
 import { useAttachments } from "../hooks/useAttachments";
@@ -53,6 +54,8 @@ function resultCellStyle(params: CellClassParams) {
 
 export default function TestRunManager({ projectId, project }: Props) {
   const { t, i18n } = useTranslation("testrun");
+  const { t: tcT } = useTranslation("testcase");
+  const priorityDisplay = useMemo(() => priorityDisplayMap(tcT), [tcT]);
   const gridLocale = i18n.language === "ko" ? AG_GRID_LOCALE_KO : AG_GRID_LOCALE_EN;
   const canManageRun = project.my_role === "admin" || project.my_role === "tester";
   const canDeleteRun = project.my_role === "admin";
@@ -583,7 +586,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
     filterPriorities.length === 0
       ? t("priorityFilter")
       : filterPriorities.length === 1
-        ? t("priorityFilterSelected", { value: filterPriorities[0] || t("priorityUnset") })
+        ? t("priorityFilterSelected", { value: (filterPriorities[0] && (priorityDisplay[filterPriorities[0]] ?? filterPriorities[0])) || t("priorityUnset") })
         : t("priorityFilterCount", { count: filterPriorities.length });
 
   // ── 결과 카운트 ──
@@ -683,6 +686,9 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
         headerName: fieldDisplay("priority", "Priority").name,
         width: 80,
         valueGetter: (params) => params.data?.test_case?.priority || "",
+        // TC 관리 그리드와 같은 색과 표시 이름. 값 자체(필터, 정렬)는 원문 그대로다.
+        cellStyle: priorityCellStyle,
+        valueFormatter: (params) => priorityDisplay[params.value] ?? params.value,
       },
       {
         _key: "test_type", field: "test_case.test_type",
@@ -903,7 +909,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
     // ★t 를 넣는다. 빼 두면 언어를 바꿔도 헤더가 옛 언어로 남는다. 첨부 맵이
     //   바뀔 때(다른 런을 열 때) 우연히 갱신되는 것에 기대고 있었다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [attachmentsMap, timerEnabled, t, fieldDisplay]
+    [attachmentsMap, timerEnabled, t, fieldDisplay, priorityDisplay]
   );
 
   const defaultColDef = useMemo<ColDef>(
@@ -1331,7 +1337,8 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                           checked={filterPriorities.includes(v)}
                           onChange={() => togglePriority(v)}
                         />
-                        {v || t("priorityUnset")}
+                        {/* 칸과 같은 표시 이름. 값(v)은 원문 그대로 필터에 쓴다 */}
+                        {(v && (priorityDisplay[v] ?? v)) || t("priorityUnset")}
                       </label>
                     ))}
                   </div>

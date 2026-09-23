@@ -91,8 +91,7 @@
     "veryHigh": "Critical",
     "high": "High",
     "normal": "Normal",
-    "low": "Low",
-    "veryLow": "Minor"
+    "low": "Low"
   },
   "sheets": "Sheets",
   "allSheets": "All",
@@ -145,8 +144,7 @@
     "매우 높음": "Critical",
     "높음": "High",
     "보통": "Normal",
-    "낮음": "Low",
-    "매우 낮음": "Minor"
+    "낮음": "Low"
   },
   "platformDisplay": {
     "공통": "Common"

@@ -88,17 +88,72 @@ describe("드래그 정렬을 켜는 조건", () => {
   });
 
   it("전체 보기에서는 끈다", async () => {
-    // 시트가 둘이면 기본 탭은 첫 시트다. 전체 탭으로 옮겨 확인한다.
+    // 시트가 둘이면 기본 탭은 전체다. 시트를 골랐다가 전체로 돌아와도 꺼진다.
     const user = userEvent.setup();
     await renderGrid(
       [sheet("로그인", 1, 1), sheet("결제", 1, 2)],
       [tc(1, 1, "로그인"), tc(2, 1, "결제")],
     );
+    await waitFor(() => expect(noColumnDrag()).toBe(false));
+
+    await user.click(screen.getByText("로그인"));
     await waitFor(() => expect(noColumnDrag()).toBe(true));
 
     await user.click(screen.getByText("전체"));
-
     await waitFor(() => expect(noColumnDrag()).toBe(false));
+  });
+
+  it("시트가 여럿이면 전체로 열고 시트 조건 없이 조회한다", async () => {
+    // 예전에는 첫 시트를 자동으로 골라 전체 요청과 첫 시트 요청이 겹쳤고,
+    // 늦게 온 전체 응답이 덮어 사이드바는 첫 시트인데 표는 전체였다.
+    await renderGrid(
+      [sheet("로그인", 1, 1), sheet("결제", 1, 2)],
+      [tc(1, 1, "로그인"), tc(2, 1, "결제")],
+    );
+    await waitFor(() => expect(testCasesApi.list).toHaveBeenCalled());
+    const calls = vi.mocked(testCasesApi.list).mock.calls;
+    expect(calls.every(([, params]) => !params?.sheet_name)).toBe(true);
+  });
+
+  it("늦게 도착한 옛 응답은 표를 덮지 않는다", async () => {
+    const user = userEvent.setup();
+    let releaseAll: (v: any) => void = () => {};
+    vi.mocked(testCasesApi.listSheets).mockResolvedValue([sheet("로그인", 1, 1), sheet("결제", 1, 2)]);
+    vi.mocked(testCasesApi.list).mockImplementation((_pid: number, params?: any) =>
+      params?.sheet_name
+        ? Promise.resolve([tc(1, 1, params.sheet_name)] as any)
+        // 전체 요청은 붙잡아 둔다. 시트 응답보다 늦게 풀어 준다.
+        : new Promise((r) => { releaseAll = r; }) as any,
+    );
+    render(<TestCaseGrid projectId={1} project={adminProject} />);
+    // 전체 요청이 붙잡혀 있는 동안은 로딩 중이라 표가 없다. 사이드바에서 바로 고른다.
+    await user.click(await screen.findByText("결제"));
+    await waitFor(() => expect(lastProps.rowData?.[0]?.sheet_name).toBe("결제"));
+
+    releaseAll([tc(1, 1, "로그인"), tc(2, 1, "결제"), tc(3, 2, "결제")]);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(lastProps.rowData.map((r: any) => r.sheet_name)).toEqual(["결제"]);
+  });
+
+  it("활성 시트를 지워 하나만 남으면 남은 시트를 선택한다", async () => {
+    // 지운 시트가 활성이면 null 이 된다. 예전에는 처음 열 때만 자동 선택해서,
+    // 시트가 하나뿐인데도 행 추가와 드래그 정렬이 막혔다.
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(testCasesApi.deleteSheet).mockResolvedValue({} as any);
+    vi.mocked(testCasesApi.listSheets)
+      .mockResolvedValueOnce([sheet("로그인", 1, 1), sheet("결제", 1, 2)])
+      .mockResolvedValue([sheet("결제", 1, 2)]);
+    vi.mocked(testCasesApi.list).mockResolvedValue([tc(1, 1, "결제")] as any);
+    render(<TestCaseGrid projectId={1} project={adminProject} />);
+
+    await user.click(await screen.findByText("로그인"));
+    await waitFor(() => expect(noColumnDrag()).toBe(true));
+
+    await user.click(screen.getAllByTitle("시트 삭제")[0]);
+    await waitFor(() => expect(testCasesApi.deleteSheet).toHaveBeenCalledWith(1, "로그인"));
+    await waitFor(() => expect(noColumnDrag()).toBe(true));
+    expect(vi.mocked(testCasesApi.list).mock.calls.at(-1)?.[1]).toEqual({ sheet_name: "결제" });
   });
 
   it("검색 중에는 끈다", async () => {

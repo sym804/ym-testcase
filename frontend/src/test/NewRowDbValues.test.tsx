@@ -44,7 +44,7 @@ const adminProject = {
 };
 
 //: DB 에 저장되는 우선순위 값. 화면 표기와 다르다.
-const DB_PRIORITIES = ["매우 높음", "높음", "보통", "낮음", "매우 낮음"];
+const DB_PRIORITIES = ["매우 높음", "높음", "보통", "낮음"];
 
 beforeEach(() => {
   vi.clearAllMocks();
