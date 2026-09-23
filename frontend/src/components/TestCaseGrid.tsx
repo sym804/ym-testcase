@@ -4,8 +4,6 @@ import {
   AllCommunityModule,
   ModuleRegistry,
   type ColDef,
-  type CellClassParams,
-  type CellStyle,
   type GridReadyEvent,
   type GridApi,
   type CellValueChangedEvent,
@@ -24,6 +22,7 @@ import { planTcIdFill, dominantTcIdPrefix, findTcIdCollisions } from "../utils/t
 import MarkdownCell from "./MarkdownCell";
 import PreconditionCell from "./PreconditionCell";
 import HighlightCell from "./HighlightCell";
+import { PRIORITY_OPTIONS, priorityCellStyle, priorityDisplayMap } from "../utils/priority";
 import { useUndoRedo } from "../hooks/useUndoRedo";
 import type { UndoGroup } from "../hooks/useUndoRedo";
 import SheetTreeSidebar from "./SheetTreeSidebar";
@@ -38,23 +37,8 @@ interface Props {
 
 const TYPE_OPTIONS = ["Func.", "UI/UX", "Perf.", "Security", "API", "Data"];
 // DB values (Korean) - display names are translated via priorityDisplay / platformDisplay in locale files
-const PRIORITY_OPTIONS = ["매우 높음", "높음", "보통", "낮음", "매우 낮음"];
+// 우선순위 값과 색은 utils/priority 에 있다. 테스트 수행 그리드와 같이 쓴다.
 const PLATFORM_OPTIONS = ["Web", "Mobile Web", "Mobile App", "iOS", "Android", "PC", "API", "공통"];
-
-const priorityColors: Record<string, string> = {
-  "매우 높음": "#DC2626",
-  "높음": "#EA580C",
-  "보통": "#2563EB",
-  "낮음": "#16A34A",
-  "매우 낮음": "#6B7280",
-};
-
-function priorityCellStyle(params: CellClassParams): CellStyle {
-  const val = params.value as string;
-  const color = priorityColors[val];
-  if (color) return { color, fontWeight: 600 };
-  return {};
-}
 
 export default function TestCaseGrid({ projectId, project, highlightTcId }: Props) {
   const { t, i18n } = useTranslation("testcase");
@@ -72,7 +56,6 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   // ── 시트 탭 (트리 구조) ──
   const [sheets, setSheets] = useState<SheetNode[]>([]);
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
-  const sheetInitialized = useRef(false);
   const [expandedSheets, setExpandedSheets] = useState<Set<number>>(new Set());
 
   // ── 커스텀 필드 ──
@@ -245,15 +228,14 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       const flatAll: SheetNode[] = [];
       const collectFlat = (nodes: SheetNode[]) => { for (const n of nodes) { flatAll.push(n); collectFlat(n.children); } };
       collectFlat(s);
-      // 시트가 하나뿐인 프로젝트도 선택해 둔다. activeSheet 가 null 이면
-      // 행 추가가 대상 시트를 못 정한다.
-      if (flatAll.length > 0 && !sheetInitialized.current) {
-        const firstLeaf = flatAll.find((n) => !n.is_folder);
-        if (firstLeaf) {
-          sheetInitialized.current = true;
-          setActiveSheet(firstLeaf.name);
-        }
-      }
+      // ★시트가 여럿이면 "전체" 로 연다. 데이터가 처음부터 전체로 오기 때문이다.
+      //   예전에는 첫 시트를 골라 두어서, 전체 요청과 첫 시트 요청이 함께 나가고
+      //   사이드바는 첫 시트인데 표는 전체인 상태가 생겼다.
+      // 시트가 하나뿐이면 그 시트를 선택해 둔다. activeSheet 가 null 이면 행 추가가
+      // 대상 시트를 못 정한다. 처음 열 때뿐 아니라 시트를 지워 하나만 남았을 때도
+      // 같은 규칙이다(지운 시트가 활성이었으면 null 이 된다).
+      const leaves = flatAll.filter((n) => !n.is_folder);
+      if (leaves.length === 1) setActiveSheet((prev) => prev ?? leaves[0].name);
     } catch {
       // 시트 API 실패 시 무시 (기존 호환)
     }
@@ -268,12 +250,20 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     }
   }, [projectId]);
 
+  // ★늦게 도착한 옛 응답이 새 응답을 덮지 않게 한다. 시트를 빠르게 바꾸거나 처음
+  //   열 때 요청이 겹치면, 사이드바는 A 시트인데 표는 B 시트(또는 전체)인 상태가
+  //   된다. CompareView 와 같은 방식이다.
+  const loadSeqRef = useRef(0);
+
   const loadData = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
+    const isStale = () => seq !== loadSeqRef.current;
     setLoading(true);
     try {
       const params: Record<string, string> = {};
       if (activeSheet) params.sheet_name = activeSheet;
       const data = await testCasesApi.list(projectId, params);
+      if (isStale()) return;
 
       // 전체 보기: 시트 순서대로 연속 번호 부여
       if (!activeSheet && flatSheets.length > 1) {
@@ -304,12 +294,13 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       setUndoCount(0);
       setRedoCount(0);
     } catch (err) {
+      if (isStale()) return;
       console.error(err);
       toast.error(t("loadFailed"));
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
-  }, [projectId, activeSheet, flatSheets]);
+  }, [projectId, activeSheet, flatSheets, t]);
 
   useEffect(() => {
     loadSheets();
@@ -348,13 +339,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   });
 
   // ── i18n display maps for DB enum values ──
-  const priorityRefData: Record<string, string> = useMemo(() => ({
-    "매우 높음": t("priorityDisplay.매우 높음", "매우 높음"),
-    "높음": t("priorityDisplay.높음", "높음"),
-    "보통": t("priorityDisplay.보통", "보통"),
-    "낮음": t("priorityDisplay.낮음", "낮음"),
-    "매우 낮음": t("priorityDisplay.매우 낮음", "매우 낮음"),
-  }), [t]);
+  const priorityRefData: Record<string, string> = useMemo(() => priorityDisplayMap(t), [t]);
 
   const platformRefData: Record<string, string> = useMemo(() => ({
     "공통": t("platformDisplay.공통", "공통"),
@@ -1359,8 +1344,12 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 <button
                   style={{ ...styles.btnPrimary, fontSize: 11, padding: "3px 10px" }}
                   onClick={async () => {
+                    // loadData 와 같은 순번을 쓴다. 진행 중인 조회가 필터 결과를 덮거나,
+                    // 필터 도중 시트를 바꿨을 때 옛 시트의 필터 결과가 들어오지 않게 한다.
+                    const seq = ++loadSeqRef.current;
                     try {
                       const data = await filtersApi.apply(projectId, filterConditions, filterLogic, activeSheet || undefined);
+                      if (seq !== loadSeqRef.current) return;
                       setRowData(data);
                       toast.success(t("filterApplied", { count: data.length }));
                     } catch {

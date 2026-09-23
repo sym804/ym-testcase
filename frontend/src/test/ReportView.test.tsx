@@ -241,7 +241,7 @@ describe("ReportView", () => {
     expect(screen.queryByText("실패하거나 차단된 항목이 없습니다.")).not.toBeInTheDocument();
   });
 
-  it("이슈 키는 Jira Base URL 로 링크하고, 못 만들면 링크를 걸지 않는다", async () => {
+  it("이슈 키는 이슈 관리 도구 주소로 링크하고, 못 만들면 링크를 걸지 않는다", async () => {
     vi.mocked(reportsApi.getData).mockResolvedValue({
       ...mockReport,
       project: { ...mockReport.project, jira_base_url: "https://jira.example.com" },

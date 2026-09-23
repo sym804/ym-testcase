@@ -129,7 +129,7 @@
     "tab_report": "리포트",
     "tab_report_desc": "결과 요약 보기, PDF/Excel 다운로드",
     "tab_settings": "설정",
-    "tab_settings_desc": "프로젝트 정보 수정, Jira 연동, 멤버 관리"
+    "tab_settings_desc": "프로젝트 정보 수정, 이슈 관리 도구 연동, 멤버 관리"
   },
   "tcManage": {
     "title": "4. TC 관리",
@@ -220,7 +220,7 @@
     "field_depth2": "소분류",
     "field_depth2_ex": "타이틀",
     "field_priority": "우선순위",
-    "field_priority_ex": "매우 높음, 높음, 보통, 낮음, 매우 낮음",
+    "field_priority_ex": "매우 높음, 높음, 보통, 낮음",
     "field_platform": "플랫폼",
     "field_platform_ex": "WEB, Mobile, iOS, Android, API, 공통",
     "field_precondition": "사전 조건",
@@ -229,7 +229,7 @@
     "field_steps_ex": "1. 메뉴를 클릭한다. 2. ...",
     "field_expected": "기대 결과",
     "field_expected_ex": "1. 페이지가 표시된다.",
-    "field_issueLink": "Jira 이슈 키. 설정 탭에서 Jira Base URL을 입력하면 클릭 시 해당 이슈 페이지로 이동 (예: https://jira.example.com/browse/PROJ-123)",
+    "field_issueLink": "테스트 결과에 적는 이슈 키 또는 주소. 리포트에서 이슈 관리 도구 주소로 연결됩니다 (예: PROJ-123)",
     "field_issueLink_ex": "PROJ-123",
     "field_assignee": "담당자",
     "field_assignee_ex": "홍길동",
@@ -481,14 +481,14 @@
     "li5": "Excel 다운로드: <strong>Excel</strong> 버튼 클릭으로 엑셀 리포트를 다운로드합니다. Summary 시트에 요약, 직전 수행 대비, 우선순위별, 카테고리별 표가 있고 Results 시트에 전체 결과가 있습니다.",
     "li3c": "우선순위별 요약: 우선순위마다 같은 건수와 PASS Rate을 확인합니다. 우선순위를 비워 둔 TC 는 (미지정) 한 줄로 모입니다.",
     "li3d": "직전 수행 대비: 같은 프로젝트에서 바로 앞에 만든 테스트 런과 비교합니다. 퇴보(PASS -> FAIL)와 개선(FAIL -> PASS) 판정은 수행 비교 화면과 같습니다. 다만 결과가 바뀐 TC 수는 두 런에서 모두 수행한(미수행이 아닌) TC 만 세므로, 비교 화면의 변경 건수와 다를 수 있습니다.",
-    "li3e": "이슈 링크: 주소(http/https)는 그대로 열리고, <code>PROJ-123</code> 같은 이슈 키는 프로젝트 설정의 Jira Base URL 로 연결됩니다. Base URL 이 없으면 링크 없이 글자로만 표시됩니다."
+    "li3e": "이슈 링크: 주소(http/https)는 그대로 열리고, <code>PROJ-123</code> 같은 이슈 키는 프로젝트 설정의 이슈 관리 도구 주소로 연결됩니다. 주소가 없으면 링크 없이 글자로만 표시됩니다."
   },
   "settings": {
     "title": "13. 설정",
     "imgAlt": "설정 탭",
     "h3_projectInfo": "13-1. 프로젝트 정보",
     "pi_li1": "프로젝트명, 설명을 수정할 수 있습니다.",
-    "pi_li2": "<strong>Jira Base URL:</strong> Jira 서버 주소를 입력합니다 (예: <code>https://jira.example.com</code>). 설정하면 TC의 Issue Link 필드에 입력한 이슈 키(예: PROJ-123)를 클릭할 때 <code>Jira Base URL/browse/PROJ-123</code>으로 이동합니다.",
+    "pi_li2": "<strong>이슈 관리 도구 주소:</strong> Jira, Linear 같은 이슈 관리 도구의 주소를 입력합니다 (예: <code>https://your-domain.atlassian.net</code>(Jira), <code>https://linear.app/워크스페이스</code>(Linear)). 이슈 키(예: PROJ-123)는 Jira 면 <code>주소/browse/PROJ-123</code>, Linear 면 <code>주소/issue/PROJ-123</code> 으로 연결됩니다. 다른 도구는 주소에 <code>{key}</code> 를 넣으면 그 자리에 이슈 키가 들어갑니다.",
     "pi_li3": "<strong>공개/비공개:</strong> 공개 프로젝트는 모든 로그인 사용자가 조회할 수 있습니다 (수정은 멤버만 가능). 비공개 프로젝트는 프로젝트 멤버와 생성자만 접근할 수 있습니다. 기본값은 <strong>공개</strong>입니다.",
     "h3_defaultFields": "13-2. 기본 필드 설정",
     "df_p1": "프로젝트의 기본 TC 필드(TC ID, Type, Category 등)의 <strong>표시 이름 변경</strong>과 <strong>숨김 설정</strong>이 가능합니다.",

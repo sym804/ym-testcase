@@ -73,5 +73,8 @@
     "removeMember": "Remove member"
   },
   "saveFailed": "Failed to save.",
-  "deleteField": "Delete field"
+  "deleteField": "Delete field",
+  "trackerUrl": "Issue tracker URL",
+  "trackerUrlPlaceholder": "Jira or Linear URL (e.g. https://linear.app/your-workspace)",
+  "trackerUrlHelp": "Issue keys (e.g. PROJ-123) link to this tracker. Jira gets /browse/, Linear gets /issue/, and other tools can use a {key} placeholder."
 }

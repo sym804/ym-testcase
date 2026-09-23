@@ -73,5 +73,8 @@
     "removeMember": "멤버 제거"
   },
   "saveFailed": "저장에 실패했습니다.",
-  "deleteField": "필드 삭제"
+  "deleteField": "필드 삭제",
+  "trackerUrl": "이슈 관리 도구 주소",
+  "trackerUrlPlaceholder": "Jira 또는 Linear 주소 (예: https://linear.app/워크스페이스)",
+  "trackerUrlHelp": "이슈 키(예: PROJ-123)를 이 주소의 이슈 페이지로 연결합니다. Jira 는 /browse/, Linear 는 /issue/ 를 붙이고, 다른 도구는 주소에 {key} 를 넣습니다."
 }
