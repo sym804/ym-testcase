@@ -12,11 +12,34 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v1.6.10.3  (2026-09-23)
+YM TestCase System  v1.6.10.4  (2026-09-23)
 ├── Frontend       v1.6.7.1
 ├── Backend        v1.6.5.0
 └── Database       v0.9.2.0
 ```
+
+---
+
+## v1.6.10.4 (2026-09-23) - [docs] 알려진 이슈와 Backlog 현행화
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.6.10.3 | **1.6.10.4** | patch +1 |
+
+### 이슈
+
+- 없음(문서만 변경)
+
+### 변경
+
+- 릴리즈 노트 하단 "알려진 이슈" 를 2026-09-23 기준으로 갱신(Open 1건). Backlog 에서 구현된 #17(테스트 계획) 제거
+- CI 스텝 이름에서 낡은 테스트 수 표기 제거
+
+### 영향
+
+- 없음
 
 ---
 
@@ -2344,7 +2367,6 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 | #14 | 코멘트/스레드 | 중간 | FE + BE + DB | TC별 토론 기능 |
 | #15 | @멘션 + 알림 | 낮음 | FE + BE + DB | FAIL 케이스 담당자 지정 |
 | #16 | TC 버전 관리 | 중간 | FE + BE | 변경 이력 diff 뷰 |
-| #17 | 테스트 계획 관리 | 중간 | FE + BE + DB | 스프린트/마일스톤 범위 |
 | #18 | API 자동화 연동 | 높음 | BE + DB | Playwright/pytest 결과 자동 기록 |
 | #19 | 태그/라벨 시스템 | 낮음 | FE + BE + DB | 자유 형식 TC 태깅 |
 
@@ -2352,18 +2374,17 @@ TEST_PORT=8009 TEST_BASE_URL=http://localhost:8009 python -m pytest test_run_tc_
 
 ## 알려진 이슈
 
-> 상세 내역은 `Issue_list.xlsx` 참고
-> 최종 검증일: 2026-03-16
+> 상세 내역은 `Issue_list.xlsx` 와 Linear(`SYM-n`) 참고
+> 최종 검증일: 2026-09-23
 
-### 현황: Open 3건 / Fixed 31건 / Deferred 1건
+### 현황: Open 1건 / 완료 237건 (이슈 로그 238행)
 
-**Open (3건)**
-- ENH-001: Alembic 마이그레이션 미도입 - `create_all()` + 수동 ALTER TABLE 사용 중 (프로덕션 전 필수)
-- ENH-002: PostgreSQL 전환 준비 - 현재 SQLite, 프로덕션 시 전환 필요
-- ENH-003: N+1 쿼리 최적화 - overview/dashboard/reports 대량 데이터 시 성능 저하 가능
+**Open (1건)**
+- ENH-002 (SYM-6): PostgreSQL 전환 준비 - 현재 SQLite, 프로덕션 시 전환 필요
 
-**Deferred (1건)**
-- SEC-002: localStorage JWT 토큰 저장 - XSS 시 탈취 가능 (장기 과제, DOMPurify로 현재 리스크 낮음)
+- 2026-03-16 기준 Open 이던 ENH-001(Alembic 도입), ENH-003(N+1 쿼리 최적화)과 Deferred 이던 SEC-002(localStorage JWT)는 모두 완료 상태
+
+### 과거 기록
 
 **v0.5.0.0에서 해결 (4건)**
 - FIX-032: overview/dashboard/testruns에서 deleted_at 필터 누락 → 삭제된 TC가 카운트에 포함
