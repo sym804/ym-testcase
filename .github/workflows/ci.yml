@@ -35,7 +35,7 @@ jobs:
         working-directory: frontend
         run: npx eslint src/ --quiet
 
-      - name: Vitest (358 unit tests)
+      - name: Vitest (unit tests)
         working-directory: frontend
         run: npx vitest run
 
