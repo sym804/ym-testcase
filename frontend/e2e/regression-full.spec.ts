@@ -631,6 +631,65 @@ test.describe("9. 리포트", () => {
 });
 
 // ============================================================================
+// 9-1. 테스트 수행 이슈 링크 (TC-RUN-023, SYM-123)
+//   jsdom 단위 테스트는 AG Grid 가 셀에 단 브라우저 리스너의 순서를 재현하지 못한다.
+//   ↗ 가 포커스를 가져가거나 더블클릭이 셀로 번지면 닫히지 않는 편집기가 열렸던
+//   경로를 실제 브라우저로 고정한다.
+// ============================================================================
+test.describe("9-1. 테스트 수행 이슈 링크", () => {
+  test("TC-RUN-023: ↗ 는 이슈를 열고 셀 편집을 망가뜨리지 않는다", async ({ page, request, context }) => {
+    const loginRes = await request.post("/api/auth/login", { data: { username: "admin", password: PASSWORD } });
+    const { access_token } = await loginRes.json();
+    const h = { Authorization: `Bearer ${access_token}` };
+    const name = `E2E_ISSUE_${Date.now()}`;
+    const proj = await request.post("/api/projects", { data: { name, jira_base_url: "https://linear.app/e2e" }, headers: h });
+    const pid = (await proj.json()).id;
+    await request.post(`/api/projects/${pid}/testcases`, { data: { no: 1, tc_id: "ISS-001" }, headers: h });
+    const run = await request.post(`/api/projects/${pid}/testruns`, { data: { name: "ISS Run" }, headers: h });
+    const runId = (await run.json()).id;
+    const detail = await (await request.get(`/api/projects/${pid}/testruns/${runId}`, { headers: h })).json();
+    await request.post(`/api/projects/${pid}/testruns/${runId}/results`, {
+      data: [{ test_case_id: detail.results[0].test_case_id, result: "PASS", issue_link: "SYM-9" }],
+      headers: h,
+    });
+
+    // 외부 사이트에 실제로 가지 않는다
+    await context.route("https://linear.app/**", (r) => r.fulfill({ status: 200, body: "ok" }));
+
+    try {
+      await login(page);
+      await page.goto(`/projects/${pid}?tab=run`);
+      await page.getByText("ISS Run").first().click();
+      const link = page.getByTestId("issue-link-open").first();
+      await link.scrollIntoViewIfNeeded();
+      await expect(link).toHaveAttribute("href", "https://linear.app/e2e/issue/SYM-9");
+      const editors = page.locator(".ag-cell-inline-editing");
+
+      // 1. ↗ 더블클릭: 새 탭 하나, 편집기 없음
+      const [tab1] = await Promise.all([context.waitForEvent("page"), link.dblclick()]);
+      await tab1.close();
+      await expect(editors).toHaveCount(0);
+
+      // 2. 가운데 버튼 클릭 뒤 Enter: 편집기가 열려도 Escape 로 닫혀야 한다
+      const [tab2] = await Promise.all([context.waitForEvent("page"), link.click({ button: "middle" })]);
+      await tab2.close();
+      await page.bringToFront();
+      await page.keyboard.press("Enter");
+      await page.keyboard.press("Escape");
+      await expect(editors).toHaveCount(0);
+
+      // 3. 링크에 포커스가 있을 때 Enter: 편집기가 아니라 링크가 열린다
+      await link.evaluate((el) => (el as HTMLElement).focus());
+      const [tab3] = await Promise.all([context.waitForEvent("page"), page.keyboard.press("Enter")]);
+      await tab3.close();
+      await expect(editors).toHaveCount(0);
+    } finally {
+      await request.delete(`/api/projects/${pid}`, { headers: h });
+    }
+  });
+});
+
+// ============================================================================
 // 10. 관리자 (TC-ADM-001 ~ 006)
 // ============================================================================
 test.describe("10. 관리자", () => {

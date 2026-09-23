@@ -229,7 +229,7 @@
     "field_steps_ex": "1. Click the menu. 2. ...",
     "field_expected": "Expected result",
     "field_expected_ex": "1. The page is displayed.",
-    "field_issueLink": "Issue key or URL recorded on a test result. The report links it through the issue tracker URL (e.g., PROJ-123)",
+    "field_issueLink": "Issue key or URL recorded on a test result. With the issue tracker URL set, the ↗ in the test run sheet and the report link to the issue (e.g., PROJ-123)",
     "field_issueLink_ex": "PROJ-123",
     "field_assignee": "Assignee",
     "field_assignee_ex": "John Doe",
@@ -409,7 +409,8 @@
     "imgAlt_filter": "Priority multi-select filter on the test run screen",
     "tip1": "<strong>TIP:</strong> The timer is optional. Turn off the toggle to enter results without time recording.",
     "create_li4": "TCs from the picked sheets are included with <strong>NS (Not Started)</strong> status. Picking every sheet covers the whole project.",
-    "imgAlt_create": "Sheet picker in the New Test Run modal"
+    "imgAlt_create": "Sheet picker in the New Test Run modal",
+    "issueLink_li": "A ↗ appears next to an http/https address in the Issue Link cell. Issue keys (e.g., PROJ-123) get one when the issue tracker URL is set in Settings. Click ↗ to open the issue in a new tab; double-click the text to edit."
   },
   "testPlans": {
     "title": "9. Test Plans / Milestones",

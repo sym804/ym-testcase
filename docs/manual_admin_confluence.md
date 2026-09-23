@@ -192,7 +192,7 @@ npx tsc --noEmit
 ### 7-2. 이슈 관리 도구 연동
 
 - 프로젝트 설정에서 **이슈 관리 도구 주소** 설정 (예: `https://yourteam.atlassian.net`, `https://linear.app/워크스페이스`)
-- 테스트 결과의 Issue Link 에 적은 이슈 키가 리포트에서 해당 이슈로 연결된다
+- 테스트 결과의 Issue Link 에 적은 이슈 키가 테스트 수행 시트(↗)와 리포트에서 해당 이슈로 연결된다
 
 ---
 
