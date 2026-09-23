@@ -55,13 +55,15 @@ import { testRunsApi, testCasesApi, attachmentsApi } from "../api";
 import { TestRunStatus } from "../types";
 import TestRunManager from "../components/TestRunManager";
 import { PRIORITY_COLORS, priorityCellStyle } from "../utils/priority";
+import IssueLinkCell from "../components/IssueLinkCell";
 import TestCaseGrid from "../components/TestCaseGrid";
 import PreconditionCell from "../components/PreconditionCell";
 import { resolveItems } from "../utils/precondition";
 import toast from "react-hot-toast";
 
 const adminProject = {
-  id: 1, name: "P", description: "", jira_base_url: null, is_private: false,
+  // 이슈 링크 칸이 context 로 받는 값을 확인하려고 주소를 채워 둔다
+  id: 1, name: "P", description: "", jira_base_url: "https://linear.app/x", is_private: false,
   created_by: 1, created_at: "2026-01-01", updated_at: "2026-01-01", my_role: "admin" as const,
 };
 
@@ -235,6 +237,15 @@ describe("수행 그리드의 사전조건", () => {
     await openRunWithPrecondition();
     const col = colById(gridProps.columnDefs, "test_case.precondition");
     expect(col.editable, "사전조건이 편집 가능하면 TC 원문이 수행 중에 바뀐다").toBe(false);
+  });
+
+  it("이슈 링크 칸은 이슈 관리 도구로 여는 렌더러를 쓰고 편집 가능하다", async () => {
+    await openRunWithPrecondition();
+    const col = colById(gridProps.columnDefs, "issue_link");
+    expect(col.cellRenderer, "이슈 키가 링크로 이어지지 않는다(SYM-123)").toBe(IssueLinkCell);
+    expect(col.editable).toBe(true);
+    // 렌더러는 주소를 context 에서 읽는다. 여기서 빠지면 링크가 조용히 안 생긴다.
+    expect(gridProps.context.trackerUrl).toBe("https://linear.app/x");
   });
 
   it("우선순위 칸은 TC 관리 그리드와 같은 색을 쓴다", async () => {

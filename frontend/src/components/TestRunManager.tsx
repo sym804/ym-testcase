@@ -21,6 +21,7 @@ import { AG_GRID_LOCALE_EN } from "../agGridLocaleEn";
 import toast from "react-hot-toast";
 import MarkdownCell from "./MarkdownCell";
 import HighlightCell from "./HighlightCell";
+import IssueLinkCell from "./IssueLinkCell";
 import { priorityCellStyle, priorityDisplayMap } from "../utils/priority";
 import PreconditionCell from "./PreconditionCell";
 import { useTestTimer } from "../hooks/useTestTimer";
@@ -796,6 +797,8 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
         headerName: "Issue Link",
         width: 140,
         editable: true,
+        // 이슈 키나 주소면 옆에 ↗ 를 붙여 이슈 관리 도구로 연다(SYM-123)
+        cellRenderer: IssueLinkCell,
       },
       ...(timerEnabled ? [{
         field: "duration_sec",
@@ -1394,7 +1397,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                       if (node?.data?.id) onRowFocused(node.data.id);
                     }
                   }}
-                  context={{ searchKeyword: filterText, preconditionIndex }}
+                  context={{ searchKeyword: filterText, preconditionIndex, trackerUrl: project.jira_base_url }}
                   // ★클릭 한 번에 편집기를 열지 않는다(더블클릭 · F2 · 바로 타이핑으로 연다).
                   //   절차나 기대 결과를 복사하려는데 편집기가 열려 막혔다. 읽기 전용
                   //   열이라 편집도 안 되면서 복사도 안 되는 상태였다. 두 값은 한 쌍이라

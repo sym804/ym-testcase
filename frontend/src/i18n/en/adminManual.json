@@ -167,7 +167,7 @@
     "jiraTitle": "7-2. Issue Tracker Integration",
     "jiraLi1": "Set the <strong>issue tracker URL</strong> in project settings. Jira and Linear are supported.",
     "jiraLi2": "Example: <code>https://your-domain.atlassian.net</code> (Jira), <code>https://linear.app/your-workspace</code> (Linear). For other tools, include a <code>{key}</code> placeholder, e.g. <code>https://tracker.example.com/items/{key}</code>.",
-    "jiraLi3": "Issue keys (e.g., PROJ-123) in report issue links open the matching issue."
+    "jiraLi3": "Issue keys (e.g., PROJ-123) in a test result's Issue Link open the matching issue from the ↗ in the test run sheet and from the report."
   },
   "fileMgmt": {
     "title": "8. File / Attachment Management",

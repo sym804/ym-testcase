@@ -553,6 +553,7 @@ export default function UserManualPage() {
                 </div>
               </div>
             </div>
+            <p style={s.p}>{t("testrun.issueLink_li")}</p>
 
             <h3 style={s.h3}>{t("testrun.h3_attachment")}</h3>
             <ul style={s.ul}>

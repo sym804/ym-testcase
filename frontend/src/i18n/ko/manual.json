@@ -229,7 +229,7 @@
     "field_steps_ex": "1. 메뉴를 클릭한다. 2. ...",
     "field_expected": "기대 결과",
     "field_expected_ex": "1. 페이지가 표시된다.",
-    "field_issueLink": "테스트 결과에 적는 이슈 키 또는 주소. 리포트에서 이슈 관리 도구 주소로 연결됩니다 (예: PROJ-123)",
+    "field_issueLink": "테스트 결과에 적는 이슈 키 또는 주소. 이슈 관리 도구 주소를 설정하면 테스트 수행 시트의 ↗ 와 리포트에서 해당 이슈로 연결됩니다 (예: PROJ-123)",
     "field_issueLink_ex": "PROJ-123",
     "field_assignee": "담당자",
     "field_assignee_ex": "홍길동",
@@ -409,7 +409,8 @@
     "imgAlt_filter": "테스트 수행 화면의 우선순위 멀티 선택 필터",
     "tip1": "<strong>TIP:</strong> 타이머는 선택 사항입니다. 토글을 끄면 시간 기록 없이 결과만 입력할 수 있습니다.",
     "create_li4": "고른 시트의 TC가 <strong>NS(미실행)</strong> 상태로 포함됩니다. 전부 고르면 프로젝트 전체를 담습니다.",
-    "imgAlt_create": "새 테스트 수행 모달의 포함할 시트 선택"
+    "imgAlt_create": "새 테스트 수행 모달의 포함할 시트 선택",
+    "issueLink_li": "Issue Link 칸에 주소(http/https)를 적으면 옆에 ↗ 가 붙습니다. 이슈 키(예: PROJ-123)는 설정 탭에 이슈 관리 도구 주소를 넣은 경우에 붙습니다. ↗ 를 누르면 해당 이슈가 새 탭으로 열리고, 글자를 더블클릭하면 편집됩니다."
   },
   "testPlans": {
     "title": "9. 테스트 플랜 / 마일스톤",

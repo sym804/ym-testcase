@@ -82,5 +82,6 @@
   "attachment": "Attachments",
   "runSheets": "Sheets to include",
   "tcCountShort": "{{count}} TCs",
-  "runSheetsSummary": "{{count}} sheet(s), {{tcCount}} TCs in this run"
+  "runSheetsSummary": "{{count}} sheet(s), {{tcCount}} TCs in this run",
+  "issueLinkOpen": "Open issue {{key}} in a new tab"
 }

@@ -82,5 +82,6 @@
   "attachment": "첨부",
   "runSheets": "포함할 시트",
   "tcCountShort": "{{count}}개 TC",
-  "runSheetsSummary": "{{count}}개 시트 ({{tcCount}}개 TC)를 이 수행에 담습니다"
+  "runSheetsSummary": "{{count}}개 시트 ({{tcCount}}개 TC)를 이 수행에 담습니다",
+  "issueLinkOpen": "{{key}} 이슈를 새 탭에서 열기"
 }
