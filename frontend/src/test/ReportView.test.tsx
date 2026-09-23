@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ReportView from "../components/ReportView";
+import i18n from "../i18n";
 
 vi.mock("react-hot-toast", () => ({
   default: { success: vi.fn(), error: vi.fn() },
@@ -304,6 +305,56 @@ describe("ReportView", () => {
     });
     render(<ReportView projectId={1} />);
     expect(await screen.findByTestId("category-rate-결제")).toHaveTextContent("-");
+  });
+
+  it("분류 없는 TC 는 요약 표와 실패·차단 목록에서 같은 이름으로 보인다", async () => {
+    // 예전에는 요약 표가 "Uncategorized", 목록이 "-" 였다
+    vi.mocked(reportsApi.getData).mockResolvedValue({
+      ...mockReport,
+      top_failures: [
+        { test_case: { tc_id: "N-1", priority: null, category: null }, result: "FAIL", actual_result: null, issue_link: null, executed_by: null },
+      ],
+      category_summary: [{ category: null, total: 1, pass: 0, fail: 1, block: 0, na: 0, not_started: 0, pass_rate: 0 }],
+    });
+    render(<ReportView projectId={1} />);
+    expect(await screen.findByTestId("category-row-unset")).toHaveTextContent("(미분류)");
+    expect(screen.getByTestId("issue-row-N-1")).toHaveTextContent("(미분류)");
+    expect(screen.queryByText("Uncategorized")).not.toBeInTheDocument();
+  });
+
+  it("실패·차단 목록의 우선순위도 요약 표와 같은 이름을 쓴다", async () => {
+    // 예전에는 비어 있으면 "-", 요약 표는 "(미지정)" 이었다
+    vi.mocked(reportsApi.getData).mockResolvedValue({
+      ...mockReport,
+      top_failures: [
+        { test_case: { tc_id: "P-1", priority: "매우 높음", category: "c" }, result: "FAIL", actual_result: null, issue_link: null, executed_by: null },
+        { test_case: { tc_id: "P-2", priority: null, category: "c" }, result: "FAIL", actual_result: null, issue_link: null, executed_by: null },
+      ],
+    });
+    render(<ReportView projectId={1} />);
+    expect(await screen.findByTestId("issue-row-P-1")).toHaveTextContent("매우 높음");
+    expect(screen.getByTestId("issue-row-P-2")).toHaveTextContent("(미지정)");
+  });
+
+  it("영어 화면에서는 우선순위를 번역한 이름으로 보인다", async () => {
+    // 한국어 모드에서는 "매우 높음" 이 번역 전후로 같은 글자라 번역이 빠져도 모른다
+    await i18n.changeLanguage("en");
+    try {
+      vi.mocked(reportsApi.getData).mockResolvedValue({
+        ...mockReport,
+        top_failures: [
+          { test_case: { tc_id: "P-1", priority: "매우 높음", category: "c" }, result: "FAIL", actual_result: null, issue_link: null, executed_by: null },
+        ],
+        priority_summary: [
+          { priority: "보통", total: 1, pass: 0, fail: 1, block: 0, na: 0, not_started: 0, pass_rate: 0 },
+        ],
+      });
+      render(<ReportView projectId={1} />);
+      expect(await screen.findByTestId("issue-row-P-1")).toHaveTextContent("Critical");
+      expect(screen.getByTestId("priority-row-보통")).toHaveTextContent("Normal");
+    } finally {
+      await i18n.changeLanguage("ko");
+    }
   });
 
   it("생성일과 완료일을 따로 표시한다", async () => {

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { reportsApi, testRunsApi } from "../api";
 import type { ReportBreakdownRow, ReportData, TestRun } from "../types";
 import { resolveIssueUrl } from "../utils/issueLink";
+import { priorityDisplayMap } from "../utils/priority";
 import toast from "react-hot-toast";
 
 const RESULT_COLOR: Record<string, string> = {
@@ -38,6 +39,9 @@ interface Props {
 
 export default function ReportView({ projectId }: Props) {
   const { t, i18n } = useTranslation("report");
+  // 우선순위 표시 이름은 그리드와 같다(testcase 네임스페이스). 요약 표와 목록이 같은 이름을 쓴다.
+  const { t: tcT } = useTranslation("testcase");
+  const priorityDisplay = useMemo(() => priorityDisplayMap(tcT), [tcT]);
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [report, setReport] = useState<ReportData | null>(null);
@@ -310,8 +314,10 @@ export default function ReportView({ projectId }: Props) {
                     return (
                       <tr key={i} data-testid={`issue-row-${f.test_case?.tc_id}`}>
                         <td style={styles.td}>{f.test_case?.tc_id || "-"}</td>
-                        <td style={styles.td}>{f.test_case?.priority || "-"}</td>
-                        <td style={styles.td}>{f.test_case?.category || "-"}</td>
+                        <td style={styles.td}>
+                          {f.test_case?.priority ? (priorityDisplay[f.test_case.priority] ?? f.test_case.priority) : t("unsetPriority")}
+                        </td>
+                        <td style={styles.td}>{f.test_case?.category || t("unsetCategory")}</td>
                         <td style={{ ...styles.td, color: RESULT_COLOR[f.result] ?? "var(--text-primary)", fontWeight: 600 }}>
                           {f.result}
                         </td>
@@ -371,7 +377,7 @@ export default function ReportView({ projectId }: Props) {
                 <tbody>
                   {report.priority_summary.map((row) => (
                     <tr key={row.priority ?? "__unset"} data-testid={`priority-row-${row.priority ?? "unset"}`}>
-                      <td style={styles.td}>{row.priority ?? t("unsetPriority")}</td>
+                      <td style={styles.td}>{row.priority ? (priorityDisplay[row.priority] ?? row.priority) : t("unsetPriority")}</td>
                       {breakdownCells(row, "priority", row.priority ?? "unset")}
                     </tr>
                   ))}
@@ -392,9 +398,9 @@ export default function ReportView({ projectId }: Props) {
               </thead>
               <tbody>
                 {report.category_summary.map((row) => (
-                  <tr key={row.category} data-testid={`category-row-${row.category}`}>
-                    <td style={styles.td}>{row.category}</td>
-                    {breakdownCells(row, "category", row.category)}
+                  <tr key={row.category === null ? "unset:" : `name:${row.category}`} data-testid={`category-row-${row.category ?? "unset"}`}>
+                    <td style={styles.td}>{row.category ?? t("unsetCategory")}</td>
+                    {breakdownCells(row, "category", row.category ?? "unset")}
                   </tr>
                 ))}
               </tbody>

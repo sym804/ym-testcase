@@ -161,6 +161,11 @@ const TEXT_ON_BG: { fg: string; bg: string; 설명: string }[] = [
   // 헤더는 배경이 따로다. 카드 기준으로 재면 흰 글자가 늘 미달로 나온다.
   { fg: "text-header", bg: "bg-header", 설명: "헤더 글자" },
   { fg: "text-header-secondary", bg: "bg-header", 설명: "헤더 보조 글자" },
+  // TC 관리와 테스트 수행 그리드의 우선순위 칸. 행 hover·선택 상태는 아래 그리드 검사가 본다.
+  { fg: "priority-critical", bg: "bg-card", 설명: "우선순위 매우 높음" },
+  { fg: "priority-high", bg: "bg-card", 설명: "우선순위 높음" },
+  { fg: "priority-normal", bg: "bg-card", 설명: "우선순위 보통" },
+  { fg: "priority-low", bg: "bg-card", 설명: "우선순위 낮음" },
 ];
 
 /**
@@ -224,7 +229,7 @@ describe("테마 토큰의 명암비", () => {
 
     for (const theme of Object.keys(THEME_BLOCKS) as (keyof typeof THEME_BLOCKS)[]) {
       for (const name of Object.keys(themeTokens(theme))) {
-        if (!/^(text|color)-/.test(name)) continue;
+        if (!/^(text|color|priority)-/.test(name)) continue;
         if (covered.has(name) || NOT_TEXT_TOKENS.has(name)) continue;
         샌_것.push(`${theme}:--${name}`);
       }
@@ -235,6 +240,58 @@ describe("테마 토큰의 명암비", () => {
       "글자색으로 쓰는 토큰이면 TEXT_ON_BG 에, 아니면 NOT_TEXT_TOKENS 에 넣어라",
     ).toEqual([]);
   });
+
+  it.each(Object.keys(THEME_BLOCKS) as (keyof typeof THEME_BLOCKS)[])(
+    "%s 테마: 그리드 행 hover·선택 상태에서도 우선순위 글자가 4.5:1 을 넘는다",
+    (theme) => {
+      // 그리드는 카드 배경 위에 반투명 파랑을 덧씌운다. 값은 테마별 그리드 블록의
+      // --ag-row-hover-color 와 --ag-selected-row-background-color 에서 읽는다.
+      // ★다크는 그리드 전용 값을 따로 둔다([data-theme="dark"] .ag-theme-alpine).
+      //   파일 전체에서 첫 선언을 읽으면 다크 검사가 라이트 값을 보게 된다(QA1 지적).
+      // 예전 고정색은 다크 "보통" 이 카드 위에서부터 3.22:1 이었다.
+      const css = fs.readFileSync(path.join(SRC, "index.css"), "utf-8");
+      const tokenBlock = css.match(THEME_BLOCKS[theme])![1];
+      const GRID_BLOCKS = {
+        라이트: /(?:^|\n)\.ag-theme-alpine,\s*\.ag-theme-quartz\s*\{([\s\S]*?)\}/,
+        다크: /\[data-theme="dark"\]\s+\.ag-theme-alpine,\s*\[data-theme="dark"\]\s+\.ag-theme-quartz\s*\{([\s\S]*?)\}/,
+      } as const;
+      const gridBlock = css.match(GRID_BLOCKS[theme]);
+      expect(gridBlock, `${theme} 그리드 블록을 못 찾았다`).toBeTruthy();
+      const decl = (src: string, name: string) =>
+        src.match(new RegExp(`--${name}:\\s*([^;]+);`))?.[1].trim();
+      const rgba = (name: string) => {
+        let v = decl(gridBlock![1], name);
+        expect(v, `${theme} 그리드 블록에 --${name} 이 없다`).toBeTruthy();
+        const ref = v!.match(/^var\(--([A-Za-z0-9_-]+)\)$/);
+        if (ref) v = decl(tokenBlock, ref[1]);   // var(--primary-light) 는 테마 토큰으로 푼다
+        const m = v?.match(/^rgba\(([^)]+)\)$/);
+        expect(m, `--${name} 값을 rgba 로 풀지 못했다: ${v}`).toBeTruthy();
+        const [r, g, b, a] = m![1].split(",").map((x) => parseFloat(x));
+        return { rgb: [r, g, b], a };
+      };
+      const hover = rgba("ag-row-hover-color");
+      const selected = rgba("ag-selected-row-background-color");
+      const toHex = (c: number[]) => "#" + c.map((x) => Math.round(x).toString(16).padStart(2, "0")).join("");
+      const over = (base: number[], o: { rgb: number[]; a: number }) =>
+        base.map((v, i) => o.rgb[i] * o.a + v * (1 - o.a));
+      const t = themeTokens(theme);
+      const card = [1, 3, 5].map((i) => parseInt(t["bg-card"].slice(i, i + 2), 16));
+      const backgrounds = {
+        hover: toHex(over(card, hover)),
+        selected: toHex(over(card, selected)),
+        "selected+hover": toHex(over(over(card, selected), hover)),
+      };
+      const 미달: string[] = [];
+      for (const fg of ["priority-critical", "priority-high", "priority-normal", "priority-low"]) {
+        expect(t[fg], `${theme} 테마에 --${fg} 가 없다`).toBeTruthy();
+        for (const [state, bg] of Object.entries(backgrounds)) {
+          const r = contrast(t[fg], bg);
+          if (r < 4.5) 미달.push(`--${fg} on ${state} ${r.toFixed(2)}`);
+        }
+      }
+      expect(미달, "AA 4.5:1 미달 - " + 미달.join(" / ")).toEqual([]);
+    },
+  );
 
   it("검사기가 실제로 미달을 잡는다", () => {
     // 이 계산이 맞는지 확인한다. 회색 위 회색은 어느 기준으로도 미달이다.

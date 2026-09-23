@@ -248,8 +248,9 @@ export interface ReportBreakdownRow {
   pass_rate: number | null;
 }
 
+/** `category` 가 null 이면 분류를 비워 둔 TC 들이다. */
 export interface ReportCategoryRow extends ReportBreakdownRow {
-  category: string;
+  category: string | null;
 }
 
 /** `priority` 가 null 이면 우선순위를 비워 둔 TC 들이다. */
