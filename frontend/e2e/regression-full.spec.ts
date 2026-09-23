@@ -403,12 +403,14 @@ test.describe("5. TC 관리", () => {
   });
 
   test("TC-TCM-007: TC 삭제", async ({ page }) => {
-    // 행 하나로 검증한다. 행이 여럿일 때 체크박스 한 칸만 켜는 것이 ag-grid 에서
-    // 안정적으로 재현되지 않아(2건 선택되거나 0건이 됨) 조건을 단순하게 둔다.
     await addSheetAndRows(page, "Delete", 1);
 
-    await page.locator('.ag-row[row-index="0"] input[type="checkbox"]').first().check();
+    // ★체크박스를 누르지 않는다. 행 추가는 100ms 뒤 새 행을 자동으로 선택한다
+    //   (TestCaseGrid addRows 의 setTimeout). 그 사이에 누르면 자동 선택과 겹쳐
+    //   선택이 풀리고 "Clicking the checkbox did not change its state" 로 깨졌다.
+    //   예전 주석의 "행이 여럿이면 2건 선택되거나 0건" 도 같은 원인이다.
     await expect(page.locator(".ag-row-selected")).toHaveCount(1);
+    await expect(page.locator('.ag-row[row-index="0"] input[type="checkbox"]').first()).toBeChecked();
 
     const delBtn = page.getByRole("button", { name: /선택 삭제/ });
     await expect(delBtn).toBeEnabled();
@@ -423,10 +425,9 @@ test.describe("5. TC 관리", () => {
     // 복제가 통째로 고장 나도 통과하는 테스트였다.
     await addSheetAndRows(page, "Copy", 1);
 
-    // 래퍼(.ag-selection-checkbox)를 누르면 포커스만 가고 체크가 안 걸리는 경우가 있다.
-    // 실제 input 을 check() 로 눌러 상태를 보장한다.
-    await page.locator('.ag-row[row-index="0"] input[type="checkbox"]').first().check();
+    // 새 행은 자동으로 선택된다. 누르면 자동 선택과 겹쳐 풀릴 수 있다(TC-TCM-007 주석).
     await expect(page.locator(".ag-row-selected")).toHaveCount(1);
+    await expect(page.locator('.ag-row[row-index="0"] input[type="checkbox"]').first()).toBeChecked();
 
     const cloneBtn = page.getByRole("button", { name: /선택 복제/ });
     await expect(cloneBtn).toBeEnabled();
