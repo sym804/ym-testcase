@@ -17,13 +17,30 @@ router = APIRouter(
 
 # ── SQL 집계 헬퍼 ────────────────────────────────────────────────────────────
 
-def _latest_run_subquery(project_id: int, db: Session, date_from: str = None, date_to: str = None):
-    """TC별 최신 런의 test_run_id를 구하는 서브쿼리."""
+def version_key(version) -> str:
+    """버전 묶음 키. 앞의 v 와 대소문자 · 공백을 무시한다("v1.5" 와 "1.5" 는 하나). 수행 목록 트리와 같은 규칙."""
+    return (version or "").strip().lower().lstrip("v")
+
+
+def _version_filter(version: str):
+    """수행의 버전이 version 묶음에 드는지. SQL 에서 같은 규칙으로 정규화한다."""
+    return func.ltrim(func.lower(func.trim(func.coalesce(TestRun.version, ""))), "v") == version_key(version)
+
+
+def _latest_run_subquery(project_id: int, db: Session, date_from: str = None, date_to: str = None,
+                         version: str = None):
+    """TC별 최신 런의 test_run_id를 구하는 서브쿼리.
+
+    version 을 주면 그 버전 묶음의 수행만 본다(09-30). 예전에는 "전체" 가 프로젝트의 모든
+    수행을 섞어 v1.4 결과가 v1.5 현황에 끼었다.
+    """
     run_filter = [TestRun.project_id == project_id]
     if date_from:
         run_filter.append(TestRun.created_at >= datetime.fromisoformat(date_from))
     if date_to:
         run_filter.append(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+    if version:
+        run_filter.append(_version_filter(version))
 
     return (
         db.query(
@@ -112,6 +129,7 @@ def dashboard_summary(
     run_id: Optional[int] = Query(None),
     date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
+    version: Optional[str] = Query(None, description="버전 묶음(앞의 v · 대소문자 무시). 없으면 전체"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -136,7 +154,7 @@ def dashboard_summary(
         return {"total": total, **c, **_rates(c, total)}
 
     # 전체 모드: SQL 집계로 TC별 최신 결과 카운트
-    latest = _latest_run_subquery(project_id, db, date_from, date_to)
+    latest = _latest_run_subquery(project_id, db, date_from, date_to, version)
     row = (
         _active_counts_query(db, project_id)
         .join(
@@ -163,6 +181,7 @@ def priority_distribution(
     run_id: Optional[int] = Query(None),
     date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
+    version: Optional[str] = Query(None, description="버전 묶음(앞의 v · 대소문자 무시). 없으면 전체"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -205,7 +224,7 @@ def priority_distribution(
             .all()
         )
     else:
-        latest = _latest_run_subquery(project_id, db, date_from, date_to)
+        latest = _latest_run_subquery(project_id, db, date_from, date_to, version)
         rows = (
             db.query(
                 TestCase.priority,
@@ -253,6 +272,7 @@ def category_breakdown(
     run_id: Optional[int] = Query(None),
     date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
+    version: Optional[str] = Query(None, description="버전 묶음(앞의 v · 대소문자 무시). 없으면 전체"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -294,7 +314,7 @@ def category_breakdown(
             .all()
         )
     else:
-        latest = _latest_run_subquery(project_id, db, date_from, date_to)
+        latest = _latest_run_subquery(project_id, db, date_from, date_to, version)
         rows = (
             db.query(
                 TestCase.category,
@@ -342,6 +362,7 @@ def round_comparison(
     date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
     run_name: Optional[str] = Query(None, description="회차를 묶을 수행 이름. 없으면 가장 최근 수행의 이름"),
+    version: Optional[str] = Query(None, description="버전 묶음(앞의 v · 대소문자 무시). 없으면 전체"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -360,6 +381,8 @@ def round_comparison(
         run_q = run_q.filter(TestRun.created_at >= datetime.fromisoformat(date_from))
     if date_to:
         run_q = run_q.filter(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+    if version:
+        run_q = run_q.filter(_version_filter(version))
 
     if not run_name:
         latest = run_q.order_by(TestRun.created_at.desc(), TestRun.id.desc()).first()
@@ -446,6 +469,7 @@ def assignee_summary(
     run_id: Optional[int] = Query(None),
     date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
+    version: Optional[str] = Query(None, description="버전 묶음(앞의 v · 대소문자 무시). 없으면 전체"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -463,6 +487,7 @@ def get_heatmap(
     run_id: Optional[int] = Query(None),
     date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
+    version: Optional[str] = Query(None, description="버전 묶음(앞의 v · 대소문자 무시). 없으면 전체"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -491,7 +516,7 @@ def get_heatmap(
         ]
 
     # 전체 모드: TC별 최신 런 결과 기준 FAIL만 집계
-    latest = _latest_run_subquery(project_id, db, date_from, date_to)
+    latest = _latest_run_subquery(project_id, db, date_from, date_to, version)
     query = (
         db.query(
             TestCase.category,

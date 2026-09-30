@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TestRunStatus } from "../types";
 import type { TestRun } from "../types";
+import { versionKey } from "../utils/version";
 
 /**
  * 수행 목록 트리. 버전 -> 수행 이름 -> 회차 세 단계로 묶고, 버전과 이름은 펼치고 접는다.
@@ -17,10 +18,6 @@ interface Props {
   runs: TestRun[];
   selectedRunId: number | null;
   onSelect: (run: TestRun) => void;
-}
-
-function versionKey(version: string | null | undefined): string {
-  return (version ?? "").trim().toLowerCase().replace(/^v/, "");
 }
 
 /** 환경도 대소문자를 무시해 묶는다("Prod" 와 "prod" 는 하나). 표시는 처음 만난 표기다(09-30 지시) */

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Dashboard from "../components/Dashboard";
 
@@ -162,13 +162,36 @@ describe("Dashboard", () => {
     vi.mocked(dashboardApi.heatmap).mockResolvedValue(mockHeatmap);
     vi.mocked(testRunsApi.list).mockResolvedValue(mockRuns);
 
-    // 첫 번째 목록이 위쪽 「테스트 수행」 이다. 두 번째는 회차 차트의 테스트 선택이다
-    const select = screen.getAllByRole("combobox")[0];
-    await user.selectOptions(select, "1");
+    await user.selectOptions(screen.getByLabelText("테스트 수행 선택"), "1");
 
     await waitFor(() => {
-      expect(dashboardApi.summary).toHaveBeenCalledWith(1, 1, undefined, undefined);
+      expect(dashboardApi.summary).toHaveBeenCalledWith(1, 1, undefined, undefined, undefined);
     });
+  });
+
+  it("버전을 고르면 그 버전으로 집계하고 수행 · 테스트 목록도 그 버전 안으로 좁힌다", async () => {
+    const user = userEvent.setup();
+    vi.mocked(testRunsApi.list).mockResolvedValue([
+      { ...mockRuns[0], id: 1, name: "R1 수행", version: "v1.5", created_at: "2026-09-30" },
+      { ...mockRuns[0], id: 2, name: "옛 수행", version: "1.4", created_at: "2026-09-01" },
+      { ...mockRuns[0], id: 3, name: "R1 수행", version: "1.5", created_at: "2026-09-29" },
+    ] as never);
+    render(<Dashboard projectId={1} />);
+    const versionSelect = await screen.findByTestId("version-select");
+    // "v1.5" 와 "1.5" 는 한 묶음이라 버전은 둘뿐이다(전체 제외)
+    expect(within(versionSelect).getAllByRole("option").map((o) => o.textContent)).toEqual(["전체 버전", "v1.5", "1.4"]);
+    expect(screen.getByTestId("scope-note")).toHaveTextContent("집계 기준: 전체 버전 · TC별 최신 결과 · 전체 기간");
+
+    await user.selectOptions(versionSelect, "1.5");
+    await waitFor(() => {
+      expect(dashboardApi.summary).toHaveBeenLastCalledWith(1, undefined, undefined, undefined, "1.5");
+      expect(dashboardApi.heatmap).toHaveBeenLastCalledWith(1, undefined, undefined, undefined, "1.5");
+      expect(dashboardApi.rounds).toHaveBeenLastCalledWith(1, undefined, undefined, undefined, "1.5");
+    });
+    expect(screen.getByTestId("scope-note")).toHaveTextContent("집계 기준: v1.5 · TC별 최신 결과");
+    // 수행 선택에는 v1.5 묶음의 수행만 남는다
+    const runOptions = within(screen.getByLabelText("테스트 수행 선택")).getAllByRole("option").map((o) => o.textContent);
+    expect(runOptions).toEqual(["전체", "R1 수행 (R1)", "R1 수행 (R1)"]);
   });
 
   it("히트맵 데이터가 비어있으면 히트맵 섹션을 표시하지 않는다", async () => {
@@ -210,7 +233,7 @@ describe("Dashboard", () => {
     const group = await screen.findByTestId("round-group");
     await user.selectOptions(group, "Full 테스트");
     await waitFor(() => {
-      expect(dashboardApi.rounds).toHaveBeenLastCalledWith(1, undefined, undefined, "Full 테스트");
+      expect(dashboardApi.rounds).toHaveBeenLastCalledWith(1, undefined, undefined, "Full 테스트", undefined);
     });
   });
 

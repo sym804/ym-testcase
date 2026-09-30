@@ -13,6 +13,7 @@ import type {
 } from "../types";
 import toast from "react-hot-toast";
 import { PRIORITY_OPTIONS, priorityDisplayMap } from "../utils/priority";
+import { versionGroups, versionKey } from "../utils/version";
 
 interface Props {
   projectId: number;
@@ -56,18 +57,21 @@ export default function Dashboard({ projectId }: Props) {
   // 라운드별 비교·추이가 묶을 수행 이름. 비우면 위에서 고른 수행의 이름, 그것도 없으면
   // 서버가 가장 최근 수행의 이름을 쓴다.
   const [trendName, setTrendName] = useState<string>("");
+  // 버전 묶음. 비우면 전체. 수행 목록 트리와 같은 묶음 규칙이라 v1.5 와 1.5 는 하나다(09-30).
+  const [selectedVersion, setSelectedVersion] = useState<string>("");
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       // 위에서 수행을 고르면 그 수행의 회차 추이를 본다
       const selectedName = runs.find((x) => x.id === selectedRunId)?.name;
+      const ver = selectedVersion || undefined;
       const [s, p, c, r, h, runList] = await Promise.all([
-        dashboardApi.summary(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
-        dashboardApi.priority(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
-        dashboardApi.category(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
-        dashboardApi.rounds(projectId, dateFrom || undefined, dateTo || undefined, trendName || selectedName || undefined),
-        dashboardApi.heatmap(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
+        dashboardApi.summary(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined, ver),
+        dashboardApi.priority(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined, ver),
+        dashboardApi.category(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined, ver),
+        dashboardApi.rounds(projectId, dateFrom || undefined, dateTo || undefined, trendName || selectedName || undefined, ver),
+        dashboardApi.heatmap(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined, ver),
         testRunsApi.list(projectId),
       ]);
       setSummary(s);
@@ -84,7 +88,7 @@ export default function Dashboard({ projectId }: Props) {
     }
     // runs 는 목록을 받은 뒤 갱신되므로 의존성에 넣지 않는다(넣으면 다시 불러오기를 되풀이한다)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, selectedRunId, dateFrom, dateTo, trendName]);
+  }, [projectId, selectedRunId, dateFrom, dateTo, trendName, selectedVersion]);
 
   useEffect(() => {
     loadData();
@@ -174,7 +178,16 @@ export default function Dashboard({ projectId }: Props) {
   };
   const executedRounds = rounds.filter((r) => (r.executed ?? r.pass + r.fail + r.block) > 0).length;
   const roundName = rounds[0]?.name;
-  const runNames = [...new Set(runs.map((r) => r.name))];
+  // 버전을 고르면 수행 선택과 회차 차트의 테스트 목록도 그 버전 안에서만 고른다
+  const versions = versionGroups(runs);
+  const runsInScope = selectedVersion ? runs.filter((r) => versionKey(r.version) === selectedVersion) : runs;
+  const runNames = [...new Set(runsInScope.map((r) => r.name))];
+  const selectedRun = runs.find((r) => r.id === selectedRunId);
+  const scopeText = [
+    selectedVersion ? (versions.find((v) => v.key === selectedVersion)?.label || t("versionNone")) : t("versionAll"),
+    selectedRun ? `${selectedRun.name} (R${selectedRun.round})` : t("scopeLatest"),
+    dateFrom ? `${dateFrom} ~ ${dateTo || t("today")}` : t("periodAll"),
+  ].join(" · ");
 
   // 툴팁에 어떤 수행인지와 실행 건수를 싣는다. x 축의 R1, R2 만으로는 알 수 없다.
   const roundTooltip = {
@@ -210,12 +223,31 @@ export default function Dashboard({ projectId }: Props) {
 
   return (
     <div>
-      {/* Run selector */}
+      {/* Version + run selector. 버전 묶음 -> 수행 순으로 좁힌다(수행 목록 트리와 같은 층) */}
       <div style={styles.selectorRow}>
-        <label style={styles.selectorLabel}>{t("testRun")}</label>
+        <label style={styles.selectorLabel}>{t("version")}</label>
+        <select
+          style={styles.select}
+          value={selectedVersion}
+          aria-label={t("versionFilter")}
+          data-testid="version-select"
+          onChange={(e) => {
+            setSelectedVersion(e.target.value);
+            // 버전을 변경하면 그 버전 밖의 수행 · 테스트 선택은 푼다
+            setSelectedRunId(undefined);
+            setTrendName("");
+          }}
+        >
+          <option value="">{t("versionAll")}</option>
+          {versions.map((v) => (
+            <option key={v.key || "__none"} value={v.key}>{v.label || t("versionNone")}</option>
+          ))}
+        </select>
+        <label style={{ ...styles.selectorLabel, marginLeft: 12 }}>{t("testRun")}</label>
         <select
           style={styles.select}
           value={selectedRunId ?? ""}
+          aria-label={t("runFilter")}
           onChange={(e) => {
             setSelectedRunId(e.target.value ? Number(e.target.value) : undefined);
             // 수행을 변경하면 회차 차트도 그 수행의 테스트로 돌아간다
@@ -223,11 +255,17 @@ export default function Dashboard({ projectId }: Props) {
           }}
         >
           <option value="">{t("all")}</option>
-          {runs.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name} (R{r.round})
-            </option>
-          ))}
+          {selectedVersion
+            ? runsInScope.map((r) => (
+                <option key={r.id} value={r.id}>{r.name} (R{r.round})</option>
+              ))
+            : versions.map((v) => (
+                <optgroup key={v.key || "__none"} label={v.label || t("versionNone")}>
+                  {runs.filter((r) => versionKey(r.version) === v.key).map((r) => (
+                    <option key={r.id} value={r.id}>{r.name} (R{r.round})</option>
+                  ))}
+                </optgroup>
+              ))}
         </select>
 
         {/* 날짜 필터 */}
@@ -277,6 +315,8 @@ export default function Dashboard({ projectId }: Props) {
           }}
         />
       </div>
+
+      <div style={styles.scopeNote} data-testid="scope-note">{t("scopeNote", { scope: scopeText })}</div>
 
       {/* Summary cards */}
       <div style={styles.cardGrid}>
@@ -668,6 +708,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   chartSubtitle: { fontWeight: 500, color: "var(--text-secondary)", fontSize: 13 },
   chartNote: { fontSize: 12, color: "var(--text-secondary)", margin: "-6px 0 10px" },
+  scopeNote: { fontSize: 12, color: "var(--text-secondary)", margin: "-12px 0 16px" },
   chartTitle: { margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--text-primary)" },
   tablesRow: {
     display: "grid",

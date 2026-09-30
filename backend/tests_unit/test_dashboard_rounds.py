@@ -77,7 +77,7 @@ def _run(env, name, round_, hours, results, status=TestRunStatus.completed):
 def _rounds(env, **kw):
     db, project, user, _ = env
     return round_comparison(project.id, date_from=None, date_to=None, db=db, current_user=user,
-                            **{"run_name": None, **kw})
+                            **{"run_name": None, "version": None, **kw})
 
 
 def test_같은_이름끼리만_회차로_묶는다(env):

@@ -327,11 +327,12 @@ export const testRunsApi = {
 
 // ─── Dashboard ───────────────────────────────────────
 export const dashboardApi = {
-  summary: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string) => {
+  summary: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string, version?: string) => {
     const params: Record<string, string | number> = {};
     if (runId) params.run_id = runId;
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (version) params.version = version;
     const res = await client.get<DashboardSummary>(
       `/api/projects/${projectId}/dashboard/summary`,
       { params: Object.keys(params).length ? params : undefined }
@@ -339,11 +340,12 @@ export const dashboardApi = {
     return res.data;
   },
 
-  priority: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string) => {
+  priority: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string, version?: string) => {
     const params: Record<string, string | number> = {};
     if (runId) params.run_id = runId;
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (version) params.version = version;
     const res = await client.get<PriorityDistribution[]>(
       `/api/projects/${projectId}/dashboard/priority`,
       { params: Object.keys(params).length ? params : undefined }
@@ -351,11 +353,12 @@ export const dashboardApi = {
     return res.data;
   },
 
-  category: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string) => {
+  category: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string, version?: string) => {
     const params: Record<string, string | number> = {};
     if (runId) params.run_id = runId;
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (version) params.version = version;
     const res = await client.get<CategoryBreakdown[]>(
       `/api/projects/${projectId}/dashboard/category`,
       { params: Object.keys(params).length ? params : undefined }
@@ -364,11 +367,12 @@ export const dashboardApi = {
   },
 
   // runName: 회차로 묶을 수행 이름. 없으면 서버가 가장 최근 수행의 이름을 쓴다.
-  rounds: async (projectId: number, dateFrom?: string, dateTo?: string, runName?: string) => {
+  rounds: async (projectId: number, dateFrom?: string, dateTo?: string, runName?: string, version?: string) => {
     const params: Record<string, string | number> = {};
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
     if (runName) params.run_name = runName;
+    if (version) params.version = version;
     const res = await client.get<RoundComparison[]>(
       `/api/projects/${projectId}/dashboard/rounds`,
       { params: Object.keys(params).length ? params : undefined }
@@ -376,11 +380,12 @@ export const dashboardApi = {
     return res.data;
   },
 
-  heatmap: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string) => {
+  heatmap: async (projectId: number, runId?: number, dateFrom?: string, dateTo?: string, version?: string) => {
     const params: Record<string, string | number> = {};
     if (runId) params.run_id = runId;
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (version) params.version = version;
     const res = await client.get<{ category: string; priority: string; fail_count: number }[]>(
       `/api/projects/${projectId}/dashboard/heatmap`,
       { params: Object.keys(params).length ? params : undefined }
