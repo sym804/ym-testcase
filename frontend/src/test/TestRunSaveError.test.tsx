@@ -145,3 +145,37 @@ describe("결과 저장이 거부될 때", () => {
     expect(vi.mocked(testRunsApi.getOne).mock.calls.length).toBe(before);
   });
 });
+
+describe("낙관적 잠금", () => {
+  it("저장에 읽어 둔 executed_at 을 보내고, 응답의 새 값을 다음 저장에 쓴다", async () => {
+    vi.mocked(testRunsApi.submitResults).mockResolvedValue([{ ...row, executed_at: "2026-09-30T15:00:00" }] as any);
+    await openRun();
+
+    gridProps.onCellValueChanged({ data: { ...row, result: "FAIL" } });
+    await waitFor(() => {
+      expect(testRunsApi.submitResults).toHaveBeenCalledWith(1, 7, [
+        expect.objectContaining({ test_case_id: 1, result: "FAIL", expected_executed_at: "2026-01-01" }),
+      ]);
+    }, { timeout: 3000 });
+
+    gridProps.onCellValueChanged({ data: { ...row, result: "BLOCK" } });
+    await waitFor(() => {
+      expect(testRunsApi.submitResults).toHaveBeenLastCalledWith(1, 7, [
+        expect.objectContaining({ result: "BLOCK", expected_executed_at: "2026-09-30T15:00:00" }),
+      ]);
+    }, { timeout: 3000 });
+  });
+
+  it("다른 사용자가 먼저 저장해 409 가 오면 그 문구를 띄우고 서버 값을 다시 읽는다", async () => {
+    vi.mocked(testRunsApi.submitResults).mockRejectedValue({
+      response: { status: 409, data: { detail: "다른 사용자가 먼저 저장한 행이 있습니다: TC-001. 최신 값으로 다시 읽습니다." } },
+    });
+    await openRun();
+    const before = vi.mocked(testRunsApi.getOne).mock.calls.length;
+    gridProps.onCellValueChanged({ data: { ...row, result: "FAIL" } });
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("다른 사용자가 먼저 저장한 행이 있습니다: TC-001"));
+      expect(vi.mocked(testRunsApi.getOne).mock.calls.length).toBe(before + 1);
+    }, { timeout: 3000 });
+  });
+});

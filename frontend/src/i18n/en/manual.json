@@ -414,7 +414,8 @@
     "priorityColor_p": "The Priority cell uses the same colors as TC Management (Critical red, High orange, Normal blue, Low green).",
     "list_li4": "The search box above the list filters by run name, and the status (in progress only / completed only) and environment filters can be combined. Environment matching ignores letter case (Prod and prod are one).",
     "rm_nextRound": "Next round",
-    "rm_nextRound_desc": "Creates the next round under the same name. The round is the highest round of that name + 1; version, environment, sheet scope and TC list are inherited and results start as NS. If the current run is still in progress you are asked whether to complete it first. The report comparison picks the previous round of the same name automatically, so nothing else needs to be set."
+    "rm_nextRound_desc": "Creates the next round under the same name. The round is the highest round of that name + 1; version, environment, sheet scope and TC list are inherited and results start as NS. If the current run is still in progress you are asked whether to complete it first. The report comparison picks the previous round of the same name automatically, so nothing else needs to be set.",
+    "concurrent_p": "If two people edit the same row at about the same time, the later save is rejected with a notice that another user saved first, and the server values are reloaded. The first save stays; re-enter yours."
   },
   "testPlans": {
     "title": "9. Test Plans / Milestones",

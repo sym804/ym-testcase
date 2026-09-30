@@ -168,9 +168,11 @@ export default function TestRunManager({ projectId, project }: Props) {
       issue_link: r.issue_link || undefined,
       remarks: r.remarks || undefined,
       duration_sec: r.duration_sec ?? undefined,
+      expected_executed_at: resultTokenRef.current[r.test_case_id] ?? undefined,
     }));
     try {
-      await testRunsApi.submitResults(projectId, selectedRun.id, payload);
+      const saved = await testRunsApi.submitResults(projectId, selectedRun.id, payload);
+      rememberTokens(saved);
     } catch (err) {
       handleSaveError(err);
     }
@@ -300,6 +302,8 @@ export default function TestRunManager({ projectId, project }: Props) {
           ...r,
           result: r.result === "NS" ? "" : r.result === "NA" ? "N/A" : r.result,
         }));
+        resultTokenRef.current = {};
+        rememberTokens(mapped);
         // 시트 탭 배지용: 이 런이 실제로 담고 있는 시트별 결과 수
         const counts: Record<string, number> = {};
         for (const r of mapped) {
@@ -387,6 +391,12 @@ export default function TestRunManager({ projectId, project }: Props) {
   //   붙여넣기 뒤 Enter 로 다음 행에 바로 넘어가는 조작에서 물린다.
   //   TC 관리 그리드(TestCaseGrid)는 처음부터 행별 키였고 이쪽만 전역이었다.
   const saveResultRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // 행마다 마지막으로 읽거나 저장한 executed_at. 저장 때 같이 보내 다른 사용자의 저장을 덮지
+  // 않게 한다(낙관적 잠금). 그리드 행 데이터를 건드리지 않으려고 ref 에 둔다.
+  const resultTokenRef = useRef<Record<number, string | null>>({});
+  const rememberTokens = (rows: { test_case_id: number; executed_at: string | null }[]) => {
+    for (const r of rows) resultTokenRef.current[r.test_case_id] = r.executed_at ?? null;
+  };
 
   const saveOneResult = useCallback(async (row: TestResult) => {
     if (!selectedRun) return;
@@ -398,9 +408,11 @@ export default function TestRunManager({ projectId, project }: Props) {
       remarks: row.remarks || undefined,
       // 타이머가 잰 시간. 백엔드는 값이 있을 때만 갱신한다.
       duration_sec: row.duration_sec ?? undefined,
+      expected_executed_at: resultTokenRef.current[row.test_case_id] ?? undefined,
     };
     try {
-      await testRunsApi.submitResults(projectId, selectedRun.id, [mapped]);
+      const saved = await testRunsApi.submitResults(projectId, selectedRun.id, [mapped]);
+      rememberTokens(saved);
     } catch (err) {
       handleSaveError(err);
     }

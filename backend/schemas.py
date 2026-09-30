@@ -322,6 +322,9 @@ class TestResultCreate(BaseModel):
     started_at: Optional[str] = None
     finished_at: Optional[str] = None
     duration_sec: Optional[float] = None
+    #: 화면이 읽어 둔 행의 executed_at. 보내면 서버가 그 뒤에 다른 저장이 있었는지 확인해
+    #: 있으면 409 로 거절한다(낙관적 잠금). 비우면 예전처럼 검사하지 않는다(스크립트 · MCP).
+    expected_executed_at: Optional[str] = None
 
 
 class TestResultUpdate(BaseModel):
