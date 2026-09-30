@@ -43,7 +43,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           justifyContent: "center",
           height: "100vh",
           gap: 16,
-          fontFamily: "sans-serif",
+          fontFamily: "var(--font-sans)",
           color: "#334155",
         }}
       >

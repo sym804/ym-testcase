@@ -21,6 +21,9 @@ import type {
   SavedFilter,
   FilterCondition,
   TCResultHistory,
+  RunIssue,
+  RunIssueCarryOverResult,
+  RunIssueInput,
 } from "../types";
 
 // ─── Auth ────────────────────────────────────────────
@@ -301,9 +304,10 @@ export const testRunsApi = {
     return res.data;
   },
 
-  clone: async (projectId: number, runId: number) => {
+  // next_round: 이름은 그대로, 회차는 같은 이름 가운데 최댓값 + 1. 기본은 예전 복제("(복제)" 이름, 같은 회차).
+  clone: async (projectId: number, runId: number, opts?: { next_round?: boolean }) => {
     const res = await client.post<TestRun>(
-      `/api/projects/${projectId}/testruns/${runId}/clone`
+      `/api/projects/${projectId}/testruns/${runId}/clone${opts?.next_round ? "?next_round=true" : ""}`
     );
     return res.data;
   },
@@ -359,10 +363,12 @@ export const dashboardApi = {
     return res.data;
   },
 
-  rounds: async (projectId: number, dateFrom?: string, dateTo?: string) => {
+  // runName: 회차로 묶을 수행 이름. 없으면 서버가 가장 최근 수행의 이름을 쓴다.
+  rounds: async (projectId: number, dateFrom?: string, dateTo?: string, runName?: string) => {
     const params: Record<string, string | number> = {};
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (runName) params.run_name = runName;
     const res = await client.get<RoundComparison[]>(
       `/api/projects/${projectId}/dashboard/rounds`,
       { params: Object.keys(params).length ? params : undefined }
@@ -403,18 +409,20 @@ export const reportsApi = {
 
   // 파일 이름은 서버가 정한다(`{프로젝트}_Report_R{회차}`). 예전에는 화면이
   // `report_{id}` 로 덮어써서 받은 파일로는 어느 수행인지 알 수 없었다.
-  downloadPdf: async (projectId: number, runId: number): Promise<ReportFile> => {
+  // lang: PDF 문구 언어(ko/en). 화면 언어를 넘긴다. 없으면 서버 기본값(ko)이다.
+  downloadPdf: async (projectId: number, runId: number, lang?: string): Promise<ReportFile> => {
     const res = await client.get(
       `/api/projects/${projectId}/reports/pdf`,
-      { params: { run_id: runId }, responseType: "blob" }
+      { params: lang ? { run_id: runId, lang } : { run_id: runId }, responseType: "blob" }
     );
     return { blob: res.data, filename: filenameFromDisposition(res.headers?.["content-disposition"]) };
   },
 
-  downloadExcel: async (projectId: number, runId: number): Promise<ReportFile> => {
+  // lang: 요약 시트 문구 언어(ko/en). PDF 와 같은 규칙이다.
+  downloadExcel: async (projectId: number, runId: number, lang?: string): Promise<ReportFile> => {
     const res = await client.get(
       `/api/projects/${projectId}/reports/excel`,
-      { params: { run_id: runId }, responseType: "blob" }
+      { params: lang ? { run_id: runId, lang } : { run_id: runId }, responseType: "blob" }
     );
     return { blob: res.data, filename: filenameFromDisposition(res.headers?.["content-disposition"]) };
   },
@@ -705,6 +713,46 @@ export const testPlansApi = {
   listRuns: async (projectId: number, planId: number) => {
     const res = await client.get<TestRun[]>(
       `/api/projects/${projectId}/testplans/${planId}/runs`
+    );
+    return res.data;
+  },
+};
+
+// ─── Run Issues ─────────────────────────────────────
+export const runIssuesApi = {
+  list: async (projectId: number, runId: number) => {
+    const res = await client.get<RunIssue[]>(
+      `/api/projects/${projectId}/testruns/${runId}/issues`
+    );
+    return res.data;
+  },
+
+  create: async (projectId: number, runId: number, data: RunIssueInput) => {
+    const res = await client.post<RunIssue>(
+      `/api/projects/${projectId}/testruns/${runId}/issues`,
+      data
+    );
+    return res.data;
+  },
+
+  update: async (projectId: number, runId: number, issueId: number, data: Partial<RunIssueInput>) => {
+    const res = await client.put<RunIssue>(
+      `/api/projects/${projectId}/testruns/${runId}/issues/${issueId}`,
+      data
+    );
+    return res.data;
+  },
+
+  delete: async (projectId: number, runId: number, issueId: number) => {
+    await client.delete(`/api/projects/${projectId}/testruns/${runId}/issues/${issueId}`);
+  },
+
+  // 이전 회차 이슈 가져오기. fromRunId 를 비우면 서버가 리포트의 비교 대상을 쓴다.
+  // 비교 대상이 없으면 404 다. 같은 링크가 이미 있으면 건너뛴다.
+  carryOver: async (projectId: number, runId: number, fromRunId?: number) => {
+    const res = await client.post<RunIssueCarryOverResult>(
+      `/api/projects/${projectId}/testruns/${runId}/issues/carry-over`,
+      fromRunId ? { from_run_id: fromRunId } : {}
     );
     return res.data;
   },

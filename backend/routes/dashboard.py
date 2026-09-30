@@ -341,20 +341,38 @@ def round_comparison(
     project_id: int,
     date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
+    run_name: Optional[str] = Query(None, description="회차를 묶을 수행 이름. 없으면 가장 최근 수행의 이름"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
-    total_tc = db.query(TestCase).filter(TestCase.project_id == project_id, TestCase.deleted_at.is_(None)).count()
+    """같은 이름의 수행을 회차(R1, R2...) 순으로 돌려준다. 라운드별 비교와 Pass/Fail 추이가 쓴다.
 
-    # Group TestRuns by round number
+    ★예전에는 프로젝트의 모든 수행을 회차 번호로만 묶고 번호마다 가장 최근 것 하나를
+      골랐다. 이름이 다른 테스트가 한 줄로 이어져(계정·세션 정책 R1 다음이 Full 테스트
+      R2 같은 식) 추이로 읽을 수 없었고, 같은 R1 끼리 밀린 수행은 어디에도 안 나왔다.
+      리포트의 비교 대상과 같은 규칙으로 같은 이름끼리만 묶는다.
+    ★합격률은 리포트·요약 카드와 같은 분모(PASS+FAIL+BLOCK)다. 화면이 N/A 까지 넣어
+      다시 계산하던 것을 없앴다. 실행이 0건이면 0% 가 아니라 null 이다. 진행 중인
+      회차가 0% 로 찍혀 폭락처럼 보였다.
+    """
     run_q = db.query(TestRun).filter(TestRun.project_id == project_id)
     if date_from:
         run_q = run_q.filter(TestRun.created_at >= datetime.fromisoformat(date_from))
     if date_to:
         run_q = run_q.filter(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
-    runs = run_q.order_by(TestRun.round, TestRun.created_at.desc()).all()
 
-    # Use the latest run per round
+    if not run_name:
+        latest = run_q.order_by(TestRun.created_at.desc(), TestRun.id.desc()).first()
+        if latest is None:
+            return []
+        run_name = latest.name
+    runs = (
+        run_q.filter(TestRun.name == run_name)
+        .order_by(TestRun.round, TestRun.created_at.desc(), TestRun.id.desc())
+        .all()
+    )
+
+    # 같은 이름에 같은 회차가 둘이면(복제 등) 가장 최근 것을 쓴다
     seen_rounds = {}
     for run in runs:
         if run.round not in seen_rounds:
@@ -404,11 +422,17 @@ def round_comparison(
         c = counts_by_run.get(run.id, {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": run_total})
 
         executed = c["pass"] + c["fail"] + c["block"]
-        pass_rate = round(c["pass"] / executed * 100, 1) if executed > 0 else 0.0
-
         result.append({
-            "round": round_num, "total": run_total,
-            **c, "pass_rate": pass_rate,
+            "round": round_num,
+            "run_id": run.id,
+            "name": run.name,
+            "status": run.status.value if hasattr(run.status, "value") else run.status,
+            "created_at": run.created_at.isoformat() if run.created_at else None,
+            "total": run_total,
+            **c,
+            "executed": executed,
+            "pass_rate": round(c["pass"] / executed * 100, 1) if executed > 0 else None,
+            "fail_rate": round(c["fail"] / executed * 100, 1) if executed > 0 else None,
         })
 
     return result

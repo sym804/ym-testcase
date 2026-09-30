@@ -107,9 +107,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     const undoGroup: UndoGroup = [];
     const changedRows: TestCase[] = [];
 
-    // ★보이는 행만 바꾼다. forEachNode 는 필터와 무관하게 로드된 모든 행을 도는데,
+    // ★보이는 행만 변경한다. forEachNode 는 필터와 무관하게 로드된 모든 행을 도는데,
     //   모든 컬럼에 필터가 걸려 있고(defaultColDef.filter) 고급 필터도 있어서
-    //   화면에 없는 행까지 바뀌고 토스트의 건수도 보이지 않는 행을 포함했다.
+    //   화면에 없는 행까지 변경되고 토스트의 건수도 보이지 않는 행을 포함했다.
     //   같은 파일의 handleAutoFillTcId 는 처음부터 이 API 를 쓴다.
     api.forEachNodeAfterFilterAndSort((node) => {
       if (!node.data) return;
@@ -250,7 +250,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     }
   }, [projectId]);
 
-  // ★늦게 도착한 옛 응답이 새 응답을 덮지 않게 한다. 시트를 빠르게 바꾸거나 처음
+  // ★늦게 도착한 옛 응답이 새 응답을 덮지 않게 한다. 시트를 빠르게 변경하거나 처음
   //   열 때 요청이 겹치면, 사이드바는 A 시트인데 표는 B 시트(또는 전체)인 상태가
   //   된다. CompareView 와 같은 방식이다.
   const loadSeqRef = useRef(0);
@@ -350,7 +350,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       const builtIn: (ColDef & { _key?: string })[] = [
         // ★No 는 읽기 전용이다. 시트 안 순번이라 사람이 정할 값이 아니고, 서버도
         //   보낸 값을 쓰지 않는다. 편집을 열어 두면 화면에는 새 값이 남고 DB 에는
-        //   옛 값이 남아 새로고침 전까지 갈린다. 순서를 바꾸려면 드래그를 쓴다.
+        //   옛 값이 남아 새로고침 전까지 갈린다. 순서를 변경하려면 드래그를 쓴다.
         // ★드래그 정렬은 한 시트를 통째로 보고 있을 때만 켠다. 정렬은 보이는 행에
         //   1..N 을 다시 매겨 보내는데, 전체 보기는 시트 경계를 넘고 검색 중에는
         //   숨은 행이 빠진다. 그대로 저장하면 시트 안 번호 규약이 무너진다.
@@ -503,7 +503,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   // 빠진다(2026-09-07 실측: 모두 바꾸기가 409 로 거부돼도 값이 화면에 남았다).
   const lastSavedRef = useRef<Record<string, TestCase>>({});
 
-  // 서버에서 온 행으로 스냅샷을 새로 잡는다. rowData 는 셀 편집으로는 바뀌지
+  // 서버에서 온 행으로 스냅샷을 새로 잡는다. rowData 는 셀 편집으로는 변경되지
   // 않고(그 경로는 node.data 를 직접 고친다) 로드·추가·복제·삭제에서만 바뀌므로,
   // 여기서 통째로 다시 잡아도 편집 중인 값을 스냅샷으로 굳히지 않는다.
   // 사라진 행의 스냅샷은 같이 버려져 시트나 프로젝트를 옮겨도 남지 않는다.
@@ -561,7 +561,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     const gridApi = gridApiRef.current;
     if (!gridApi) return;
 
-    // ★값을 쓰기 전에 먼저 본다. 거절할 상황에서 화면 번호를 미리 바꿔 두면,
+    // ★값을 쓰기 전에 먼저 본다. 거절할 상황에서 화면 번호를 미리 변경해 두면,
     //   되돌리는 재조회가 실패했을 때 잘못된 번호가 화면에 남는다.
     //   보이는 행만 다시 매겨 보내면 숨은 행과 번호가 겹친다. rowDrag 를 전체
     //   보기와 검색 중에 꺼 두지만 컬럼 필터와 정렬은 그것으로 막히지 않는다.
@@ -878,7 +878,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           ? t("importCreatedUpdated", { created, updated })
           : t("importCreated", { count: imported });
         toast.success(msg);
-        // 프로젝트 안에 이미 있던 TC ID 는 빈 번호로 바꿔 넣는다. 조용히 넘기지 않는다.
+        // 프로젝트 안에 이미 있던 TC ID 는 빈 번호로 변경해 넣는다. 조용히 넘기지 않는다.
         const renamed = result.renamed ?? 0;
         if (renamed > 0) toast(t("importRenamed", { count: renamed }), { icon: "⚠️" });
         setActiveSheet(sheet.name);
@@ -1345,7 +1345,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   style={{ ...styles.btnPrimary, fontSize: 11, padding: "3px 10px" }}
                   onClick={async () => {
                     // loadData 와 같은 순번을 쓴다. 진행 중인 조회가 필터 결과를 덮거나,
-                    // 필터 도중 시트를 바꿨을 때 옛 시트의 필터 결과가 들어오지 않게 한다.
+                    // 필터 도중 시트를 변경했을 때 옛 시트의 필터 결과가 들어오지 않게 한다.
                     const seq = ++loadSeqRef.current;
                     try {
                       const data = await filtersApi.apply(projectId, filterConditions, filterLogic, activeSheet || undefined);
@@ -1499,7 +1499,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             rowDragManaged={true}
             onRowDragEnd={handleRowDragEnd}
             // ★클릭 한 번에 편집기를 열지 않는다(더블클릭 · F2 · 바로 타이핑으로 연다).
-            //   TC 를 눈으로 훑는 동안 값이 바뀔 수 있었고, 편집기가 떠 있는 칸은
+            //   TC 를 눈으로 훑는 동안 값이 변경될 수 있었고, 편집기가 떠 있는 칸은
             //   텍스트를 끌어서 복사할 수 없었다. 두 값은 한 쌍이다. singleClickEdit 을
             //   되살리면 아래 텍스트 선택이 사실상 무효가 된다.
             enableCellTextSelection={true}

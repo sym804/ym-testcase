@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 #: TC ID 길이 상한. 컬럼이 String(50) 인데 SQLite 는 길이를 강제하지 않아서,
 #: 검증이 없으면 긴 값이 그대로 쌓이고 PostgreSQL 로 옮길 때 그 데이터를 못 옮긴다.
-#: 값은 채번 쪽(tc_id_service)이 원본이다. 두 벌로 두면 컬럼을 늘릴 때 한쪽만 바뀐다.
+#: 값은 채번 쪽(tc_id_service)이 원본이다. 두 벌로 두면 컬럼을 늘릴 때 한쪽만 변경된다.
 from services.tc_id_service import TC_ID_MAX_LEN  # noqa: E402
 
 
@@ -114,19 +114,46 @@ class ResetPasswordWithCode(BaseModel):
 
 # ── Project ───────────────────────────────────────────────────────────────────
 
+#: 고를 수 있는 이슈 관리 도구. 빈 값은 "지정 안 함" 으로 읽어 NULL 로 저장한다.
+ISSUE_TRACKERS = ("jira", "linear")
+
+
+def _normalize_tracker(v):
+    if v is None:
+        return None
+    v = str(v).strip().lower()
+    if not v:
+        return None
+    if v not in ISSUE_TRACKERS:
+        raise ValueError(f"issue_tracker must be one of {', '.join(ISSUE_TRACKERS)}")
+    return v
+
+
 class ProjectCreate(BaseModel):
     name: str = Field(..., min_length=1)
     description: Optional[str] = None
     jira_base_url: Optional[str] = None
+    issue_tracker: Optional[str] = None
     is_private: bool = False
+
+    @field_validator("issue_tracker", mode="before")
+    @classmethod
+    def _tracker(cls, v):
+        return _normalize_tracker(v)
 
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     jira_base_url: Optional[str] = None
+    issue_tracker: Optional[str] = None
     is_private: Optional[bool] = None
     field_config: Optional[dict] = None
+
+    @field_validator("issue_tracker", mode="before")
+    @classmethod
+    def _tracker(cls, v):
+        return _normalize_tracker(v)
 
 
 class ProjectResponse(BaseModel):
@@ -134,6 +161,7 @@ class ProjectResponse(BaseModel):
     name: str
     description: Optional[str] = None
     jira_base_url: Optional[str] = None
+    issue_tracker: Optional[str] = None
     is_private: bool = False
     field_config: Optional[dict] = None
     created_by: int
@@ -281,6 +309,8 @@ class TestRunUpdate(BaseModel):
     version: Optional[str] = None
     environment: Optional[str] = None
     round: Optional[int] = None
+    #: 리포트의 비교 대상 수행. null 이면 자동(같은 이름의 이전 회차)으로 되돌린다.
+    compare_run_id: Optional[int] = None
 
 
 class TestResultCreate(BaseModel):
@@ -359,6 +389,7 @@ class TestRunResponse(BaseModel):
     status: str
     sheet_names: Optional[List[str]] = None
     test_plan_id: Optional[int] = None
+    compare_run_id: Optional[int] = None
     created_by: int
     created_at: datetime
     completed_at: Optional[datetime] = None
@@ -368,7 +399,7 @@ class TestRunResponse(BaseModel):
     def _round_default(cls, v):
         """비어 있으면 1 라운드로 읽는다.
 
-        ★컬럼은 NOT NULL 로 바꿨지만(e5a83f21c760) 마이그레이션 전 DB 를 보는
+        ★컬럼은 NOT NULL 로 변경했지만(e5a83f21c760) 마이그레이션 전 DB 를 보는
           서버가 있으면 여기서 다시 터진다. 목록 응답 하나가 못 만들어지면 그
           프로젝트의 수행 목록 전체가 500 이 되므로 읽는 쪽도 견디게 둔다.
         """
@@ -388,16 +419,21 @@ class TestRunListResponse(BaseModel):
     status: str
     sheet_names: Optional[List[str]] = None
     test_plan_id: Optional[int] = None
+    compare_run_id: Optional[int] = None
     created_by: int
     created_at: datetime
     completed_at: Optional[datetime] = None
+
+    #: 목록 화면의 진행률. 담은 TC 수와 수행한(NS 아닌) 수. 목록 조회에서만 채우고 그 밖은 0 이다.
+    tc_total: int = 0
+    tc_executed: int = 0
 
     @field_validator("round", mode="before")
     @classmethod
     def _round_default(cls, v):
         """비어 있으면 1 라운드로 읽는다.
 
-        ★컬럼은 NOT NULL 로 바꿨지만(e5a83f21c760) 마이그레이션 전 DB 를 보는
+        ★컬럼은 NOT NULL 로 변경했지만(e5a83f21c760) 마이그레이션 전 DB 를 보는
           서버가 있으면 여기서 다시 터진다. 목록 응답 하나가 못 만들어지면 그
           프로젝트의 수행 목록 전체가 500 이 되므로 읽는 쪽도 견디게 둔다.
         """
@@ -410,7 +446,7 @@ class TestRunListResponse(BaseModel):
 #
 # 대시보드 응답 스키마는 두지 않는다. 라우트가 dict 로 "pass" 키를 직접 내는데,
 # 예전에 있던 모델들은 `pass_` 로 선언하고 파이썬 `model_dump` 오버라이드로 이름을
-# 바꿔 내는 구조였다. 아무 데서도 쓰이지 않았지만, 누가 `response_model=` 로 붙이는
+# 변경해 내는 구조였다. 아무 데서도 쓰이지 않았지만, 누가 `response_model=` 로 붙이는
 # 순간 FastAPI 직렬화가 pydantic-core 를 타서 그 오버라이드를 건너뛴다. 응답 키가
 # `pass_` 가 되고 화면의 카드와 도넛이 조용히 빈다. 고치려고 손대면 터지는 모양이라
 # 지운다. 스키마를 다시 두려면 필드 이름부터 `pass` 로 낼 수 있는 방법을 정해야 한다.
@@ -511,3 +547,159 @@ class SavedFilterResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── Run Issue ────────────────────────────────────────────────────────────────
+
+def _http_url(v):
+    v = (v or "").strip()
+    # javascript: 같은 주소가 리포트에서 링크가 되지 않도록 http(s) 만 받는다.
+    if not (v.lower().startswith("http://") or v.lower().startswith("https://")):
+        raise ValueError("url must start with http:// or https://")
+    return v
+
+
+def _blank_to_none(v):
+    if v is None:
+        return None
+    v = str(v).strip()
+    return v or None
+
+
+def _tc_id_list(v):
+    """연관 TC-ID 목록. 공백과 빈 값을 버리고 순서를 지키며 중복을 없앤다.
+
+    화면 입력칸이 쉼표로 이은 문자열을 보내도 받는다.
+    """
+    if v is None:
+        return None
+    if isinstance(v, str):
+        v = v.split(",")
+    return list(dict.fromkeys(s for s in (str(x).strip() for x in v) if s))
+
+
+ISSUE_VERDICTS = ("resolved", "open", "partial", "unverified")
+
+
+def _verdict(v):
+    """QA 확인 결과. 비우면 NULL, 모르는 값은 422."""
+    v = _blank_to_none(v)
+    if v is None:
+        return None
+    v = v.lower()
+    if v not in ISSUE_VERDICTS:
+        raise ValueError(f"verdict must be one of {', '.join(ISSUE_VERDICTS)}")
+    return v
+
+
+class RunIssueCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=500)
+    url: str = Field(..., max_length=1000)
+    issue_key: Optional[str] = Field(None, max_length=50)
+    status: Optional[str] = Field(None, max_length=50)
+    note: Optional[str] = None
+    #: 연관 TC 의 TC-ID. 이 수행에 담긴 TC 만 받는다. 없어도 된다.
+    tc_ids: List[str] = []
+    #: 처음 발견한 수행(같은 프로젝트의 다른 수행). 비우면 이번 수행에서 발견한 신규 이슈다.
+    origin_run_id: Optional[int] = None
+    #: 이번 수행에서 확인한 결과. resolved / open / partial / unverified.
+    verdict: Optional[str] = Field(None, max_length=20)
+
+    @field_validator("verdict", mode="before")
+    @classmethod
+    def _verdict_value(cls, v):
+        return _verdict(v)
+
+    @field_validator("tc_ids", mode="before")
+    @classmethod
+    def _tcs(cls, v):
+        return _tc_id_list(v) or []
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _title(cls, v):
+        return (v or "").strip()
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def _url(cls, v):
+        return _http_url(v)
+
+    @field_validator("issue_key", "status", "note", mode="before")
+    @classmethod
+    def _blank(cls, v):
+        return _blank_to_none(v)
+
+
+class RunIssueUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    url: Optional[str] = Field(None, max_length=1000)
+    issue_key: Optional[str] = Field(None, max_length=50)
+    status: Optional[str] = Field(None, max_length=50)
+    note: Optional[str] = None
+    #: 보내면 통째로 변경한다. 빈 목록은 연결을 모두 푼다.
+    tc_ids: Optional[List[str]] = None
+    #: null 을 보내면 신규 이슈로 돌린다(발견 수행을 비운다).
+    origin_run_id: Optional[int] = None
+    verdict: Optional[str] = Field(None, max_length=20)
+
+    @field_validator("tc_ids", mode="before")
+    @classmethod
+    def _tcs(cls, v):
+        return [] if v is None else _tc_id_list(v)
+
+    @field_validator("verdict", mode="before")
+    @classmethod
+    def _verdict_value(cls, v):
+        return _verdict(v)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _title(cls, v):
+        return None if v is None else str(v).strip()
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def _url(cls, v):
+        return None if v is None else _http_url(v)
+
+    @field_validator("issue_key", "status", "note", mode="before")
+    @classmethod
+    def _blank(cls, v):
+        # ★None 과 "" 을 구분하지 않는다. 둘 다 "비운다" 다. 안 보낸 필드는
+        #   exclude_unset 으로 걸러지므로 여기까지 오지 않는다.
+        return _blank_to_none(v)
+
+
+class RunIssueResponse(BaseModel):
+    id: int
+    test_run_id: int
+    issue_key: Optional[str] = None
+    title: str
+    url: str
+    status: Optional[str] = None
+    note: Optional[str] = None
+    tc_ids: List[str] = []
+    origin_run_id: Optional[int] = None
+    origin_round: Optional[int] = None
+    verdict: Optional[str] = None
+    created_by: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RunIssueCarryOver(BaseModel):
+    """이전 회차 이슈 가져오기. 비우면 리포트의 비교 대상(compare_run_id 또는 같은 이름의 이전 회차)."""
+    from_run_id: Optional[int] = None
+
+
+class RunIssueCarryOverResult(BaseModel):
+    from_run_id: int
+    from_run_name: str
+    from_run_round: int
+    #: 새로 넣은 수. 이미 같은 주소가 있던 이슈는 skipped 로 센다.
+    added: int
+    skipped: int
+    issues: List[RunIssueResponse] = []

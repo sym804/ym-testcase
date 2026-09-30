@@ -3,7 +3,7 @@ import { render, waitFor } from "@testing-library/react";
 
 // 커스텀 필드 컬럼은 field 가 `cf_<이름>` 이고 값은 valueGetter/valueSetter 로
 // data.custom_fields[이름] 을 읽고 쓴다. 그런데 Ctrl+D 채우기와 undo/redo 는
-// `node.data[field]` 라는 최상위 속성에 바로 대입해서, 화면 값이 안 바뀌고
+// `node.data[field]` 라는 최상위 속성에 바로 대입해서, 화면 값이 안 변경되고
 // 저장 페이로드의 `cf_이름` 키는 백엔드 스키마에 없어 조용히 버려졌다.
 // 그런데도 "N개 채움" 토스트는 떴다(SYM-26 과 같은 유형).
 let gridProps: any = null;
@@ -98,7 +98,7 @@ describe("커스텀 필드 컬럼의 Ctrl+D 채우기", () => {
 
     expect(
       target.data.custom_fields?.["환경"],
-      "최상위 속성에만 써서 화면 값이 안 바뀐다",
+      "최상위 속성에만 써서 화면 값이 안 변경된다",
     ).toBe("운영");
 
     await waitFor(() => {

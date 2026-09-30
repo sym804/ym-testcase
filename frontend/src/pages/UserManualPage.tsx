@@ -416,7 +416,7 @@ export default function UserManualPage() {
 
             <h3 style={s.h3}>{t("mdImport.h3_format")}</h3>
             <p style={s.p} dangerouslySetInnerHTML={{ __html: t("mdImport.format_p1") }} />
-            <pre style={{...s.p, backgroundColor: "var(--bg-input)", padding: "16px", borderRadius: "8px", fontFamily: "monospace", fontSize: "13px", whiteSpace: "pre", overflowX: "auto"}}>{t("mdImport.format_example")}</pre>
+            <pre style={{...s.p, backgroundColor: "var(--bg-input)", padding: "16px", borderRadius: "8px", fontFamily: "var(--font-mono)", fontSize: "13px", whiteSpace: "pre", overflowX: "auto"}}>{t("mdImport.format_example")}</pre>
 
             <h3 style={s.h3}>{t("mdImport.h3_sheetName")}</h3>
             <ul style={s.ul}>
@@ -509,9 +509,10 @@ export default function UserManualPage() {
 
             <h3 style={s.h3}>{t("testrun.h3_list")}</h3>
             <ul style={s.ul}>
-              <li>{t("testrun.list_li1")}</li>
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.list_li1") }} />
               <li>{t("testrun.list_li2")}</li>
               <li>{t("testrun.list_li3")}</li>
+              <li>{t("testrun.list_li4")}</li>
             </ul>
 
             <h3 style={s.h3}>{t("testrun.h3_sync")}</h3>
@@ -572,6 +573,7 @@ export default function UserManualPage() {
               <tbody>
                 <tr><td style={s.td}>{t("testrun.rm_complete")}</td><td style={s.td}>{t("testrun.rm_complete_desc")}</td></tr>
                 <tr><td style={s.td}>{t("testrun.rm_reopen")}</td><td style={s.td}>{t("testrun.rm_reopen_desc")}</td></tr>
+                <tr><td style={s.td}>{t("testrun.rm_nextRound")}</td><td style={s.td}>{t("testrun.rm_nextRound_desc")}</td></tr>
                 <tr><td style={s.td}>{t("testrun.rm_clone")}</td><td style={s.td}>{t("testrun.rm_clone_desc")}</td></tr>
                 <tr><td style={s.td}>{t("testrun.rm_delete")}</td><td style={s.td}>{t("testrun.rm_delete_desc")}</td></tr>
                 <tr><td style={s.td}>{t("testrun.rm_export")}</td><td style={s.td}>{t("testrun.rm_export_desc")}</td></tr>
@@ -695,6 +697,7 @@ export default function UserManualPage() {
               <li>{t("report.li3b")}</li>
               <li>{t("report.li3c")}</li>
               <li>{t("report.li3d")}</li>
+              <li dangerouslySetInnerHTML={{ __html: t("report.li3f") }} />
               <li dangerouslySetInnerHTML={{ __html: t("report.li3e") }} />
               <li dangerouslySetInnerHTML={{ __html: t("report.li4") }} />
               <li dangerouslySetInnerHTML={{ __html: t("report.li5") }} />
@@ -711,6 +714,7 @@ export default function UserManualPage() {
             <ul style={s.ul}>
               <li>{t("settings.pi_li1")}</li>
               <li dangerouslySetInnerHTML={{ __html: t("settings.pi_li2") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("settings.pi_li2b") }} />
               <li dangerouslySetInnerHTML={{ __html: t("settings.pi_li3") }} />
             </ul>
 
@@ -970,7 +974,7 @@ const s: Record<string, React.CSSProperties> = {
   table: { width: "100%", borderCollapse: "collapse" as const, fontSize: 13, marginBottom: 20 },
   th: { padding: "10px 12px", backgroundColor: "#1E293B", color: "#fff", textAlign: "left" as const, fontWeight: 600, borderBottom: "2px solid #334155" },
   td: { padding: "10px 12px", borderBottom: "1px solid var(--border-color, #E2E8F0)", verticalAlign: "top" as const },
-  tdCode: { padding: "10px 12px", borderBottom: "1px solid var(--border-color, #E2E8F0)", fontFamily: "monospace", fontWeight: 600, backgroundColor: "var(--bg-input, #F8FAFC)" },
+  tdCode: { padding: "10px 12px", borderBottom: "1px solid var(--border-color, #E2E8F0)", fontFamily: "var(--font-mono)", fontWeight: 600, backgroundColor: "var(--bg-input, #F8FAFC)" },
   tdCheck: { padding: "10px 12px", borderBottom: "1px solid var(--border-color, #E2E8F0)", textAlign: "center" as const, color: "#16A34A", fontWeight: 700 },
   tdX: { padding: "10px 12px", borderBottom: "1px solid var(--border-color, #E2E8F0)", textAlign: "center" as const, color: "#DC2626" },
   featureGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 },

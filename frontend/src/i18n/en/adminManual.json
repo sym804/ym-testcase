@@ -273,14 +273,14 @@
     },
     "testRuns": {
       "title": "Test Runs",
-      "list": "Run list",
+      "list": "List runs (with tc_total · tc_executed progress)",
       "create": "Create run",
       "detail": "Run detail (with results)",
       "update": "Update run",
       "saveResults": "Save results (bulk)",
       "complete": "Complete run",
       "reopen": "Reopen run (completed -> in progress)",
-      "clone": "Clone run",
+      "clone": "Clone run. ?next_round=true creates the next round of the same name (max round + 1, plan inherited)",
       "delete": "Delete run",
       "export": "Run Excel Export"
     },
@@ -319,15 +319,23 @@
     },
     "misc": {
       "title": "Reports / Attachments / Other",
-      "reportJson": "Report JSON",
-      "reportPdf": "PDF download",
-      "reportExcel": "Excel download",
+      "reportJson": "Report JSON (with issues · issue_summary · comparison.changes)",
+      "reportPdf": "PDF download (?lang=ko|en, default ko)",
+      "reportExcel": "Excel download (?lang=ko|en, summary sheet wording)",
       "attachmentList": "Attachment list",
       "attachmentUpload": "Upload attachment",
       "attachmentDownload": "Download attachment",
       "attachmentDelete": "Delete attachment",
       "globalSearch": "Global TC search",
       "overview": "Overall status"
+    },
+    "runIssues": {
+      "title": "Run issues (report issue section)",
+      "list": "List issues",
+      "create": "Add issue (title · url required; issue_key · status · note · tc_ids · origin_run_id · verdict). Same url is 409",
+      "update": "Update issue (verdict: resolved · open · partial · unverified)",
+      "delete": "Delete issue",
+      "carryOver": "Carry over previous issues (body from_run_id, defaults to the comparison target; same url skipped)"
     }
   },
   "troubleshoot": {

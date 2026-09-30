@@ -4,7 +4,7 @@
 `from models import ...` 를 한다. pytest 는 수집 단계에서 테스트 모듈을 전부
 임포트하므로, 그 시점에 `database.py` 가 함께 임포트되며 `engine` 이 기본값인
 개발용 `./tc_manager.db` 에 묶였다. `conftest.py::_server` 가
-`os.environ["DATABASE_URL"]` 을 임시 DB 로 바꾸는 것은 수집이 끝난 뒤라 늦었다.
+`os.environ["DATABASE_URL"]` 을 임시 DB 로 변경하는 것은 수집이 끝난 뒤라 늦었다.
 
 그 결과 `main.py` 의 lifespan(실행 시점에 `os.getenv` 를 읽는다)은 임시 DB 로
 마이그레이션하고, 앱 세션은 개발 DB 를 봤다. CI 에서는 테이블이 없는 빈 DB 를

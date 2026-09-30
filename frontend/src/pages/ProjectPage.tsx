@@ -101,7 +101,7 @@ export default function ProjectPage() {
           {activeTab === "run" && <TestRunManager projectId={projectId} project={project} />}
           {activeTab === "compare" && <CompareView projectId={projectId} />}
           {activeTab === "dashboard" && <Dashboard projectId={projectId} />}
-          {activeTab === "report" && <ReportView projectId={projectId} />}
+          {activeTab === "report" && <ReportView projectId={projectId} project={project} />}
           {activeTab === "settings" && <ProjectSettings project={project} onUpdate={setProject} />}
         </Suspense>
       </div>

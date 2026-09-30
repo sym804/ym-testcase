@@ -274,7 +274,7 @@ def update_testcase(
     _get_project_or_404(project_id, db)
 
     # ★지운 TC 는 수정 대상이 아니다. 고칠 수 있으면 삭제와 복원의 의미가
-    #   흔들리고, 화면에 없는 행의 TC ID 가 바뀌어 복원했을 때 다른 것이 된다.
+    #   흔들리고, 화면에 없는 행의 TC ID 가 변경되어 복원했을 때 다른 것이 된다.
     tc = db.query(TestCase).filter(
         TestCase.id == tc_id,
         TestCase.project_id == project_id,
@@ -284,8 +284,8 @@ def update_testcase(
         raise HTTPException(status_code=404, detail="Test case not found")
 
     update_data = payload.model_dump(exclude_unset=True)
-    # ★번호는 여기서 바꿀 수 없다. 시트 안 순번이라 사람이 정할 값이 아니고,
-    #   임의 값을 넣으면 구멍이 생기거나 유니크 제약에 걸린다. 순서를 바꾸려면
+    # ★번호는 여기서 변경할 수 없다. 시트 안 순번이라 사람이 정할 값이 아니고,
+    #   임의 값을 넣으면 구멍이 생기거나 유니크 제약에 걸린다. 순서를 변경하려면
     #   정렬 API 를 쓴다.
     update_data.pop("no", None)
     if "sheet_name" in update_data:

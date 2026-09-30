@@ -35,7 +35,7 @@ def allocate_tc_id(base: str, taken: Iterable[str]) -> str:
     taken_set = taken if isinstance(taken, set) else set(taken)
     base = (base or "").strip() or "TC"
 
-    # 길이를 먼저 맞춘 뒤에 충돌을 본다. 순서를 바꾸면 잘린 결과가
+    # 길이를 먼저 맞춘 뒤에 충돌을 본다. 순서를 변경하면 잘린 결과가
     # 이미 쓰이는 ID 와 같아도 통과해 버린다.
     candidate = fit_tc_id(base)
     if candidate not in taken_set:

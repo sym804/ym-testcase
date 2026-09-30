@@ -228,7 +228,7 @@ describe("드래그 저장 직전 검사", () => {
     expect(testCasesApi.reorder).not.toHaveBeenCalled();
   });
 
-  it("거절할 때 화면 번호를 미리 바꾸지 않는다", async () => {
+  it("거절할 때 화면 번호를 미리 변경하지 않는다", async () => {
     const local = [tc(1, 1, "결제"), tc(2, 2, "결제"), tc(3, 3, "결제")];
     await renderGrid([sheet("결제", 3, 1)], local);
     await waitFor(() => expect(lastProps).toBeTruthy());

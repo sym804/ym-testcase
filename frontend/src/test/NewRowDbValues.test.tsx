@@ -80,7 +80,7 @@ describe("새 행의 기본값", () => {
     expect(DB_PRIORITIES).toContain(created.priority);
   });
 
-  it("영어로 바꿔도 우선순위는 같은 DB 값이다", async () => {
+  it("영어로 변경해도 우선순위는 같은 DB 값이다", async () => {
     await i18n.changeLanguage("en");
     const created = await addOneRow("+ Add Row");
     expect(DB_PRIORITIES).toContain(created.priority);

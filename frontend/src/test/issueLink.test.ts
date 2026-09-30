@@ -41,4 +41,20 @@ describe("resolveIssueUrl", () => {
     expect(resolveIssueUrl("javascript:alert(1)", "https://jira.x.com")).toBeNull();
     expect(resolveIssueUrl("PROJ-1", "javascript:alert(1)//")).toBeNull();
   });
+
+  it("도구를 골랐으면 주소 모양보다 그 선택을 따른다", () => {
+    // 자체 도메인 Jira 가 아닌 곳에 Linear 를 고른 경우
+    expect(resolveIssueUrl("SF-1", "https://tracker.x.com", "linear")).toBe("https://tracker.x.com/issue/SF-1");
+    expect(resolveIssueUrl("SF-1", "https://linear.app/sym/team/SF/active", "linear")).toBe("https://linear.app/sym/issue/SF-1");
+    expect(resolveIssueUrl("PROJ-1", "https://jira.x.com", "jira")).toBe("https://jira.x.com/browse/PROJ-1");
+  });
+
+  it("도구를 골라도 {key} 와 /browse, /issue 로 끝나는 주소가 먼저다", () => {
+    expect(resolveIssueUrl("A-1", "https://t.x.com/i/{key}", "jira")).toBe("https://t.x.com/i/A-1");
+    expect(resolveIssueUrl("A-1", "https://t.x.com/issue", "jira")).toBe("https://t.x.com/issue/A-1");
+  });
+
+  it("도구를 고르지 않으면 예전처럼 짐작한다", () => {
+    expect(resolveIssueUrl("SF-1", "https://tracker.x.com", null)).toBe("https://tracker.x.com/browse/SF-1");
+  });
 });

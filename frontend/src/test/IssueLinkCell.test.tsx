@@ -89,7 +89,7 @@ describe("IssueLinkCell", () => {
     expect(onParentKey).toHaveBeenCalledTimes(1);
   });
 
-  it("값이 링크 아닌 값에서 링크로 바뀌어도 더블클릭이 번지지 않는다", () => {
+  it("값이 링크 아닌 값에서 링크로 변경되어도 더블클릭이 번지지 않는다", () => {
     // 리스너를 처음 그릴 때만 달면 편집으로 생긴 ↗ 에는 빠진다
     const props = (value: string) => ({ value, context: { trackerUrl: "https://linear.app/sym" } }) as any;
     const { container, rerender } = render(<IssueLinkCell {...props("재현 안 됨")} />);

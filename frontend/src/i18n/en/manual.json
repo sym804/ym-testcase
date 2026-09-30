@@ -361,9 +361,9 @@
     "create_li2": "Enter the run name, round (R1/R2/...), version, and environment.",
     "create_li3": "Under <strong>Sheets to include</strong>, pick the sheets this run covers. Every sheet starts checked; unchecking one leaves it out. The section is hidden when the project has only one sheet.",
     "h3_list": "8-2. Test Run List",
-    "list_li1": "All test runs for the project are displayed in the left panel.",
-    "list_li2": "Run name, round, version, and status (In Progress/Completed) are shown.",
-    "list_li3": "Click a run to display the results grid on the right.",
+    "list_li1": "The left panel is a three-level tree: <strong>version → run name → round</strong>. Versions are grouped ignoring a leading v and letter case (v1.5 and 1.5 are one group), and runs with the same name are grouped by round.",
+    "list_li2": "Versions and run names expand and collapse with ▾/▸. A version with no run in progress starts collapsed and shows only its count. Each round row shows the environment, status (In progress/Completed) and progress (share of executed TCs).",
+    "list_li3": "Click a run name to open its latest round, or a round row to open that round on the right.",
     "h3_sync": "8-3. Syncing the Run with the TC List",
     "sync_li1": "When you add TCs after creating a run, <strong>in-progress</strong> runs pick them up automatically and show them as <strong>NS (Not Started)</strong>. A run scoped to specific sheets only picks up TCs <strong>added within those sheets</strong>.",
     "sync_li2": "<strong>Completed</strong> runs keep the snapshot taken at completion, so TCs added later are not included. Use \"Reopen\" or create a new run to include them.",
@@ -391,7 +391,7 @@
     "rm_reopen": "Resume",
     "rm_reopen_desc": "Reverts a completed run to \"In Progress\". Existing result data is preserved and not reset. Use when additional execution or result modifications are needed.",
     "rm_clone": "Clone",
-    "rm_clone_desc": "Clones the run structure (name, round, environment, TC list) to create a new run. All results are reset to NS; attachments and comments are not cloned.",
+    "rm_clone_desc": "Clones the run structure (round, environment, sheet scope, TC list) into a new run named with \"(복제)\" and the same round. All results are reset to NS; attachments and comments are not cloned. For the next round of the same test, use \"Next round\".",
     "rm_delete": "Delete",
     "rm_delete_desc": "Permanently deletes the run and all results and attachments. This cannot be undone, so use with caution.",
     "rm_export": "Export",
@@ -411,7 +411,10 @@
     "create_li4": "TCs from the picked sheets are included with <strong>NS (Not Started)</strong> status. Picking every sheet covers the whole project.",
     "imgAlt_create": "Sheet picker in the New Test Run modal",
     "issueLink_li": "A ↗ appears next to an http/https address in the Issue Link cell. Issue keys (e.g., PROJ-123) get one when the issue tracker URL is set in Settings. Click ↗ to open the issue in a new tab; double-click the text to edit.",
-    "priorityColor_p": "The Priority cell uses the same colors as TC Management (Critical red, High orange, Normal blue, Low green)."
+    "priorityColor_p": "The Priority cell uses the same colors as TC Management (Critical red, High orange, Normal blue, Low green).",
+    "list_li4": "The search box above the list filters by run name, and the status (in progress only / completed only) and environment filters can be combined. Environment matching ignores letter case (Prod and prod are one).",
+    "rm_nextRound": "Next round",
+    "rm_nextRound_desc": "Creates the next round under the same name. The round is the highest round of that name + 1; version, environment, sheet scope and TC list are inherited and results start as NS. If the current run is still in progress you are asked whether to complete it first. The report comparison picks the previous round of the same name automatically, so nothing else needs to be set."
   },
   "testPlans": {
     "title": "9. Test Plans / Milestones",
@@ -455,7 +458,7 @@
     "chart_donut": "Result Distribution (Donut)",
     "chart_donut_desc": "Visualizes PASS/FAIL/BLOCK/N/A/Not Executed ratios as a donut chart",
     "chart_bar": "Round Comparison (Bar)",
-    "chart_bar_desc": "Shows result trends by round (R1, R2, R3...) specified at test run creation as stacked bar chart. Multiple runs in the same round are aggregated",
+    "chart_bar_desc": "Shows runs with the same name by round (R1, R2, R3...) as a stacked bar chart. Choose the test at the top right of the chart (defaults to the selected run, otherwise the most recent run). If one name has several runs in the same round, the most recent one is used",
     "chart_priority": "Priority Distribution",
     "chart_priority_desc": "TC count by priority, PASS/FAIL/BLOCK/N/A/Not Executed counts table",
     "chart_category": "Category Distribution",
@@ -477,13 +480,14 @@
     "p1": "View test run results as a summary report and download as PDF/Excel.",
     "li1": "Select a test run in the Report tab.",
     "li2": "Summary section: Shows total TCs, counts for PASS/FAIL/BLOCK/N/A/Not Started, and PASS Rate. The PASS Rate denominator is executed TCs (PASS+FAIL+BLOCK), excluding Not Started.",
-    "li3": "Failed / blocked items: Lists TCs with FAIL or BLOCK results, highest priority first, with result, actual result, executor and issue link.",
+    "li3": "Failed / blocked items: Lists TCs with FAIL or BLOCK results, highest priority first, with result, actual result and issue link.",
     "li3b": "Category summary: Shows Total/PASS/FAIL/BLOCK/N/A/Not Started counts and pass rate per category. The pass rate shows - when nothing in the category was executed.",
-    "li4": "PDF download: Click the <strong>PDF</strong> button to download a formatted PDF report named <code>Project_Report_R{round}.pdf</code>. Long text is shortened; the full text is in the Excel file.",
-    "li5": "Excel download: Click the <strong>Excel</strong> button to download an Excel report. The Summary sheet has the summary, previous-run comparison, priority and category tables; the Results sheet has every result.",
+    "li4": "PDF download: Click the <strong>PDF</strong> button to download a formatted PDF report. It follows the screen order (project info → overall status → run comparison → issues → failed/blocked → by priority → by category) and the UI language. The file is named <code>Project_Report_R{round}.pdf</code>. Long text is shortened; the full text is in the Excel file.",
+    "li5": "Excel download: Click the <strong>Excel</strong> button to download an Excel report. The Summary sheet has overall status, run comparison (cards and change details), issues (grouped), priority and category tables in the UI language; the Results sheet has every result with the same headers as the run export.",
     "li3c": "Priority summary: Shows the same counts and pass rate per priority. TCs without a priority are grouped as (unset).",
-    "li3d": "Compared to previous run: Compares with the run created just before in the same project. Regression (PASS -> FAIL) and Improved (FAIL -> PASS) follow the Compare screen. The changed count only includes TCs executed (not Not Started) in both runs, so it can differ from the Compare screen.",
-    "li3e": "Issue links: http/https addresses open as-is, and issue keys such as <code>PROJ-123</code> link through the issue tracker URL in project settings. Without it they are shown as plain text."
+    "li3d": "Run comparison: The target defaults to the previous round of the same name (R1 for R2); choosing another run in the list saves it. Four cards (previously failed TCs · fixed TCs (FAIL -> PASS) · still failing TCs (FAIL -> FAIL) · regressed TCs (PASS -> FAIL)) are followed by a change-details table showing which TC changed how and which issues it is linked to. Only TCs executed (not Not Started) in both runs count. Without a target (R1) the section is left out of the PDF and Excel.",
+    "li3e": "Issue links: http/https addresses open as-is, and issue keys such as <code>PROJ-123</code> link through the issue tracker URL in project settings. Without it they are shown as plain text.",
+    "li3f": "Issues: The issues handled in this run. <strong>Add issue</strong> takes a title and link (http/https); the key is taken from the link, and related TCs (comma separated), severity and status can be added. A link goes into a run only once. <strong>Carry over previous issues</strong> copies issues from the run chosen next to the button (the comparison target when empty); carried issues show that round (R1) in the Found column and start as Unverified. Picking Resolved · Still open · Partially fixed · Unverified in the Status column saves immediately, and the list is split into <strong>Unresolved</strong> (everything not resolved, including issues added in this run) and <strong>Resolved</strong>. An unverified issue whose related TCs all passed in this run gets a \"likely resolved\" mark without changing its status. Issue keys written only in result cells appear below as candidates; clicking one fills the form. The project's issue tracker (Jira/Linear) is shown in the section title."
   },
   "settings": {
     "title": "13. Settings",
@@ -530,7 +534,8 @@
     "imgAlt_members": "Member management",
     "mem_li1": "Add users to the project and assign project roles.",
     "mem_li2": "Project roles: <strong>Project Admin</strong> (project management), <strong>Project Tester</strong> (test execution)",
-    "mem_li3": "Role changes and member removal are available (project creator cannot be removed)."
+    "mem_li3": "Role changes and member removal are available (project creator cannot be removed).",
+    "pi_li2b": "<strong>Issue tracker:</strong> Choose Jira or Linear. It decides how issue keys are turned into links and puts the tool name in the report's issue section title. \"Not set\" guesses from the URL shape."
   },
   "roles": {
     "title": "14. Role-based Permissions",

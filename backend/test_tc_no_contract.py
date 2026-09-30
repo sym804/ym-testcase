@@ -115,7 +115,7 @@ def test_sheets_are_numbered_separately(token, project):
 
 
 def test_reorder_can_swap_numbers(token, project):
-    """드래그 정렬이 번호를 맞바꿔도 중간에 겹치지 않는다."""
+    """드래그 정렬이 번호를 맞변경해도 중간에 겹치지 않는다."""
     h = auth(token)
     ids = []
     for i in range(1, 4):
@@ -218,7 +218,7 @@ def test_import_keeps_row_order(token, project):
 
 
 def test_update_cannot_change_number(token, project):
-    """수정 API 로 번호를 바꿀 수 없다.
+    """수정 API 로 번호를 변경할 수 없다.
 
     번호는 순번이라 사람이 직접 정할 값이 아니다. 열어 두면 구멍이 생기거나
     유니크 제약에 걸려 409 가 난다.

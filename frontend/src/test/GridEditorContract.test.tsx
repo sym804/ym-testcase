@@ -6,11 +6,11 @@ import i18n from "../i18n";
 // 두 그리드가 거의 같은 코드인데 한쪽만 고쳐 온 이력이 있다.
 // - 여러 줄 텍스트 컬럼에 큰 편집기를 안 달면 기본 input 이 열려 줄바꿈이 지워진다(SYM-25).
 //   그때 TC 그리드만 고치고 수행 그리드가 빠졌다.
-// - 찾기/바꾸기가 forEachNode 를 쓰면 필터로 숨은 행까지 바꾼다.
+// - 찾기/바꾸기가 forEachNode 를 쓰면 필터로 숨은 행까지 변경한다.
 // - 사전조건 열이 TC 그리드에만 있었다(SYM-108). 수행자가 실행 직전에 갖춰야 할
 //   상태를 보려고 TC 관리 화면을 따로 열어야 했다.
 // - Platform(test_type)도 같은 모양으로 빠져 있었다(SYM-109).
-// - 프로젝트의 필드 표시 설정을 TC 그리드만 따랐다(SYM-111). 이름을 바꾸거나
+// - 프로젝트의 필드 표시 설정을 TC 그리드만 따랐다(SYM-111). 이름을 변경하거나
 //   숨겨도 수행 그리드는 영문 기본값을 그대로 보여 줬다.
 // - Ctrl+D 가 읽기 전용 TC 열에서도 "채웠다" 고 알렸다(SYM-110).
 let gridProps: any = null;
@@ -138,9 +138,9 @@ describe("여러 줄 텍스트 컬럼의 편집기", () => {
 });
 
 describe("언어 전환", () => {
-  it("언어를 바꾸면 수행 그리드 헤더도 바뀐다", async () => {
+  it("언어를 변경하면 수행 그리드 헤더도 변경된다", async () => {
     // ★columnDefs 가 t 를 클로저로 잡는데 의존성 배열에 t 가 없어서, 언어를
-    //   바꿔도 헤더가 옛 언어로 남았다. 첨부 맵이 바뀔 때(다른 런을 열 때)
+    //   변경해도 헤더가 옛 언어로 남았다. 첨부 맵이 변경될 때(다른 런을 열 때)
     //   우연히 갱신되는 것에 기대고 있었다.
     const user = userEvent.setup();
     render(<TestRunManager projectId={1} project={adminProject as any} />);
@@ -159,13 +159,13 @@ describe("언어 전환", () => {
 });
 
 describe("찾기/바꾸기 범위", () => {
-  it("필터로 걸러진 행은 바꾸지 않는다", async () => {
+  it("필터로 걸러진 행은 변경하지 않는다", async () => {
     render(<TestCaseGrid projectId={1} project={adminProject as any} />);
     await waitFor(() => expect(testCasesApi.list).toHaveBeenCalled());
 
     // 화면에 보이는 행(A)과 필터로 숨은 행(B)을 가진 그리드 API 를 흉내낸다.
-    const visible = { data: { ...mockTC, id: 1, remarks: "바꿀값" } };
-    const hidden = { data: { ...mockTC, id: 2, remarks: "바꿀값" } };
+    const visible = { data: { ...mockTC, id: 1, remarks: "변경할값" } };
+    const hidden = { data: { ...mockTC, id: 2, remarks: "변경할값" } };
     const api = {
       forEachNode: (cb: (n: any) => void) => { cb(visible); cb(hidden); },
       forEachNodeAfterFilterAndSort: (cb: (n: any) => void) => { cb(visible); },
@@ -178,12 +178,12 @@ describe("찾기/바꾸기 범위", () => {
     gridProps.onGridReady?.({ api });
 
     const user = userEvent.setup();
-    await user.type(await screen.findByPlaceholderText("검색..."), "바꿀값");
+    await user.type(await screen.findByPlaceholderText("검색..."), "변경할값");
     await user.click(screen.getByTitle("바꾸기"));
     await user.type(await screen.findByPlaceholderText("바꿀 내용..."), "새값");
     await user.click(screen.getByText("모두 바꾸기"));
 
-    expect(hidden.data.remarks, "필터로 숨은 행까지 바뀌었다").toBe("바꿀값");
+    expect(hidden.data.remarks, "필터로 숨은 행까지 변경되었다").toBe("변경할값");
     expect(visible.data.remarks).toBe("새값");
   });
 });
@@ -233,10 +233,10 @@ describe("수행 그리드의 사전조건", () => {
   });
 
   it("읽기 전용이다", async () => {
-    // 수행 중에 TC 원문이 고쳐지면 다른 런의 기준까지 바뀐다.
+    // 수행 중에 TC 원문이 고쳐지면 다른 런의 기준까지 변경된다.
     await openRunWithPrecondition();
     const col = colById(gridProps.columnDefs, "test_case.precondition");
-    expect(col.editable, "사전조건이 편집 가능하면 TC 원문이 수행 중에 바뀐다").toBe(false);
+    expect(col.editable, "사전조건이 편집 가능하면 TC 원문이 수행 중에 변경된다").toBe(false);
   });
 
   it("이슈 링크 칸은 이슈 관리 도구로 여는 렌더러를 쓰고 편집 가능하다", async () => {
@@ -351,7 +351,7 @@ describe("수행 그리드와 프로젝트 필드 설정", () => {
     await openRunWith(configured);
     expect(colById(gridProps.columnDefs, "test_case.precondition").headerName).toBe("사전조건 / 테스트 데이터");
     expect(colById(gridProps.columnDefs, "test_case.test_type").headerName).toBe("플랫폼");
-    // tc_id 는 숨길 수 없지만 이름은 바꿀 수 있다. 그 열만 하드코딩으로 남아 있었다.
+    // tc_id 는 숨길 수 없지만 이름은 변경할 수 있다. 그 열만 하드코딩으로 남아 있었다.
     expect(colById(gridProps.columnDefs, "test_case.tc_id").headerName).toBe("케이스 번호");
   });
 
@@ -378,7 +378,7 @@ describe("수행 그리드와 프로젝트 필드 설정", () => {
 });
 
 describe("읽기 전용 열에서의 Ctrl+D", () => {
-  // 읽기 전용 TC 열에서 Ctrl+D 를 누르면 값은 안 바뀌는데 "채웠다" 토스트가 뜨고
+  // 읽기 전용 TC 열에서 Ctrl+D 를 누르면 값은 안 변경되는데 "채웠다" 토스트가 뜨고
   // 저장 요청이 나갔다(SYM-110). node.data["test_case.precondition"] 처럼 점 찍힌
   // 키가 평평하게 새로 생겨서 화면 값은 그대로였다.
   async function openRun() {
@@ -483,7 +483,7 @@ describe("읽기 전용 열에서의 Ctrl+D", () => {
 });
 
 describe("셀 선택과 편집 진입", () => {
-  // 클릭 한 번에 편집기가 열리면 TC 를 눈으로 훑는 동안 값이 바뀔 수 있고,
+  // 클릭 한 번에 편집기가 열리면 TC 를 눈으로 훑는 동안 값이 변경될 수 있고,
   // 편집기가 떠 있는 칸은 텍스트를 끌어서 복사할 수 없다. 수행 시트에서
   // 절차나 기대 결과를 복사하려던 것이 매번 막혔다.
   // 두 그리드가 같은 규칙을 따라야 화면을 옮길 때 조작이 달라지지 않는다.
@@ -530,7 +530,7 @@ describe("셀 선택과 편집 진입", () => {
 
   it("수행 그리드에서 편집 가능한 열은 셋뿐이다", async () => {
     // ★수행 화면에서 TC 원문을 고치면 같은 TC 를 담은 다른 런의 기준까지 흔들린다.
-    //   편집 진입 방식을 바꾸다가 읽기 전용이 풀리지 않았는지 여기서 잡는다.
+    //   편집 진입 방식을 변경하다가 읽기 전용이 풀리지 않았는지 여기서 잡는다.
     const p = await openRunGrid();
     const editable = p.columnDefs
       .filter((c: any) => c.editable === true)

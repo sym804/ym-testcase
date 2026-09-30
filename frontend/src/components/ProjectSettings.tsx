@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { projectsApi, customFieldsApi } from "../api";
-import type { Project, CustomFieldDef } from "../types";
+import type { Project, CustomFieldDef, IssueTracker } from "../types";
 import ProjectMembers from "./ProjectMembers";
 import toast from "react-hot-toast";
 import { translateError } from "../utils/errorMessage";
@@ -20,6 +20,7 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
   const [projectName, setProjectName] = useState(project.name);
   const [projectDesc, setProjectDesc] = useState(project.description || "");
   const [trackerUrl, setTrackerUrl] = useState(project.jira_base_url || "");
+  const [tracker, setTracker] = useState<IssueTracker | "">(project.issue_tracker || "");
   const [saving, setSaving] = useState(false);
   const [nameSaving, setNameSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -64,7 +65,7 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
     if (!projectName.trim()) return;
     setNameSaving(true);
     try {
-      // ★빈 문자열을 undefined 로 바꾸지 않는다. axios 가 undefined 키를 통째로
+      // ★빈 문자열을 undefined 로 변경하지 않는다. axios 가 undefined 키를 통째로
       //   빼고, 백엔드는 exclude_unset 이라 그 필드를 건드리지 않는다. 그래서
       //   설명을 지우면 화면은 비어 보이고 성공 토스트까지 뜨는데 DB 값은 그대로
       //   남아, 탭을 나갔다 들어오면 지운 설명이 되살아났다.
@@ -72,8 +73,10 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
         name: projectName.trim(),
         description: projectDesc.trim(),
         // 필드 이름은 호환 때문에 jira_base_url 이지만 Jira 전용이 아니다(Linear 등).
-        // 예전에는 프로젝트를 만들 때만 넣을 수 있어 나중에 바꿀 길이 없었다.
+        // 예전에는 프로젝트를 만들 때만 넣을 수 있어 나중에 변경할 길이 없었다.
         jira_base_url: trackerUrl.trim(),
+        // 빈 값은 "지정 안 함" 이다. 서버가 NULL 로 저장하고 주소 모양으로 짐작한다.
+        issue_tracker: tracker || null,
       });
       onUpdate(updated);
       toast.success(t("saved") || "저장되었습니다");
@@ -107,6 +110,20 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
               onChange={(e) => setProjectDesc(e.target.value)}
               placeholder={t("projectDescPlaceholder") || "프로젝트 설명 (선택)"}
             />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={s.label}>{t("issueTracker")}</div>
+            <select
+              data-testid="issue-tracker"
+              style={{ ...s.input, marginTop: 4, minWidth: 200 }}
+              value={tracker}
+              onChange={(e) => setTracker(e.target.value as IssueTracker | "")}
+            >
+              <option value="">{t("issueTrackerAuto")}</option>
+              <option value="jira">Jira</option>
+              <option value="linear">Linear</option>
+            </select>
+            <div style={{ ...s.desc, marginTop: 4 }}>{t("issueTrackerHelp")}</div>
           </div>
           <div style={{ marginBottom: 12 }}>
             <div style={s.label}>{t("trackerUrl")}</div>
@@ -491,7 +508,7 @@ function BuiltInFieldSettings({ project, onUpdate }: { project: Project; onUpdat
             if (!c) return null;
             return (
               <tr key={f.key} style={{ borderBottom: "1px solid var(--border-color)", opacity: c.visible ? 1 : 0.5 }}>
-                <td style={{ padding: "6px 10px", fontFamily: "monospace", fontSize: 12, color: "var(--text-secondary)" }}>{f.key}</td>
+                <td style={{ padding: "6px 10px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)" }}>{f.key}</td>
                 <td style={{ padding: "6px 10px" }}>
                   <input
                     type="text"
