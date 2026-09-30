@@ -9,7 +9,7 @@
   "notStarted": "Not Started",
   "resultDistribution": "Result Distribution",
   "roundComparison": "Round Comparison",
-  "passFailTrend": "Pass/Fail Rate Trend",
+  "passFailTrend": "Pass / Fail Rate Trend",
   "priorityDistribution": "Priority Distribution",
   "categoryDistribution": "Category Distribution",
   "completionRate": "Completion Rate",
@@ -23,5 +23,8 @@
   "category": "Category",
   "total": "Total",
   "unsetPriority": "(unset)",
-  "unsetCategory": "(uncategorized)"
+  "unsetCategory": "(uncategorized)",
+  "trendPass": "Pass rate (%)",
+  "trendFail": "Fail rate (%)",
+  "trendBasis": "Runs of the same name in round order (R{{first}}–R{{last}}). Pass rate = PASS ÷ executed TCs (PASS+FAIL+BLOCK); fail rate = FAIL ÷ the same. Not Started and N/A are excluded, and rounds with nothing executed get no point."
 }

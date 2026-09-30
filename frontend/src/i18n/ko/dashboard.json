@@ -9,7 +9,7 @@
   "notStarted": "미수행",
   "resultDistribution": "결과 분포",
   "roundComparison": "라운드별 비교",
-  "passFailTrend": "Pass/Fail Rate 추이",
+  "passFailTrend": "합격률 · 실패율 추이",
   "priorityDistribution": "우선순위별 분포",
   "categoryDistribution": "카테고리별 분포",
   "completionRate": "완료율",
@@ -23,5 +23,8 @@
   "category": "카테고리",
   "total": "합계",
   "unsetPriority": "(미지정)",
-  "unsetCategory": "(미분류)"
+  "unsetCategory": "(미분류)",
+  "trendPass": "합격률 (%)",
+  "trendFail": "실패율 (%)",
+  "trendBasis": "같은 이름의 수행을 회차 순(R{{first}}~R{{last}})으로 봅니다. 합격률 = PASS ÷ 수행한 TC(PASS+FAIL+BLOCK), 실패율 = FAIL ÷ 같은 분모. 미수행 · N/A 는 빼고, 수행한 TC 가 없는 회차는 점을 찍지 않습니다."
 }
