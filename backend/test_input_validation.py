@@ -107,16 +107,16 @@ def test_삭제된_TC는_수정할_수_없다(token, project):
     assert d.status_code in (200, 204), d.text
 
     r = requests.put(f"{BASE}/api/projects/{project}/testcases/{tc}", headers=auth(token),
-                     json={"category": "바뀐값"})
+                     json={"category": "변경된값"})
     assert r.status_code == 404, f"삭제된 TC 가 수정됐다: {r.status_code} {r.text}"
 
 
 def test_살아있는_TC는_수정할_수_있다(token, project):
     tc = _add_tc(token, project, 1, "TC-D02")
     r = requests.put(f"{BASE}/api/projects/{project}/testcases/{tc}", headers=auth(token),
-                     json={"category": "바뀐값"})
+                     json={"category": "변경된값"})
     assert r.status_code == 200, r.text
-    assert r.json()["category"] == "바뀐값"
+    assert r.json()["category"] == "변경된값"
 
 
 # ── TC ID ─────────────────────────────────────────────────────────────────────
@@ -152,10 +152,10 @@ def test_정상_TC_ID는_받는다(token, project):
 
 # ── 시트 이름 ─────────────────────────────────────────────────────────────────
 
-def test_번호가_겹치는_이름으로_바꾸면_이유를_알려_준다(token, project):
+def test_번호가_겹치는_이름으로_변경하면_이유를_알려_준다(token, project):
     """★시트를 지워도 TC 의 sheet_name 은 남고, 복원하면 활성 TC 로 돌아온다.
 
-    그 이름으로 다른 시트를 바꾸면 (프로젝트, 시트명, 번호)가 겹쳐 유니크 제약에
+    그 이름으로 다른 시트를 변경하면 (프로젝트, 시트명, 번호)가 겹쳐 유니크 제약에
     걸린다. 종전에는 전역 핸들러가 "데이터 제약 조건에 걸렸습니다" 라는 409 만
     내서 무엇을 어떻게 고쳐야 하는지 알 수 없었다.
 
@@ -205,7 +205,7 @@ def test_부딪히지_않는_이름_변경은_막지_않는다(token, project):
                  json={"sheet_name": "보관"})
     requests.delete(f"{BASE}/api/projects/{project}/testcases/sheets/보관", headers=h)
 
-    # 빈 시트를 그 이름으로 바꾼다. 옮길 TC 가 없으니 부딪히지 않는다.
+    # 빈 시트를 그 이름으로 변경한다. 옮길 TC 가 없으니 부딪히지 않는다.
     rs2 = requests.post(f"{BASE}/api/projects/{project}/testcases/sheets", headers=h,
                         json={"name": "빈시트", "parent_id": None, "is_folder": False})
     other_id = rs2.json()["id"]

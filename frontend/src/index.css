@@ -6,6 +6,13 @@
 }
 
 :root {
+  /* 폰트. 한글은 Pretendard 가 맡는다.
+     예전 본문은 Inter(로드되지 않음)였고 한글은 맑은 고딕으로 대체됐다.
+     코드는 Consolas 인데 한글 글리프가 없어 TC 본문 `<운영자 ID>` 같은 한글만
+     굴림체로 대체돼 어색했다. 영문은 Consolas, 한글은 Pretendard 로 잇는다. */
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+  --font-mono: Consolas, 'Cascadia Mono', Menlo, 'Pretendard Variable', Pretendard, monospace;
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -112,7 +119,7 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--bg-page);
   color: var(--text-primary);
   font-size: 14px;
@@ -232,6 +239,17 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ─── Form inputs ─────────────────────────────────── */
+/* 폼 요소는 본문 폰트를 상속하지 않는다. 종류를 나열하면 빠지는 것이 생겨
+   날짜 칸(type="date")과 type 없는 입력칸, 버튼이 브라우저 기본 폰트(한국어
+   Windows 에서는 굴림)로 나왔다. 종류와 상관없이 모두 상속시킨다.
+   달력 팝업 자체는 브라우저가 그리는 것이라 CSS 로 바꿀 수 없다. */
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
 input[type="text"],
 input[type="password"],
 input[type="email"],
@@ -307,7 +325,7 @@ select:focus {
 /* ─── AG Grid Overrides (v35+) ───────────────────── */
 .ag-theme-alpine,
 .ag-theme-quartz {
-  --ag-font-family: 'Inter', -apple-system, sans-serif;
+  --ag-font-family: var(--font-sans);
   --ag-font-size: 12px;
   --ag-header-background-color: #1E293B;
   --ag-header-foreground-color: #F1F5F9;
@@ -504,7 +522,7 @@ select:focus {
   font-style: italic;
 }
 .md-cell code {
-  font-family: 'Consolas', 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
   padding: 1px 4px;
   border-radius: 4px;

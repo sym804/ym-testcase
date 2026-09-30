@@ -106,7 +106,7 @@ describe("결과 저장이 거부될 때", () => {
   });
 
   it("저장이 거부되면 서버 값을 다시 받아 화면을 되돌린다", async () => {
-    // ★화면 값만 바뀐 채로 남으면 저장된 것처럼 보인다(SYM-35 와 같은 유형).
+    // ★화면 값만 변경된 채로 남으면 저장된 것처럼 보인다(SYM-35 와 같은 유형).
     vi.mocked(testRunsApi.submitResults).mockRejectedValue({
       response: { data: { detail: "거부" } },
     });

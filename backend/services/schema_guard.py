@@ -21,7 +21,9 @@ REQUIRED_COLUMNS = {
     "test_case_sheets": ["parent_id", "is_folder"],
     #: token_version 은 요청마다 읽힌다. 없는 채로 head 로 표시되면 인증이 통째로 죽는다.
     "users": ["must_change_password", "token_version"],
-    "projects": ["is_private", "field_config"],
+    "projects": ["is_private", "field_config", "issue_tracker"],
+    #: 리포트가 읽는다. 없는 채로 head 로 표시되면 리포트가 통째로 죽는다.
+    "run_issues": ["issue_key"],
 }
 
 

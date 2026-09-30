@@ -27,6 +27,7 @@ from routes import search as search_routes
 from routes import members as member_routes
 from routes import custom_fields as custom_fields_routes
 from routes import testplans as testplan_routes
+from routes import run_issues as run_issue_routes
 from routes import filters as filter_routes
 from routes import tc_result_history as tc_result_history_routes
 from routes import account_requests as account_request_routes
@@ -69,7 +70,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YM TestCase API",
     description="Your Method, Your Test Case Manager",
-    version="1.6.5.1",
+    version="1.7.0.0",
     lifespan=lifespan,
 )
 
@@ -121,7 +122,7 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
         logger.info("TC ID 중복 거절: %s %s", request.method, request.url.path)
         return JSONResponse(
             status_code=409,
-            content={"detail": "이미 쓰이는 TC ID입니다. 다른 값으로 바꿔 주세요."},
+            content={"detail": "이미 쓰이는 TC ID입니다. 다른 값으로 변경해 주세요."},
         )
     logger.error("Integrity error on %s %s: %s", request.method, request.url.path, detail)
     return JSONResponse(status_code=409, content={"detail": "데이터 제약 조건에 걸렸습니다."})
@@ -152,6 +153,7 @@ app.include_router(member_routes.router)
 app.include_router(member_routes.assign_all_router)
 app.include_router(custom_fields_routes.router)
 app.include_router(testplan_routes.router)
+app.include_router(run_issue_routes.router)
 app.include_router(filter_routes.router)
 app.include_router(tc_result_history_routes.router)
 app.include_router(account_request_routes.router)

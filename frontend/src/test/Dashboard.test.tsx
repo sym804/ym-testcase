@@ -46,8 +46,8 @@ const mockCategory = [
   { category: "로그인", total: 20, pass: 15, fail: 3, block: 1, na: 1, not_started: 0 },
 ];
 const mockRounds = [
-  { round: 1, total: 100, pass: 50, fail: 30, block: 10, na: 10, pass_rate: 50 },
-  { round: 2, total: 100, pass: 60, fail: 20, block: 10, na: 10, pass_rate: 60 },
+  { round: 1, run_id: 1, name: "R1 수행", status: "completed", total: 100, pass: 50, fail: 30, block: 10, na: 10, not_started: 0, executed: 90, pass_rate: 55.6, fail_rate: 33.3 },
+  { round: 2, run_id: 2, name: "R1 수행", status: "completed", total: 100, pass: 60, fail: 20, block: 10, na: 10, not_started: 0, executed: 90, pass_rate: 66.7, fail_rate: 22.2 },
 ];
 const mockHeatmap = [
   { category: "로그인", priority: "High", fail_count: 3 },
@@ -133,7 +133,7 @@ describe("Dashboard", () => {
   it("히트맵을 렌더링한다", async () => {
     render(<Dashboard projectId={1} />);
     await waitFor(() => {
-      expect(screen.getByText("결함 밀집 히트맵 (Category x Priority)")).toBeInTheDocument();
+      expect(screen.getByText("결함 분포 (카테고리 × 우선순위)")).toBeInTheDocument();
     });
   });
 
@@ -162,7 +162,8 @@ describe("Dashboard", () => {
     vi.mocked(dashboardApi.heatmap).mockResolvedValue(mockHeatmap);
     vi.mocked(testRunsApi.list).mockResolvedValue(mockRuns);
 
-    const select = screen.getByRole("combobox");
+    // 첫 번째 목록이 위쪽 「테스트 수행」 이다. 두 번째는 회차 차트의 테스트 선택이다
+    const select = screen.getAllByRole("combobox")[0];
     await user.selectOptions(select, "1");
 
     await waitFor(() => {
@@ -178,6 +179,53 @@ describe("Dashboard", () => {
       expect(screen.getByText("전체 TC")).toBeInTheDocument();
     });
 
-    expect(screen.queryByText("결함 밀집 히트맵 (Category x Priority)")).not.toBeInTheDocument();
+    expect(screen.queryByText("결함 분포 (카테고리 × 우선순위)")).not.toBeInTheDocument();
+  });
+
+  it("회차 추이는 실행한 회차가 둘 이상일 때만 그린다", async () => {
+    vi.mocked(dashboardApi.rounds).mockResolvedValue([
+      mockRounds[0],
+      { ...mockRounds[1], status: "in_progress", pass: 0, fail: 0, block: 0, na: 0, not_started: 100, executed: 0, pass_rate: null, fail_rate: null },
+    ]);
+    render(<Dashboard projectId={1} />);
+    await screen.findByText("전체 TC");
+    expect(screen.queryByTestId("pass-fail-trend")).toBeNull();
+  });
+
+  it("회차 추이 제목에 어떤 테스트인지 붙인다", async () => {
+    render(<Dashboard projectId={1} />);
+    const trend = await screen.findByTestId("pass-fail-trend");
+    expect(trend).toHaveTextContent("Pass/Fail Rate 추이 · R1 수행");
+  });
+
+  it("차트의 테스트를 변경하면 그 이름으로 회차를 다시 불러온다", async () => {
+    const user = userEvent.setup();
+    vi.mocked(testRunsApi.list).mockResolvedValue([
+      ...mockRuns,
+      { ...mockRuns[0], id: 2, name: "Full 테스트", round: 1 },
+    ]);
+    render(<Dashboard projectId={1} />);
+    const group = await screen.findByTestId("round-group");
+    await user.selectOptions(group, "Full 테스트");
+    await waitFor(() => {
+      expect(dashboardApi.rounds).toHaveBeenLastCalledWith(1, undefined, undefined, "Full 테스트");
+    });
+  });
+
+  it("히트맵 우선순위 열은 심각도 순, 행은 FAIL 이 많은 순이고 합계를 붙인다", async () => {
+    vi.mocked(dashboardApi.heatmap).mockResolvedValue([
+      { category: "로그인", priority: "낮음", fail_count: 1 },
+      { category: "결제", priority: "보통", fail_count: 2 },
+      { category: "결제", priority: "매우 높음", fail_count: 3 },
+      { category: "", priority: "높음", fail_count: 1 },
+    ]);
+    render(<Dashboard projectId={1} />);
+    const heat = await screen.findByTestId("heatmap");
+    const heads = [...heat.querySelectorAll("thead th")].map((th) => th.textContent);
+    expect(heads).toEqual(["카테고리", "매우 높음", "높음", "보통", "낮음", "합계"]);
+    const rows = [...heat.querySelectorAll("tbody tr")].map((tr) => tr.querySelector("td")?.textContent);
+    expect(rows).toEqual(["결제", "(미분류)", "로그인"]);
+    expect(screen.getByTestId("heatmap-row-결제")).toHaveTextContent("5");
+    expect(heat).toHaveTextContent("FAIL 7건 · TC별 최신 결과 기준");
   });
 });

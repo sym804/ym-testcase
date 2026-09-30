@@ -12,6 +12,7 @@ import type {
   TestRun,
 } from "../types";
 import toast from "react-hot-toast";
+import { PRIORITY_OPTIONS, priorityDisplayMap } from "../utils/priority";
 
 interface Props {
   projectId: number;
@@ -52,15 +53,20 @@ export default function Dashboard({ projectId }: Props) {
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  // 라운드별 비교·추이가 묶을 수행 이름. 비우면 위에서 고른 수행의 이름, 그것도 없으면
+  // 서버가 가장 최근 수행의 이름을 쓴다.
+  const [trendName, setTrendName] = useState<string>("");
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      // 위에서 수행을 고르면 그 수행의 회차 추이를 본다
+      const selectedName = runs.find((x) => x.id === selectedRunId)?.name;
       const [s, p, c, r, h, runList] = await Promise.all([
         dashboardApi.summary(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
         dashboardApi.priority(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
         dashboardApi.category(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
-        dashboardApi.rounds(projectId, dateFrom || undefined, dateTo || undefined),
+        dashboardApi.rounds(projectId, dateFrom || undefined, dateTo || undefined, trendName || selectedName || undefined),
         dashboardApi.heatmap(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined),
         testRunsApi.list(projectId),
       ]);
@@ -76,7 +82,9 @@ export default function Dashboard({ projectId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [projectId, selectedRunId, dateFrom, dateTo]);
+    // runs 는 목록을 받은 뒤 갱신되므로 의존성에 넣지 않는다(넣으면 다시 불러오기를 되풀이한다)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, selectedRunId, dateFrom, dateTo, trendName]);
 
   useEffect(() => {
     loadData();
@@ -131,39 +139,55 @@ export default function Dashboard({ projectId }: Props) {
         data: rounds.map((r) => r.na),
         backgroundColor: CARD_COLORS.na,
       },
+      {
+        // 진행 중인 회차가 빈 막대로 보이지 않게 미수행도 쌓는다
+        label: t("notStarted"),
+        data: rounds.map((r) => r.not_started ?? 0),
+        backgroundColor: CARD_COLORS.not_started,
+      },
     ],
   };
 
+  // 합격률은 서버 값(PASS / 수행분)을 그대로 쓴다. 리포트·요약 카드와 같은 숫자다.
+  // 실행이 0건인 회차는 null 이라 점을 찍지 않는다. 진행 중인 회차는 속이 빈 점이다.
+  const inProgress = rounds.map((r) => r.status === "in_progress");
+  const trendPoint = (color: string) => ({
+    borderColor: color,
+    pointBackgroundColor: inProgress.map((p) => (p ? (isDark ? "#1E2230" : "#FFFFFF") : color)),
+    pointBorderColor: color,
+    pointBorderWidth: 2,
+    tension: 0,
+    fill: false,
+    spanGaps: false,
+    pointRadius: 5,
+    pointHoverRadius: 7,
+  });
   const trendData = {
     labels: rounds.map((r) => `R${r.round}`),
     datasets: [
-      {
-        label: "Pass Rate (%)",
-        data: rounds.map((r) => {
-          const total = r.pass + r.fail + r.block + r.na;
-          return total > 0 ? Math.round((r.pass / total) * 100 * 10) / 10 : 0;
-        }),
-        borderColor: CARD_COLORS.pass,
-        backgroundColor: "rgba(26, 127, 55, 0.1)",
-        tension: 0.3,
-        fill: true,
-        pointRadius: 5,
-        pointHoverRadius: 7,
-      },
-      {
-        label: "Fail Rate (%)",
-        data: rounds.map((r) => {
-          const total = r.pass + r.fail + r.block + r.na;
-          return total > 0 ? Math.round((r.fail / total) * 100 * 10) / 10 : 0;
-        }),
-        borderColor: CARD_COLORS.fail,
-        backgroundColor: "rgba(207, 34, 46, 0.1)",
-        tension: 0.3,
-        fill: true,
-        pointRadius: 5,
-        pointHoverRadius: 7,
-      },
+      { label: "Pass Rate (%)", data: rounds.map((r) => r.pass_rate), ...trendPoint(CARD_COLORS.pass) },
+      { label: "Fail Rate (%)", data: rounds.map((r) => r.fail_rate ?? null), ...trendPoint(CARD_COLORS.fail) },
     ],
+  };
+  const executedRounds = rounds.filter((r) => (r.executed ?? r.pass + r.fail + r.block) > 0).length;
+  const roundName = rounds[0]?.name;
+  const runNames = [...new Set(runs.map((r) => r.name))];
+
+  // 툴팁에 어떤 수행인지와 실행 건수를 싣는다. x 축의 R1, R2 만으로는 알 수 없다.
+  const roundTooltip = {
+    callbacks: {
+      title: (items: { dataIndex: number }[]) => {
+        const r = rounds[items[0]?.dataIndex ?? 0];
+        return r ? `${r.name ?? ""} (R${r.round})` : "";
+      },
+      afterTitle: (items: { dataIndex: number }[]) => {
+        const r = rounds[items[0]?.dataIndex ?? 0];
+        if (!r) return "";
+        const executed = r.executed ?? r.pass + r.fail + r.block;
+        const state = r.status === "in_progress" ? t("inProgress") : t("completed");
+        return `${state} · ${t("executedOf", { executed, total: r.total })}`;
+      },
+    },
   };
 
   const cards = [
@@ -188,9 +212,11 @@ export default function Dashboard({ projectId }: Props) {
         <select
           style={styles.select}
           value={selectedRunId ?? ""}
-          onChange={(e) =>
-            setSelectedRunId(e.target.value ? Number(e.target.value) : undefined)
-          }
+          onChange={(e) => {
+            setSelectedRunId(e.target.value ? Number(e.target.value) : undefined);
+            // 수행을 변경하면 회차 차트도 그 수행의 테스트로 돌아간다
+            setTrendName("");
+          }}
         >
           <option value="">{t("all")}</option>
           {runs.map((r) => (
@@ -272,11 +298,26 @@ export default function Dashboard({ projectId }: Props) {
           </div>
         </div>
         <div style={styles.chartCard}>
-          <h4 style={styles.chartTitle}>{t("roundComparison")}</h4>
+          <div style={styles.chartHeader}>
+            <h4 style={{ ...styles.chartTitle, margin: 0 }}>{t("roundComparison")}</h4>
+            {runNames.length > 0 && (
+              <select
+                data-testid="round-group"
+                aria-label={t("roundGroup")}
+                style={{ ...styles.select, minWidth: 200, fontSize: 12, padding: "4px 8px" }}
+                value={trendName || roundName || ""}
+                onChange={(e) => setTrendName(e.target.value)}
+              >
+                {runNames.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            )}
+          </div>
           <Bar
             data={barData}
             options={{
-              plugins: { legend: { position: "top", labels: { color: chartTextColor } } },
+              plugins: { legend: { position: "top", labels: { color: chartTextColor } }, tooltip: roundTooltip },
               scales: {
                 x: { stacked: true, ticks: { color: chartTextColor }, grid: { color: chartGridColor } },
                 y: { stacked: true, beginAtZero: true, ticks: { color: chartTextColor }, grid: { color: chartGridColor } },
@@ -287,14 +328,27 @@ export default function Dashboard({ projectId }: Props) {
         </div>
       </div>
 
-      {/* Trend chart */}
-      {rounds.length > 1 && (
-        <div style={{ ...styles.chartCard, marginBottom: 28 }}>
-          <h4 style={styles.chartTitle}>{t("passFailTrend")}</h4>
+      {/* 회차 추이. 같은 이름의 수행을 회차 순으로 본다. 실행한 회차가 둘 이상일 때만 그린다 */}
+      {executedRounds > 1 && (
+        <div style={{ ...styles.chartCard, marginBottom: 28 }} data-testid="pass-fail-trend">
+          <h4 style={styles.chartTitle}>
+            {t("passFailTrend")}
+            {roundName ? <span style={styles.chartSubtitle}> · {roundName}</span> : null}
+          </h4>
           <Line
             data={trendData}
             options={{
-              plugins: { legend: { position: "top", labels: { color: chartTextColor } } },
+              plugins: {
+                legend: { position: "top", labels: { color: chartTextColor } },
+                tooltip: {
+                  ...roundTooltip,
+                  callbacks: {
+                    ...roundTooltip.callbacks,
+                    label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) =>
+                      `${ctx.dataset.label}: ${ctx.parsed.y == null ? "-" : `${ctx.parsed.y}%`}`,
+                  },
+                },
+              },
               scales: {
                 x: { ticks: { color: chartTextColor }, grid: { color: chartGridColor } },
                 y: { beginAtZero: true, max: 100, ticks: { callback: (v) => `${v}%`, color: chartTextColor }, grid: { color: chartGridColor } },
@@ -371,94 +425,167 @@ export default function Dashboard({ projectId }: Props) {
       </div>
 
       {/* Heatmap */}
-      {heatmap.length > 0 && <HeatmapTable data={heatmap} />}
+      {heatmap.length > 0 && (
+        <HeatmapTable
+          data={heatmap}
+          scopeLabel={
+            selectedRunId
+              ? (() => { const r = runs.find((x) => x.id === selectedRunId); return r ? `${r.name} (R${r.round})` : ""; })()
+              : t("heatmapScopeLatest")
+          }
+        />
+      )}
     </div>
   );
 }
 
-function HeatmapTable({ data }: { data: { category: string; priority: string; fail_count: number }[] }) {
+type HeatCell = { category: string; priority: string; fail_count: number };
+
+/**
+ * FAIL 건수를 카테고리 x 우선순위로 본다.
+ *
+ * ★우선순위 열은 심각도 순(매우 높음 -> 낮음)이다. 예전에는 글자순이라 낮음, 높음,
+ *   매우 높음, 보통 으로 섞였다.
+ * ★색은 FAIL 색 한 가지를 진하기로만 나눈다. 예전 네 색(노랑~빨강)은 최대값이 2 면
+ *   1건이 주황, 2건이 빨강 원색이라 요란했고 옅은 칸에도 흰 글자라 읽기 어려웠다.
+ * 행은 FAIL 이 많은 카테고리부터 둔다. 어디에 몰렸는지 위에서 바로 보인다.
+ */
+function HeatmapTable({ data, scopeLabel }: { data: HeatCell[]; scopeLabel: string }) {
   const { t } = useTranslation("dashboard");
-  const { categories, priorities, grid, maxVal } = useMemo(() => {
-    const catSet = new Set<string>();
+  const { t: tcT } = useTranslation("testcase");
+  const priorityDisplay = useMemo(() => priorityDisplayMap(tcT), [tcT]);
+
+  const { rows, priorities, colTotals, total, maxVal } = useMemo(() => {
+    const grid: Record<string, Record<string, number>> = {};
     const priSet = new Set<string>();
-    const map: Record<string, Record<string, number>> = {};
     let max = 0;
     data.forEach((d) => {
-      catSet.add(d.category);
+      (grid[d.category] ??= {})[d.priority] = d.fail_count;
       priSet.add(d.priority);
-      if (!map[d.category]) map[d.category] = {};
-      map[d.category][d.priority] = d.fail_count;
-      if (d.fail_count > max) max = d.fail_count;
+      max = Math.max(max, d.fail_count);
     });
+    // 아는 우선순위는 심각도 순, 모르는 값은 글자순, 빈 값(미지정)은 맨 끝
+    const known = PRIORITY_OPTIONS.filter((p) => priSet.has(p));
+    const unknown = [...priSet].filter((p) => p && !PRIORITY_OPTIONS.includes(p)).sort();
+    const pris = [...known, ...unknown, ...(priSet.has("") ? [""] : [])];
+    const rowList = Object.entries(grid)
+      .map(([category, cells]) => ({
+        category,
+        cells,
+        total: Object.values(cells).reduce((a, b) => a + b, 0),
+      }))
+      .sort((a, b) => b.total - a.total || a.category.localeCompare(b.category, "ko"));
+    const cols = pris.map((p) => rowList.reduce((sum, r) => sum + (r.cells[p] ?? 0), 0));
     return {
-      categories: Array.from(catSet).sort(),
-      priorities: Array.from(priSet).sort(),
-      grid: map,
+      rows: rowList,
+      priorities: pris,
+      colTotals: cols,
+      total: cols.reduce((a, b) => a + b, 0),
       maxVal: max,
     };
   }, [data]);
 
-  const cellColor = (count: number) => {
-    if (count === 0 || !maxVal) return "var(--bg-input)";
-    const ratio = count / maxVal;
-    if (ratio > 0.7) return "#DC2626";
-    if (ratio > 0.4) return "#F97316";
-    if (ratio > 0.1) return "#FBBF24";
-    return "#FEF3C7";
+  // 1건도 보이게 최소 18%, 최대값은 85% 진하기
+  const intensity = (count: number) => (maxVal ? 18 + Math.round((count / maxVal) * 67) : 0);
+  const cellStyle = (count: number): React.CSSProperties => {
+    if (!count) return hm.cell;
+    const pct = intensity(count);
+    return {
+      ...hm.cell,
+      backgroundColor: `color-mix(in srgb, var(--color-fail) ${pct}%, transparent)`,
+      color: pct >= 55 ? "#fff" : "var(--text-primary)",
+      fontWeight: 700,
+    };
   };
+  const priorityLabel = (p: string) => (p ? (priorityDisplay[p] ?? p) : t("unsetPriority"));
 
   return (
-    <div style={{ marginTop: 20, backgroundColor: "var(--bg-card)", borderRadius: 12, padding: 24, boxShadow: "var(--shadow)" }}>
-      <h4 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
-        {t("heatmapTitle")}
-      </h4>
-      <div style={{ overflow: "auto" }}>
-        <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
+    <div style={hm.card} data-testid="heatmap">
+      <div style={hm.header}>
+        <div>
+          <h4 style={hm.title}>{t("heatmapTitle")}</h4>
+          <div style={hm.subtitle}>{t("heatmapSubtitle", { scope: scopeLabel, total })}</div>
+        </div>
+        {/* 진하기 범례. 칸의 숫자가 곧 FAIL 건수라 눈금은 최소·최대만 둔다 */}
+        <div style={hm.legend} aria-hidden="true">
+          <span>1</span>
+          {[18, 40, 62, 85].map((pct) => (
+            <span
+              key={pct}
+              style={{ ...hm.legendSwatch, backgroundColor: `color-mix(in srgb, var(--color-fail) ${pct}%, transparent)` }}
+            />
+          ))}
+          <span>{maxVal}</span>
+        </div>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={hm.table}>
           <thead>
             <tr>
-              <th style={{ padding: "8px 10px", borderBottom: "2px solid var(--border-color)", textAlign: "left", color: "var(--text-secondary)", fontWeight: 600 }}>
-                {t("categoryPriority")}
-              </th>
+              <th style={{ ...hm.th, textAlign: "left" }}>{t("category")}</th>
               {priorities.map((p) => (
-                <th key={p} style={{ padding: "8px 10px", borderBottom: "2px solid var(--border-color)", textAlign: "center", color: "var(--text-secondary)", fontWeight: 600 }}>
-                  {p}
-                </th>
+                <th key={p || "__unset"} style={hm.th}>{priorityLabel(p)}</th>
               ))}
+              <th style={{ ...hm.th, ...hm.totalHead }}>{t("total")}</th>
             </tr>
           </thead>
           <tbody>
-            {categories.map((cat) => (
-              <tr key={cat}>
-                <td style={{ padding: "8px 10px", borderBottom: "1px solid var(--border-color)", fontWeight: 600, color: "var(--text-primary)" }}>
-                  {cat}
-                </td>
-                {priorities.map((pri) => {
-                  const count = grid[cat]?.[pri] || 0;
+            {rows.map((row) => (
+              <tr key={row.category || "__unset"} data-testid={`heatmap-row-${row.category || "unset"}`}>
+                <td style={hm.rowHead}>{row.category || t("unsetCategory")}</td>
+                {priorities.map((p) => {
+                  const count = row.cells[p] ?? 0;
                   return (
-                    <td
-                      key={pri}
-                      style={{
-                        padding: "8px 10px",
-                        borderBottom: "1px solid var(--border-color)",
-                        textAlign: "center",
-                        fontWeight: 700,
-                        color: count > 0 ? "#fff" : "#94A3B8",
-                        backgroundColor: cellColor(count),
-                        borderRadius: 4,
-                      }}
-                    >
-                      {count || "-"}
+                    <td key={p || "__unset"} style={cellStyle(count)}>
+                      {count || ""}
                     </td>
                   );
                 })}
+                <td style={{ ...hm.cell, ...hm.totalCell }}>{row.total}</td>
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr>
+              <td style={{ ...hm.rowHead, ...hm.totalRow }}>{t("total")}</td>
+              {colTotals.map((n, i) => (
+                <td key={priorities[i] || "__unset"} style={{ ...hm.cell, ...hm.totalCell, ...hm.totalRow }}>{n}</td>
+              ))}
+              <td style={{ ...hm.cell, ...hm.totalCell, ...hm.totalRow }}>{total}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
   );
 }
+
+const hm: Record<string, React.CSSProperties> = {
+  card: { marginTop: 20, backgroundColor: "var(--bg-card)", borderRadius: 12, padding: 24, boxShadow: "var(--shadow)" },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 16 },
+  title: { margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" },
+  subtitle: { marginTop: 4, fontSize: 12, color: "var(--text-secondary)" },
+  legend: { display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text-secondary)" },
+  legendSwatch: { width: 18, height: 12, borderRadius: 3, display: "inline-block" },
+  // 칸 사이를 띄워 격자선 없이 칸만으로 읽히게 한다
+  // 칸이 화면 폭만큼 늘어나면 한 칸이 200px 가 넘어 색 덩어리만 보인다. 내용 폭으로 둔다
+  table: { borderCollapse: "separate", borderSpacing: 4, fontSize: 13 },
+  th: { padding: "6px 8px", textAlign: "center", color: "var(--text-secondary)", fontWeight: 600, fontSize: 12, whiteSpace: "nowrap" },
+  rowHead: { padding: "6px 8px", color: "var(--text-primary)", fontWeight: 500, whiteSpace: "nowrap" },
+  cell: {
+    padding: "6px 8px",
+    textAlign: "center",
+    borderRadius: 6,
+    // 빈 칸도 격자가 보이게 옅게 칠한다. 라이트 테마에서 --bg-input 은 카드와 같은 흰색이다
+    backgroundColor: "color-mix(in srgb, var(--text-secondary) 8%, transparent)",
+    color: "var(--text-secondary)",
+    minWidth: 88,
+    fontVariantNumeric: "tabular-nums",
+  },
+  totalHead: { color: "var(--text-primary)" },
+  totalCell: { backgroundColor: "transparent", color: "var(--text-primary)", fontWeight: 700 },
+  totalRow: { paddingTop: 10 },
+};
 
 const styles: Record<string, React.CSSProperties> = {
   selectorRow: {
@@ -516,6 +643,15 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "var(--shadow)",
     border: "1px solid var(--border-color)",
   },
+  chartHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap" as const,
+    marginBottom: 12,
+  },
+  chartSubtitle: { fontWeight: 500, color: "var(--text-secondary)", fontSize: 13 },
   chartTitle: { margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--text-primary)" },
   tablesRow: {
     display: "grid",

@@ -229,7 +229,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   resultNote: { fontSize: 12, marginBottom: 8 },
   resultRow: { display: "flex", alignItems: "center", gap: 8 },
-  code: { fontSize: 14, fontFamily: "monospace", letterSpacing: 1 },
+  code: { fontSize: 14, fontFamily: "var(--font-mono)", letterSpacing: 1 },
   copyBtn: {
     padding: "4px 10px", fontSize: 12, cursor: "pointer",
     border: "1px solid var(--border-color, #E2E8F0)", borderRadius: 4,

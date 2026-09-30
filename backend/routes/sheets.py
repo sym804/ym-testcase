@@ -234,11 +234,11 @@ def rename_sheet(
         db.rollback()
         raise HTTPException(
             status_code=400,
-            detail=f"'{new_name}' 을 쓰는 TC 와 번호가 겹칩니다. 다른 이름으로 바꿔 주세요.",
+            detail=f"'{new_name}' 을 쓰는 TC 와 번호가 겹칩니다. 다른 이름으로 변경해 주세요.",
         )
 
     # ★시트를 골라 만든 테스트 수행은 그 범위를 시트 이름으로 들고 있다. 여기서 같이
-    #   바꾸지 않으면 범위가 아무것도 가리키지 않게 되어, 그 수행은 결과 제출이 전부
+    #   변경하지 않으면 범위가 아무것도 가리키지 않게 되어, 그 수행은 결과 제출이 전부
     #   거부되고 새 TC 도 흡수하지 못하며 시트 탭도 사라진다.
     from models import TestRun
     for run in db.query(TestRun).filter(TestRun.project_id == project_id).all():
@@ -257,7 +257,7 @@ def rename_sheet(
         db.rollback()
         raise HTTPException(
             status_code=400,
-            detail=f"'{new_name}' 을 쓰는 TC 와 번호가 겹칩니다. 다른 이름으로 바꿔 주세요.",
+            detail=f"'{new_name}' 을 쓰는 TC 와 번호가 겹칩니다. 다른 이름으로 변경해 주세요.",
         )
     return {"id": sheet.id, "name": sheet.name, "old_name": old_name}
 

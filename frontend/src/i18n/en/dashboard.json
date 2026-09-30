@@ -13,6 +13,15 @@
   "priorityDistribution": "Priority Distribution",
   "categoryDistribution": "Category Distribution",
   "completionRate": "Completion Rate",
-  "heatmapTitle": "Defect Density Heatmap (Category x Priority)",
-  "categoryPriority": "Category \\ Priority"
+  "heatmapTitle": "Defect Distribution (Category × Priority)",
+  "roundGroup": "Test to show rounds for",
+  "inProgress": "In progress",
+  "completed": "Completed",
+  "executedOf": "Executed {{executed}}/{{total}}",
+  "heatmapSubtitle": "{{total}} FAIL · {{scope}}",
+  "heatmapScopeLatest": "latest result per TC",
+  "category": "Category",
+  "total": "Total",
+  "unsetPriority": "(unset)",
+  "unsetCategory": "(uncategorized)"
 }

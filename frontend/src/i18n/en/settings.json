@@ -76,5 +76,8 @@
   "deleteField": "Delete field",
   "trackerUrl": "Issue tracker URL",
   "trackerUrlPlaceholder": "Jira or Linear URL (e.g. https://linear.app/your-workspace)",
-  "trackerUrlHelp": "Issue keys (e.g. PROJ-123) link to this tracker. Jira gets /browse/, Linear gets /issue/, and other tools can use a {key} placeholder."
+  "trackerUrlHelp": "Issue keys (e.g. PROJ-123) link to this tracker. Jira gets /browse/, Linear gets /issue/, and other tools can use a {key} placeholder.",
+  "issueTracker": "Issue tracker",
+  "issueTrackerAuto": "Not set (guess from URL)",
+  "issueTrackerHelp": "Decides how issue keys are turned into links. Also shown in the report's issue section title."
 }

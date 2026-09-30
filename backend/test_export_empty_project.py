@@ -80,7 +80,7 @@ def test_merged_sheet_with_no_testcases(export):
 
 
 def test_split_sheets_keeps_tabs_per_sheet_name(export):
-    """TC 가 있으면 sheet_name 마다 탭이 생긴다. 엑셀 금지 문자는 바뀐다."""
+    """TC 가 있으면 sheet_name 마다 탭이 생긴다. 엑셀 금지 문자는 변경된다."""
     tcs = [
         _TC(1, "AUTH-001", "인증/보안"),
         _TC(2, "AUTH-002", "인증/보안"),

@@ -1,3 +1,5 @@
+import type { IssueTracker } from "../types";
+
 /**
  * 이슈 링크 칸의 값을 이동할 주소로 바꾼다. 이동할 곳이 없으면 null.
  *
@@ -6,8 +8,9 @@
  *   이슈 주소 모양이 달라 아래 차례로 정한다.
  *   1. 주소에 `{key}` 가 있으면 그 자리에 넣는다. 어떤 도구든 이 모양으로 적으면 된다
  *   2. `/browse` 나 `/issue` 로 끝나면 그 뒤에 붙인다
- *   3. Linear(`linear.app/워크스페이스`)는 `/issue/키`
- *   4. 그 밖은 Jira 로 보고 `/browse/키`. 예전부터 Jira 주소만 받던 설정과 호환된다
+ *   3. 프로젝트에서 도구를 골랐으면 그 모양을 쓴다. Linear 는 `/issue/키`, Jira 는 `/browse/키`
+ *   4. 고르지 않았으면 주소로 짐작한다. `linear.app/워크스페이스` 는 Linear, 그 밖은 Jira.
+ *      예전부터 Jira 주소만 받던 설정과 호환된다
  * - 그 밖의 값은 null 이다. 예전에는 `href="#"` 로 걸어서 눌러도 아무 일이 없었다.
  *
  * `javascript:` 같은 주소가 링크가 되지 않도록 http(s) 만 통과시킨다.
@@ -15,7 +18,11 @@
 const HTTP = /^https?:\/\//i;
 const ISSUE_KEY = /^[A-Za-z][A-Za-z0-9_]*-\d+$/;
 
-export function resolveIssueUrl(link: string | null | undefined, trackerUrl?: string | null): string | null {
+export function resolveIssueUrl(
+  link: string | null | undefined,
+  trackerUrl?: string | null,
+  tracker?: IssueTracker | null,
+): string | null {
   const value = (link ?? "").trim();
   if (!value) return null;
   if (HTTP.test(value)) return value;
@@ -31,6 +38,8 @@ export function resolveIssueUrl(link: string | null | undefined, trackerUrl?: st
   // 팀 화면 주소(linear.app/sym/team/SYM/active)를 그대로 붙여 넣는 경우가 많다.
   // 워크스페이스 이름까지만 남기고 /issue/키 를 붙인다.
   const linear = /^(https?:\/\/(?:www\.)?linear\.app\/[^/?#]+)/i.exec(trimmed);
+  if (tracker === "jira") return `${trimmed}/browse/${key}`;
   if (linear) return `${linear[1]}/issue/${key}`;
+  if (tracker === "linear") return `${trimmed}/issue/${key}`;
   return `${trimmed}/browse/${key}`;
 }

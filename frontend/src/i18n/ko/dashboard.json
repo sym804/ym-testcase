@@ -13,6 +13,15 @@
   "priorityDistribution": "우선순위별 분포",
   "categoryDistribution": "카테고리별 분포",
   "completionRate": "완료율",
-  "heatmapTitle": "결함 밀집 히트맵 (Category x Priority)",
-  "categoryPriority": "Category \\ Priority"
+  "heatmapTitle": "결함 분포 (카테고리 × 우선순위)",
+  "roundGroup": "회차를 볼 테스트",
+  "inProgress": "진행 중",
+  "completed": "완료",
+  "executedOf": "실행 {{executed}}/{{total}}",
+  "heatmapSubtitle": "FAIL {{total}}건 · {{scope}}",
+  "heatmapScopeLatest": "TC별 최신 결과 기준",
+  "category": "카테고리",
+  "total": "합계",
+  "unsetPriority": "(미지정)",
+  "unsetCategory": "(미분류)"
 }

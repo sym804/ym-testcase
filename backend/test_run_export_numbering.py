@@ -143,7 +143,7 @@ def test_export_order_matches_sheet_tabs(token, project):
 
     tabs = _leaf_tabs(token, pid)
     assert [no for no, _ in rows] == list(range(1, len(rows) + 1))
-    # TC ID 접두어가 그 TC 의 시트 이름이다. 시트가 바뀌는 자리만 뽑아 비교한다.
+    # TC ID 접두어가 그 TC 의 시트 이름이다. 시트가 변경되는 자리만 뽑아 비교한다.
     seen = []
     for _, tc_id in rows:
         name = tc_id.split("-")[1]
