@@ -1,4 +1,5 @@
 import io
+import re
 import os
 from datetime import datetime
 from typing import List
@@ -498,11 +499,41 @@ def _build_report_data(run: TestRun, db: Session) -> dict:
     }
 
 
-def report_filename(project_name: str, run: TestRun, ext: str) -> str:
-    """내려받을 파일 이름. Windows 에서 못 쓰는 글자는 밑줄로 변경한다."""
+def _safe_name(text: str) -> str:
+    """Windows 에서 못 쓰는 글자는 밑줄로 변경한다."""
     bad = set(chr(92) + '/:*?"<>|')
-    safe = "".join("_" if ch in bad or ord(ch) < 32 else ch for ch in project_name).strip()
-    return f"{safe or 'report'}_Report_R{run.round}.{ext}"
+    return "".join("_" if ch in bad or ord(ch) < 32 else ch for ch in text).strip()
+
+
+def _run_slug(project_name: str, run: TestRun) -> str:
+    """파일 이름에 넣을 수행 이름. "Starfort 1.5 계정 · 세션 정책 테스트" -> "계정·세션정책".
+
+    프로젝트 이름과 버전은 파일 이름의 다른 자리에 이미 있으니 빼고, 꼬리의 "테스트"/"Test" 도
+    빼며(파일 이름에 Test_Report 가 붙는다), 남은 글자는 공백 없이 붙인다(09-30 사용자 형식).
+    """
+    from routes.dashboard import version_key
+
+    name = (run.name or "").strip()
+    proj = (project_name or "").strip()
+    if proj and name.lower().startswith(proj.lower()):
+        name = name[len(proj):].strip()
+    if run.version:
+        vk = version_key(run.version)
+        name = " ".join(tok for tok in name.split() if version_key(tok) != vk)
+    name = re.sub(r"\s*(테스트|test)\s*$", "", name, flags=re.IGNORECASE).strip()
+    slug = re.sub(r"\s+", "", name)
+    return slug or re.sub(r"\s+", "", (run.name or "").strip()) or "run"
+
+
+def report_filename(project_name: str, run: TestRun, ext: str, when: datetime = None) -> str:
+    """내려받을 파일 이름: {프로젝트}_{수행}_Test_Report_{YYYYMMDD}.{ext}
+
+    예: Starfort_계정·세션정책_Test_Report_20260930.pdf (09-30 사용자 형식). 날짜는 내려받는 날이다.
+    예전 이름 {프로젝트}_Report_R{회차} 는 어느 테스트인지 몰라 파일만 보고 구분할 수 없었다.
+    """
+    day = (when or datetime.now()).strftime("%Y%m%d")
+    project = _safe_name(project_name) or "report"
+    return f"{project}_{_safe_name(_run_slug(project_name, run))}_Test_Report_{day}.{ext}"
 
 
 def _fmt_dt(iso) -> str:
