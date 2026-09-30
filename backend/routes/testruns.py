@@ -244,6 +244,28 @@ def update_testrun(
     return run
 
 
+def _stale_rows(results, existing_map: dict, db: Session) -> list[str]:
+    """expected_executed_at 을 보낸 행 가운데 서버의 executed_at 과 다른 행의 TC ID."""
+    stale_ids = []
+    for r in results:
+        if not r.expected_executed_at:
+            continue
+        existing = existing_map.get(r.test_case_id)
+        if existing is None or existing.executed_at is None:
+            continue
+        try:
+            expected = datetime.fromisoformat(r.expected_executed_at)
+        except (ValueError, TypeError):
+            continue
+        # 마이크로초 단위 저장이라 그대로 비교한다. JSON 왕복에서 tz 는 붙지 않는다(naive KST).
+        if existing.executed_at.replace(tzinfo=None) != expected.replace(tzinfo=None):
+            stale_ids.append(r.test_case_id)
+    if not stale_ids:
+        return []
+    names = dict(db.query(TestCase.id, TestCase.tc_id).filter(TestCase.id.in_(stale_ids)).all())
+    return [names.get(i) or str(i) for i in stale_ids]
+
+
 @router.post("/{run_id}/results", response_model=List[TestResultResponse])
 def submit_results(
     project_id: int,
@@ -334,6 +356,18 @@ def submit_results(
     ).all()
     for er in existing_results:
         existing_map[er.test_case_id] = er
+
+    # ★낙관적 잠금. 화면이 읽어 둔 executed_at 을 같이 보내면, 그 뒤에 다른 사람이 같은 행을
+    #   저장했는지 본다. 자동 저장은 행마다 300ms 뒤 PUT 이고 먼저 나간 요청을 취소하지 못해서,
+    #   두 사람이 같은 행을 고치면 늦게 도착한 옛 값이 새 값을 덮었다(09-30, 팀 사용 대비).
+    #   하나라도 어긋나면 배치 전체를 거절한다. 일부만 저장하면 화면과 서버가 반쯤 갈린다.
+    conflicts = _stale_rows(results, existing_map, db)
+    if conflicts:
+        raise HTTPException(
+            status_code=409,
+            detail="다른 사용자가 먼저 저장한 행이 있습니다: " + ", ".join(conflicts)
+            + ". 최신 값으로 다시 읽습니다.",
+        )
 
     saved: list[TestResult] = []
     for r in results:

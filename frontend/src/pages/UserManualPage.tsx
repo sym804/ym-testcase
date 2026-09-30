@@ -556,6 +556,7 @@ export default function UserManualPage() {
             </div>
             <p style={s.p}>{t("testrun.priorityColor_p")}</p>
             <p style={s.p}>{t("testrun.issueLink_li")}</p>
+            <p style={s.p}>{t("testrun.concurrent_p")}</p>
 
             <h3 style={s.h3}>{t("testrun.h3_attachment")}</h3>
             <ul style={s.ul}>

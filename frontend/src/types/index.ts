@@ -171,6 +171,8 @@ export interface TestResult {
   started_at?: string | null;
   finished_at?: string | null;
   duration_sec?: number | null;
+  /** 저장 때만 보낸다. 화면이 읽어 둔 executed_at. 서버 값과 다르면 409(다른 사용자가 먼저 저장) */
+  expected_executed_at?: string | null;
   test_case?: TestCase;
 }
 
