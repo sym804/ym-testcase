@@ -332,9 +332,15 @@ export default function Dashboard({ projectId }: Props) {
         </div>
       </div>
 
-      {/* 회차 추이. 같은 이름의 수행을 회차 순으로 본다. 실행한 회차가 둘 이상일 때만 그린다 */}
+      {/* 회차 추이와 결함 히트맵을 한 줄에 절반씩. 추이는 선 둘이라 전체 폭이 남았다(09-30 지적).
+          실행한 회차가 둘 이상일 때만 추이를 그리고, 하나만 있으면 그것이 전체 폭을 쓴다 */}
+      {(executedRounds > 1 || heatmap.length > 0) && (
+      <div
+        style={{ ...styles.chartsRow, gridTemplateColumns: executedRounds > 1 && heatmap.length > 0 ? "1fr 1fr" : "1fr" }}
+        data-testid="trend-heatmap-row"
+      >
       {executedRounds > 1 && (
-        <div style={{ ...styles.chartCard, marginBottom: 28 }} data-testid="pass-fail-trend">
+        <div style={styles.chartCard} data-testid="pass-fail-trend">
           <h4 style={styles.chartTitle}>
             {t("passFailTrend")}
             {roundName ? <span style={styles.chartSubtitle}> · {roundName}</span> : null}
@@ -365,6 +371,18 @@ export default function Dashboard({ projectId }: Props) {
             }}
           />
         </div>
+      )}
+      {heatmap.length > 0 && (
+        <HeatmapTable
+          data={heatmap}
+          scopeLabel={
+            selectedRunId
+              ? (() => { const r = runs.find((x) => x.id === selectedRunId); return r ? `${r.name} (R${r.round})` : ""; })()
+              : t("heatmapScopeLatest")
+          }
+        />
+      )}
+      </div>
       )}
 
       {/* Tables */}
@@ -432,17 +450,6 @@ export default function Dashboard({ projectId }: Props) {
         </div>
       </div>
 
-      {/* Heatmap */}
-      {heatmap.length > 0 && (
-        <HeatmapTable
-          data={heatmap}
-          scopeLabel={
-            selectedRunId
-              ? (() => { const r = runs.find((x) => x.id === selectedRunId); return r ? `${r.name} (R${r.round})` : ""; })()
-              : t("heatmapScopeLatest")
-          }
-        />
-      )}
     </div>
   );
 }
@@ -569,7 +576,7 @@ function HeatmapTable({ data, scopeLabel }: { data: HeatCell[]; scopeLabel: stri
 }
 
 const hm: Record<string, React.CSSProperties> = {
-  card: { marginTop: 20, backgroundColor: "var(--bg-card)", borderRadius: 12, padding: 24, boxShadow: "var(--shadow)" },
+  card: { backgroundColor: "var(--bg-card)", borderRadius: 12, padding: 24, boxShadow: "var(--shadow)", border: "1px solid var(--border-color)", minWidth: 0 },
   header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 16 },
   title: { margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" },
   subtitle: { marginTop: 4, fontSize: 12, color: "var(--text-secondary)" },
