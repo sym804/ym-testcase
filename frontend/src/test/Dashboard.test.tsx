@@ -195,7 +195,9 @@ describe("Dashboard", () => {
   it("회차 추이 제목에 어떤 테스트인지 붙인다", async () => {
     render(<Dashboard projectId={1} />);
     const trend = await screen.findByTestId("pass-fail-trend");
-    expect(trend).toHaveTextContent("Pass/Fail Rate 추이 · R1 수행");
+    expect(trend).toHaveTextContent("합격률 · 실패율 추이 · R1 수행");
+    // 기준 설명이 붙는다: 같은 이름 · 회차 순 · 분모
+    expect(screen.getByTestId("trend-basis")).toHaveTextContent("합격률 = PASS ÷ 수행한 TC(PASS+FAIL+BLOCK)");
   });
 
   it("차트의 테스트를 변경하면 그 이름으로 회차를 다시 불러온다", async () => {

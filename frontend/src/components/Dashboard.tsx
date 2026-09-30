@@ -162,11 +162,14 @@ export default function Dashboard({ projectId }: Props) {
     pointRadius: 5,
     pointHoverRadius: 7,
   });
+  // x 축은 회차와 날짜. "R1, R2" 만으로는 언제 수행한 것인지 알 수 없었다(09-30 지적).
+  const roundLabel = (r: { round: number; created_at?: string | null }) =>
+    r.created_at ? `R${r.round} (${r.created_at.slice(5, 10)})` : `R${r.round}`;
   const trendData = {
-    labels: rounds.map((r) => `R${r.round}`),
+    labels: rounds.map(roundLabel),
     datasets: [
-      { label: "Pass Rate (%)", data: rounds.map((r) => r.pass_rate), ...trendPoint(CARD_COLORS.pass) },
-      { label: "Fail Rate (%)", data: rounds.map((r) => r.fail_rate ?? null), ...trendPoint(CARD_COLORS.fail) },
+      { label: t("trendPass"), data: rounds.map((r) => r.pass_rate), ...trendPoint(CARD_COLORS.pass) },
+      { label: t("trendFail"), data: rounds.map((r) => r.fail_rate ?? null), ...trendPoint(CARD_COLORS.fail) },
     ],
   };
   const executedRounds = rounds.filter((r) => (r.executed ?? r.pass + r.fail + r.block) > 0).length;
@@ -185,7 +188,8 @@ export default function Dashboard({ projectId }: Props) {
         if (!r) return "";
         const executed = r.executed ?? r.pass + r.fail + r.block;
         const state = r.status === "in_progress" ? t("inProgress") : t("completed");
-        return `${state} · ${t("executedOf", { executed, total: r.total })}`;
+        // 비율의 근거가 되는 건수를 같이 보여 준다
+        return `${state} · ${t("executedOf", { executed, total: r.total })} · PASS ${r.pass} · FAIL ${r.fail} · BLOCK ${r.block}`;
       },
     },
   };
@@ -335,6 +339,10 @@ export default function Dashboard({ projectId }: Props) {
             {t("passFailTrend")}
             {roundName ? <span style={styles.chartSubtitle}> · {roundName}</span> : null}
           </h4>
+          {/* 무엇을 나눈 값인지 밝힌다. 제목과 R1 · R2 만으로는 기준을 알 수 없다 */}
+          <div style={styles.chartNote} data-testid="trend-basis">
+            {t("trendBasis", { first: rounds[0]?.round ?? 1, last: rounds[rounds.length - 1]?.round ?? 1 })}
+          </div>
           <Line
             data={trendData}
             options={{
@@ -652,6 +660,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 12,
   },
   chartSubtitle: { fontWeight: 500, color: "var(--text-secondary)", fontSize: 13 },
+  chartNote: { fontSize: 12, color: "var(--text-secondary)", margin: "-6px 0 10px" },
   chartTitle: { margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--text-primary)" },
   tablesRow: {
     display: "grid",
