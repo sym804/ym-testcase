@@ -109,7 +109,7 @@ test.describe("자동 저장 거부 처리", () => {
     await expect(page.locator(".ag-header-cell").first()).toBeVisible({ timeout: 20000 });
     await expect(page.locator('.ag-row[row-index="1"]')).toBeVisible({ timeout: 20000 });
 
-    // 두 번째 행의 TC ID 를 첫 행과 같은 값으로 바꾼다 (서버가 409 로 거부한다)
+    // 두 번째 행의 TC ID 를 첫 행과 같은 값으로 변경한다 (서버가 409 로 거부한다)
     await page.locator('.ag-row[row-index="1"] [col-id="tc_id"]').dblclick();
     await page.locator(".ag-cell-inline-editing input.ag-input-field-input")
       .first().fill("REV-001");
@@ -142,7 +142,7 @@ test.describe("자동 저장 거부 처리", () => {
 
   // 셀 편집 말고 일괄 변경 경로도 같아야 한다. 이쪽은 onCellValueChanged 를
   // 타지 않고 행 데이터를 직접 바꾼 뒤 자동저장만 부른다.
-  test("모두 바꾸기가 거부돼도 값이 되돌아간다", async ({ page, request }) => {
+  test("모두 변경하기가 거부돼도 값이 되돌아간다", async ({ page, request }) => {
     const pw = process.env.TEST_ADMIN_PASSWORD || "test1234";
     const auth = await request.post("/api/auth/login", {
       data: { username: "admin", password: pw },
@@ -174,16 +174,16 @@ test.describe("자동 저장 거부 처리", () => {
     await expect(page.locator(".ag-header-cell").first()).toBeVisible({ timeout: 20000 });
     await expect(page.locator('.ag-row[row-index="1"]')).toBeVisible({ timeout: 20000 });
 
-    // BLK-002 를 BLK-001 로 모두 바꾼다 (서버가 409 로 거부한다)
+    // BLK-002 를 BLK-001 로 모두 변경한다 (서버가 409 로 거부한다)
     await page.getByPlaceholder("검색...", { exact: true }).fill("BLK-002");
-    await page.getByRole("button", { name: "바꾸기" }).click();
-    await page.getByPlaceholder("바꿀 내용...").fill("BLK-001");
-    // 모두 바꾸기도 행 단위 autoSaveRow 로 저장한다. 중복 TC ID 라 서버가 409 로 거부한다.
+    await page.getByRole("button", { name: "변경하기" }).click();
+    await page.getByPlaceholder("변경할 내용...").fill("BLK-001");
+    // 모두 변경하기도 행 단위 autoSaveRow 로 저장한다. 중복 TC ID 라 서버가 409 로 거부한다.
     // 상태를 보지 않으면 500 이 떨어져도 이 테스트가 통과한다.
     const replaced = page.waitForResponse(
       (r) => /\/testcases\/\d+$/.test(r.url()) && r.request().method() === "PUT"
     );
-    await page.getByRole("button", { name: "모두 바꾸기" }).click();
+    await page.getByRole("button", { name: "모두 변경하기" }).click();
     expect((await replaced).status()).toBe(409);
 
     const list = await (await request.get(

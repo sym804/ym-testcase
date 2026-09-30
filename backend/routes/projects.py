@@ -38,6 +38,7 @@ def _project_response(project: Project, user: User, db: Session) -> dict:
         "name": project.name,
         "description": project.description,
         "jira_base_url": project.jira_base_url,
+        "issue_tracker": project.issue_tracker,
         "is_private": project.is_private,
         "field_config": _get_field_config(project.id, db),
         "created_by": project.created_by,
@@ -92,6 +93,7 @@ def list_projects(
             "name": p.name,
             "description": p.description,
             "jira_base_url": p.jira_base_url,
+            "issue_tracker": p.issue_tracker,
             "is_private": p.is_private,
             "created_by": p.created_by,
             "created_at": p.created_at,
@@ -111,6 +113,7 @@ def create_project(
         name=payload.name,
         description=payload.description,
         jira_base_url=payload.jira_base_url,
+        issue_tracker=payload.issue_tracker,
         is_private=payload.is_private,
         created_by=current_user.id,
     )

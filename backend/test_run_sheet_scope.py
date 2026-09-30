@@ -201,8 +201,8 @@ def test_대시보드_분모가_런_범위를_따른다(token, project):
     assert sum(x["total"] for x in pri) == 2, pri
 
 
-def test_시트_이름을_바꿔도_런_범위가_따라간다(token, project):
-    """★런 범위는 시트 이름으로 저장된다. 이름이 바뀌면 그 범위가 아무것도 가리키지 않는다.
+def test_시트_이름을_변경해도_런_범위가_따라간다(token, project):
+    """★런 범위는 시트 이름으로 저장된다. 이름이 변경되면 그 범위가 아무것도 가리키지 않는다.
 
     그러면 결과 제출이 전부 400 이 되고, 새 TC 도 흡수되지 않으며, 시트 탭도 사라진다.
     """
@@ -236,7 +236,7 @@ def test_시트_이름을_바꿔도_런_범위가_따라간다(token, project):
                         json=[{"test_case_id": tc_id, "result": "PASS"}])
     assert sub.status_code == 200, sub.text
 
-    # 바뀐 이름의 시트에 TC 를 더하면 흡수해야 한다
+    # 변경된 이름의 시트에 TC 를 더하면 흡수해야 한다
     _add_tc(token, project, 200, "TC-결제하기-NEW", "결제하기")
     after = requests.get(f"{BASE}/api/projects/{project}/testruns/{run_id}", headers=h).json()
     assert "TC-결제하기-NEW" in {x["test_case"]["tc_id"] for x in after["results"]}

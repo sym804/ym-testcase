@@ -12,7 +12,7 @@
   않는다" 를 지켜야 한다. 여기서는 한 번 비켜 둔 뒤 최종 값을 쓴다.
 
 ★마이그레이션(f2b7c04e91a8)에도 비슷한 SQL 이 있다. 일부러 나눠 둔다. 마이그레이션은
-  그때의 스키마에 묶인 기록이라, 이 파일이 바뀐다고 과거 마이그레이션까지 바뀌면
+  그때의 스키마에 묶인 기록이라, 이 파일이 변경된다고 과거 마이그레이션까지 변경되면
   안 된다(그 시점에는 유니크 인덱스도 없었다).
 """
 from sqlalchemy import text
@@ -70,7 +70,7 @@ def park_sheet_numbers(project_id: int, sheet_name: str, db: Session) -> None:
 
 
 def renumber_sheet(project_id: int, sheet_name: str, db: Session) -> None:
-    """한 시트의 no 를 1 부터 다시 매긴다. 지금 차례는 바꾸지 않는다."""
+    """한 시트의 no 를 1 부터 다시 매긴다. 지금 차례는 변경하지 않는다."""
     db.execute(text("DROP TABLE IF EXISTS temp._tc_rank"))
     # ★순위를 CTE 로 두지 않고 임시 테이블에 담는다. 갱신 대상과 같은 테이블을 읽는
     #   CTE 는 SQLite 가 인라인으로 펼치면 행마다 다시 평가되어, 이미 바꾼 값 위에서

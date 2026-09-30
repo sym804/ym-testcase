@@ -480,7 +480,7 @@ const s: Record<string, React.CSSProperties> = {
   tempPwBox: {
     padding: "12px 16px", borderRadius: 8,
     backgroundColor: "var(--bg-input)", border: "1px solid var(--border-input)",
-    fontSize: 18, fontWeight: 700, fontFamily: "monospace",
+    fontSize: 18, fontWeight: 700, fontFamily: "var(--font-mono)",
     color: "var(--text-primary)", letterSpacing: 1, marginBottom: 16,
   },
   copyBtn: {

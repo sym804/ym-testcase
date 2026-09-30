@@ -58,7 +58,7 @@ describe("planTcIdFill", () => {
     expect(idsOf(all, plan!)).toEqual(["SFW-001", "keep", "SFW-002", "keep", "SFW-003"]);
   });
 
-  it("이미 순번이 맞으면 바꿀 것이 없다", () => {
+  it("이미 순번이 맞으면 변경할 것이 없다", () => {
     expect(planTcIdFill(["SFW-001", "SFW-002", "SFW-003"], [0, 1, 2])).toEqual([]);
   });
 
@@ -88,7 +88,7 @@ describe("dominantTcIdPrefix", () => {
   });
 
   // 대량 행 추가는 여기서 나온 maxNum 뒤로 이어 붙인다.
-  // 예전에는 await 루프 안에서 rowData 클로저가 안 바뀌어 전부 같은 번호를 받았다.
+  // 예전에는 await 루프 안에서 rowData 클로저가 안 변경되어 전부 같은 번호를 받았다.
   it("대량 추가 시 번호가 겹치지 않고 이어진다", () => {
     const seed = dominantTcIdPrefix(["SFW-001", "SFW-002", "SFW-003"])!;
     const made = Array.from({ length: 4 }, (_, i) =>

@@ -12,11 +12,47 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v1.6.10.5  (2026-09-23)
-├── Frontend       v1.6.7.2
-├── Backend        v1.6.5.1
-└── Database       v0.9.2.0
+YM TestCase System  v1.7.0.0  (2026-09-30)
+├── Frontend       v1.7.0.0
+├── Backend        v1.7.0.0
+└── Database       v0.10.0.0
 ```
+
+---
+
+## v1.7.0.0 (2026-09-30) - [feat] 리포트 이슈 종합 · 수행 비교 상세 · 수행 목록 트리
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.6.10.5 | **1.7.0.0** | feature +1 |
+| Frontend | 1.6.7.2 | **1.7.0.0** | feature +1 |
+| Backend | 1.6.5.1 | **1.7.0.0** | feature +1 |
+| Database | 0.9.2.0 | **0.10.0.0** | feature +1 |
+
+### 변경
+
+- 리포트 이슈 섹션 신설: 수행마다 이슈(제목 · 링크 · 연관 TC · 심각도 · 상태) 등록, 이전 회차 이슈 가져오기, 상태 판정(해결 · 유지 · 부분 해결 · 미확인). 묶음은 미해결 · 처리 완료, 연관 TC 가 모두 PASS 인 미확인 이슈는 "해결 후보"
+- 프로젝트 설정에 이슈 관리 도구(Jira/Linear) 선택
+- 수행 비교: 비교 대상 선택, 카드 넷(이전 실패 · 수정 · 미수정 · 퇴보)과 변경 상세 표. FAIL 그대로인 TC 도 "미수정" 으로 실림
+- 테스트 수행 목록을 버전 → 이름 → 회차 트리로. 회차 행에 환경 · 상태 · 진행률, 검색과 상태 · 환경 필터, "다음 회차" 버튼
+- PDF 를 웹과 같은 차례 · 언어로 재구성, 엑셀 요약 시트도 화면 언어(?lang=)
+- 대시보드 라운드 비교 · 추이를 같은 이름끼리 묶고 히트맵 재설계. 본문 Pretendard, 코드 칸 Consolas
+- 용어 "바뀐다"→"변경된다", "해소"→"해결". 수행자는 이름만. PDF 남색 · Excel 초록 버튼. 매뉴얼 갱신
+
+### Database
+
+- a7d3e5c19f42: run_issues · run_issue_test_cases 테이블, projects.issue_tracker, test_runs.compare_run_id. 추가만, 기동 때 자동 적용
+
+### API
+
+- `/testruns/{run}/issues` CRUD · `carry-over`, `clone?next_round=true`, 런 목록 `tc_total` · `tc_executed`, 리포트 JSON `issues` · `issue_summary` · `comparison.changes`, `reports/pdf|excel?lang=`
+
+### 영향
+
+- 리포트 JSON 의 `executors` 는 그대로지만 화면 · PDF · 엑셀은 이름만 보여 준다. 리포트의 옛 「연관 Jira 이슈」 섹션은 없어졌다(`jira_issues` 필드는 호환용으로 남음)
+- 수행 목록의 "이전 런 더보기" 는 트리의 버전 접힘으로 대체
 
 ---
 

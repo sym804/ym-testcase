@@ -492,6 +492,15 @@ describe("reportsApi", () => {
     expect(result.filename).toBe("테스트_Report_R2.pdf");
   });
 
+  it("downloadPdf passes the screen language", async () => {
+    mockGet.mockResolvedValueOnce({ data: new Blob(["pdf"]), headers: {} });
+    await reportsApi.downloadPdf(1, 5, "en");
+    expect(mockGet).toHaveBeenCalledWith("/api/projects/1/reports/pdf", {
+      params: { run_id: 5, lang: "en" },
+      responseType: "blob",
+    });
+  });
+
   it("downloadExcel sends GET with blob responseType", async () => {
     const blob = new Blob(["excel"]);
     mockGet.mockResolvedValueOnce({ data: blob });
