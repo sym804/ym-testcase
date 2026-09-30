@@ -273,14 +273,14 @@
     },
     "testRuns": {
       "title": "테스트 런",
-      "list": "런 목록",
+      "list": "런 목록 (tc_total · tc_executed 진행률 포함)",
       "create": "런 생성",
       "detail": "런 상세 (결과 포함)",
       "update": "런 수정",
       "saveResults": "결과 저장 (벌크)",
       "complete": "런 완료",
       "reopen": "런 다시 수행 (완료→진행중)",
-      "clone": "런 복제",
+      "clone": "런 복제. ?next_round=true 면 같은 이름의 다음 회차(회차 최댓값 + 1, 플랜 승계)",
       "delete": "런 삭제",
       "export": "런 Excel Export"
     },
@@ -319,15 +319,23 @@
     },
     "misc": {
       "title": "리포트 / 첨부파일 / 기타",
-      "reportJson": "리포트 JSON",
-      "reportPdf": "PDF 다운로드",
-      "reportExcel": "Excel 다운로드",
+      "reportJson": "리포트 JSON (issues · issue_summary · comparison.changes 포함)",
+      "reportPdf": "PDF 다운로드 (?lang=ko|en, 기본 ko)",
+      "reportExcel": "Excel 다운로드 (?lang=ko|en, 요약 시트 문구)",
       "attachmentList": "첨부파일 목록",
       "attachmentUpload": "첨부파일 업로드",
       "attachmentDownload": "첨부파일 다운로드",
       "attachmentDelete": "첨부파일 삭제",
       "globalSearch": "글로벌 TC 검색",
       "overview": "전체 현황"
+    },
+    "runIssues": {
+      "title": "수행 이슈 (리포트 이슈 섹션)",
+      "list": "이슈 목록",
+      "create": "이슈 추가 (title · url 필수, issue_key · status · note · tc_ids · origin_run_id · verdict). 같은 url 은 409",
+      "update": "이슈 수정 (verdict: resolved · open · partial · unverified)",
+      "delete": "이슈 삭제",
+      "carryOver": "이전 회차 이슈 가져오기 (본문 from_run_id, 비우면 비교 대상. 같은 url 은 건너뜀)"
     }
   },
   "troubleshoot": {

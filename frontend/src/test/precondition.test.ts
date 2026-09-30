@@ -143,7 +143,7 @@ describe("화면에 나가는 문구", () => {
     await i18n.changeLanguage("ko");
   });
 
-  it("영어로 바꾸면 참조 안내도 영어로 나온다", async () => {
+  it("영어로 변경하면 참조 안내도 영어로 나온다", async () => {
     // ★이 문구들은 그리드 셀과 호버 팝업에 그대로 찍힌다. 한글로 고정돼 있으면
     //   영어 화면에서만 한글이 섞인다.
     await i18n.changeLanguage("en");

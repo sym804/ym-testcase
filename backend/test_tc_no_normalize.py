@@ -86,7 +86,7 @@ def test_fills_gaps_within_sheet(db):
 
 
 def test_keeps_existing_order(db):
-    """번호만 바꾸고 순서는 바꾸지 않는다."""
+    """번호만 변경하고 순서는 변경하지 않는다."""
     s, _ = db
     _add(s, 1, "결제", 51)   # id 1
     _add(s, 1, "결제", 4)    # id 2

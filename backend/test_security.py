@@ -395,7 +395,7 @@ class TestNonMemberIsBlockedFromReadEndpoints:
     """비멤버가 private 프로젝트의 집계 화면을 못 보는지 실제로 친다.
 
     예전에는 `routes/dashboard.py` 소스에 "check_project_access" 라는 글자가
-    있는지 읽어서 판정했다. 그 방식은 의존성 이름을 바꾸거나 한 엔드포인트만
+    있는지 읽어서 판정했다. 그 방식은 의존성 이름을 변경하거나 한 엔드포인트만
     빠뜨려도 통과한다. 반대로 권한이 멀쩡해도 리팩터링하면 빨개진다.
     """
 

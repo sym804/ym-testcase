@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { useTranslation } from "react-i18next";
 import { resolveIssueUrl } from "../utils/issueLink";
+import type { IssueTracker } from "../types";
 
 /**
  * 이슈 링크 칸. 글자는 그대로 두고, 이동할 주소가 있으면 옆에 ↗ 를 붙인다.
@@ -9,14 +10,20 @@ import { resolveIssueUrl } from "../utils/issueLink";
  * ★글자 전체를 링크로 만들지 않는다. 이 칸은 편집 칸이라 더블클릭으로 편집에
  *   들어가는데, 글자가 링크면 더블클릭 한 번에 새 탭이 두 번 열린다.
  *
- * 주소는 context.trackerUrl(프로젝트의 이슈 관리 도구 주소)로 만든다. 규칙은
+ * 주소는 context.trackerUrl(프로젝트의 이슈 관리 도구 주소)과 context.tracker(도구 종류)로 만든다. 규칙은
  * 리포트와 같은 resolveIssueUrl 이다.
  */
 export default function IssueLinkCell(props: CustomCellRendererProps) {
   const { t } = useTranslation("testrun");
   const linkRef = useRef<HTMLAnchorElement>(null);
   const raw = props.value != null ? String(props.value) : "";
-  const url = raw ? resolveIssueUrl(raw, props.context?.trackerUrl as string | null | undefined) : null;
+  const url = raw
+    ? resolveIssueUrl(
+        raw,
+        props.context?.trackerUrl as string | null | undefined,
+        props.context?.tracker as IssueTracker | null | undefined,
+      )
+    : null;
 
   // ★↗ 는 셀 편집과 엮이면 안 된다. 두 가지를 브라우저 리스너로 막는다. React 의
   //   합성 이벤트는 AG Grid 가 셀에 직접 단 리스너보다 늦게 돌아서 막지 못한다.

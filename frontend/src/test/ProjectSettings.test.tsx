@@ -235,7 +235,7 @@ describe("ProjectSettings - Danger Zone (Delete Flow)", () => {
     });
   });
 
-  it("삭제 중 버튼 텍스트가 '삭제 중...'으로 바뀐다", async () => {
+  it("삭제 중 버튼 텍스트가 '삭제 중...'으로 변경된다", async () => {
     let resolveDelete: () => void;
     vi.mocked(projectsApi.delete).mockImplementation(
       () => new Promise<void>((resolve) => { resolveDelete = resolve; })
@@ -395,6 +395,7 @@ describe("ProjectSettings - Custom Fields CRUD", () => {
         name: "TestProject",
         description: "",
         jira_base_url: "",
+        issue_tracker: null,
       });
     });
   });
@@ -413,12 +414,13 @@ describe("ProjectSettings - Custom Fields CRUD", () => {
         name: "TestProject",
         description: "결제 회귀용",
         jira_base_url: "",
+        issue_tracker: null,
       });
     });
   });
 
-  it("이슈 관리 도구 주소를 설정 탭에서 바꿔 저장한다", async () => {
-    // 예전에는 프로젝트를 만들 때만 넣을 수 있어, 만든 뒤에는 바꿀 길이 없었다.
+  it("이슈 관리 도구 주소를 설정 탭에서 변경해 저장한다", async () => {
+    // 예전에는 프로젝트를 만들 때만 넣을 수 있어, 만든 뒤에는 변경할 길이 없었다.
     const user = userEvent.setup();
     renderSettings({ ...adminProject, jira_base_url: "https://x.atlassian.net" } as any);
 
@@ -433,7 +435,36 @@ describe("ProjectSettings - Custom Fields CRUD", () => {
         name: "TestProject",
         description: "테스트",
         jira_base_url: "https://linear.app/sym",
+        issue_tracker: null,
       });
+    });
+  });
+
+  it("이슈 관리 도구를 골라 저장한다", async () => {
+    const user = userEvent.setup();
+    renderSettings({ ...adminProject, jira_base_url: "https://linear.app/sym" } as any);
+
+    const select = screen.getByTestId("issue-tracker");
+    expect(select).toHaveValue("");
+    await user.selectOptions(select, "linear");
+    await user.click(screen.getAllByText("저장")[0]);
+
+    await waitFor(() => {
+      expect(projectsApi.update).toHaveBeenCalledWith(1, expect.objectContaining({ issue_tracker: "linear" }));
+    });
+  });
+
+  it("저장된 도구를 불러오고, 지정 안 함으로 되돌리면 null 을 보낸다", async () => {
+    const user = userEvent.setup();
+    renderSettings({ ...adminProject, issue_tracker: "jira" } as any);
+
+    const select = screen.getByTestId("issue-tracker");
+    expect(select).toHaveValue("jira");
+    await user.selectOptions(select, "");
+    await user.click(screen.getAllByText("저장")[0]);
+
+    await waitFor(() => {
+      expect(projectsApi.update).toHaveBeenCalledWith(1, expect.objectContaining({ issue_tracker: null }));
     });
   });
 

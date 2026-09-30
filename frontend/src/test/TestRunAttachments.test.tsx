@@ -192,8 +192,8 @@ describe("테스트 수행 - 첨부파일 표시", () => {
     expect(emptyRow.textContent).toBe("+");
   });
 
-  it("런을 빠르게 바꾸면 늦게 온 이전 런의 응답이 화면을 덮지 않는다", async () => {
-    // ★런 상세와 첨부 조회는 런/시트를 바꿀 때마다 다시 돈다. 앞 요청이 늦게 도착하면
+  it("런을 빠르게 변경하면 늦게 온 이전 런의 응답이 화면을 덮지 않는다", async () => {
+    // ★런 상세와 첨부 조회는 런/시트를 변경할 때마다 다시 돈다. 앞 요청이 늦게 도착하면
     //   이전 런의 결과와 첨부가 지금 보고 있는 런 위에 그려진다.
     const run2 = { ...mockRun, id: 2, name: "Sprint 2 테스트", round: 2 };
     vi.mocked(testRunsApi.list).mockResolvedValue([mockRun, run2] as any);

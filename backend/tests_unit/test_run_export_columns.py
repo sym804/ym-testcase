@@ -138,7 +138,7 @@ def test_열_차례가_의도대로다(db, seeded):
 
 
 def test_기존_열이_밀려나지_않는다(db, seeded):
-    """열을 끼우면 뒤 열의 인덱스가 바뀐다. 값이 제 열에 들어가는지 본다."""
+    """열을 끼우면 뒤 열의 인덱스가 변경된다. 값이 제 열에 들어가는지 본다."""
     ws = _sheet(db, seeded)
     headers = [c.value for c in ws[1]]
     row = {h: ws.cell(row=2, column=i + 1).value for i, h in enumerate(headers)}

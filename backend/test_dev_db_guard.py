@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HERE = Path(__file__).resolve().parent
 
 #: HTTP 로 요청을 보내는 테스트 파일이 쓰는 기본 주소 패턴.
-#: 따옴표 종류와 os.environ.get 표기까지 받는다. 표기를 조금 바꿔 쓴 파일이
+#: 따옴표 종류와 os.environ.get 표기까지 받는다. 표기를 조금 변경해 쓴 파일이
 #: 검사에서 조용히 빠지면, 그 파일만 실 DB 를 치게 된다.
 _BASE_RE = re.compile(
     r"""os\.(?:getenv|environ\.get)\(\s*["']TEST_BASE_URL["']\s*,\s*["']https?://[^"':]+:(\d+)["']"""

@@ -23,6 +23,7 @@ import MarkdownCell from "./MarkdownCell";
 import HighlightCell from "./HighlightCell";
 import IssueLinkCell from "./IssueLinkCell";
 import { priorityCellStyle, priorityDisplayMap } from "../utils/priority";
+import RunTreePanel from "./RunTreePanel";
 import PreconditionCell from "./PreconditionCell";
 import { useTestTimer } from "../hooks/useTestTimer";
 import { useAttachments } from "../hooks/useAttachments";
@@ -71,7 +72,6 @@ export default function TestRunManager({ projectId, project }: Props) {
   // 새 런에 담을 시트. 모달을 열 때 전체 선택으로 시작하고 체크를 풀어 줄인다.
   const [newRunSheets, setNewRunSheets] = useState<Set<string>>(new Set());
   const [panelCollapsed, setPanelCollapsed] = useState(false);
-  const [showAllCompleted, setShowAllCompleted] = useState(false);
   const [countTick, setCountTick] = useState(0);
   const gridApiRef = useRef<GridApi | null>(null);
 
@@ -149,7 +149,7 @@ export default function TestRunManager({ projectId, project }: Props) {
   const loadRunDetailRef = useRef<((run: TestRun) => void) | null>(null);
 
   // 저장이 거부되면 서버가 이유를 준다. "저장 실패" 로 뭉개면 무엇이 막혔는지 알 수 없고,
-  // 화면 값은 이미 바뀐 채로 남아 저장된 것처럼 보인다(SYM-35 와 같은 유형).
+  // 화면 값은 이미 변경된 채로 남아 저장된 것처럼 보인다(SYM-35 와 같은 유형).
   // 이유를 그대로 띄우고 서버 값으로 되돌린다.
   const handleSaveError = useCallback((err: unknown) => {
     const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -281,7 +281,7 @@ export default function TestRunManager({ projectId, project }: Props) {
   //   이전 런의 결과와 첨부가 지금 보고 있는 런 위에 그려진다. 세대 번호를 붙여
   //   최신 요청만 화면에 반영한다.
   const runDetailSeqRef = useRef(0);
-  // 첨부를 이미 통째로 받아 둔 런. 시트 탭만 바꿀 때는 다시 받지 않는다.
+  // 첨부를 이미 통째로 받아 둔 런. 시트 탭만 변경할 때는 다시 받지 않는다.
   const seededRunIdRef = useRef<number | null>(null);
 
   const loadRunDetail = useCallback(
@@ -575,7 +575,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
     };
   }, []);
 
-  // 런이나 시트를 옮기면 그 아래 그리드가 통째로 바뀐다. 열린 메뉴를 그대로 두면
+  // 런이나 시트를 옮기면 그 아래 그리드가 통째로 변경된다. 열린 메뉴를 그대로 두면
   // 옛 화면에 띄운 것이 새 화면 위에 남는다.
   useEffect(() => {
     setPriorityMenuOpen(false);
@@ -707,7 +707,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
         wrapText: true,
         autoHeight: true,
         cellClass: "ag-cell-left",
-        // ★읽기 전용이다. 수행 화면에서 고치면 TC 원문이 바뀌어 같은 TC 를 담은
+        // ★읽기 전용이다. 수행 화면에서 고치면 TC 원문이 변경되어 같은 TC 를 담은
         //   다른 런의 기준까지 흔들린다. TC 원문은 TC 관리 화면에서만 고친다.
         editable: false,
         // 참조는 셀 안에 펼치지 않고 PreconditionCell 이 띄우는 툴팁으로만 보인다.
@@ -909,8 +909,8 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         .map(({ _key, ...rest }) => rest);
     },
-    // ★t 를 넣는다. 빼 두면 언어를 바꿔도 헤더가 옛 언어로 남는다. 첨부 맵이
-    //   바뀔 때(다른 런을 열 때) 우연히 갱신되는 것에 기대고 있었다.
+    // ★t 를 넣는다. 빼 두면 언어를 변경해도 헤더가 옛 언어로 남는다. 첨부 맵이
+    //   변경될 때(다른 런을 열 때) 우연히 갱신되는 것에 기대고 있었다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [attachmentsMap, timerEnabled, t, fieldDisplay, priorityDisplay]
   );
@@ -966,6 +966,24 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
       loadRunDetail(cloned);
     } catch {
       toast.error(t("cloneFailed"));
+    }
+  };
+
+  // 다음 회차: 이름은 그대로, 회차 +1, 결과는 NS. 진행 중이면 먼저 완료 처리할지 묻는다.
+  const handleNextRound = async () => {
+    if (!selectedRun) return;
+    const nextRound = Math.max(...runs.filter((r) => r.name === selectedRun.name).map((r) => r.round), selectedRun.round) + 1;
+    if (!confirm(t("nextRoundConfirm", { name: selectedRun.name, round: nextRound }))) return;
+    try {
+      if (selectedRun.status !== TestRunStatus.COMPLETED && confirm(t("nextRoundCompleteFirst"))) {
+        await testRunsApi.complete(projectId, selectedRun.id);
+      }
+      const created = await testRunsApi.clone(projectId, selectedRun.id, { next_round: true });
+      toast.success(t("nextRoundSuccess", { round: created.round }));
+      loadRuns();
+      loadRunDetail(created);
+    } catch {
+      toast.error(t("nextRoundFailed"));
     }
   };
 
@@ -1042,65 +1060,14 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
               ◀
             </button>
           </div>
-          <div style={styles.runList}>
-            {loadingRuns ? (
-              <div style={styles.loadingText}>{t("common:loadingData")}</div>
-            ) : runs.length === 0 ? (
-              <div style={styles.emptyText}>{t("noRuns")}</div>
-            ) : (() => {
-              const inProgress = runs.filter(r => r.status !== TestRunStatus.COMPLETED);
-              const completed = runs.filter(r => r.status === TestRunStatus.COMPLETED);
-              const INITIAL_SHOW = 5;
-              const visibleCompleted = showAllCompleted ? completed : completed.slice(0, INITIAL_SHOW);
-              const hiddenCount = completed.length - INITIAL_SHOW;
-              const allVisible = [...inProgress, ...visibleCompleted];
-
-              return <>
-                {allVisible.map((run) => (
-                  <div
-                    key={run.id}
-                    style={{
-                      ...styles.runItem,
-                      ...(selectedRun?.id === run.id ? styles.runItemActive : {}),
-                    }}
-                    onClick={() => loadRunDetail(run)}
-                  >
-                    <div style={styles.runName}>{run.name}</div>
-                    <div style={styles.runMeta}>
-                      R{run.round} | {run.version || "-"}
-                    </div>
-                    <span
-                      style={{
-                        ...styles.statusBadge,
-                        backgroundColor:
-                          run.status === TestRunStatus.COMPLETED ? "rgba(26, 127, 55, 0.15)" : "rgba(37, 99, 235, 0.15)",
-                        color:
-                          run.status === TestRunStatus.COMPLETED ? "var(--color-pass)" : "#60A5FA",
-                      }}
-                    >
-                      {run.status === TestRunStatus.COMPLETED ? t("completed") : t("inProgress")}
-                    </span>
-                  </div>
-                ))}
-                {!showAllCompleted && hiddenCount > 0 && (
-                  <div
-                    style={{ padding: "8px 12px", textAlign: "center", cursor: "pointer", color: "var(--text-secondary)", fontSize: 12, borderBottom: "1px solid var(--border-color)" }}
-                    onClick={() => setShowAllCompleted(true)}
-                  >
-                    {t("showOlderRuns", { count: hiddenCount })}
-                  </div>
-                )}
-                {showAllCompleted && hiddenCount > 0 && (
-                  <div
-                    style={{ padding: "8px 12px", textAlign: "center", cursor: "pointer", color: "var(--text-secondary)", fontSize: 12, borderBottom: "1px solid var(--border-color)" }}
-                    onClick={() => setShowAllCompleted(false)}
-                  >
-                    {t("collapseRuns")}
-                  </div>
-                )}
-              </>;
-            })()}
-          </div>
+          {/* 버전 -> 수행 이름 -> 회차 트리. 예전 한 줄 목록은 수행이 늘면 회차가 흩어졌다(09-30) */}
+          {loadingRuns ? (
+            <div style={styles.loadingText}>{t("common:loadingData")}</div>
+          ) : runs.length === 0 ? (
+            <div style={styles.emptyText}>{t("noRuns")}</div>
+          ) : (
+            <RunTreePanel runs={runs} selectedRunId={selectedRun?.id ?? null} onSelect={loadRunDetail} />
+          )}
           {canManageRun && (
             <button style={styles.newRunBtn} onClick={() => { setNewRunSheets(new Set(selectableSheets.map((sh) => sh.name))); setShowModal(true); }}>
               {t("newRun")}
@@ -1176,9 +1143,14 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                   </button>
                 )}
                 {canManageRun && (
-                  <button style={styles.btnGhost} onClick={handleClone}>
-                    {t("cloneRun")}
-                  </button>
+                  <>
+                    <button style={styles.btnGhost} onClick={handleNextRound} data-testid="next-round">
+                      {t("nextRound")}
+                    </button>
+                    <button style={styles.btnGhost} onClick={handleClone}>
+                      {t("cloneRun")}
+                    </button>
+                  </>
                 )}
                 <button style={styles.btnGhost} onClick={async () => {
                   if (!selectedRun) return;
@@ -1397,7 +1369,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                       if (node?.data?.id) onRowFocused(node.data.id);
                     }
                   }}
-                  context={{ searchKeyword: filterText, preconditionIndex, trackerUrl: project.jira_base_url }}
+                  context={{ searchKeyword: filterText, preconditionIndex, trackerUrl: project.jira_base_url, tracker: project.issue_tracker }}
                   // ★클릭 한 번에 편집기를 열지 않는다(더블클릭 · F2 · 바로 타이핑으로 연다).
                   //   절차나 기대 결과를 복사하려는데 편집기가 열려 막혔다. 읽기 전용
                   //   열이라 편집도 안 되면서 복사도 안 되는 상태였다. 두 값은 한 쌍이라
@@ -1691,8 +1663,8 @@ const sheetTabStyles: Record<string, React.CSSProperties> = {
 const styles: Record<string, React.CSSProperties> = {
   wrapper: { display: "flex", gap: 12, height: "calc(100vh - 160px)" },
   leftPanel: {
-    width: 240,
-    minWidth: 240,
+    width: 280,
+    minWidth: 280,
     backgroundColor: "var(--bg-card)",
     borderRadius: 12,
     border: "1px solid var(--border-color)",

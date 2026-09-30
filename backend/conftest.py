@@ -87,7 +87,7 @@ def _isolate_database_url():
     path = os.path.join(tmp_dir, "ymtc_test.db").replace("\\", "/")
     os.environ["DATABASE_URL"] = f"sqlite:///{path}"
     #: ignore_errors 를 켠다. Windows 에서 SQLite 핸들이 아직 열려 있으면 삭제가
-    #: 실패하는데, 임시 폴더가 남는 것은 테스트 결과를 바꾸지 않는다.
+    #: 실패하는데, 임시 폴더가 남는 것은 테스트 결과를 변경하지 않는다.
     atexit.register(shutil.rmtree, tmp_dir, True)
     return tmp_dir
 
@@ -152,7 +152,7 @@ def _server():
         return
 
     # 임시 DB 는 이 파일 맨 위에서 이미 DATABASE_URL 에 박아 두었다.
-    # 여기서 다시 바꾸면 수집 단계에 만들어진 engine 과 갈라진다.
+    # 여기서 다시 변경하면 수집 단계에 만들어진 engine 과 갈라진다.
     from main import app
 
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")

@@ -26,7 +26,7 @@ def _app_models():
     ★모듈 최상단에서 import 하면 안 된다. models -> database 인데 database 는
       import 시점에 DATABASE_URL 을 읽어 엔진을 만든다. pytest 는 수집 단계에서
       테스트 모듈을 import 하므로, 최상단 import 는 conftest 의 세션 픽스처가
-      DATABASE_URL 을 임시 DB 로 바꾸기 **전에** 엔진을 운영 DB 로 굳혀 버린다.
+      DATABASE_URL 을 임시 DB 로 변경하기 **전에** 엔진을 운영 DB 로 굳혀 버린다.
       그러면 다른 테스트 파일이 운영 admin 비밀번호로 로그인하려다 전부 죽는다
       (2026-09-05 실측: 이 파일을 추가하자 test_security.py 169건이 에러).
     """

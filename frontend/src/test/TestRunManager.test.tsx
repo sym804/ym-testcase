@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("ag-grid-react", () => ({
@@ -138,7 +138,8 @@ const makeResult = (overrides: Partial<TestResult> = {}): TestResult => ({
 
 const mockRuns: TestRun[] = [
   makeRun({ id: 1, name: "Sprint 1 테스트", status: TestRunStatus.IN_PROGRESS }),
-  makeRun({ id: 2, name: "Sprint 2 테스트", version: "v2.0", round: 2, status: TestRunStatus.COMPLETED }),
+  // 같은 버전(v1.0)에 두면 진행 중 수행이 있어 트리가 펼쳐진 채로 시작한다. 접힘은 따로 검사한다.
+  makeRun({ id: 2, name: "Sprint 2 테스트", version: "v1.0", round: 2, status: TestRunStatus.COMPLETED }),
 ];
 
 const mockRunDetail = {
@@ -205,12 +206,96 @@ describe("TestRunManager", () => {
       });
     });
 
-    it("라운드/버전 정보를 표시한다", async () => {
+    it("버전 -> 수행 이름 -> 회차 트리로 보여 주고 회차 행에 환경 · 상태 · 진행률을 싣는다", async () => {
+      vi.mocked(testRunsApi.list).mockResolvedValue([
+        makeRun({ id: 1, name: "정책", version: "v1.5", round: 2, environment: "Dev", tc_total: 50, tc_executed: 20, created_at: "2026-09-30" }),
+        makeRun({ id: 2, name: "정책", version: "1.5", round: 1, environment: "Dev", status: TestRunStatus.COMPLETED, tc_total: 50, tc_executed: 50, created_at: "2026-09-29" }),
+        makeRun({ id: 3, name: "Full", version: "v1.5", round: 1, environment: "Prod", tc_total: 10, tc_executed: 0, created_at: "2026-09-28" }),
+        makeRun({ id: 4, name: "e2e", version: "v1.4", round: 1, environment: "prod", status: TestRunStatus.COMPLETED, created_at: "2026-09-01" }),
+      ]);
       renderComponent();
+      await waitFor(() => expect(screen.getByTestId("run-tree")).toBeInTheDocument());
+      // "v1.5" 와 "1.5" 는 같은 버전 묶음이다. 최근 수행 순이라 v1.5 가 v1.4 앞에 온다
+      const tree = screen.getByTestId("run-tree");
+      expect(tree.textContent!.indexOf("v1.5")).toBeLessThan(tree.textContent!.indexOf("v1.4"));
+      expect(screen.getByTestId("version-1.5")).toHaveTextContent("v1.5");
+      expect(screen.getByTestId("version-1.5")).toHaveTextContent("3건 · 진행 중 2");
+      // 진행 중인 수행이 없는 v1.4 는 접혀 있어 회차 행이 없다
+      expect(screen.getByTestId("version-1.4")).toHaveTextContent("1건");
+      expect(screen.queryByTestId("run-row-4")).toBeNull();
+      // 회차 행: R2 · Dev · 진행 중 · 40%
+      expect(screen.getByTestId("run-row-1")).toHaveTextContent("R2");
+      expect(screen.getByTestId("run-row-1")).toHaveTextContent("Dev");
+      expect(screen.getByTestId("run-row-1")).toHaveTextContent("40%");
+      expect(screen.getByTestId("run-row-2")).toHaveTextContent("완료");
+      expect(screen.getByTestId("series-정책")).toHaveTextContent("2회차");
+    });
+
+    it("접힌 버전을 누르면 펼쳐지고, 검색과 상태 필터로 거른다", async () => {
+      const user = userEvent.setup();
+      vi.mocked(testRunsApi.list).mockResolvedValue([
+        makeRun({ id: 1, name: "정책", version: "v1.5", round: 1, created_at: "2026-09-30" }),
+        makeRun({ id: 4, name: "e2e", version: "v1.4", round: 1, status: TestRunStatus.COMPLETED, created_at: "2026-09-01" }),
+      ]);
+      renderComponent();
+      await waitFor(() => expect(screen.getByTestId("version-1.4")).toBeInTheDocument());
+      await user.click(screen.getByTestId("version-1.4").querySelector("button")!);
+      expect(screen.getByTestId("run-row-4")).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText("수행 이름 검색"), "e2e");
+      expect(screen.queryByTestId("version-1.5")).toBeNull();
+      expect(screen.getByTestId("version-1.4")).toBeInTheDocument();
+      await user.clear(screen.getByLabelText("수행 이름 검색"));
+
+      await user.selectOptions(screen.getByLabelText("상태 필터"), "in_progress");
+      expect(screen.getByTestId("version-1.5")).toBeInTheDocument();
+      expect(screen.queryByTestId("version-1.4")).toBeNull();
+    });
+
+    it("다른 회차를 고르면 앞서 고른 행의 선택 표시가 사라진다", async () => {
+      const user = userEvent.setup();
+      vi.mocked(testRunsApi.list).mockResolvedValue([
+        makeRun({ id: 1, name: "정책", version: "v1", round: 2, created_at: "2026-09-30" }),
+        makeRun({ id: 2, name: "정책", version: "v1", round: 1, created_at: "2026-09-29" }),
+      ]);
+      renderComponent();
+      await user.click(await screen.findByTestId("run-row-1"));
+      await waitFor(() => expect(screen.getByTestId("run-row-1").style.backgroundColor).toBe("var(--primary-light)"));
+      await user.click(screen.getByTestId("run-row-2"));
+      await waitFor(() => expect(screen.getByTestId("run-row-2").style.backgroundColor).toBe("var(--primary-light)"));
+      // 선택은 테두리 없이 배경색만. 축약형 background 와 섞이면 해제된 행의 스타일이 비어 회색 버튼으로 남았다
+      expect(screen.getByTestId("run-row-1").style.backgroundColor).toBe("transparent");
+      expect(screen.getByTestId("run-row-1").style.borderColor).toBe("");
+    });
+
+    it("환경 필터는 대소문자를 무시해 하나로 묶는다", async () => {
+      const user = userEvent.setup();
+      vi.mocked(testRunsApi.list).mockResolvedValue([
+        makeRun({ id: 1, name: "A", version: "v1", environment: "Prod", created_at: "2026-09-30" }),
+        makeRun({ id: 2, name: "B", version: "v1", environment: "prod", created_at: "2026-09-29" }),
+        makeRun({ id: 3, name: "C", version: "v1", environment: "Dev", created_at: "2026-09-28" }),
+      ]);
+      renderComponent();
+      const envFilter = await screen.findByLabelText("환경 필터");
+      expect(within(envFilter).getAllByRole("option").map((o) => o.textContent)).toEqual(["전체 환경", "Dev", "Prod"]);
+      await user.selectOptions(envFilter, "prod");
+      expect(screen.getByTestId("run-row-1")).toBeInTheDocument();
+      expect(screen.getByTestId("run-row-2")).toBeInTheDocument();
+      expect(screen.queryByTestId("run-row-3")).toBeNull();
+    });
+
+    it("다음 회차 버튼은 진행 중이면 완료 처리를 묻고 next_round 로 복제한다", async () => {
+      const user = userEvent.setup();
+      vi.mocked(testRunsApi.clone).mockResolvedValue(makeRun({ id: 9, name: "Sprint 1 테스트", round: 2 }));
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      renderComponent();
+      await user.click(await screen.findByText("Sprint 1 테스트"));
+      await user.click(await screen.findByTestId("next-round"));
       await waitFor(() => {
-        expect(screen.getByText("R1 | v1.0")).toBeInTheDocument();
-        expect(screen.getByText("R2 | v2.0")).toBeInTheDocument();
+        expect(testRunsApi.complete).toHaveBeenCalledWith(1, 1);
+        expect(testRunsApi.clone).toHaveBeenCalledWith(1, 1, { next_round: true });
       });
+      expect(toast.success).toHaveBeenCalledWith("R2 을 만들었습니다.");
     });
 
     it("선택된 수행이 없으면 안내 메시지를 표시한다", async () => {
@@ -653,52 +738,28 @@ describe("TestRunManager", () => {
   });
 
   describe("완료된 수행 접기/펼치기", () => {
-    it("완료된 수행이 5개 넘으면 더보기 링크를 표시한다", async () => {
+    it("완료된 수행이 많아도 이름별로 묶여 회차 행으로 보이고, 완료만 있는 버전은 접힌다", async () => {
       const manyRuns = [
-        makeRun({ id: 1, name: "진행 중 수행", status: TestRunStatus.IN_PROGRESS }),
+        makeRun({ id: 1, name: "진행 중 수행", version: "v2.0", status: TestRunStatus.IN_PROGRESS, created_at: "2026-09-30" }),
         ...Array.from({ length: 8 }, (_, i) =>
-          makeRun({ id: i + 10, name: `완료 수행 ${i + 1}`, status: TestRunStatus.COMPLETED })
-        ),
-      ];
-      vi.mocked(testRunsApi.list).mockResolvedValue(manyRuns);
-      renderComponent();
-
-      await waitFor(() => {
-        expect(screen.getByText("진행 중 수행")).toBeInTheDocument();
-      });
-
-      // 처음 5개 완료 + 1개 진행 중만 보여야 함
-      expect(screen.getByText("완료 수행 1")).toBeInTheDocument();
-      expect(screen.getByText("완료 수행 5")).toBeInTheDocument();
-      // 6번째는 숨겨져야 함
-      expect(screen.queryByText("완료 수행 6")).not.toBeInTheDocument();
-
-      // "더보기" 링크
-      expect(screen.getByText(/이전 런 3개 더보기/)).toBeInTheDocument();
-    });
-
-    it("더보기 클릭 시 모든 완료 수행을 표시한다", async () => {
-      const manyRuns = [
-        makeRun({ id: 1, name: "진행 중 수행", status: TestRunStatus.IN_PROGRESS }),
-        ...Array.from({ length: 8 }, (_, i) =>
-          makeRun({ id: i + 10, name: `완료 수행 ${i + 1}`, status: TestRunStatus.COMPLETED })
+          makeRun({ id: i + 10, name: "회귀", version: "v1.0", round: i + 1, status: TestRunStatus.COMPLETED, created_at: `2026-09-${10 + i}` })
         ),
       ];
       vi.mocked(testRunsApi.list).mockResolvedValue(manyRuns);
       const user = userEvent.setup();
       renderComponent();
 
-      await waitFor(() => {
-        expect(screen.getByText(/이전 런 3개 더보기/)).toBeInTheDocument();
-      });
+      await waitFor(() => expect(screen.getByText("진행 중 수행")).toBeInTheDocument());
+      // v1.0 은 전부 완료라 접혀 있고, 건수만 보인다
+      expect(screen.getByTestId("version-1.0")).toHaveTextContent("8건");
+      expect(screen.queryByTestId("series-회귀")).toBeNull();
 
-      await user.click(screen.getByText(/이전 런 3개 더보기/));
-
-      await waitFor(() => {
-        expect(screen.getByText("완료 수행 6")).toBeInTheDocument();
-        expect(screen.getByText("완료 수행 8")).toBeInTheDocument();
-        expect(screen.getByText(/접기/)).toBeInTheDocument();
-      });
+      await user.click(screen.getByTestId("version-1.0").querySelector("button")!);
+      // 같은 이름 8회차가 한 묶음이고, 큰 회차가 위다
+      expect(screen.getByTestId("series-회귀")).toHaveTextContent("8회차");
+      const rows = within(screen.getByTestId("version-1.0")).getAllByTestId(/^run-row-/).map((el) => el.textContent);
+      expect(rows[0]).toContain("R8");
+      expect(rows[7]).toContain("R1");
     });
   });
 

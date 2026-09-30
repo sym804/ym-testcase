@@ -111,7 +111,7 @@ def admin_headers():
 
 @pytest.fixture(scope="module")
 def normal_user(admin_headers):
-    """일반 사용자 하나를 만들어 둔다. 비밀번호를 바꾸는 테스트의 대상이 된다."""
+    """일반 사용자 하나를 만들어 둔다. 비밀번호를 변경하는 테스트의 대상이 된다."""
     requests.post(f"{BASE}/api/auth/register", json={
         "username": "__recover_user__", "password": "origin1234", "display_name": "Recover User",
     })

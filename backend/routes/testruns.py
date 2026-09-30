@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, subqueryload, load_only
+from sqlalchemy import func, case
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
@@ -46,7 +47,7 @@ def list_testruns(
     current_user: User = Depends(check_project_access("viewer")),
 ):
     _get_project_or_404(project_id, db)
-    return (
+    runs = (
         db.query(TestRun)
         .filter(TestRun.project_id == project_id)
         .order_by(TestRun.created_at.desc())
@@ -54,6 +55,32 @@ def list_testruns(
         .limit(limit)
         .all()
     )
+    # 목록 항목에 진행률을 싣는다(런 수와 무관하게 SQL 1회). 상세를 열지 않아도 어느
+    # 회차가 얼마나 진행됐는지 트리에서 보이게 한다(09-30, 수행이 많아질 때의 관리).
+    progress = _bulk_run_progress([r.id for r in runs], db)
+    out = []
+    for r in runs:
+        item = TestRunListResponse.model_validate(r)
+        item.tc_total, item.tc_executed = progress.get(r.id, (0, 0))
+        out.append(item)
+    return out
+
+
+def _bulk_run_progress(run_ids: list[int], db: Session) -> dict[int, tuple[int, int]]:
+    """런별 (담은 TC 수, 수행한 수). 수행한 수는 NS 가 아닌 결과 행이다."""
+    if not run_ids:
+        return {}
+    rows = (
+        db.query(
+            TestResult.test_run_id,
+            func.count(TestResult.id),
+            func.sum(case((TestResult.result != TestResultValue.NS, 1), else_=0)),
+        )
+        .filter(TestResult.test_run_id.in_(run_ids))
+        .group_by(TestResult.test_run_id)
+        .all()
+    )
+    return {run_id: (int(total), int(executed or 0)) for run_id, total, executed in rows}
 
 
 @router.post("", response_model=TestRunListResponse, status_code=status.HTTP_201_CREATED)
@@ -200,6 +227,16 @@ def update_testrun(
         # 알 수 없는 메시지라, 여기서 이유를 붙여 거절한다.
         if key == "round" and value is None:
             raise HTTPException(status_code=400, detail="라운드는 비울 수 없습니다.")
+        # 비교 대상은 같은 프로젝트의 다른 수행만 받는다. 다른 프로젝트의 수행 id 를
+        # 넣으면 리포트에 그 수행의 이름과 결과가 실린다.
+        if key == "compare_run_id" and value is not None:
+            if value == run.id:
+                raise HTTPException(status_code=400, detail="Cannot compare a run with itself")
+            exists = db.query(TestRun.id).filter(
+                TestRun.id == value, TestRun.project_id == project_id,
+            ).first()
+            if not exists:
+                raise HTTPException(status_code=400, detail="Compare run not found in this project")
         setattr(run, key, value)
 
     db.commit()
@@ -354,7 +391,7 @@ def submit_results(
     except IntegrityError as exc:
         # ★같은 TC 를 동시에 제출하면 둘 다 "없음" 으로 보고 각자 새 행을 넣는다.
         #   유니크 제약이 뒤늦게 잡아 주므로 그대로 500 을 내지 말고 다시 시도하게 한다.
-        # ★유니크 위반만 409 로 바꾼다. 외래키 위반 같은 다른 무결성 오류까지 삼키면
+        # ★유니크 위반만 409 로 변경한다. 외래키 위반 같은 다른 무결성 오류까지 삼키면
         #   원인이 다른 사고를 "동시 저장" 으로 오인시켜 헛된 재시도를 유도한다(QA1 지적).
         db.rollback()
         if "uq_test_results_run_case" not in str(getattr(exc, "orig", exc)):
@@ -385,7 +422,7 @@ def complete_testrun(
 
     # ★여기서 동기화하지 않는다. reopen 은 부르는데 complete 는 안 부르는 비대칭이
     #   빠뜨린 것처럼 보이지만, 완료는 "여기서 끝" 이라는 선언이다. 그 순간에 새 TC 를
-    #   끌어들이면 수행하지 않은 행이 NS 로 들어가 합격률과 총계가 바뀐다.
+    #   끌어들이면 수행하지 않은 행이 NS 로 들어가 합격률과 총계가 변경된다.
     #   reopen 이 부르는 것은 반대로 "다시 연다" 라서 그 사이 늘어난 TC 를 담아야 하기
     #   때문이다. TC 생성·복제·복원·임포트가 이미 진행 중 수행을 맞추므로
     #   (sync_project_in_progress_runs) 완료 직전에 누락이 남는 경로는 사실상 없다.
@@ -462,10 +499,16 @@ def delete_testrun(
 def clone_testrun(
     project_id: int,
     run_id: int,
+    next_round: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("tester")),
 ):
-    """Clone an existing test run with all its test results reset to NS."""
+    """Clone an existing test run with all its test results reset to NS.
+
+    next_round=true 면 "다음 회차" 다. 이름은 그대로 두고 회차를 같은 이름 가운데 가장 큰
+    회차 + 1 로 정하며 플랜도 이어받는다. 예전 복제는 이름에 "(복제)" 가 붙고 회차가 그대로라
+    다음 회차를 만들 때마다 둘 다 손으로 고쳐야 했다(09-30).
+    """
     _get_project_or_404(project_id, db)
 
     source = (
@@ -477,13 +520,23 @@ def clone_testrun(
     if not source:
         raise HTTPException(status_code=404, detail="Test run not found")
 
+    if next_round:
+        max_round = (
+            db.query(func.max(TestRun.round))
+            .filter(TestRun.project_id == project_id, TestRun.name == source.name)
+            .scalar()
+        ) or 0
+        name, round_ = source.name, max_round + 1
+    else:
+        name, round_ = f"{source.name} (복제)", source.round
     new_run = TestRun(
         project_id=project_id,
-        name=f"{source.name} (복제)",
+        name=name,
         version=source.version,
         environment=source.environment,
-        round=source.round,
+        round=round_,
         sheet_names=source.sheet_names,
+        test_plan_id=source.test_plan_id if next_round else None,
         created_by=current_user.id,
     )
     db.add(new_run)

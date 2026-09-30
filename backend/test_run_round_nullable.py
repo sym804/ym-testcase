@@ -26,7 +26,7 @@ if dev_db_guard.DEV_DB_AT_RISK:
 def _models():
     """models 를 함수 안에서 들인다.
 
-    ★모듈 최상단에서 import 하면 conftest 가 DATABASE_URL 을 임시 DB 로 바꾸기
+    ★모듈 최상단에서 import 하면 conftest 가 DATABASE_URL 을 임시 DB 로 변경하기
       전에 엔진이 개발 DB 로 굳는다(test_result_uniqueness.py 와 같은 이유).
     """
     import models

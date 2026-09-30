@@ -92,7 +92,7 @@ describe("API Client Interceptors", () => {
       expect(window.location.href).toBe("/login");
     });
 
-    it("인증이 필요한 경로(/projects)에서 401을 받으면 href 를 /login 으로 바꾼다", async () => {
+    it("인증이 필요한 경로(/projects)에서 401을 받으면 href 를 /login 으로 변경한다", async () => {
       Object.defineProperty(window, "location", {
         value: { ...window.location, pathname: "/projects", href: "http://localhost/projects" },
         writable: true,
@@ -107,7 +107,7 @@ describe("API Client Interceptors", () => {
     });
 
     it.each(["/login", "/register", "/account-help", "/reset-password"])(
-      "비로그인 공개 경로 %s 에서는 401을 받아도 href 를 바꾸지 않는다",
+      "비로그인 공개 경로 %s 에서는 401을 받아도 href 를 변경하지 않는다",
       async (pathname) => {
         const initialHref = `http://localhost${pathname}`;
         Object.defineProperty(window, "location", {

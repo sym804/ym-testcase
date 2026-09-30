@@ -427,6 +427,13 @@ npx tsc --noEmit`}</pre>
                 ["DELETE", "/api/projects/{id}/testplans/{plan_id}", t("apiRef.testPlans.delete")],
                 ["GET", "/api/projects/{id}/testplans/{plan_id}/runs", t("apiRef.testPlans.runs")],
               ]},
+              { title: t("apiRef.runIssues.title"), endpoints: [
+                ["GET", "/api/projects/{id}/testruns/{run_id}/issues", t("apiRef.runIssues.list")],
+                ["POST", "/api/projects/{id}/testruns/{run_id}/issues", t("apiRef.runIssues.create")],
+                ["PUT", "/api/projects/{id}/testruns/{run_id}/issues/{issue_id}", t("apiRef.runIssues.update")],
+                ["DELETE", "/api/projects/{id}/testruns/{run_id}/issues/{issue_id}", t("apiRef.runIssues.delete")],
+                ["POST", "/api/projects/{id}/testruns/{run_id}/issues/carry-over", t("apiRef.runIssues.carryOver")],
+              ]},
               { title: t("apiRef.filters.title"), endpoints: [
                 ["GET", "/api/projects/{id}/filters", t("apiRef.filters.list")],
                 ["POST", "/api/projects/{id}/filters", t("apiRef.filters.create")],
@@ -548,7 +555,7 @@ const s: Record<string, React.CSSProperties> = {
   table: { width: "100%", borderCollapse: "collapse" as const, fontSize: 13, marginBottom: 20 },
   th: { padding: "10px 12px", backgroundColor: "#7C2D12", color: "#fff", textAlign: "left" as const, fontWeight: 600 },
   td: { padding: "10px 12px", borderBottom: "1px solid var(--border-color, #E2E8F0)", verticalAlign: "top" as const },
-  tdCode: { padding: "10px 12px", borderBottom: "1px solid var(--border-color, #E2E8F0)", fontFamily: "monospace", fontSize: 12, backgroundColor: "var(--bg-input, #F8FAFC)" },
+  tdCode: { padding: "10px 12px", borderBottom: "1px solid var(--border-color, #E2E8F0)", fontFamily: "var(--font-mono)", fontSize: 12, backgroundColor: "var(--bg-input, #F8FAFC)" },
   tdWarn: { padding: "10px 12px", borderBottom: "1px solid var(--border-color, #E2E8F0)", color: "var(--text-danger, #DC2626)", fontWeight: 600 },
   codeBlock: { borderRadius: 8, overflow: "hidden", marginBottom: 16, border: "1px solid var(--border-color, #E2E8F0)" },
   codeTitle: { padding: "8px 16px", backgroundColor: "#334155", color: "#94A3B8", fontSize: 12, fontWeight: 600 },

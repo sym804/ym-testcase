@@ -4,7 +4,7 @@
 - BLOCK 만 있는 수행이 "실패 항목이 없습니다" 로 나왔다. 상세 목록이 FAIL 만 모았다.
 - PDF 요약 표가 216mm 로 A4 본문(190mm)을 넘어 합격률 칸이 "Pas" 로 잘렸다.
 - 엑셀 합격률이 문자열 "92.0%" 였다.
-- 관련 이슈 목록이 set 을 거쳐 재시작마다 순서가 바뀔 수 있었다.
+- 관련 이슈 목록이 set 을 거쳐 재시작마다 순서가 변경될 수 있었다.
 
 실행: cd backend && python -m pytest tests_unit/test_report_content.py -q
 """
@@ -57,7 +57,8 @@ def db(tmp_path):
 def _make(db, results, *, prev_results=None, project_name="P"):
     """results: [(tc_id, priority, category, 결과, 실제결과, 이슈링크, 수행자)]
 
-    prev_results 를 주면 같은 TC 로 한 시간 앞선 런을 먼저 만든다.
+    prev_results 를 주면 같은 TC 로 한 시간 앞선 런을 먼저 만든다. 같은 이름의
+    1회차로 만들고 이번 런을 2회차로 둔다. 비교 대상은 같은 이름의 이전 회차다.
     """
     admin = User(username="admin", password_hash="x", display_name="관리자", role="admin")
     tester = User(username="t1", password_hash="x", display_name="테스터", role="user")
@@ -82,8 +83,8 @@ def _make(db, results, *, prev_results=None, project_name="P"):
 
     base = datetime(2026, 9, 1, 10, 0)
 
-    def add_run(name, when, rows):
-        run = TestRun(project_id=project.id, name=name, round=1, created_by=admin.id, created_at=when)
+    def add_run(name, when, rows, round_=1):
+        run = TestRun(project_id=project.id, name=name, round=round_, created_by=admin.id, created_at=when)
         db.add(run)
         db.flush()
         for tc_id, result, actual, link, who in rows:
@@ -94,8 +95,9 @@ def _make(db, results, *, prev_results=None, project_name="P"):
         return run
 
     if prev_results:
-        add_run("이전", base, prev_results)
-    run = add_run("이번", base + timedelta(hours=1), [(r[0], *r[3:]) for r in results])
+        add_run("수행", base, prev_results, round_=1)
+    run = add_run("수행", base + timedelta(hours=1), [(r[0], *r[3:]) for r in results],
+                  round_=2 if prev_results else 1)
     db.commit()
     return project, run, admin
 
@@ -233,7 +235,8 @@ def test_직전_수행_대비_회귀와_해결(db):
         ],
     )
     comp = _json(db, made)["comparison"]
-    assert comp["previous_run"]["name"] == "이전"
+    assert (comp["previous_run"]["name"], comp["previous_run"]["round"]) == ("수행", 1)
+    assert comp["mode"] == "auto"
     assert comp["common"] == 4
     assert comp["changed"] == 3
     # 판정 기준은 수행 비교 화면(CompareView)과 같다
@@ -279,25 +282,38 @@ def test_분류가_NULL_과_빈_문자열이면_한_줄로_합친다(db):
     # 이름은 화면과 파일이 정한다. JSON 은 null 이다(우선순위 미지정과 같은 규칙)
     assert [(r["category"], r["total"]) for r in rows] == [(None, 2)]
 
-    # 파일에서는 우선순위 미지정과 같은 "(none)" 이다. "Uncategorized" 가 남으면 안 된다
+    # 파일에서는 우선순위 미지정과 같은 "(none)"(영문) · "(미분류)"(한국어) 다. "Uncategorized" 가 남으면 안 된다
     project, run, user = made
-    ws = load_workbook(io.BytesIO(_body(
-        report_excel(project_id=project.id, run_id=run.id, db=db, current_user=user)
-    )))["Summary"]
-    values = [c.value for row in ws.iter_rows() for c in row]
+
+    def xl_values(lang):
+        ws = load_workbook(io.BytesIO(_body(
+            report_excel(project_id=project.id, run_id=run.id, lang=lang, db=db, current_user=user)
+        )))["Summary"]
+        return [c.value for row in ws.iter_rows() for c in row]
+
+    values = xl_values("en")
     assert "(none)" in values
     assert "Uncategorized" not in values
-    # PDF 도 같은 이름이다. 폰트는 레포에 들어 있어 항상 검사한다
+    values = xl_values("ko")
+    assert "(미분류)" in values and "(none)" not in values
+    # PDF 는 화면 언어를 따른다. 영문이면 엑셀과 같은 "(none)", 한국어면 웹과 같은 "(미분류)" 다.
+    # 폰트는 레포에 들어 있어 항상 검사한다
     from pypdf import PdfReader
-    text = "".join(pg.extract_text() for pg in PdfReader(io.BytesIO(_body(
-        report_pdf(project_id=project.id, run_id=run.id, db=db, current_user=user)
-    ))).pages)
-    assert "(none)" in text and "Uncategorized" not in text
+
+    def pdf_text(lang):
+        return "".join(pg.extract_text() for pg in PdfReader(io.BytesIO(_body(
+            report_pdf(project_id=project.id, run_id=run.id, lang=lang, db=db, current_user=user)
+        ))).pages)
+
+    en = pdf_text("en")
+    assert "(none)" in en and "Uncategorized" not in en
+    ko = pdf_text("ko")
+    assert "(미분류)" in ko and "Uncategorized" not in ko
 
 
 # ── 파일 ────────────────────────────────────────────────────────────────────
 
-def test_파일명에서_Windows_금지_문자를_바꾼다(db):
+def test_파일명에서_Windows_금지_문자를_변경한다(db):
     made = _make(db, [("A", "High", "c", R.PASS, None, None, "t1")], project_name="웹/앱: QA?")
     _, run, _ = made
     assert report_filename("웹/앱: QA?", run, "pdf") == "웹_앱_ QA__Report_R1.pdf"
@@ -310,14 +326,43 @@ def test_엑셀_합격률은_숫자다(db):
     ])
     project, run, user = made
     ws = load_workbook(io.BytesIO(_body(
-        report_excel(project_id=project.id, run_id=run.id, db=db, current_user=user)
+        report_excel(project_id=project.id, run_id=run.id, lang="en", db=db, current_user=user)
     )))["Summary"]
     rates = [c for row in ws.iter_rows() for c in row if c.number_format == "0.0%"]
     assert rates, "합격률 칸에 백분율 서식이 없다"
     assert all(isinstance(c.value, (int, float)) or c.value is None for c in rates)
     assert 0.5 in [c.value for c in rates], "전체 합격률 50% 가 0.5 로 들어가야 한다"
     titles = {c.value for row in ws.iter_rows() for c in row}
-    assert {"Priority Breakdown", "Category Breakdown"} <= titles
+    assert {"By Priority", "By Category"} <= titles
+
+
+def test_엑셀_요약_시트는_화면_언어를_따른다(db):
+    """PDF 와 같은 문구 표(REPORT_TEXT)를 쓴다. 기본은 한국어, Results 시트 머리글은 언어와 무관하다."""
+    made = _make(db, [
+        ("A", "High", "c", R.PASS, None, None, "t1"),
+        ("B", None, "c", R.FAIL, None, None, "t1"),
+    ])
+    project, run, user = made
+
+    def sheets(lang=None):
+        kw = {"lang": lang} if lang else {}
+        wb = load_workbook(io.BytesIO(_body(
+            report_excel(project_id=project.id, run_id=run.id, db=db, current_user=user, **kw)
+        )))
+        return ({c.value for row in wb["Summary"].iter_rows() for c in row if isinstance(c.value, str)},
+                [c.value for c in wb["Results"][1]])
+
+    ko, res_ko = sheets()
+    assert {"전체 현황", "우선순위별 요약", "카테고리별 요약", "미수행", "(미지정)", "우선순위", "카테고리"} <= ko
+    assert "PASS" in ko and "PASS Rate" in ko, "결과 값 이름은 언어와 무관하다"
+    assert not {"Overall Status", "By Priority", "(none)"} & ko
+    assert any(v.startswith("테스트 수행: ") for v in ko) and any(v.startswith("상태: 진행 중") for v in ko)
+    assert any(v.endswith("테스트 리포트") for v in ko)
+
+    en, res_en = sheets("en")
+    assert {"Overall Status", "By Priority", "By Category", "Not started", "(none)"} <= en
+    assert not {"전체 현황", "(미지정)"} & en
+    assert res_ko == res_en and res_ko[:2] == ["No", "TC ID"]
 
 
 def test_엑셀_요약의_분류명도_수식으로_읽히지_않는다(db):
@@ -369,7 +414,9 @@ def test_PDF_합격률_칸이_잘리지_않는다(db):
     right_margin = float(page.mediabox.width) - 10 / 25.4 * 72
     assert xs, "합격률 값이 PDF 에 없다"
     assert xs[0] + 20 <= right_margin, f"합격률 값이 x={xs[0]:.0f}pt 에서 시작해 여백선({right_margin:.0f}pt)을 넘는다"
-    assert "B-0" in text and "[BLOCK]" in text, "BLOCK 상세가 PDF 에 없다"
+    # 실패·차단 항목은 웹과 같은 한 줄 표다. BLOCK 도 FAIL 과 같이 실린다
+    all_text = "".join(p.extract_text() for p in reader.pages)
+    assert "B-0" in all_text and "BLOCK" in all_text and "막힘 사유" in all_text, "BLOCK 항목이 PDF 에 없다"
     fonts = {
         str(f["/BaseFont"])
         for p in reader.pages

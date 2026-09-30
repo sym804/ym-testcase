@@ -1,10 +1,10 @@
-"""토큰 폐기 - 비밀번호를 바꿔도 옛 토큰이 살아 있던 자리
+"""토큰 폐기 - 비밀번호를 변경해도 옛 토큰이 살아 있던 자리
 
 JWT 는 발급하면 만료까지 서버가 막을 수 없다. 그래서 만료를 길게 잡으면
 유출된 토큰을 되돌릴 방법이 사라진다. 로그인 유지가 3650일이었고 로그아웃은
 쿠키만 지웠으므로, 본문으로 받은 access_token 하나로 10년을 쓸 수 있었다.
 
-사용자 행에 버전을 두고 토큰에 그 값을 실으면, 비밀번호를 바꾸는 것만으로
+사용자 행에 버전을 두고 토큰에 그 값을 실으면, 비밀번호를 변경하는 것만으로
 그 사용자의 토큰이 전부 한 번에 막힌다.
 
 실행: cd backend && python -m pytest test_token_revocation.py -v
@@ -38,7 +38,7 @@ def login(username, password, remember_me=False):
 
 @pytest.fixture
 def victim():
-    """비밀번호를 바꿔도 되는 일회용 계정.
+    """비밀번호를 변경해도 되는 일회용 계정.
 
     사용자 삭제 API 가 없으므로 테스트마다 새 이름을 쓴다. 같은 이름을 재사용하면
     앞 테스트가 바꾼 비밀번호 때문에 다음 테스트의 로그인이 어긋난다.
@@ -58,7 +58,7 @@ def victim():
     yield {"id": r.json()["id"], "username": username, "password": first_pw, "admin": admin_token}
 
 
-def test_비밀번호를_바꾸면_그_전_토큰이_막힌다(victim):
+def test_비밀번호를_변경하면_그_전_토큰이_막힌다(victim):
     old = login(victim["username"], victim["password"]).json()["access_token"]
     assert requests.get(f"{BASE}/api/auth/me", headers=auth(old)).status_code == 200
 
@@ -71,11 +71,11 @@ def test_비밀번호를_바꾸면_그_전_토큰이_막힌다(victim):
 
     after = requests.get(f"{BASE}/api/auth/me", headers=auth(old))
     assert after.status_code == 401, (
-        f"비밀번호를 바꿨는데 옛 토큰이 아직 통한다: {after.status_code}"
+        f"비밀번호를 변경했는데 옛 토큰이 아직 통한다: {after.status_code}"
     )
 
 
-def test_비밀번호를_바꾸면_새_토큰은_통한다(victim):
+def test_비밀번호를_변경하면_새_토큰은_통한다(victim):
     old = login(victim["username"], victim["password"]).json()["access_token"]
     requests.put(
         f"{BASE}/api/auth/change-password",

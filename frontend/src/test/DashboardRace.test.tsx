@@ -69,12 +69,12 @@ describe("비교 화면의 경쟁 상태", () => {
     const user = userEvent.setup();
     render(<CompareView projectId={1} />);
 
-    // 화면에 표시되는 TC ID 는 기준(좌) 수행의 것이라 좌측을 바꿔 가며 본다.
+    // 화면에 표시되는 TC ID 는 기준(좌) 수행의 것이라 좌측을 변경해 가며 본다.
     const selects = await screen.findAllByRole("combobox");
     await user.selectOptions(selects[1], "1");
     await user.selectOptions(selects[0], "2"); // 느린 요청 시작
 
-    // 아직 응답 전에 기준 수행을 3회차로 바꾼다.
+    // 아직 응답 전에 기준 수행을 3회차로 변경한다.
     await user.selectOptions(selects[0], "3");
 
     await waitFor(() => {
