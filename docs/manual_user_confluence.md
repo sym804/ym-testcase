@@ -275,7 +275,15 @@ Issue Link 칸에 주소(http/https)나 이슈 키를 적으면 옆에 ↗ 가 �
 - 한 TC 를 여러 테스트가 덮으면 FAIL, NS, PASS 순으로 나쁜 쪽이 남습니다.
 - 기본값으로 이미 기록된 결과는 NS 로 덮어쓰지 않습니다. 결과 · 실제 결과 · 비고는 덮어쓰고 이슈 링크는 그대로 둡니다.
 - TC ID 는 제목 맨 앞이 프로젝트의 TC ID 와 정확히 같을 때만 매칭합니다. describe 제목의 ID 는 확인하지 않습니다.
-- 스크립트로 올릴 때는 `POST /api/projects/{id}/testruns/{run_id}/results/import` 에 파일을 multipart 로 전송하고 API 키(4-1)로 인증합니다. `dry_run=true` 면 계산만 합니다.
+- CI 에서는 수행을 미리 만들 필요가 없습니다. 저장소의 `scripts/ymtc-upload.mjs` 에 수행 이름만 주면 같은 이름의 다음 회차를 만들어 기록합니다(처음이면 R1). 버전 · 환경 · 시트 범위는 직전 회차를 이어받고, 주면 그 값으로 바뀝니다. `--round open` 은 진행 중인 회차에 이어 기록하고, `--dry-run` 은 회차를 만들지 않고 결과만 출력합니다.
+- CLI 없이 직접 부를 때는 `POST /api/projects/{id}/testruns/import?run_name=...`(이름으로, 회차 자동 생성) 또는 `POST /api/projects/{id}/testruns/{run_id}/results/import`(기존 런에) 에 파일을 multipart 로 전송하고 API 키(4-1)로 인증합니다. `dry_run=true` 면 계산만 합니다.
+
+```bash
+# Playwright 실행 뒤 결과 올리기 (Node 18 이상)
+PLAYWRIGHT_JSON_OUTPUT_NAME=results.json npx playwright test --reporter=list,json
+YMTC_API_KEY=ymtc_... node scripts/ymtc-upload.mjs \
+  --url http://127.0.0.1:8008 --project 1 --run-name "Starfort e2e" --version 1.6 results.json
+```
 
 ⚠️ **JUnit XML 주의**: Playwright 의 junit 리포터는 `embedAnnotationsAsProperties: true` 를 켜야 test.fail 결함 재현이 FAIL 로 구분됩니다. 끄면 통과로 기록됩니다.
 

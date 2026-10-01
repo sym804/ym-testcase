@@ -619,7 +619,9 @@ export default function UserManualPage() {
               <li>{t("testrun.imp_li4")}</li>
               <li>{t("testrun.imp_li5")}</li>
               <li>{t("testrun.imp_li6")}</li>
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.imp_li7") }} />
             </ul>
+            <pre style={{...s.p, backgroundColor: "var(--bg-input)", padding: "16px", borderRadius: "8px", fontFamily: "var(--font-mono)", fontSize: "13px", whiteSpace: "pre", overflowX: "auto"}}>{t("testrun.imp_cli_example")}</pre>
             <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("testrun.imp_warn") }} />
             <div style={s.tipBox} dangerouslySetInnerHTML={{ __html: t("testrun.imp_tip") }} />
 

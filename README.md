@@ -110,7 +110,7 @@ cd frontend && npm install                # 프론트엔드 의존성 변경 시
 | 이슈 관리 도구 연동 | Jira, Linear 주소 설정. 이슈 키를 테스트 수행 시트와 리포트에서 링크 |
 | 고급 필터 | AND/OR 다중 조건, 필터 저장/불러오기 |
 | Import/Export | Excel(xlsx), Jira CSV, Markdown |
-| 자동화 결과 가져오기 | Playwright JSON · JUnit XML 결과를 테스트 런에 기록 (미리보기 후 적용) |
+| 자동화 결과 가져오기 | Playwright JSON · JUnit XML 결과를 테스트 런에 기록 (미리보기 후 적용). CI 용 CLI `scripts/ymtc-upload.mjs` 는 수행 이름만으로 다음 회차를 만들어 올림 |
 | API 키 | 스크립트 · CI 용 사용자별 키, Bearer 인증, 발급 · 폐기 |
 | 접근 제어 | 시스템 역할 + 프로젝트 역할 이중 구조 |
 | 보안 | httpOnly 쿠키 인증, CSRF 보호, Rate Limiting, bcrypt |

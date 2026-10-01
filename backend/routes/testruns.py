@@ -112,38 +112,64 @@ def create_testrun(
         if plan.project_id != project_id:
             raise HTTPException(status_code=400, detail="다른 프로젝트의 테스트 플랜은 연결할 수 없습니다.")
 
-    # 시트를 골라 만든 런은 그 범위를 저장한다. 생성 시점의 필터가 아니라 런의
-    # 범위라서, 진행 중 런이 새 TC 를 흡수할 때도 같은 조건을 쓴다.
-    sheet_names = None
-    if payload.sheet_names is not None:
-        # 같은 이름을 여러 번 보내도 한 번만 저장한다. 순서는 보낸 순서를 지킨다.
-        sheet_names = list(dict.fromkeys(n.strip() for n in payload.sheet_names if n and n.strip()))
-        if not sheet_names:
-            raise HTTPException(status_code=400, detail="시트를 하나 이상 선택하세요.")
-        # 폴더는 TC 를 직접 담지 않는다. 범위로 받으면 빈 런이 되므로 거부한다.
-        known = {
-            row[0] for row in db.query(TestCaseSheet.name)
-            .filter(
-                TestCaseSheet.project_id == project_id,
-                TestCaseSheet.is_folder.is_(False),
-            ).all()
-        }
-        unknown = [n for n in sheet_names if n not in known]
-        if unknown:
-            raise HTTPException(
-                status_code=400,
-                detail=f"런에 담을 수 없는 시트입니다: {', '.join(unknown)}",
-            )
-
-    run = TestRun(
-        project_id=project_id,
+    sheet_names = _validate_sheet_names(project_id, payload.sheet_names, db)
+    run = _new_run(
+        project_id, current_user, db,
         name=payload.name,
         version=payload.version,
         environment=payload.environment,
-        round=payload.round,
+        round_=payload.round,
         test_plan_id=payload.test_plan_id,
         sheet_names=sheet_names,
-        created_by=current_user.id,
+    )
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+def _validate_sheet_names(project_id: int, names: Optional[List[str]], db: Session) -> Optional[List[str]]:
+    """런 범위로 받을 시트 이름을 고른다. None 이면 프로젝트 전체.
+
+    시트를 골라 만든 런은 그 범위를 저장한다. 생성 시점의 필터가 아니라 런의
+    범위라서, 진행 중 런이 새 TC 를 흡수할 때도 같은 조건을 쓴다.
+    """
+    if names is None:
+        return None
+    # 같은 이름을 여러 번 보내도 한 번만 저장한다. 순서는 보낸 순서를 지킨다.
+    sheet_names = list(dict.fromkeys(n.strip() for n in names if n and n.strip()))
+    if not sheet_names:
+        raise HTTPException(status_code=400, detail="시트를 하나 이상 선택하세요.")
+    # 폴더는 TC 를 직접 담지 않는다. 범위로 받으면 빈 런이 되므로 거부한다.
+    known = {
+        row[0] for row in db.query(TestCaseSheet.name)
+        .filter(
+            TestCaseSheet.project_id == project_id,
+            TestCaseSheet.is_folder.is_(False),
+        ).all()
+    }
+    unknown = [n for n in sheet_names if n not in known]
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"런에 담을 수 없는 시트입니다: {', '.join(unknown)}",
+        )
+    return sheet_names
+
+
+def _new_run(
+    project_id: int, user: User, db: Session, *, name: str, version, environment,
+    round_: int, test_plan_id, sheet_names: Optional[List[str]],
+) -> TestRun:
+    """런을 만들고 범위의 TC 를 NS 로 담는다. 커밋은 부른 쪽이 한다."""
+    run = TestRun(
+        project_id=project_id,
+        name=name,
+        version=version,
+        environment=environment,
+        round=round_,
+        test_plan_id=test_plan_id,
+        sheet_names=sheet_names,
+        created_by=user.id,
     )
     db.add(run)
     db.flush()  # get run.id
@@ -162,13 +188,10 @@ def create_testrun(
                 "test_run_id": run.id,
                 "test_case_id": tc_id,
                 "result": TestResultValue.NS,
-                "executed_by": current_user.id,
+                "executed_by": user.id,
             }
             for tc_id in tc_ids
         ])
-
-    db.commit()
-    db.refresh(run)
     return run
 
 
@@ -475,6 +498,99 @@ def import_results(
     if run.status == TestRunStatus.completed:
         raise HTTPException(status_code=400, detail="완료된 테스트 런은 수정할 수 없습니다. 재오픈 후 수정하세요.")
 
+    fmt, entries = _read_report(file)
+    summary = _record_import(run, fmt, entries, db, current_user,
+                             dry_run=dry_run, keep_executed=keep_executed, label=label)
+    if not dry_run:
+        db.commit()
+    return summary
+
+
+@router.post("/import")
+def import_results_by_name(
+    project_id: int,
+    run_name: str = Query(..., max_length=200, description="수행 이름. 같은 이름의 회차에 이어 붙인다"),
+    round_mode: str = Query("next", alias="round", pattern="^(next|open)$",
+                       description="next: 다음 회차를 만든다. open: 진행 중인 회차가 있으면 거기에 기록한다"),
+    version: Optional[str] = Query(None, max_length=50, description="새 회차의 버전. 비우면 직전 회차를 이어받는다"),
+    environment: Optional[str] = Query(None, max_length=100, description="새 회차의 환경. 비우면 직전 회차를 이어받는다"),
+    sheet_names: Optional[str] = Query(None, description="쉼표 구분 시트 이름. 주면 그 범위로 새 회차를 만든다"),
+    file: UploadFile = File(...),
+    dry_run: bool = Query(False, description="true 면 회차를 만들지 않고 계산만 한다"),
+    keep_executed: bool = Query(True, description="이미 기록된 결과를 미실행(NS)으로 덮어쓰지 않는다"),
+    label: Optional[str] = Query(None, max_length=100, description="비고 앞머리. 비우면 형식 이름"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(check_project_access("tester")),
+):
+    """수행 id 없이 이름으로 결과 파일을 올린다. CI 가 회차를 미리 만들어 둘 필요가 없게 한다.
+
+    - 같은 이름의 수행이 있으면 최신 회차를 이어받아 다음 회차를 만든다(화면의 「다음 회차」 와 같다).
+      버전 · 환경은 주면 그 값, 비우면 직전 회차 값이다.
+    - round=open 이면 같은 이름의 진행 중인 회차에 기록한다. 스위트를 나눠 여러 번 올릴 때 쓴다.
+      진행 중인 회차가 없으면 next 와 같다.
+    - 같은 이름이 없으면 R1 을 만든다. 범위는 sheet_names, 없으면 프로젝트 전체.
+    - dry_run 이면 같은 계산을 한 뒤 되돌린다. 회차는 남지 않는다.
+    """
+    _get_project_or_404(project_id, db)
+    name = run_name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="수행 이름을 입력해 주세요.")
+    # 회차를 만들기 전에 파일부터 읽는다. 깨진 파일로 빈 회차가 남지 않게.
+    fmt, entries = _read_report(file)
+    sheets = _validate_sheet_names(
+        project_id, sheet_names.split(",") if sheet_names is not None else None, db,
+    )
+
+    latest_q = (
+        db.query(TestRun)
+        .filter(TestRun.project_id == project_id, TestRun.name == name)
+        .order_by(TestRun.round.desc(), TestRun.created_at.desc(), TestRun.id.desc())
+    )
+    target = None
+    if round_mode == "open":
+        target = latest_q.filter(TestRun.status == TestRunStatus.in_progress).first()
+    created = target is None
+    if created:
+        latest = latest_q.first()
+        if latest is not None and sheets is None:
+            target = _clone_run(latest, current_user, db, next_round=True)
+        else:
+            target = _new_run(
+                project_id, current_user, db,
+                name=name,
+                version=latest.version if latest else None,
+                environment=latest.environment if latest else None,
+                round_=_max_round(project_id, name, db) + 1,
+                test_plan_id=latest.test_plan_id if latest else None,
+                sheet_names=sheets,
+            )
+        if version is not None:
+            target.version = version.strip() or None
+        if environment is not None:
+            target.environment = environment.strip() or None
+        db.flush()
+
+    summary = _record_import(target, fmt, entries, db, current_user,
+                             dry_run=dry_run, keep_executed=keep_executed, label=label)
+    run_info = {
+        "id": None if (dry_run and created) else target.id,
+        "name": target.name,
+        "round": target.round,
+        "version": target.version,
+        "environment": target.environment,
+        "created": created,
+    }
+    if dry_run:
+        # ★새 회차까지 만들어 같은 계산을 한 뒤 통째로 되돌린다. 미리보기가 실제 적용과 같은 경로를 탄다.
+        db.rollback()
+    else:
+        db.commit()
+    summary["run_id"] = run_info["id"]
+    summary["run"] = run_info
+    return summary
+
+
+def _read_report(file: UploadFile):
     content = read_limited_sync(file.file, MAX_RESULT_IMPORT_SIZE)
     try:
         fmt, entries = parse_report(content, file.filename)
@@ -482,9 +598,15 @@ def import_results(
         raise HTTPException(status_code=400, detail=str(exc))
     if not entries:
         raise HTTPException(status_code=400, detail="파일에 테스트 결과가 없습니다.")
+    return fmt, entries
 
+
+def _record_import(run: TestRun, fmt: str, entries, db: Session, user: User, *,
+                   dry_run: bool, keep_executed: bool, label: Optional[str]) -> dict:
+    """판정 결과를 런의 행에 적는다. 커밋은 부른 쪽이 한다(dry_run 이면 적지 않는다)."""
+    project_id, run_id = run.project_id, run.id
     # 런 생성 뒤에 추가된 TC 도 행이 있어야 기록된다. 상세 조회와 같은 보정을 먼저 한다.
-    sync_run_results(run, db)
+    sync_run_results(run, db, commit=False)
 
     # 프로젝트의 TC 전체와 대조한다. 이 수행 범위 밖의 TC 는 매칭은 되지만 기록하지 않고 알려 준다.
     project_tcs = dict(
@@ -520,13 +642,10 @@ def import_results(
         row.result = TestResultValue(o.result)
         row.actual_result = (o.actual or None) and o.actual[:1000]
         row.remarks = f"{prefix}. {o.note}" if o.note else prefix
-        row.executed_by = current_user.id
+        row.executed_by = user.id
         row.executed_at = now
         if o.duration_sec is not None:
             row.duration_sec = o.duration_sec
-
-    if not dry_run:
-        db.commit()
 
     return {
         "format": fmt,
@@ -663,24 +782,35 @@ def clone_testrun(
     if not source:
         raise HTTPException(status_code=404, detail="Test run not found")
 
+    new_run = _clone_run(source, current_user, db, next_round=next_round)
+    db.commit()
+    db.refresh(new_run)
+    return new_run
+
+
+def _max_round(project_id: int, name: str, db: Session) -> int:
+    return (
+        db.query(func.max(TestRun.round))
+        .filter(TestRun.project_id == project_id, TestRun.name == name)
+        .scalar()
+    ) or 0
+
+
+def _clone_run(source: TestRun, user: User, db: Session, *, next_round: bool) -> TestRun:
+    """런 구조를 복제해 결과를 NS 로 둔 새 런을 만든다. 커밋은 부른 쪽이 한다."""
     if next_round:
-        max_round = (
-            db.query(func.max(TestRun.round))
-            .filter(TestRun.project_id == project_id, TestRun.name == source.name)
-            .scalar()
-        ) or 0
-        name, round_ = source.name, max_round + 1
+        name, round_ = source.name, _max_round(source.project_id, source.name, db) + 1
     else:
         name, round_ = f"{source.name} (복제)", source.round
     new_run = TestRun(
-        project_id=project_id,
+        project_id=source.project_id,
         name=name,
         version=source.version,
         environment=source.environment,
         round=round_,
         sheet_names=source.sheet_names,
         test_plan_id=source.test_plan_id if next_round else None,
-        created_by=current_user.id,
+        created_by=user.id,
     )
     db.add(new_run)
     db.flush()
@@ -698,12 +828,9 @@ def clone_testrun(
                 "test_run_id": new_run.id,
                 "test_case_id": r.test_case_id,
                 "result": TestResultValue.NS,
-                "executed_by": current_user.id,
+                "executed_by": user.id,
             })
         db.bulk_insert_mappings(TestResult, rows)
-
-    db.commit()
-    db.refresh(new_run)
     return new_run
 
 

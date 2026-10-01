@@ -219,7 +219,7 @@ npx tsc -b
 
 ---
 
-## 10. API 엔드포인트 (55개)
+## 10. API 엔드포인트 (56개)
 
 API 문서(Swagger UI): `http://localhost:8008/docs`
 
@@ -272,6 +272,7 @@ API 문서(Swagger UI): `http://localhost:8008/docs`
 | PUT | /api/projects/{id}/testruns/{run_id} | 런 수정 |
 | POST | /api/projects/{id}/testruns/{run_id}/results | 결과 저장 (벌크) |
 | POST | /api/projects/{id}/testruns/{run_id}/results/import | 자동화 결과 파일 가져오기 (Playwright JSON · JUnit XML, ?dry_run · keep_executed · label) |
+| POST | /api/projects/{id}/testruns/import | 이름으로 결과 파일 올리기. 같은 이름의 다음 회차를 만들어 기록 (?run_name · round=next 또는 open · version · environment · sheet_names · dry_run) |
 | PUT | /api/projects/{id}/testruns/{run_id}/complete | 런 완료 |
 | POST | /api/projects/{id}/testruns/{run_id}/clone | 런 복제 |
 | DELETE | /api/projects/{id}/testruns/{run_id} | 런 삭제 |
