@@ -231,7 +231,7 @@
     "apiAuthSetting": "엔드포인트별 역할 체크"
   },
   "apiRef": {
-    "title": "10. API 엔드포인트 (82개)",
+    "title": "10. API 엔드포인트 (83개)",
     "swaggerInfo": "API 문서(Swagger UI)는",
     "swaggerInfoSuffix": "에서 확인할 수 있습니다.",
     "descTh": "설명",
@@ -288,6 +288,7 @@
       "update": "런 수정",
       "saveResults": "결과 저장 (벌크)",
       "importResults": "자동화 결과 파일 가져오기 (Playwright JSON · JUnit XML, ?dry_run · keep_executed · label)",
+      "importByName": "이름으로 결과 파일 올리기. 같은 이름의 다음 회차를 만들어 기록 (?run_name · round=next|open · version · environment · sheet_names · dry_run)",
       "complete": "런 완료",
       "reopen": "런 다시 수행 (완료→진행중)",
       "clone": "런 복제. ?next_round=true 면 같은 이름의 다음 회차(회차 최댓값 + 1, 플랜 승계)",

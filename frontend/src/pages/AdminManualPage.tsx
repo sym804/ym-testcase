@@ -406,6 +406,7 @@ npx tsc --noEmit`}</pre>
                 ["PUT", "/api/projects/{id}/testruns/{run_id}", t("apiRef.testRuns.update")],
                 ["POST", "/api/projects/{id}/testruns/{run_id}/results", t("apiRef.testRuns.saveResults")],
                 ["POST", "/api/projects/{id}/testruns/{run_id}/results/import", t("apiRef.testRuns.importResults")],
+                ["POST", "/api/projects/{id}/testruns/import", t("apiRef.testRuns.importByName")],
                 ["PUT", "/api/projects/{id}/testruns/{run_id}/complete", t("apiRef.testRuns.complete")],
                 ["PUT", "/api/projects/{id}/testruns/{run_id}/reopen", t("apiRef.testRuns.reopen")],
                 ["POST", "/api/projects/{id}/testruns/{run_id}/clone", t("apiRef.testRuns.clone")],

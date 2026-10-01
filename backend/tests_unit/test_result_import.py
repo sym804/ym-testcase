@@ -300,3 +300,90 @@ def test_완료된_수행과_빈_파일은_거절(env):
     with pytest.raises(HTTPException) as e:
         _import(env, PW_JSON)
     assert e.value.status_code == 400 and "완료된" in e.value.detail
+
+
+# ── 이름으로 올리기 (회차 자동 생성) ─────────────────────────────────────────
+
+from routes.testruns import import_results_by_name  # noqa: E402
+
+
+def _import_by_name(env, content, *, run_name="수행", round_mode="next", version=None, environment=None,
+                    sheet_names=None, dry_run=False, keep_executed=True, label=None):
+    db, project, _, _, a = env
+    upload = UploadFile(file=io.BytesIO(content), filename="r.json")
+    return import_results_by_name(
+        project.id, run_name=run_name, round_mode=round_mode, version=version, environment=environment,
+        sheet_names=sheet_names, file=upload, dry_run=dry_run, keep_executed=keep_executed, label=label,
+        db=db, current_user=a,
+    )
+
+
+def _runs(env, name="수행"):
+    db, project, _, _, _ = env
+    db.expire_all()
+    return db.query(TestRun).filter_by(project_id=project.id, name=name).order_by(TestRun.round).all()
+
+
+def test_이름으로_올리면_다음_회차를_만들어_기록하고_앞_회차는_그대로(env):
+    db, _, run, _, _ = env
+    run.version, run.environment = "1.5", "prod"
+    db.commit()
+    res = _import_by_name(env, PW_JSON)
+    runs = _runs(env)
+    assert [r.round for r in runs] == [1, 2]
+    r2 = runs[1]
+    assert res["run"] == {"id": r2.id, "name": "수행", "round": 2, "version": "1.5", "environment": "prod", "created": True}
+    assert r2.sheet_names == ["S"], "범위를 이어받는다"
+    assert res["counts"] == {"PASS": 2, "FAIL": 4, "NS": 2}
+    rows = {x.test_case_id: x.result for x in db.query(TestResult).filter_by(test_run_id=r2.id)}
+    assert R.FAIL in rows.values()
+    assert all(x.result == R.NS for x in db.query(TestResult).filter_by(test_run_id=runs[0].id)), "R1 은 건드리지 않는다"
+
+
+def test_버전과_환경을_주면_새_회차에_그_값(env):
+    res = _import_by_name(env, PW_JSON, version="1.6", environment="dev")
+    assert res["run"]["version"] == "1.6" and res["run"]["environment"] == "dev"
+
+
+def test_open_은_진행_중인_회차에_기록하고_없으면_새로_만든다(env):
+    db, _, run, _, _ = env
+    res = _import_by_name(env, PW_JSON, round_mode="open")
+    assert res["run"]["created"] is False and res["run"]["id"] == run.id
+    assert [r.round for r in _runs(env)] == [1]
+    run.status = TestRunStatus.completed
+    db.commit()
+    res = _import_by_name(env, PW_JSON, round_mode="open")
+    assert res["run"]["created"] is True and res["run"]["round"] == 2
+
+
+def test_미리보기는_회차를_남기지_않는다(env):
+    res = _import_by_name(env, PW_JSON, dry_run=True)
+    assert res["dry_run"] and res["run"]["created"] and res["run"]["id"] is None and res["run"]["round"] == 2
+    assert res["counts"] == {"PASS": 2, "FAIL": 4, "NS": 2}
+    assert [r.round for r in _runs(env)] == [1], "되돌려서 R2 가 없다"
+
+
+def test_처음_보는_이름은_R1_범위는_시트_지정이_없으면_프로젝트_전체(env):
+    data = json.dumps({"suites": [{"title": "f", "specs": [
+        {"title": "FE-C-01 범위 밖 시트", "tests": [_pw_test("expected")]},
+        {"title": "FE-A-01 안", "tests": [_pw_test("expected")]},
+    ]}]}).encode()
+    res = _import_by_name(env, data, run_name="e2e")
+    assert res["run"]["round"] == 1 and res["recorded"] == 2 and res["out_of_run"] == []
+    res = _import_by_name(env, data, run_name="e2e-S", sheet_names="S")
+    assert res["out_of_run"] == ["FE-C-01"]
+    assert _runs(env, "e2e-S")[0].sheet_names == ["S"]
+
+
+def test_시트를_주면_이어받지_않고_그_범위로_다음_회차(env):
+    res = _import_by_name(env, PW_JSON, sheet_names="밖")
+    assert res["run"]["round"] == 2 and _runs(env)[1].sheet_names == ["밖"]
+
+
+def test_깨진_파일과_없는_시트는_회차를_만들기_전에_거절(env):
+    for kw in ({"content": b"garbage"}, {"content": PW_JSON, "sheet_names": "없는 시트"}):
+        content = kw.pop("content")
+        with pytest.raises(HTTPException) as e:
+            _import_by_name(env, content, **kw)
+        assert e.value.status_code == 400
+    assert [r.round for r in _runs(env)] == [1]

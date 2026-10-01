@@ -231,7 +231,7 @@
     "apiAuthSetting": "Per-endpoint role check"
   },
   "apiRef": {
-    "title": "10. API Endpoints (82)",
+    "title": "10. API Endpoints (83)",
     "swaggerInfo": "API documentation (Swagger UI) is available at",
     "swaggerInfoSuffix": ".",
     "descTh": "Description",
@@ -288,6 +288,7 @@
       "update": "Update run",
       "saveResults": "Save results (bulk)",
       "importResults": "Import automation result file (Playwright JSON · JUnit XML, ?dry_run · keep_executed · label)",
+      "importByName": "Upload a result file by run name; creates the next round of that name (?run_name · round=next|open · version · environment · sheet_names · dry_run)",
       "complete": "Complete run",
       "reopen": "Reopen run (completed -> in progress)",
       "clone": "Clone run. ?next_round=true creates the next round of the same name (max round + 1, plan inherited)",

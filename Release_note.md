@@ -12,11 +12,38 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v1.9.0.2  (2026-10-01)
-├── Frontend       v1.9.0.2
-├── Backend        v1.9.0.0
+YM TestCase System  v1.10.0.0  (2026-10-01)
+├── Frontend       v1.10.0.0
+├── Backend        v1.10.0.0
 └── Database       v0.11.0.0
 ```
+
+---
+
+## v1.10.0.0 (2026-10-01) - [feat] 이름으로 결과 올리기 · CI 업로드 CLI
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.9.0.2 | **1.10.0.0** | feature +1 |
+| Frontend | 1.9.0.2 | **1.10.0.0** | feature +1 |
+| Backend | 1.9.0.0 | **1.10.0.0** | feature +1 |
+
+### 변경
+
+- `POST /testruns/import?run_name=...`. 수행 id 없이 이름으로 결과 파일을 올린다. 같은 이름이 있으면 최신 회차를 이어받아 다음 회차를 만들고(버전 · 환경 · 시트 범위 · 플랜), 없으면 R1 을 만든다
+- `round=open` 이면 진행 중인 회차에 기록한다. 스위트를 나눠 여러 번 올릴 때 쓴다
+- `version` · `environment` 를 주면 새 회차에 그 값, `sheet_names` 를 주면 이어받지 않고 그 범위로 만든다
+- `dry_run` 은 회차를 만든 뒤 같은 계산을 하고 되돌린다. 깨진 파일 · 없는 시트는 회차를 만들기 전에 거절한다
+- `scripts/ymtc-upload.mjs`: 의존성 없는 Node 18+ CLI. API 키는 환경변수 `YMTC_API_KEY` 로만 받는다(CI 로그에 남지 않게)
+- 런 생성 · 다음 회차 복제 · 결과 기록을 커밋하지 않는 공통 함수로 묶어 기존 엔드포인트와 같이 쓴다
+- 매뉴얼(앱 8-9 · 운영 엔드포인트 · Confluence)과 README 에 CLI 사용법
+
+### 영향
+
+- CI 가 회차를 미리 만들 필요가 없다. Playwright 실행 뒤 CLI 한 줄로 다음 회차가 생기고 결과가 기록된다
+- 기존 `POST /testruns/{run_id}/results/import` 는 그대로다
 
 ---
 
