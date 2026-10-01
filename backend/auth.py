@@ -1,6 +1,8 @@
 # .env 로딩 - 아래 os.getenv 호출보다 먼저 실행되어야 한다
 import env_setup  # noqa: F401
 
+import hashlib
+import hmac
 import os
 import secrets
 import logging
@@ -90,6 +92,52 @@ def _check_csrf(request: Request, auth_source: str):
         raise HTTPException(status_code=403, detail="CSRF 토큰이 유효하지 않습니다.")
 
 
+#: API 키 원문의 머리. JWT 는 "eyJ" 로 시작하므로 겹치지 않는다.
+API_KEY_PREFIX = "ymtc_"
+#: last_used_at 을 이보다 자주 쓰지 않는다. 읽기 요청이 전부 쓰기가 되지 않게.
+API_KEY_TOUCH_INTERVAL = timedelta(minutes=1)
+
+
+def hash_api_key(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def generate_api_key() -> tuple[str, str]:
+    """(원문, key_id). 원문은 `ymtc_<key_id 8자>_<비밀 43자>` 이다."""
+    key_id = secrets.token_hex(4)
+    return f"{API_KEY_PREFIX}{key_id}_{secrets.token_urlsafe(32)}", key_id
+
+
+def _user_from_api_key(raw: str, db: Session) -> User:
+    """API 키로 사용자를 찾는다. 어느 단계에서 실패했는지는 응답에 드러내지 않는다."""
+    from models import ApiKey, now_kst
+
+    denied = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="유효하지 않은 API 키입니다.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    parts = raw.split("_", 2)
+    if len(parts) != 3 or not parts[1]:
+        raise denied
+    key = db.query(ApiKey).filter(ApiKey.key_id == parts[1]).first()
+    # ★해시는 상수 시간으로 비교한다. 행이 없을 때도 같은 비교를 한 번 해서
+    #   key_id 의 존재 여부가 응답 시간으로 새지 않게 한다.
+    expected = key.key_hash if key else "0" * 64
+    if not hmac.compare_digest(hash_api_key(raw), expected) or key is None:
+        raise denied
+    now = now_kst()
+    if key.revoked_at is not None or (key.expires_at is not None and key.expires_at <= now):
+        raise denied
+    user = db.query(User).filter(User.id == key.user_id).first()
+    if user is None:
+        raise denied
+    if key.last_used_at is None or now - key.last_used_at >= API_KEY_TOUCH_INTERVAL:
+        key.last_used_at = now
+        db.commit()
+    return user
+
+
 def get_current_user(
     request: Request,
     token: Optional[str] = Depends(oauth2_scheme),
@@ -101,6 +149,12 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     jwt_token, auth_source = _extract_token(request, token)
+
+    # API 키는 Authorization 헤더로만 받는다. 헤더 인증이라 CSRF 대상이 아니다.
+    if auth_source == "header" and jwt_token.startswith(API_KEY_PREFIX):
+        request.state.auth_method = "api_key"
+        return _user_from_api_key(jwt_token, db)
+    request.state.auth_method = "session"
 
     # CSRF 검증 (쿠키 인증 + 상태 변경 요청)
     _check_csrf(request, auth_source)
@@ -132,6 +186,35 @@ def get_current_user(
         raise credentials_exception
 
     return user
+
+
+def revoke_user_api_keys(user_id: int, db: Session) -> int:
+    """그 사용자의 살아 있는 키를 모두 폐기한다. 커밋은 부른 쪽이 한다.
+
+    비밀번호가 바뀌는 자리(본인 변경 · 관리자 초기화 · 계정 복구)에서 부른다. 계정을 되찾는
+    국면인데 탈취한 쪽이 만들어 둔 키가 살아 있으면 비밀번호를 바꾼 의미가 없다.
+    """
+    from models import ApiKey, now_kst
+
+    return (
+        db.query(ApiKey)
+        .filter(ApiKey.user_id == user_id, ApiKey.revoked_at.is_(None))
+        .update({ApiKey.revoked_at: now_kst()}, synchronize_session=False)
+    )
+
+
+def get_session_user(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """로그인 세션으로만 허용하는 작업. API 키로 부르면 403.
+
+    키 발급 · 폐기, 비밀번호 변경, 로그아웃이 여기에 걸린다. 키 하나가 새 키를 찍어 내거나,
+    로그아웃으로 그 사용자의 웹 세션을 전부 끊을 수 있으면 유출된 키의 피해가 키 밖으로 번진다.
+    """
+    if getattr(request.state, "auth_method", None) == "api_key":
+        raise HTTPException(status_code=403, detail="API 키로는 할 수 없는 작업입니다. 로그인해서 진행해 주세요.")
+    return current_user
 
 
 def role_required(minimum_role: str):

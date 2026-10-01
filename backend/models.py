@@ -483,3 +483,31 @@ class AccountRequest(Base):
     __table_args__ = (
         Index("ix_account_requests_status_created", "status", "created_at"),
     )
+
+
+# ── ApiKey ────────────────────────────────────────────────────────────────────
+
+class ApiKey(Base):
+    """스크립트 · CI 가 비밀번호 없이 API 를 부르는 수단.
+
+    원문은 발급 응답에서 한 번만 보여 주고 저장하지 않는다. 원문이 충분히 무작위라
+    (256비트) bcrypt 같은 느린 해시가 필요 없고, SHA-256 으로 대조한다.
+    key_id 는 원문 안에 그대로 들어 있는 짧은 식별자다. 해시 대조 전에 행을 찾는 데 쓰고,
+    화면에서 어느 키인지 알아보는 데도 쓴다.
+    """
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(100), nullable=False)
+    key_id = Column(String(16), nullable=False, unique=True)
+    key_hash = Column(String(64), nullable=False)
+    created_at = Column(DateTime, default=now_kst)
+    #: 요청마다 쓰면 읽기 요청도 전부 쓰기가 된다. 1분 넘게 지났을 때만 갱신한다.
+    last_used_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_api_keys_user_id", "user_id"),
+    )

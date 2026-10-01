@@ -14,6 +14,7 @@ from models import User, UserRole
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
 from auth import (
     hash_password, verify_password, create_access_token, get_current_user, role_required,
+    get_session_user, revoke_user_api_keys,
     COOKIE_SECURE, COOKIE_SAMESITE, COOKIE_MAX_AGE, ACCESS_TOKEN_EXPIRE_HOURS,
     REMEMBER_ME_DAYS,
 )
@@ -186,7 +187,8 @@ def login(payload: UserLogin, request: Request, response: Response, db: Session 
 def logout(
     response: Response,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    # ★API 키로 부르면 아래 버전 올림이 그 사용자의 웹 세션을 전부 끊는다. 세션으로만 받는다.
+    current_user: User = Depends(get_session_user),
 ):
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("csrf_token", path="/")
@@ -208,7 +210,7 @@ def me(current_user: User = Depends(get_current_user)):
 def change_password(
     payload: PasswordChange,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_session_user),
 ):
     if not verify_password(payload.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="현재 비밀번호가 올바르지 않습니다.")
@@ -220,6 +222,7 @@ def change_password(
     current_user.must_change_password = False
     # 비밀번호를 바꾼 이유가 유출이면, 옛 토큰이 살아 있는 한 바꾼 의미가 없다
     current_user.token_version = (current_user.token_version or 0) + 1
+    revoke_user_api_keys(current_user.id, db)
     db.commit()
     db.refresh(current_user)
     logger.info("Password changed: %s", current_user.username)
@@ -261,9 +264,12 @@ def update_user_role(
 @router.put("/users/{user_id}/reset-password")
 def reset_password(
     user_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(role_required("admin")),
 ):
+    # ★임시 비밀번호를 응답으로 돌려준다. 유출된 관리자 키로 남의 계정을 가져갈 수 없게 세션으로만 받는다.
+    get_session_user(request, current_user)
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
@@ -275,6 +281,7 @@ def reset_password(
     user.must_change_password = True
     # 관리자가 초기화하는 상황은 계정을 되찾는 국면이다. 옛 토큰을 같이 끊는다
     user.token_version = (user.token_version or 0) + 1
+    revoke_user_api_keys(user.id, db)
     db.commit()
     logger.info("Password reset by admin for user: %s", user.username)
     return {"temp_password": temp_pw}

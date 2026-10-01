@@ -25,6 +25,7 @@ import type {
   RunIssueCarryOverResult,
   RunIssueInput,
   ResultImportSummary,
+  ApiKeyItem,
 } from "../types";
 
 // ─── Auth ────────────────────────────────────────────
@@ -51,6 +52,25 @@ export const authApi = {
     const res = await client.get<{ available: boolean }>("/api/auth/check-username", {
       params: { username },
     });
+    return res.data;
+  },
+
+  // 본인 API 키. 원문(key)은 발급 응답에서만 온다.
+  listApiKeys: async () => {
+    const res = await client.get<ApiKeyItem[]>("/api/auth/api-keys");
+    return res.data;
+  },
+
+  createApiKey: async (name: string, expiresDays: number | null) => {
+    const res = await client.post<ApiKeyItem & { key: string }>("/api/auth/api-keys", {
+      name,
+      expires_days: expiresDays,
+    });
+    return res.data;
+  },
+
+  revokeApiKey: async (id: number) => {
+    const res = await client.delete<ApiKeyItem>(`/api/auth/api-keys/${id}`);
     return res.data;
   },
 
