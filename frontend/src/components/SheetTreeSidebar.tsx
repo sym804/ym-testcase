@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import { testCasesApi } from "../api";
@@ -73,6 +73,48 @@ export default function SheetTreeSidebar({
     }
   };
 
+  // ── 시트/폴더 이름 변경 (내부 상태) ──
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  // Enter 로 확정하면 입력칸이 사라지며 blur 가 한 번 더 올 수 있다. state 는 아직 옛 값이라
+  //   ref 로 "지금 편집 중인 노드" 와 "보내는 중" 을 따로 들고 같은 변경을 두 번 보내지 않게 막는다.
+  const renamingRef = useRef<number | null>(null);
+  const renameBusy = useRef(false);
+
+  const startRename = (node: SheetNode) => {
+    renamingRef.current = node.id;
+    setRenamingId(node.id);
+    setRenameValue(node.name);
+  };
+
+  const cancelRename = () => {
+    renamingRef.current = null;
+    setRenamingId(null);
+    setRenameValue("");
+  };
+
+  const handleRename = async (node: SheetNode) => {
+    if (renameBusy.current || renamingRef.current !== node.id) return;
+    const name = renameValue.trim();
+    const label = node.is_folder ? t("folder") : t("sheet");
+    if (name === node.name) { cancelRename(); return; }
+    if (!name) { toast.error(t("nameRequired", { label })); return; }
+    renameBusy.current = true;
+    try {
+      await testCasesApi.renameSheet(projectId, node.id, name);
+      cancelRename();
+      // 고르고 있던 시트면 새 이름으로 따라간다. 옛 이름으로 남으면 그리드가 빈 시트를 보여 준다.
+      if (activeSheet === node.name) setActiveSheet(name);
+      onSheetChange();
+      toast.success(t("sheetRenamed", { oldName: node.name, name, label }));
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t("sheetRenameFailed", { label }));
+    } finally {
+      renameBusy.current = false;
+    }
+  };
+
   if (flatSheets.length <= 1 && flatSheets[0]?.name === "기본") return null;
 
   const renderNode = (node: SheetNode, depth: number): React.ReactNode => {
@@ -132,10 +174,32 @@ export default function SheetTreeSidebar({
           )}
           {/* 아이콘 */}
           <span style={{ fontSize: 14, flexShrink: 0 }}>{node.is_folder ? (isExpanded ? "📂" : "📁") : "📄"}</span>
-          {/* 이름 */}
-          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {node.name}
-          </span>
+          {/* 이름 (이름 변경 중이면 입력칸) */}
+          {renamingId === node.id ? (
+            <input
+              aria-label={t("renameSheetInput", { label: node.is_folder ? t("folder") : t("sheet") })}
+              style={{ flex: 1, minWidth: 0, padding: "1px 4px", fontSize: 12, borderRadius: 4, border: "1px solid var(--accent)", backgroundColor: "var(--bg-input)", color: "var(--text-primary)", outline: "none" }}
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === "Enter") handleRename(node);
+                if (e.key === "Escape") cancelRename();
+              }}
+              onBlur={() => handleRename(node)}
+              autoFocus
+              onFocus={(e) => e.target.select()}
+            />
+          ) : (
+            <span
+              style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              onDoubleClick={canEditTC ? (e) => { e.stopPropagation(); startRename(node); } : undefined}
+            >
+              {node.name}
+            </span>
+          )}
           {/* TC 수 (시트만) */}
           {!node.is_folder && (
             <span style={{ fontSize: 10, color: "var(--text-secondary)", flexShrink: 0 }}>
@@ -171,6 +235,14 @@ export default function SheetTreeSidebar({
                   >📄+</span>
                 </>
               )}
+              <span
+                title={node.is_folder ? t("renameFolder") : t("renameSheet")}
+                style={{ cursor: "pointer", fontSize: 11, opacity: 0.4, padding: "0 2px" }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startRename(node);
+                }}
+              >✎</span>
               <span
                 title={node.is_folder ? t("deleteFolder") : t("deleteSheet")}
                 style={{ cursor: "pointer", fontSize: 12, opacity: 0.4, padding: "0 2px" }}
