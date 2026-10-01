@@ -265,6 +265,7 @@ export default function UserManualPage() {
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li4") }} />
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li5") }} />
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li6") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li6b") }} />
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li7") }} />
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li8") }} />
             </ul>
@@ -353,6 +354,15 @@ export default function UserManualPage() {
               <li dangerouslySetInnerHTML={{ __html: t("sheetTree.del_li1") }} />
               <li>{t("sheetTree.del_li2")}</li>
               <li dangerouslySetInnerHTML={{ __html: t("sheetTree.del_li3") }} />
+            </ul>
+
+            <h3 style={s.h3}>{t("sheetTree.h3_rename")}</h3>
+            <ul style={s.ul}>
+              <li dangerouslySetInnerHTML={{ __html: t("sheetTree.ren_li1") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("sheetTree.ren_li2") }} />
+              <li>{t("sheetTree.ren_li3")}</li>
+              <li>{t("sheetTree.ren_li4")}</li>
+              <li>{t("sheetTree.ren_li5")}</li>
             </ul>
 
             <div style={s.infoBox} dangerouslySetInnerHTML={{ __html: t("sheetTree.info1") }} />
@@ -578,6 +588,7 @@ export default function UserManualPage() {
                 <tr><td style={s.td}>{t("testrun.rm_clone")}</td><td style={s.td}>{t("testrun.rm_clone_desc")}</td></tr>
                 <tr><td style={s.td}>{t("testrun.rm_delete")}</td><td style={s.td}>{t("testrun.rm_delete_desc")}</td></tr>
                 <tr><td style={s.td}>{t("testrun.rm_export")}</td><td style={s.td}>{t("testrun.rm_export_desc")}</td></tr>
+                <tr><td style={s.td}>{t("testrun.rm_import")}</td><td style={s.td}>{t("testrun.rm_import_desc")}</td></tr>
               </tbody>
             </table>
             <h3 style={s.h3}>{t("testrun.h3_timer")}</h3>
@@ -596,6 +607,21 @@ export default function UserManualPage() {
               <li>{t("testrun.filter_li5")}</li>
             </ul>
             <img src="/manual-images/43_testrun_priority_filter.png" alt={t("testrun.imgAlt_filter")} style={s.img} />
+
+            <h3 style={s.h3}>{t("testrun.h3_import")}</h3>
+            <p style={s.p} dangerouslySetInnerHTML={{ __html: t("testrun.imp_p1") }} />
+            <ol style={s.ol}>
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.imp_li1") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.imp_li2") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("testrun.imp_li3") }} />
+            </ol>
+            <ul style={s.ul}>
+              <li>{t("testrun.imp_li4")}</li>
+              <li>{t("testrun.imp_li5")}</li>
+              <li>{t("testrun.imp_li6")}</li>
+            </ul>
+            <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("testrun.imp_warn") }} />
+            <div style={s.tipBox} dangerouslySetInnerHTML={{ __html: t("testrun.imp_tip") }} />
 
             <div style={s.tipBox} dangerouslySetInnerHTML={{ __html: t("testrun.tip1") }} />
           </section>
@@ -881,8 +907,26 @@ export default function UserManualPage() {
                   <td style={s.td}>{t("header.row_logout_func")}</td>
                   <td style={s.td}>{t("header.row_logout_desc")}</td>
                 </tr>
+                <tr>
+                  <td style={s.td}>{t("header.row_apikey_area")}</td>
+                  <td style={s.td}>{t("header.row_apikey_func")}</td>
+                  <td style={s.td}>{t("header.row_apikey_desc")}</td>
+                </tr>
               </tbody>
             </table>
+
+            <h3 style={s.h3}>{t("header.h3_apiKey")}</h3>
+            <p style={s.p} dangerouslySetInnerHTML={{ __html: t("header.ak_p1") }} />
+            <ol style={s.ol}>
+              <li dangerouslySetInnerHTML={{ __html: t("header.ak_li1") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("header.ak_li2") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("header.ak_li3") }} />
+            </ol>
+            <ul style={s.ul}>
+              <li>{t("header.ak_li4")}</li>
+              <li>{t("header.ak_li5")}</li>
+            </ul>
+            <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("header.ak_warn") }} />
           </section>
 
           {/* 2. 프로젝트 상세 */}

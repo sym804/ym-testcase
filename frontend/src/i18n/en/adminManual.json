@@ -90,6 +90,8 @@
     "testPlansRel": "Belongs to project, linked to test_runs (1:N)",
     "savedFiltersDesc": "Saved filters",
     "savedFiltersRel": "Belongs to project, conditions JSON",
+    "apiKeysDesc": "API keys (hash only)",
+    "apiKeysRel": "Belongs to a user, all revoked when the password changes",
     "softDeleteTitle": "4-2. Soft Delete Policy",
     "softDeleteInfo": "Test cases are <strong>soft-deleted</strong> (deleted_at field is set). They are <strong>permanently deleted after 7 days</strong>. Deleted TCs can be restored via the restore API (<code>POST /api/projects/{id}/testcases/{tc_id}/restore</code>)."
   },
@@ -111,6 +113,7 @@
     "resetOl3": "Share the temporary password with the user.",
     "resetOl4": "The user will see a <strong>forced password change</strong> screen on their next login.",
     "resetPwWarn": "<strong>Warning:</strong> The temporary password is displayed only once. Make sure to note it down before sharing.",
+    "resetApiKeyInfo": "<strong>Note:</strong> Resetting a password also revokes all of that user's API keys. Password resets and account recovery approvals can be done only from a signed-in admin session, not with an API key.",
     "initialAccountTitle": "5-4. Initial Account",
     "initialAccountInfo": "The first user to register is automatically assigned the <strong>Admin</strong> role. All subsequent users start as <strong>User</strong>. An administrator must change their roles as needed.",
     "accountRequestTitle": "5-5. Approving Account Recovery Requests",
@@ -205,6 +208,9 @@
     "authToken": "Auth token",
     "authTokenImpl": "JWT (HS256) + httpOnly cookie",
     "authTokenSetting": "TOKEN_EXPIRE_HOURS (default 2h)",
+    "apiKey": "API keys",
+    "apiKeyImpl": "Per-user create · revoke, SHA-256 hash stored, Bearer header auth",
+    "apiKeySetting": "Expiry 30 · 90 · 180 · 365 days or never, 20 per user, all revoked when the password changes",
     "csrf": "CSRF protection",
     "csrfImpl": "csrf_token cookie + X-CSRF-Token header verification",
     "csrfSetting": "Auto-applied on state-changing requests",
@@ -225,7 +231,7 @@
     "apiAuthSetting": "Per-endpoint role check"
   },
   "apiRef": {
-    "title": "10. API Endpoints (73)",
+    "title": "10. API Endpoints (82)",
     "swaggerInfo": "API documentation (Swagger UI) is available at",
     "swaggerInfoSuffix": ".",
     "descTh": "Description",
@@ -243,7 +249,10 @@
       "listAccountRequests": "List account recovery requests",
       "approveAccountRequest": "Approve account recovery request",
       "rejectAccountRequest": "Reject account recovery request",
-      "resetPasswordWithCode": "Reset password with code"
+      "resetPasswordWithCode": "Reset password with code",
+      "listApiKeys": "List own API keys (signed-in session only)",
+      "createApiKey": "Create an API key; the raw key is returned once (signed-in session only)",
+      "revokeApiKey": "Revoke an API key (signed-in session only)"
     },
     "projects": {
       "title": "Projects",
@@ -278,6 +287,7 @@
       "detail": "Run detail (with results)",
       "update": "Update run",
       "saveResults": "Save results (bulk)",
+      "importResults": "Import automation result file (Playwright JSON · JUnit XML, ?dry_run · keep_executed · label)",
       "complete": "Complete run",
       "reopen": "Reopen run (completed -> in progress)",
       "clone": "Clone run. ?next_round=true creates the next round of the same name (max round + 1, plan inherited)",

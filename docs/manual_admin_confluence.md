@@ -93,6 +93,7 @@ npx tsc --noEmit
 | `attachments` | 첨부파일 메타데이터 | test_result 참조 |
 | `project_members` | 프로젝트 멤버 | user + project 연결 |
 | `test_case_history` | TC 변경 이력 | test_case 참조 |
+| `api_keys` | API 키 (해시만 저장) | user 소속, 비밀번호가 바뀌면 전부 폐기 |
 
 ### 4-2. 소프트 삭제 정책
 
@@ -130,6 +131,8 @@ npx tsc --noEmit
 4. 사용자는 다음 로그인 시 **비밀번호 강제 변경** 화면이 표시됩니다.
 
 ⚠️ **주의**: 임시 비밀번호는 화면에 1회만 표시됩니다. 반드시 메모하여 전달하세요.
+
+ℹ️ **참고**: 비밀번호를 초기화하면 그 사용자의 API 키도 모두 폐기됩니다. 초기화와 계정 복구 승인은 로그인한 관리자 화면에서만 할 수 있고, API 키로는 할 수 없습니다.
 
 ### 5-5. 초기 계정
 
@@ -220,6 +223,7 @@ npx tsc --noEmit
 | 비밀번호 저장 | bcrypt 해싱 | 자동 적용 |
 | 비밀번호 초기화 | Admin이 임시 비밀번호 발급, 강제 변경 플래그 | Admin 페이지 |
 | 인증 토큰 | JWT (HS256) | TOKEN_EXPIRE_HOURS (기본 2시간) |
+| API 키 | 사용자별 발급 · 폐기, SHA-256 해시 저장, Bearer 헤더 인증 | 만료 30 · 90 · 180 · 365일 또는 없음, 1인 20개, 비밀번호가 바뀌면 전부 폐기 |
 | 로그인 제한 | Rate Limiting | IP+사용자당 5분간 10회 (초과 시 잠금) |
 | CORS | 오리진 화이트리스트 | CORS_ORIGINS (와일드카드 금지) |
 | 파일 업로드 | 확장자 화이트리스트 + 경로 탐색 방지 | 허용 확장자 고정 |
@@ -228,7 +232,7 @@ npx tsc --noEmit
 
 ---
 
-## 10. API 엔드포인트 (52개)
+## 10. API 엔드포인트 (55개)
 
 API 문서(Swagger UI): `http://localhost:8008/docs`
 
@@ -243,7 +247,10 @@ API 문서(Swagger UI): `http://localhost:8008/docs`
 | PUT | /api/auth/change-password | 비밀번호 변경 (최소 8자) |
 | GET | /api/auth/users | 사용자 목록 (QA Manager 이상) |
 | PUT | /api/auth/users/{user_id}/role | 역할 변경 (Admin) |
-| PUT | /api/auth/users/{user_id}/reset-password | 비밀번호 초기화 (Admin) |
+| PUT | /api/auth/users/{user_id}/reset-password | 비밀번호 초기화 (Admin, 로그인 세션만) |
+| GET | /api/auth/api-keys | 본인 API 키 목록 (로그인 세션만) |
+| POST | /api/auth/api-keys | API 키 발급. 원문은 응답에서 1회만 (로그인 세션만) |
+| DELETE | /api/auth/api-keys/{key_id} | API 키 폐기 (로그인 세션만) |
 
 ### 프로젝트
 
@@ -277,6 +284,7 @@ API 문서(Swagger UI): `http://localhost:8008/docs`
 | GET | /api/projects/{id}/testruns/{run_id} | 런 상세 (결과 포함) |
 | PUT | /api/projects/{id}/testruns/{run_id} | 런 수정 |
 | POST | /api/projects/{id}/testruns/{run_id}/results | 결과 저장 (벌크) |
+| POST | /api/projects/{id}/testruns/{run_id}/results/import | 자동화 결과 파일 가져오기 (Playwright JSON · JUnit XML, ?dry_run · keep_executed · label) |
 | PUT | /api/projects/{id}/testruns/{run_id}/complete | 런 완료 |
 | POST | /api/projects/{id}/testruns/{run_id}/clone | 런 복제 |
 | DELETE | /api/projects/{id}/testruns/{run_id} | 런 삭제 |

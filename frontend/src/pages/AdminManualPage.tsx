@@ -182,6 +182,7 @@ npx tsc --noEmit`}</pre>
                 <tr><td style={s.tdCode}>custom_field_defs</td><td style={s.td}>{t("database.customFieldDefsDesc")}</td><td style={s.td}>{t("database.customFieldDefsRel")}</td></tr>
                 <tr><td style={s.tdCode}>test_plans</td><td style={s.td}>{t("database.testPlansDesc")}</td><td style={s.td}>{t("database.testPlansRel")}</td></tr>
                 <tr><td style={s.tdCode}>saved_filters</td><td style={s.td}>{t("database.savedFiltersDesc")}</td><td style={s.td}>{t("database.savedFiltersRel")}</td></tr>
+                <tr><td style={s.tdCode}>api_keys</td><td style={s.td}>{t("database.apiKeysDesc")}</td><td style={s.td}>{t("database.apiKeysRel")}</td></tr>
               </tbody>
             </table>
 
@@ -217,6 +218,7 @@ npx tsc --noEmit`}</pre>
               <li dangerouslySetInnerHTML={{ __html: t("userMgmt.resetOl4") }} />
             </ol>
             <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("userMgmt.resetPwWarn") }} />
+            <div style={s.infoBox} dangerouslySetInnerHTML={{ __html: t("userMgmt.resetApiKeyInfo") }} />
 
             <h3 style={s.h3}>{t("userMgmt.initialAccountTitle")}</h3>
             <div style={s.infoBox} dangerouslySetInnerHTML={{ __html: t("userMgmt.initialAccountInfo") }} />
@@ -336,6 +338,7 @@ npx tsc --noEmit`}</pre>
                 <tr><td style={s.td}>{t("security.pwStorage")}</td><td style={s.td}>{t("security.pwStorageImpl")}</td><td style={s.td}>{t("security.pwPolicySetting")}</td></tr>
                 <tr><td style={s.td}>{t("security.pwReset")}</td><td style={s.td}>{t("security.pwResetImpl")}</td><td style={s.td}>{t("security.pwResetSetting")}</td></tr>
                 <tr><td style={s.td}>{t("security.authToken")}</td><td style={s.td}>{t("security.authTokenImpl")}</td><td style={s.td}>{t("security.authTokenSetting")}</td></tr>
+                <tr><td style={s.td}>{t("security.apiKey")}</td><td style={s.td}>{t("security.apiKeyImpl")}</td><td style={s.td}>{t("security.apiKeySetting")}</td></tr>
                 <tr><td style={s.td}>{t("security.csrf")}</td><td style={s.td}>{t("security.csrfImpl")}</td><td style={s.td}>{t("security.csrfSetting")}</td></tr>
                 <tr><td style={s.td}>{t("security.loginLimit")}</td><td style={s.td}>{t("security.loginLimitImpl")}</td><td style={s.td}>{t("security.loginLimitSetting")}</td></tr>
                 <tr><td style={s.td}>{t("security.cors")}</td><td style={s.td}>{t("security.corsImpl")}</td><td style={s.td}>{t("security.corsSetting")}</td></tr>
@@ -368,6 +371,9 @@ npx tsc --noEmit`}</pre>
                 ["POST", "/api/auth/account-requests/{id}/approve", t("apiRef.auth.approveAccountRequest")],
                 ["POST", "/api/auth/account-requests/{id}/reject", t("apiRef.auth.rejectAccountRequest")],
                 ["POST", "/api/auth/reset-password/verify", t("apiRef.auth.resetPasswordWithCode")],
+                ["GET", "/api/auth/api-keys", t("apiRef.auth.listApiKeys")],
+                ["POST", "/api/auth/api-keys", t("apiRef.auth.createApiKey")],
+                ["DELETE", "/api/auth/api-keys/{key_id}", t("apiRef.auth.revokeApiKey")],
               ]},
               { title: t("apiRef.projects.title"), endpoints: [
                 ["GET", "/api/projects", t("apiRef.projects.list")],
@@ -399,6 +405,7 @@ npx tsc --noEmit`}</pre>
                 ["GET", "/api/projects/{id}/testruns/{run_id}", t("apiRef.testRuns.detail")],
                 ["PUT", "/api/projects/{id}/testruns/{run_id}", t("apiRef.testRuns.update")],
                 ["POST", "/api/projects/{id}/testruns/{run_id}/results", t("apiRef.testRuns.saveResults")],
+                ["POST", "/api/projects/{id}/testruns/{run_id}/results/import", t("apiRef.testRuns.importResults")],
                 ["PUT", "/api/projects/{id}/testruns/{run_id}/complete", t("apiRef.testRuns.complete")],
                 ["PUT", "/api/projects/{id}/testruns/{run_id}/reopen", t("apiRef.testRuns.reopen")],
                 ["POST", "/api/projects/{id}/testruns/{run_id}/clone", t("apiRef.testRuns.clone")],
