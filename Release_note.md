@@ -12,11 +12,32 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v1.9.0.1  (2026-10-01)
-├── Frontend       v1.9.0.1
+YM TestCase System  v1.9.0.2  (2026-10-01)
+├── Frontend       v1.9.0.2
 ├── Backend        v1.9.0.0
 └── Database       v0.11.0.0
 ```
+
+---
+
+## v1.9.0.2 (2026-10-01) - [chore] Docker 잔재 정리
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.9.0.1 | **1.9.0.2** | patch +1 |
+| Frontend | 1.9.0.1 | **1.9.0.2** | patch +1 |
+
+### 변경
+
+- Docker 지원은 v0.7.1.0(ENH-019)에서 접었으나 남아 있던 `backend/Dockerfile` · `frontend/Dockerfile` · `frontend/nginx.conf` 삭제
+- 운영 매뉴얼(앱 · Confluence)에서 `docker-compose` 실행 · 재시작 안내 삭제, 구성 표의 배포 행 삭제
+- Confluence 운영 매뉴얼 프로덕션 빌드의 타입 검사를 `npx tsc -b` 로(`--noEmit` 은 검사 대상이 0개)
+
+### 영향
+
+- 없음. 실행 방법은 그대로 uvicorn + Vite 다
 
 ---
 
