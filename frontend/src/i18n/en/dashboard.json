@@ -35,5 +35,14 @@
   "scopeNote": "Scope: {{scope}}",
   "periodAll": "All time",
   "today": "today",
-  "scopeLatest": "latest result per TC"
+  "scopeLatest": "latest result per TC",
+  "stabilityTitle": "TC stability",
+  "stabilityBasis": "{{analyzed}} TCs run {{min}}+ times · {{unstable}} changed result · {{alwaysFail}} always failing",
+  "stabilityHelp": "Runs within the version and period filters are ordered by time, and changes between PASS and FAIL · BLOCK are counted. Independent of the run selection; retries inside one run are not included. TCs that failed every time are not listed but counted as always failing.",
+  "stabilityEmpty": "No TC changed its result.",
+  "stabilityExecuted": "Runs",
+  "stabilityFailRate": "Fail rate",
+  "stabilityFlips": "Changes",
+  "stabilityRecent": "Recent (oldest left)",
+  "stabilityLastRun": "Last run"
 }

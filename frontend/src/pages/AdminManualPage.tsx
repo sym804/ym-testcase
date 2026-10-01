@@ -420,6 +420,7 @@ npx tsc --noEmit`}</pre>
                 ["GET", "/api/projects/{id}/dashboard/rounds", t("apiRef.dashboard.rounds")],
                 ["GET", "/api/projects/{id}/dashboard/assignee", t("apiRef.dashboard.assignee")],
                 ["GET", "/api/projects/{id}/dashboard/heatmap", t("apiRef.dashboard.heatmap")],
+                ["GET", "/api/projects/{id}/dashboard/stability", t("apiRef.dashboard.stability")],
               ]},
               { title: t("apiRef.customFields.title"), endpoints: [
                 ["GET", "/api/projects/{id}/custom-fields", t("apiRef.customFields.list")],

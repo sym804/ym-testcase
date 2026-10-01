@@ -543,3 +543,94 @@ def get_heatmap(
         {"category": r.category or "", "priority": r.priority or "", "fail_count": r.fail_count}
         for r in query
     ]
+
+
+#: 안정성에서 실행으로 세는 결과. NA · NS 는 수행하지 않은 것이라 뺀다.
+_EXECUTED = (TestResultValue.PASS, TestResultValue.FAIL, TestResultValue.BLOCK)
+
+
+@router.get("/stability")
+def tc_stability(
+    project_id: int,
+    date_from: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
+    version: Optional[str] = Query(None, description="버전 묶음(앞의 v · 대소문자 무시). 없으면 전체"),
+    min_runs: int = Query(2, ge=2, le=50, description="이만큼 실행된 TC 만 본다"),
+    limit: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(check_project_access("viewer")),
+):
+    """TC 별 실행 이력으로 본 안정성.
+
+    수행(회차)마다 쌓인 결과를 시간 순으로 늘어놓고, PASS 와 그 밖(FAIL · BLOCK) 사이를 오간
+    횟수를 센다. 오간 적이 있으면 불안정 TC 다(flaky 후보, 또는 고쳐졌다 다시 깨진 것).
+    매번 실패한 TC 는 따로 센다. test.fail 로 고정한 결함 재현이 여기에 든다.
+    재시도는 한 수행 안의 일이라 여기서 보이지 않는다. 회차 사이의 변동만 본다.
+    """
+    run_filter = [TestRun.project_id == project_id]
+    if date_from:
+        run_filter.append(TestRun.created_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        run_filter.append(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+    if version:
+        run_filter.append(_version_filter(version))
+
+    rows = (
+        db.query(TestResult.test_case_id, TestResult.result, TestRun.name, TestRun.round)
+        .join(TestRun, TestResult.test_run_id == TestRun.id)
+        .join(TestCase, TestResult.test_case_id == TestCase.id)
+        .filter(*run_filter, TestCase.deleted_at.is_(None), TestResult.result.in_(_EXECUTED))
+        .order_by(TestResult.test_case_id, TestRun.created_at, TestRun.id)
+        .all()
+    )
+    history: dict[int, list] = {}
+    for tc_pk, result, run_name, run_round in rows:
+        history.setdefault(tc_pk, []).append((result, run_name, run_round))
+
+    analyzed = unstable_n = always_fail_n = 0
+    unstable = []
+    for tc_pk, seq in history.items():
+        if len(seq) < min_runs:
+            continue
+        analyzed += 1
+        passed = [r == TestResultValue.PASS for r, _, _ in seq]
+        flips = sum(1 for a, b in zip(passed, passed[1:]) if a != b)
+        fails = sum(1 for r, _, _ in seq if r == TestResultValue.FAIL)
+        if fails == len(seq):
+            always_fail_n += 1
+        if flips == 0:
+            continue
+        unstable_n += 1
+        last = seq[-1]
+        unstable.append({
+            "test_case_id": tc_pk,
+            "executed": len(seq),
+            "fail": fails,
+            "block": sum(1 for r, _, _ in seq if r == TestResultValue.BLOCK),
+            "fail_rate": round(fails / len(seq) * 100, 1),
+            "flips": flips,
+            "flip_rate": round(flips / (len(seq) - 1) * 100, 1),
+            # 최근 10회. 왼쪽이 오래된 것이다
+            "recent": [r.value for r, _, _ in seq[-10:]],
+            "last_run": f"{last[1]} R{last[2]}",
+        })
+
+    unstable.sort(key=lambda x: (-x["flip_rate"], -x["flips"], -x["executed"], x["test_case_id"]))
+    unstable = unstable[:limit]
+    tcs = {
+        tc.id: tc for tc in db.query(TestCase.id, TestCase.tc_id, TestCase.category, TestCase.sheet_name)
+        .filter(TestCase.id.in_([u["test_case_id"] for u in unstable])).all()
+    } if unstable else {}
+    for u in unstable:
+        tc = tcs.get(u["test_case_id"])
+        u["tc_id"] = tc.tc_id if tc else ""
+        u["category"] = (tc.category or "") if tc else ""
+        u["sheet_name"] = tc.sheet_name if tc else ""
+
+    return {
+        "min_runs": min_runs,
+        "analyzed": analyzed,
+        "unstable_count": unstable_n,
+        "always_fail_count": always_fail_n,
+        "unstable": unstable,
+    }

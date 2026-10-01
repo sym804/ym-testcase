@@ -25,6 +25,7 @@ vi.mock("../api", () => ({
     category: vi.fn(),
     rounds: vi.fn(),
     heatmap: vi.fn(),
+    stability: vi.fn(),
   },
   testRunsApi: {
     list: vi.fn(),
@@ -63,6 +64,7 @@ beforeEach(() => {
   vi.mocked(dashboardApi.category).mockResolvedValue(mockCategory);
   vi.mocked(dashboardApi.rounds).mockResolvedValue(mockRounds);
   vi.mocked(dashboardApi.heatmap).mockResolvedValue(mockHeatmap);
+  vi.mocked(dashboardApi.stability).mockResolvedValue({ min_runs: 2, analyzed: 0, unstable_count: 0, always_fail_count: 0, unstable: [] });
   vi.mocked(testRunsApi.list).mockResolvedValue(mockRuns);
 });
 
@@ -187,11 +189,45 @@ describe("Dashboard", () => {
       expect(dashboardApi.summary).toHaveBeenLastCalledWith(1, undefined, undefined, undefined, "1.5");
       expect(dashboardApi.heatmap).toHaveBeenLastCalledWith(1, undefined, undefined, undefined, "1.5");
       expect(dashboardApi.rounds).toHaveBeenLastCalledWith(1, undefined, undefined, undefined, "1.5");
+      expect(dashboardApi.stability).toHaveBeenLastCalledWith(1, undefined, undefined, "1.5");
     });
     expect(screen.getByTestId("scope-note")).toHaveTextContent("집계 기준: v1.5 · TC별 최신 결과");
     // 수행 선택에는 v1.5 묶음의 수행만 남는다
     const runOptions = within(screen.getByLabelText("테스트 수행 선택")).getAllByRole("option").map((o) => o.textContent);
     expect(runOptions).toEqual(["전체", "R1 수행 (R1)", "R1 수행 (R1)"]);
+  });
+
+  it("TC 안정성: 결과가 바뀐 TC 를 최근 결과와 함께 보여 준다", async () => {
+    vi.mocked(dashboardApi.stability).mockResolvedValue({
+      min_runs: 2, analyzed: 5, unstable_count: 1, always_fail_count: 2,
+      unstable: [{
+        test_case_id: 9, tc_id: "FE-AUTH-05", category: "인증", sheet_name: "S", executed: 4, fail: 2, block: 0,
+        fail_rate: 50, flips: 3, flip_rate: 100, recent: ["PASS", "FAIL", "PASS", "FAIL"], last_run: "e2e R4",
+      }],
+    });
+    render(<Dashboard projectId={1} />);
+    const box = await screen.findByTestId("stability");
+    expect(box).toHaveTextContent("2회 이상 실행된 TC 5건 · 결과가 바뀐 TC 1건 · 계속 실패 2건");
+    expect(box).toHaveTextContent("FE-AUTH-05");
+    expect(box).toHaveTextContent("e2e R4");
+    expect(within(box).getByLabelText("PASS FAIL PASS FAIL")).toBeInTheDocument();
+  });
+
+  it("TC 안정성: 분석할 TC 가 없으면 그리지 않고, 불러오지 못해도 나머지는 보인다", async () => {
+    render(<Dashboard projectId={1} />);
+    await screen.findByText("전체 TC");
+    expect(screen.queryByTestId("stability")).toBeNull();
+
+    vi.mocked(dashboardApi.stability).mockRejectedValue(new Error("down"));
+    render(<Dashboard projectId={1} />);
+    await waitFor(() => expect(screen.getAllByText("전체 TC").length).toBe(2));
+    expect(screen.queryByTestId("stability")).toBeNull();
+  });
+
+  it("TC 안정성: 바뀐 TC 가 없으면 안내 문구", async () => {
+    vi.mocked(dashboardApi.stability).mockResolvedValue({ min_runs: 2, analyzed: 3, unstable_count: 0, always_fail_count: 1, unstable: [] });
+    render(<Dashboard projectId={1} />);
+    expect(await screen.findByText("결과가 바뀐 TC 가 없습니다.")).toBeInTheDocument();
   });
 
   it("히트맵 데이터가 비어있으면 히트맵 섹션을 표시하지 않는다", async () => {

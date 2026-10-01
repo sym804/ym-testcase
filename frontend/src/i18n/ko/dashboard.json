@@ -35,5 +35,14 @@
   "scopeNote": "집계 기준: {{scope}}",
   "periodAll": "전체 기간",
   "today": "오늘",
-  "scopeLatest": "TC별 최신 결과"
+  "scopeLatest": "TC별 최신 결과",
+  "stabilityTitle": "TC 안정성",
+  "stabilityBasis": "{{min}}회 이상 실행된 TC {{analyzed}}건 · 결과가 바뀐 TC {{unstable}}건 · 계속 실패 {{alwaysFail}}건",
+  "stabilityHelp": "버전 · 기간 필터 안의 회차를 시간 순으로 늘어놓고, PASS 와 FAIL · BLOCK 사이를 오간 횟수를 셉니다. 수행 선택과 무관하며 같은 수행 안의 재시도는 포함하지 않습니다. 매번 실패한 TC 는 목록에 넣지 않고 「계속 실패」 로 셉니다.",
+  "stabilityEmpty": "결과가 바뀐 TC 가 없습니다.",
+  "stabilityExecuted": "실행",
+  "stabilityFailRate": "실패율",
+  "stabilityFlips": "결과 변경",
+  "stabilityRecent": "최근 결과 (왼쪽이 과거)",
+  "stabilityLastRun": "마지막 수행"
 }

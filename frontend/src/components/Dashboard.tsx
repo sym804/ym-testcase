@@ -9,6 +9,7 @@ import type {
   PriorityDistribution,
   CategoryBreakdown,
   RoundComparison,
+  StabilitySummary,
   TestRun,
 } from "../types";
 import toast from "react-hot-toast";
@@ -51,6 +52,7 @@ export default function Dashboard({ projectId }: Props) {
   const [category, setCategory] = useState<CategoryBreakdown[]>([]);
   const [rounds, setRounds] = useState<RoundComparison[]>([]);
   const [heatmap, setHeatmap] = useState<{ category: string; priority: string; fail_count: number }[]>([]);
+  const [stability, setStability] = useState<StabilitySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
@@ -93,6 +95,20 @@ export default function Dashboard({ projectId }: Props) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // 안정성은 보조 표라 따로 부른다. 실패해도 대시보드의 나머지는 그대로 보인다.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const st = await dashboardApi.stability(projectId, dateFrom || undefined, dateTo || undefined, selectedVersion || undefined);
+        if (alive) setStability(st);
+      } catch {
+        if (alive) setStability(null);
+      }
+    })();
+    return () => { alive = false; };
+  }, [projectId, dateFrom, dateTo, selectedVersion]);
 
   if (loading || !summary) {
     return (
@@ -490,9 +506,92 @@ export default function Dashboard({ projectId }: Props) {
         </div>
       </div>
 
+      {stability && stability.analyzed > 0 && <StabilityTable data={stability} colors={CARD_COLORS} />}
+
     </div>
   );
 }
+
+/**
+ * TC 안정성. 회차를 시간 순으로 늘어놓고 PASS 와 FAIL · BLOCK 을 오간 TC 를 위에 둔다.
+ *
+ * 매번 실패한 TC 는 불안정이 아니라 「계속 실패」 로 따로 센다(test.fail 로 고정한 결함 재현 등).
+ * 수행 선택과 무관하게 버전 · 기간 필터 안의 회차를 모두 본다. 한 수행 안의 재시도는 보이지 않는다.
+ */
+function StabilityTable({ data, colors }: { data: StabilitySummary; colors: typeof COLORS_LIGHT }) {
+  const { t } = useTranslation("dashboard");
+  const chipColor: Record<string, string> = { PASS: colors.pass, FAIL: colors.fail, BLOCK: colors.block };
+  return (
+    <div style={{ ...styles.tableCard, marginTop: 24 }} data-testid="stability">
+      <h4 style={styles.tableTitle}>{t("stabilityTitle")}</h4>
+      <div style={st.basis}>
+        {t("stabilityBasis", {
+          min: data.min_runs,
+          analyzed: data.analyzed,
+          unstable: data.unstable_count,
+          alwaysFail: data.always_fail_count,
+        })}
+      </div>
+      <div style={st.help}>{t("stabilityHelp")}</div>
+      {data.unstable.length === 0 ? (
+        <div style={st.empty}>{t("stabilityEmpty")}</div>
+      ) : (
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>TC ID</th>
+              <th style={styles.th}>Category</th>
+              <th style={styles.thNum}>{t("stabilityExecuted")}</th>
+              <th style={styles.thNum}>FAIL</th>
+              <th style={styles.thNum}>{t("stabilityFailRate")}</th>
+              <th style={styles.thNum}>{t("stabilityFlips")}</th>
+              <th style={styles.th}>{t("stabilityRecent")}</th>
+              <th style={styles.th}>{t("stabilityLastRun")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.unstable.map((row) => (
+              <tr key={row.test_case_id}>
+                <td style={styles.td}>{row.tc_id}</td>
+                <td style={styles.td}>{row.category}</td>
+                <td style={styles.tdNum}>{row.executed}</td>
+                <td style={{ ...styles.tdNum, color: colors.fail }}>{row.fail}</td>
+                <td style={styles.tdNum}>{row.fail_rate}%</td>
+                <td style={styles.tdNum}>{row.flips}</td>
+                <td style={styles.td}>
+                  <span style={st.chips} aria-label={row.recent.join(" ")}>
+                    {row.recent.map((r, i) => (
+                      <span key={i} title={r} style={{ ...st.chip, backgroundColor: chipColor[r] }}>{r[0]}</span>
+                    ))}
+                  </span>
+                </td>
+                <td style={styles.td}>{row.last_run}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+const st: Record<string, React.CSSProperties> = {
+  basis: { fontSize: 13, color: "var(--text-primary)", marginBottom: 4 },
+  help: { fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 },
+  empty: { fontSize: 13, color: "var(--text-secondary)", padding: "8px 0" },
+  chips: { display: "inline-flex", gap: 2 },
+  chip: {
+    display: "inline-block",
+    width: 16,
+    height: 16,
+    lineHeight: "16px",
+    borderRadius: 3,
+    fontSize: 10,
+    fontWeight: 700,
+    textAlign: "center",
+    color: "#fff",
+  },
+};
 
 type HeatCell = { category: string; priority: string; fail_count: number };
 

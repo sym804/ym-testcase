@@ -176,6 +176,31 @@ export interface TestResult {
   test_case?: TestCase;
 }
 
+/** 대시보드 TC 안정성. 회차 사이에서 PASS 와 FAIL · BLOCK 을 오간 TC */
+export interface StabilityItem {
+  test_case_id: number;
+  tc_id: string;
+  category: string;
+  sheet_name: string;
+  executed: number;
+  fail: number;
+  block: number;
+  fail_rate: number;
+  flips: number;
+  flip_rate: number;
+  /** 최근 10회, 왼쪽이 오래된 것 */
+  recent: ("PASS" | "FAIL" | "BLOCK")[];
+  last_run: string;
+}
+
+export interface StabilitySummary {
+  min_runs: number;
+  analyzed: number;
+  unstable_count: number;
+  always_fail_count: number;
+  unstable: StabilityItem[];
+}
+
 /** 본인 API 키 목록 항목. 원문은 없고, prefix 로 어느 키인지 알아본다. */
 export interface ApiKeyItem {
   id: number;

@@ -231,7 +231,7 @@
     "apiAuthSetting": "Per-endpoint role check"
   },
   "apiRef": {
-    "title": "10. API Endpoints (83)",
+    "title": "10. API Endpoints (84)",
     "swaggerInfo": "API documentation (Swagger UI) is available at",
     "swaggerInfoSuffix": ".",
     "descTh": "Description",
@@ -302,7 +302,8 @@
       "category": "Category distribution",
       "rounds": "Round comparison",
       "assignee": "Assignee status",
-      "heatmap": "Failure heatmap"
+      "heatmap": "Failure heatmap",
+      "stability": "TC stability: result changes across rounds and always failing TCs (?version · date_from · date_to · min_runs · limit)"
     },
     "customFields": {
       "title": "Custom Fields",

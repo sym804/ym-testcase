@@ -219,7 +219,7 @@ npx tsc -b
 
 ---
 
-## 10. API 엔드포인트 (56개)
+## 10. API 엔드포인트 (57개)
 
 API 문서(Swagger UI): `http://localhost:8008/docs`
 
@@ -288,6 +288,7 @@ API 문서(Swagger UI): `http://localhost:8008/docs`
 | GET | /api/projects/{id}/dashboard/rounds | 라운드별 비교 |
 | GET | /api/projects/{id}/dashboard/assignee | 담당자별 현황 |
 | GET | /api/projects/{id}/dashboard/heatmap | 실패 히트맵 |
+| GET | /api/projects/{id}/dashboard/stability | TC 안정성. 회차 간 결과 변경 · 계속 실패 (?version · date_from · date_to · min_runs · limit) |
 
 ### 리포트
 
