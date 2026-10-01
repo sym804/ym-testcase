@@ -24,6 +24,7 @@ import type {
   RunIssue,
   RunIssueCarryOverResult,
   RunIssueInput,
+  ResultImportSummary,
 } from "../types";
 
 // ─── Auth ────────────────────────────────────────────
@@ -286,6 +287,28 @@ export const testRunsApi = {
     const res = await client.post<TestResult[]>(
       `/api/projects/${projectId}/testruns/${runId}/results`,
       results
+    );
+    return res.data;
+  },
+
+  // 자동화 결과 파일(Playwright JSON · JUnit XML)을 회차 결과로. dryRun 이면 계산만 한다.
+  importResults: async (
+    projectId: number,
+    runId: number,
+    file: File,
+    opts: { dryRun: boolean; keepExecuted: boolean; label?: string }
+  ) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const params: Record<string, string> = {
+      dry_run: String(opts.dryRun),
+      keep_executed: String(opts.keepExecuted),
+    };
+    if (opts.label?.trim()) params.label = opts.label.trim();
+    const res = await client.post<ResultImportSummary>(
+      `/api/projects/${projectId}/testruns/${runId}/results/import`,
+      formData,
+      { params, headers: { "Content-Type": "multipart/form-data" } }
     );
     return res.data;
   },

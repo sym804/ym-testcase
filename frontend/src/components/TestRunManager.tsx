@@ -25,6 +25,7 @@ import IssueLinkCell from "./IssueLinkCell";
 import { priorityCellStyle, priorityDisplayMap } from "../utils/priority";
 import RunTreePanel from "./RunTreePanel";
 import PreconditionCell from "./PreconditionCell";
+import ResultImportModal from "./ResultImportModal";
 import { useTestTimer } from "../hooks/useTestTimer";
 import { useAttachments } from "../hooks/useAttachments";
 import { useResultFilters } from "../hooks/useResultFilters";
@@ -67,6 +68,7 @@ export default function TestRunManager({ projectId, project }: Props) {
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState({ name: "", version: "", environment: "", round: 1 });
   const [creating, setCreating] = useState(false);
   // 새 런에 담을 시트. 모달을 열 때 전체 선택으로 시작하고 체크를 풀어 줄인다.
@@ -1179,6 +1181,11 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                 }}>
                   Excel
                 </button>
+                {canManageRun && selectedRun.status !== TestRunStatus.COMPLETED && (
+                  <button style={styles.btnGhost} onClick={() => setShowImport(true)} data-testid="import-results">
+                    {t("importResults")}
+                  </button>
+                )}
                 {canManageRun && (selectedRun.status !== TestRunStatus.COMPLETED ? (
                   <button style={styles.btnComplete} onClick={handleComplete}>
                     {t("completeRun")}
@@ -1618,6 +1625,15 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
             </form>
           </div>
         </div>
+      )}
+
+      {showImport && selectedRun && (
+        <ResultImportModal
+          projectId={projectId}
+          run={selectedRun}
+          onClose={() => setShowImport(false)}
+          onApplied={() => { loadRuns(); loadRunDetail(selectedRun); }}
+        />
       )}
 
     </div>

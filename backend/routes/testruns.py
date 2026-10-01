@@ -2,9 +2,9 @@ import io
 import os
 from datetime import datetime
 from models import now_kst
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, subqueryload, load_only
@@ -24,6 +24,17 @@ from routes.attachments import UPLOAD_DIR
 from services.run_sync_service import sync_run_results
 from services.excel_safe import safe_cell
 from services.sheet_order import leaf_sheet_order, sort_results_for_export
+from services.upload_guard import read_limited_sync
+from services.result_import import (
+    ImportFormatError, parse_report, aggregate,
+    KIND_FIXED, KIND_FAIL, KIND_KNOWN_FAIL,
+)
+
+#: 자동화 결과 파일 상한. 전량 스위트(230여 건) JSON 이 수 MB 라 여유를 둔다.
+MAX_RESULT_IMPORT_SIZE = 20 * 1024 * 1024
+FORMAT_LABEL = {"playwright-json": "Playwright JSON", "junit-xml": "JUnit XML"}
+#: 응답에 싣는 미매칭 제목 상한. 나머지는 건수만 준다.
+MAX_UNMATCHED_LISTED = 200
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/testruns",
@@ -437,6 +448,104 @@ def submit_results(
     for item in saved:
         db.refresh(item)
     return saved
+
+
+@router.post("/{run_id}/results/import")
+def import_results(
+    project_id: int,
+    run_id: int,
+    file: UploadFile = File(...),
+    dry_run: bool = Query(False, description="true 면 계산만 하고 저장하지 않는다"),
+    keep_executed: bool = Query(True, description="이미 기록된 결과를 미실행(NS)으로 덮어쓰지 않는다"),
+    label: Optional[str] = Query(None, max_length=100, description="비고 앞머리. 비우면 형식 이름"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(check_project_access("tester")),
+):
+    """자동화 결과 파일(Playwright JSON · JUnit XML)을 이 수행의 결과로 기록한다.
+
+    테스트 제목 맨 앞의 TC ID 로 행을 찾는다. 판정 규칙은 services/result_import.py.
+    이슈 링크는 건드리지 않는다. 사람이 단 링크가 자동 기록으로 지워지면 안 된다.
+    """
+    _get_project_or_404(project_id, db)
+    run = db.query(TestRun).filter(
+        TestRun.id == run_id, TestRun.project_id == project_id
+    ).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Test run not found")
+    if run.status == TestRunStatus.completed:
+        raise HTTPException(status_code=400, detail="완료된 테스트 런은 수정할 수 없습니다. 재오픈 후 수정하세요.")
+
+    content = read_limited_sync(file.file, MAX_RESULT_IMPORT_SIZE)
+    try:
+        fmt, entries = parse_report(content, file.filename)
+    except ImportFormatError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not entries:
+        raise HTTPException(status_code=400, detail="파일에 테스트 결과가 없습니다.")
+
+    # 런 생성 뒤에 추가된 TC 도 행이 있어야 기록된다. 상세 조회와 같은 보정을 먼저 한다.
+    sync_run_results(run, db)
+
+    # 프로젝트의 TC 전체와 대조한다. 이 수행 범위 밖의 TC 는 매칭은 되지만 기록하지 않고 알려 준다.
+    project_tcs = dict(
+        db.query(TestCase.tc_id, TestCase.id).filter(
+            TestCase.project_id == project_id,
+            TestCase.deleted_at.is_(None),
+            TestCase.tc_id.isnot(None),
+        ).all()
+    )
+    outcomes, unmatched = aggregate(entries, set(project_tcs))
+
+    rows = {
+        r.test_case_id: r for r in db.query(TestResult).filter(TestResult.test_run_id == run_id).all()
+    }
+    prefix = (label or "").strip() or f"자동 기록 ({FORMAT_LABEL[fmt]})"
+
+    items, out_of_run, kept = [], [], []
+    counts = {"PASS": 0, "FAIL": 0, "NS": 0}
+    now = now_kst()
+    for tc_id in sorted(outcomes):
+        o = outcomes[tc_id]
+        row = rows.get(project_tcs[tc_id])
+        if row is None:
+            out_of_run.append(tc_id)
+            continue
+        if keep_executed and o.result == "NS" and row.result != TestResultValue.NS:
+            kept.append(tc_id)
+            continue
+        counts[o.result] += 1
+        items.append({"tc_id": tc_id, "result": o.result, "kind": o.kind, "note": o.note})
+        if dry_run:
+            continue
+        row.result = TestResultValue(o.result)
+        row.actual_result = (o.actual or None) and o.actual[:1000]
+        row.remarks = f"{prefix}. {o.note}" if o.note else prefix
+        row.executed_by = current_user.id
+        row.executed_at = now
+        if o.duration_sec is not None:
+            row.duration_sec = o.duration_sec
+
+    if not dry_run:
+        db.commit()
+
+    return {
+        "format": fmt,
+        "dry_run": dry_run,
+        "run_id": run_id,
+        "total_tests": len(entries),
+        "matched_tests": len(entries) - len(unmatched),
+        "matched_tcs": len(outcomes),
+        "recorded": len(items),
+        "counts": counts,
+        "items": items,
+        "kept_executed": kept,
+        "out_of_run": out_of_run,
+        "fixed_candidates": [i["tc_id"] for i in items if i["kind"] == KIND_FIXED],
+        "unexpected_failures": [i["tc_id"] for i in items if i["kind"] == KIND_FAIL],
+        "known_failures": sum(1 for i in items if i["kind"] == KIND_KNOWN_FAIL),
+        "unmatched_count": len(unmatched),
+        "unmatched": unmatched[:MAX_UNMATCHED_LISTED],
+    }
 
 
 @router.put("/{run_id}/complete", response_model=TestRunListResponse)

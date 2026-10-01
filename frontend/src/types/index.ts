@@ -176,6 +176,29 @@ export interface TestResult {
   test_case?: TestCase;
 }
 
+/** 자동화 결과 파일 가져오기 응답. dry_run 이면 저장하지 않은 계산 결과다. */
+export interface ResultImportSummary {
+  format: "playwright-json" | "junit-xml";
+  dry_run: boolean;
+  run_id: number;
+  total_tests: number;
+  matched_tests: number;
+  matched_tcs: number;
+  recorded: number;
+  counts: { PASS: number; FAIL: number; NS: number };
+  items: { tc_id: string; result: "PASS" | "FAIL" | "NS"; kind: string; note: string }[];
+  /** 이미 기록된 결과라 NS 로 덮지 않은 TC */
+  kept_executed: string[];
+  /** 프로젝트에는 있으나 이 수행의 범위 밖이라 기록하지 않은 TC */
+  out_of_run: string[];
+  /** test.fail 표식인데 통과한 TC. 결함 해소 후보 */
+  fixed_candidates: string[];
+  unexpected_failures: string[];
+  known_failures: number;
+  unmatched_count: number;
+  unmatched: string[];
+}
+
 export interface Attachment {
   id: number;
   test_result_id: number;

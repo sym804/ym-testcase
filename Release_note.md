@@ -12,11 +12,38 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v1.7.3.0  (2026-10-01)
-├── Frontend       v1.7.3.0
-├── Backend        v1.7.2.0
+YM TestCase System  v1.8.0.0  (2026-10-01)
+├── Frontend       v1.8.0.0
+├── Backend        v1.8.0.0
 └── Database       v0.10.0.0
 ```
+
+---
+
+## v1.8.0.0 (2026-10-01) - [feat] 자동화 결과 파일 가져오기
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.7.3.0 | **1.8.0.0** | feature +1 |
+| Frontend | 1.7.3.0 | **1.8.0.0** | feature +1 |
+| Backend | 1.7.2.0 | **1.8.0.0** | feature +1 |
+
+### 변경
+
+- `POST /testruns/{run}/results/import`. Playwright JSON 리포트와 JUnit XML 을 내용으로 가려 받아 수행 결과로 기록한다. `dry_run` 이면 계산만 한다
+- 테스트 제목 맨 앞의 TC ID 가 프로젝트 TC 와 정확히 같을 때만 매칭한다. 수행 범위 밖 TC 는 기록하지 않고 알려 준다
+- 판정: test.fail 재현 · 예상 밖 실패 · test.fail 인데 통과(해소 후보)는 FAIL, 재시도 통과는 PASS, test.skip 과 연쇄 미실행은 NS. 여러 테스트가 한 TC 를 덮으면 FAIL > NS > PASS
+- 기본값으로 이미 기록된 결과를 NS 로 덮지 않는다. 이슈 링크는 건드리지 않는다
+- 수행 화면 「결과 가져오기」. 미리보기를 본 뒤에만 적용하고, 파일이나 옵션을 바꾸면 미리보기를 지운다
+- XML 은 DOCTYPE · 엔티티 선언을 만나면 거절한다
+
+### 영향
+
+- 기록 스크립트(record_run_from_e2e.py)와 같은 판정이다. 실제 리포트 4개로 대조해 TC Manager 에 있는 TC 의 판정이 모두 같았다
+- JUnit 은 Playwright junit 리포터에 `embedAnnotationsAsProperties: true` 가 있어야 test.fail 재현이 FAIL 로 갈린다
+- 기획안 4-2 의 describe ID 사용과 접미어 떼기는 넣지 않았다. ID 를 뗀 test.fail 감시 테스트와 지운 접미어 TC 의 테스트가 TC 결과를 뒤집었다
 
 ---
 
