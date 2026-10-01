@@ -31,6 +31,7 @@ from routes import run_issues as run_issue_routes
 from routes import filters as filter_routes
 from routes import tc_result_history as tc_result_history_routes
 from routes import account_requests as account_request_routes
+from routes import api_keys as api_key_routes
 # Import models so Base.metadata knows about all tables
 import models  # noqa: F401
 
@@ -70,7 +71,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YM TestCase API",
     description="Your Method, Your Test Case Manager",
-    version="1.8.0.0",
+    version="1.9.0.0",
     lifespan=lifespan,
 )
 
@@ -157,6 +158,7 @@ app.include_router(run_issue_routes.router)
 app.include_router(filter_routes.router)
 app.include_router(tc_result_history_routes.router)
 app.include_router(account_request_routes.router)
+app.include_router(api_key_routes.router)
 
 
 

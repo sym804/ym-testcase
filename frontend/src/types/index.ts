@@ -176,6 +176,18 @@ export interface TestResult {
   test_case?: TestCase;
 }
 
+/** 본인 API 키 목록 항목. 원문은 없고, prefix 로 어느 키인지 알아본다. */
+export interface ApiKeyItem {
+  id: number;
+  name: string;
+  prefix: string;
+  created_at: string | null;
+  last_used_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+  status: "active" | "expired" | "revoked";
+}
+
 /** 자동화 결과 파일 가져오기 응답. dry_run 이면 저장하지 않은 계산 결과다. */
 export interface ResultImportSummary {
   format: "playwright-json" | "junit-xml";

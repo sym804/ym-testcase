@@ -24,6 +24,8 @@ REQUIRED_COLUMNS = {
     "projects": ["is_private", "field_config", "issue_tracker"],
     #: 리포트가 읽는다. 없는 채로 head 로 표시되면 리포트가 통째로 죽는다.
     "run_issues": ["issue_key"],
+    #: API 키 인증이 요청마다 읽는다. 없는 채로 head 로 표시되면 키 인증이 통째로 죽는다.
+    "api_keys": ["key_hash", "revoked_at"],
 }
 
 

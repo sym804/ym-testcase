@@ -5,6 +5,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { useEffect, useRef, useState } from "react";
 import { projectsApi, searchApi, authApi } from "../api";
 import PasswordInput from "./PasswordInput";
+import ApiKeysModal from "./ApiKeysModal";
 import type { Project, TestCase } from "../types";
 import { UserRole } from "../types";
 import toast from "react-hot-toast";
@@ -49,6 +50,7 @@ export default function Header() {
   // User menu dropdown
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showChangePw, setShowChangePw] = useState(false);
+  const [showApiKeys, setShowApiKeys] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = (q: string) => {
@@ -246,6 +248,12 @@ export default function Header() {
                 {t("changePassword")}
               </button>
               <button
+                style={styles.userMenuItem}
+                onClick={() => { setShowUserMenu(false); setShowApiKeys(true); }}
+              >
+                {t("apiKeys")}
+              </button>
+              <button
                 style={{ ...styles.userMenuItem, color: "var(--color-fail)" }}
                 onClick={() => { setShowUserMenu(false); logout(); }}
               >
@@ -257,6 +265,7 @@ export default function Header() {
         {showChangePw && (
           <ChangePasswordInline onClose={() => setShowChangePw(false)} />
         )}
+        {showApiKeys && <ApiKeysModal onClose={() => setShowApiKeys(false)} />}
       </div>
     </header>
   );

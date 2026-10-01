@@ -21,7 +21,7 @@ from schemas import (
     AccountRequestCreate, AccountRequestListItem, AccountRequestReject,
     ResetPasswordWithCode,
 )
-from auth import hash_password, verify_password, role_required
+from auth import hash_password, verify_password, role_required, get_session_user, revoke_user_api_keys
 from routes.auth import _check_rate_limit, _clear_failures, _record_failure
 
 logger = logging.getLogger(__name__)
@@ -159,9 +159,12 @@ def list_account_requests(
 def approve_account_request(
     request_id: int,
     payload: AccountRequestApprove,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(role_required("admin")),
 ):
+    # ★재설정 코드를 응답으로 돌려준다. 유출된 관리자 키로 남의 계정을 가져갈 수 없게 세션으로만 받는다.
+    get_session_user(request, current_user)
     req = db.query(AccountRequest).filter(AccountRequest.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="요청을 찾을 수 없습니다.")
@@ -278,6 +281,7 @@ def reset_password_with_code(
     user.must_change_password = False
     # 복구는 계정을 되찾는 국면이다. 옛 토큰이 살아 있으면 되찾은 것이 아니다
     user.token_version = (user.token_version or 0) + 1
+    revoke_user_api_keys(user.id, db)
     # 살아 있는 approved 요청을 전부 닫는다. 중복 억제가 pending 만 보기 때문에 한
     # 사용자가 approved 를 여러 건 들고 있을 수 있고, 쓴 한 건만 닫으면 나머지 코드가
     # 최대 24시간 동안 그대로 유효하다. 이미 메신저로 흘러간 코드가 남는다.
