@@ -517,8 +517,7 @@ cp backup/tc_manager_20260316.db backend/tc_manager.db
 # Attachments recovery
 cp -r backup/uploads_20260316/* backend/uploads/
 
-# Restart server
-docker-compose restart backend`}</pre>
+# Restart server (stop the running uvicorn and start it again)`}</pre>
             </div>
 
             <div style={s.tipBox} dangerouslySetInnerHTML={{ __html: t("backup.tip1") }} />

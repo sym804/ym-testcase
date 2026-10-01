@@ -15,7 +15,6 @@
 | **Frontend** | React 18, TypeScript, Vite, AG Grid, Chart.js | 포트 5173 (개발) / 80 (프로덕션) |
 | **Database** | SQLite (기본) / PostgreSQL (프로덕션 권장) | `tc_manager.db` |
 | **인증** | JWT (HS256), bcrypt 해싱 | 토큰 만료 2시간 |
-| **배포** | Docker / Docker Compose 지원 | `docker-compose.yml` |
 
 ---
 
@@ -35,19 +34,7 @@ npm install
 npm run dev
 ```
 
-### 2-2. Docker Compose 실행
-
-```bash
-docker-compose up -d
-
-# 상태 확인
-docker-compose ps
-
-# 로그 확인
-docker-compose logs -f backend
-```
-
-### 2-3. 프로덕션 빌드
+### 2-2. 프로덕션 빌드
 
 ```bash
 # Frontend 프로덕션 빌드
@@ -55,7 +42,7 @@ cd frontend
 npm run build
 
 # TypeScript 타입 체크
-npx tsc --noEmit
+npx tsc -b
 ```
 
 ---
@@ -379,8 +366,7 @@ cp backup/tc_manager_20260316.db backend/tc_manager.db
 # 첨부파일 복구
 cp -r backup/uploads_20260316/* backend/uploads/
 
-# 서버 재시작
-docker-compose restart backend
+# 서버 재시작 (실행 중인 uvicorn 을 끄고 다시 띄운다)
 ```
 
 💡 **권장**: 정기적인 백업 스케줄 설정 (일 1회). SQLite 파일과 uploads 디렉토리를 함께 백업해야 합니다.
