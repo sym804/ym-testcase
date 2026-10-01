@@ -90,6 +90,8 @@
     "testPlansRel": "project 소속, test_runs 연결 (1:N)",
     "savedFiltersDesc": "저장된 필터",
     "savedFiltersRel": "project 소속, conditions JSON",
+    "apiKeysDesc": "API 키 (해시만 저장)",
+    "apiKeysRel": "user 소속, 비밀번호가 바뀌면 전부 폐기",
     "softDeleteTitle": "4-2. 소프트 삭제 정책",
     "softDeleteInfo": "테스트 케이스는 삭제 시 <strong>소프트 삭제</strong>됩니다 (deleted_at 필드 설정). <strong>7일 후</strong> 자동 영구 삭제됩니다. 삭제된 TC는 복원 API(<code>POST /api/projects/{id}/testcases/{tc_id}/restore</code>)로 복원 가능합니다."
   },
@@ -111,6 +113,7 @@
     "resetOl3": "해당 임시 비밀번호를 사용자에게 전달합니다.",
     "resetOl4": "사용자는 다음 로그인 시 <strong>비밀번호 강제 변경</strong> 화면이 표시됩니다.",
     "resetPwWarn": "<strong>주의:</strong> 임시 비밀번호는 화면에 1회만 표시됩니다. 반드시 메모하여 전달하세요.",
+    "resetApiKeyInfo": "<strong>참고:</strong> 비밀번호를 초기화하면 그 사용자의 API 키도 모두 폐기됩니다. 초기화와 계정 복구 승인은 로그인한 관리자 화면에서만 할 수 있고, API 키로는 할 수 없습니다.",
     "initialAccountTitle": "5-4. 초기 계정",
     "initialAccountInfo": "시스템 최초 가입 사용자가 자동으로 <strong>Admin</strong> 역할을 부여받습니다. 이후 가입자는 모두 <strong>User</strong>로 시작합니다. 관리자가 필요에 따라 역할을 변경해주어야 합니다.",
     "accountRequestTitle": "5-5. 계정 복구 요청 승인",
@@ -205,6 +208,9 @@
     "authToken": "인증 토큰",
     "authTokenImpl": "JWT (HS256) + httpOnly 쿠키",
     "authTokenSetting": "TOKEN_EXPIRE_HOURS (기본 2시간)",
+    "apiKey": "API 키",
+    "apiKeyImpl": "사용자별 발급 · 폐기, SHA-256 해시 저장, Bearer 헤더 인증",
+    "apiKeySetting": "만료 30 · 90 · 180 · 365일 또는 없음, 1인 20개, 비밀번호가 바뀌면 전부 폐기",
     "csrf": "CSRF 방어",
     "csrfImpl": "csrf_token 쿠키 + X-CSRF-Token 헤더 검증",
     "csrfSetting": "상태 변경 요청 시 자동 적용",
@@ -225,7 +231,7 @@
     "apiAuthSetting": "엔드포인트별 역할 체크"
   },
   "apiRef": {
-    "title": "10. API 엔드포인트 (73개)",
+    "title": "10. API 엔드포인트 (82개)",
     "swaggerInfo": "API 문서(Swagger UI)는",
     "swaggerInfoSuffix": "에서 확인할 수 있습니다.",
     "descTh": "설명",
@@ -243,7 +249,10 @@
       "listAccountRequests": "계정 복구 요청 목록",
       "approveAccountRequest": "계정 복구 요청 승인",
       "rejectAccountRequest": "계정 복구 요청 반려",
-      "resetPasswordWithCode": "코드로 비밀번호 재설정"
+      "resetPasswordWithCode": "코드로 비밀번호 재설정",
+      "listApiKeys": "본인 API 키 목록 (로그인 세션만)",
+      "createApiKey": "API 키 발급. 원문은 응답에서 1회만 (로그인 세션만)",
+      "revokeApiKey": "API 키 폐기 (로그인 세션만)"
     },
     "projects": {
       "title": "프로젝트",
@@ -278,6 +287,7 @@
       "detail": "런 상세 (결과 포함)",
       "update": "런 수정",
       "saveResults": "결과 저장 (벌크)",
+      "importResults": "자동화 결과 파일 가져오기 (Playwright JSON · JUnit XML, ?dry_run · keep_executed · label)",
       "complete": "런 완료",
       "reopen": "런 다시 수행 (완료→진행중)",
       "clone": "런 복제. ?next_round=true 면 같은 이름의 다음 회차(회차 최댓값 + 1, 플랜 승계)",
