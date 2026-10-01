@@ -231,7 +231,7 @@
     "apiAuthSetting": "엔드포인트별 역할 체크"
   },
   "apiRef": {
-    "title": "10. API 엔드포인트 (83개)",
+    "title": "10. API 엔드포인트 (84개)",
     "swaggerInfo": "API 문서(Swagger UI)는",
     "swaggerInfoSuffix": "에서 확인할 수 있습니다.",
     "descTh": "설명",
@@ -302,7 +302,8 @@
       "category": "카테고리별 분포",
       "rounds": "라운드별 비교",
       "assignee": "담당자별 현황",
-      "heatmap": "실패 히트맵"
+      "heatmap": "실패 히트맵",
+      "stability": "TC 안정성. 회차 간 결과 변경 · 계속 실패 (?version · date_from · date_to · min_runs · limit)"
     },
     "customFields": {
       "title": "커스텀 필드",

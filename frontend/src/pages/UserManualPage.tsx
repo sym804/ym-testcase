@@ -700,6 +700,7 @@ export default function UserManualPage() {
                 <tr><td style={s.td}>{t("dashboard.chart_category")}</td><td style={s.td}>{t("dashboard.chart_category_desc")}</td></tr>
                 <tr><td style={s.td}>{t("dashboard.chart_assignee")}</td><td style={s.td}>{t("dashboard.chart_assignee_desc")}</td></tr>
                 <tr><td style={s.td}>{t("dashboard.chart_heatmap")}</td><td style={s.td}>{t("dashboard.chart_heatmap_desc")}</td></tr>
+                <tr><td style={s.td}>{t("dashboard.chart_stability")}</td><td style={s.td}>{t("dashboard.chart_stability_desc")}</td></tr>
               </tbody>
             </table>
 

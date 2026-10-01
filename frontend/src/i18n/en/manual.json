@@ -489,11 +489,13 @@
     "chart_assignee_desc": "Assigned/completed/pass rate table per assignee",
     "chart_heatmap": "Failure Heatmap",
     "chart_heatmap_desc": "Shows failure counts in a Category x Priority matrix using color intensity",
+    "chart_stability": "TC stability",
+    "chart_stability_desc": "For TCs run at least twice, results are ordered by round and the changes between PASS and FAIL · BLOCK are counted. TCs whose result changed are listed with runs, FAIL, fail rate, recent results, and last run; TCs that failed every time are only counted as always failing. Follows the version and period filters regardless of the run selection; retries inside one run are not included.",
     "h3_dateFilter": "11-3. Date Filter",
     "df_p1": "Specify a date range at the top of the dashboard to analyze test results for a specific period.",
     "df_li1": "<strong>Preset buttons:</strong> Click \"All\", \"7 days\", \"30 days\", \"90 days\" buttons to instantly filter data for that period.",
     "df_li2": "<strong>Custom range:</strong> Manually enter start and end dates to specify your desired period.",
-    "df_li3": "The date filter applies to all charts and statistics (summary, priority, category, round, assignee, heatmap).",
+    "df_li3": "The date filter applies to all charts and statistics (summary, priority, category, round, assignee, heatmap, TC stability).",
     "df_li4": "Can be used together with the run selection dropdown."
   },
   "report": {

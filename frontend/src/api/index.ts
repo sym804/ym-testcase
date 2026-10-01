@@ -26,6 +26,7 @@ import type {
   RunIssueInput,
   ResultImportSummary,
   ApiKeyItem,
+  StabilitySummary,
 } from "../types";
 
 // ─── Auth ────────────────────────────────────────────
@@ -431,6 +432,19 @@ export const dashboardApi = {
     if (version) params.version = version;
     const res = await client.get<{ category: string; priority: string; fail_count: number }[]>(
       `/api/projects/${projectId}/dashboard/heatmap`,
+      { params: Object.keys(params).length ? params : undefined }
+    );
+    return res.data;
+  },
+
+  // 수행 선택과 무관하다. 버전 · 기간 안의 회차를 모두 본다.
+  stability: async (projectId: number, dateFrom?: string, dateTo?: string, version?: string) => {
+    const params: Record<string, string | number> = {};
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    if (version) params.version = version;
+    const res = await client.get<StabilitySummary>(
+      `/api/projects/${projectId}/dashboard/stability`,
       { params: Object.keys(params).length ? params : undefined }
     );
     return res.data;
