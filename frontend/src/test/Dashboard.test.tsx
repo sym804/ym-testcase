@@ -182,7 +182,7 @@ describe("Dashboard", () => {
     const versionSelect = await screen.findByTestId("version-select");
     // "v1.5" 와 "1.5" 는 한 묶음이라 버전은 둘뿐이다(전체 제외)
     expect(within(versionSelect).getAllByRole("option").map((o) => o.textContent)).toEqual(["전체 버전", "v1.5", "1.4"]);
-    expect(screen.getByTestId("scope-note")).toHaveTextContent("집계 기준: 전체 버전 · TC별 최신 결과 · 전체 기간");
+    expect(screen.getByTestId("scope-note")).toHaveTextContent("집계 기준: 전체 버전 · TC별 마지막 판정 · 전체 기간");
 
     await user.selectOptions(versionSelect, "1.5");
     await waitFor(() => {
@@ -191,7 +191,7 @@ describe("Dashboard", () => {
       expect(dashboardApi.rounds).toHaveBeenLastCalledWith(1, undefined, undefined, undefined, "1.5");
       expect(dashboardApi.stability).toHaveBeenLastCalledWith(1, undefined, undefined, "1.5");
     });
-    expect(screen.getByTestId("scope-note")).toHaveTextContent("집계 기준: v1.5 · TC별 최신 결과");
+    expect(screen.getByTestId("scope-note")).toHaveTextContent("집계 기준: v1.5 · TC별 마지막 판정");
     // 수행 선택에는 v1.5 묶음의 수행만 남는다
     const runOptions = within(screen.getByLabelText("테스트 수행 선택")).getAllByRole("option").map((o) => o.textContent);
     expect(runOptions).toEqual(["전체", "R1 수행 (R1)", "R1 수행 (R1)"]);
@@ -287,6 +287,6 @@ describe("Dashboard", () => {
     const rows = [...heat.querySelectorAll("tbody tr")].map((tr) => tr.querySelector("td")?.textContent);
     expect(rows).toEqual(["결제", "(미분류)", "로그인"]);
     expect(screen.getByTestId("heatmap-row-결제")).toHaveTextContent("5");
-    expect(heat).toHaveTextContent("FAIL 7건 · TC별 최신 결과 기준");
+    expect(heat).toHaveTextContent("FAIL 7건 · TC별 마지막 판정 기준");
   });
 });

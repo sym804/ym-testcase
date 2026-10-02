@@ -472,7 +472,7 @@
     "sum_li3": "<strong>FAIL</strong>: Fail count and ratio",
     "sum_li4": "<strong>BLOCK</strong>: Block count and ratio",
     "sum_li5": "<strong>N/A</strong>: Not applicable count and ratio",
-    "sum_li6": "<strong>Not Executed</strong>: Not executed count and ratio",
+    "sum_li6": "<strong>Not Started</strong>: Not started count and ratio. With no run selected, each TC counts by its result in the latest run that judged it (PASS/FAIL/BLOCK/N/A), and only TCs never judged within the selected version and period are Not Started. Adding a TC to a new run as Not Started keeps its earlier result. Latest follows the order runs were created, not when results were entered",
     "h3_charts": "11-2. Charts",
     "imgAlt_charts": "Dashboard charts",
     "chart_th1": "Chart",

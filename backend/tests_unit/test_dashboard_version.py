@@ -1,7 +1,7 @@
 """대시보드 버전 묶음 필터
 
 - version 을 주면 그 버전 묶음의 수행만 본다. "v1.5" 와 "1.5" 는 한 묶음이다.
-- 전체 모드는 예전처럼 모든 수행의 TC 별 최신 결과다.
+- 전체 모드는 모든 수행에서 TC 별 마지막 판정 결과다(NS 는 판정이 아니라 건너뛴다).
 
 실행: cd backend && python -m pytest tests_unit/test_dashboard_version.py -q
 """
@@ -85,9 +85,10 @@ def test_버전_키는_앞의_v_와_대소문자를_무시한다():
 def test_버전을_주면_그_묶음의_수행만_본다(env):
     _run(env, "옛 테스트", "v1.4", 0, (R.PASS, R.PASS, R.PASS))
     _run(env, "새 테스트", "1.5", 1, (R.FAIL, R.NS, R.NS))
-    # 전체: TC 별 최신 수행이 v1.5 라 그 결과(FAIL 1 · NS 2)다. v1.4 의 PASS 는 묻힌다
+    # 전체: TC 별 마지막 판정이다. T-1 은 v1.5 의 FAIL, T-2 · T-3 은 v1.5 에서 NS 라
+    #   v1.4 의 PASS 가 남는다(SYM-131 전에는 NS 가 그 PASS 를 덮어 (0, 1, 2) 였다)
     all_ = _summary(env)
-    assert (all_["pass"], all_["fail"], all_["not_started"]) == (0, 1, 2)
+    assert (all_["pass"], all_["fail"], all_["not_started"]) == (2, 1, 0)
     # v1.5 묶음("1.5" 표기): 그 수행만. 수행하지 않은 TC 는 미수행
     v15 = _summary(env, version="v1.5")
     assert (v15["pass"], v15["fail"], v15["not_started"]) == (0, 1, 2)
