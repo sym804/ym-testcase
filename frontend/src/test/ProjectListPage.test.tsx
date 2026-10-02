@@ -202,6 +202,31 @@ describe("ProjectListPage - Overview Stats Display", () => {
     });
   });
 
+  // SYM-133: 판정이 없는 새 회차는 0% 가 아니라 값 없음이다
+  it("Pass Rate 가 없으면 0% 나 null% 대신 '-' 를 표시한다", async () => {
+    vi.mocked(overviewApi.get).mockResolvedValue({
+      summary: { ...mockOverview.summary, pass_rate: null },
+      projects: [mockOverview.projects[0], { ...mockOverview.projects[1], pass_rate: null }],
+    });
+    renderPage();
+    await screen.findByText("72%");
+    // 프로젝트 이름은 카드와 표 두 곳에 나온다. 표의 행을 고른다
+    const rowB = screen.getAllByText("Project B").map((el) => el.closest("tr")).find(Boolean) as HTMLTableRowElement;
+    const cellB = rowB.cells[rowB.cells.length - 1];
+    expect(cellB).toHaveTextContent(/^-$/);
+    // 값이 없는 칸을 합격 색으로 칠하지 않는다
+    expect(cellB.style.color).toBe("var(--text-secondary)");
+    const summaryLabel = screen.getAllByText("Pass Rate").find((el) => !el.closest("table")) as HTMLElement;
+    expect(summaryLabel.nextElementSibling).toHaveTextContent(/^-$/);
+  });
+
+  it("프로젝트가 없으면 요약 Pass Rate 도 '-' 다", async () => {
+    vi.mocked(overviewApi.get).mockResolvedValue({ summary: { total_projects: 0, total_tc: 0, pass: 0, fail: 0, block: 0, na: 0, not_started: 0, progress: 0, pass_rate: null }, projects: [] });
+    renderPage();
+    const label = await screen.findByText("Pass Rate");
+    expect(label.nextElementSibling).toHaveTextContent(/^-$/);
+  });
+
   it("결과별 범례를 표시한다 (PASS, FAIL, BLOCK, N/A, 미수행)", async () => {
     renderPage();
     await waitFor(() => {
@@ -223,7 +248,7 @@ describe("ProjectListPage - Overview Stats Display", () => {
 
   it("프로젝트가 없으면 '등록된 프로젝트가 없습니다.'를 표시한다", async () => {
     vi.mocked(projectsApi.list).mockResolvedValue([]);
-    vi.mocked(overviewApi.get).mockResolvedValue({ summary: { total_projects: 0, total_tc: 0, pass: 0, fail: 0, block: 0, na: 0, not_started: 0, progress: 0, pass_rate: 0 }, projects: [] });
+    vi.mocked(overviewApi.get).mockResolvedValue({ summary: { total_projects: 0, total_tc: 0, pass: 0, fail: 0, block: 0, na: 0, not_started: 0, progress: 0, pass_rate: null }, projects: [] });
     renderPage();
     await waitFor(() => {
       expect(screen.getByText("등록된 프로젝트가 없습니다.")).toBeInTheDocument();

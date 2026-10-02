@@ -42,7 +42,7 @@ def global_overview(
             "summary": {
                 "total_projects": 0, "total_tc": 0,
                 "pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": 0,
-                "progress": 0.0, "pass_rate": 0.0,
+                "progress": 0.0, "pass_rate": None,
             },
             "projects": [],
         }
@@ -134,7 +134,8 @@ def global_overview(
 
         done = count - ns
         progress = round(done / count * 100, 1) if count > 0 else 0.0
-        pass_rate = round(p / (p + f + b) * 100, 1) if (p + f + b) > 0 else 0.0
+        # 판정(PASS/FAIL/BLOCK)이 없으면 값 없음. 0% 로 내면 새 회차를 만드는 순간 폭락처럼 보인다(SYM-133)
+        pass_rate = round(p / (p + f + b) * 100, 1) if (p + f + b) > 0 else None
 
         project_summaries.append({
             "id": proj.id,
@@ -152,7 +153,7 @@ def global_overview(
     overall_done = total_tc - total_not_started
     overall_progress = round(overall_done / total_tc * 100, 1) if total_tc > 0 else 0.0
     executed = total_pass + total_fail + total_block
-    overall_pass_rate = round(total_pass / executed * 100, 1) if executed > 0 else 0.0
+    overall_pass_rate = round(total_pass / executed * 100, 1) if executed > 0 else None
 
     return {
         "summary": {
