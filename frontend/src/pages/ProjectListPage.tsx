@@ -18,7 +18,8 @@ interface ProjectSummary {
   na: number;
   not_started: number;
   progress: number;
-  pass_rate: number;
+  /** 판정(PASS/FAIL/BLOCK)이 없으면 null (SYM-133) */
+  pass_rate: number | null;
 }
 
 interface OverviewData {
@@ -31,9 +32,13 @@ interface OverviewData {
     na: number;
     not_started: number;
     progress: number;
-    pass_rate: number;
+    pass_rate: number | null;
   };
   projects: ProjectSummary[];
+}
+
+function formatPassRate(rate: number | null) {
+  return rate == null ? "-" : `${rate}%`;
 }
 
 const RESULT_COLORS = {
@@ -43,6 +48,11 @@ const RESULT_COLORS = {
   na: "#6B7280",
   not_started: "#D1D5DB",
 };
+
+/** 값이 없을 때는 합격 색을 칠하지 않는다 */
+function passRateColor(rate: number | null) {
+  return rate == null ? "var(--text-secondary)" : RESULT_COLORS.pass;
+}
 
 function ProgressBar({ data, noTcLabel }: { data: { pass: number; fail: number; block: number; na: number; not_started: number; total: number }; noTcLabel?: string }) {
   if (data.total === 0) return <div style={s.barEmpty}>{noTcLabel || "No TC"}</div>;
@@ -199,7 +209,7 @@ export default function ProjectListPage() {
               </div>
               <div style={s.summaryCard}>
                 <div style={s.summaryLabel}>{t("passRate")}</div>
-                <div style={{ ...s.summaryValue, color: RESULT_COLORS.pass }}>{sm.pass_rate}%</div>
+                <div style={{ ...s.summaryValue, color: passRateColor(sm.pass_rate) }}>{formatPassRate(sm.pass_rate)}</div>
               </div>
             </div>
 
@@ -298,8 +308,8 @@ export default function ProjectListPage() {
                             <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{p.progress}%</span>
                           </div>
                         </td>
-                        <td style={{ ...s.tdNum, color: RESULT_COLORS.pass, fontWeight: 700 }}>
-                          {p.pass_rate}%
+                        <td style={{ ...s.tdNum, color: passRateColor(p.pass_rate), fontWeight: 700 }}>
+                          {formatPassRate(p.pass_rate)}
                         </td>
                       </tr>
                     ))}
