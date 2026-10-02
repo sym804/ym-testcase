@@ -50,9 +50,14 @@ def _current_versions() -> dict:
 VERSIONS = _current_versions()
 
 
+# 릴리즈 절 제목. `## System 1.10.3.1 - [fix] 요약 (날짜)` 가 규격이고, 날짜 근거가 없어
+# 옛 형식으로 남긴 `## v0.1.0.0 (...)` 도 읽는다(2026-10-02 제목 소급).
+RELEASE_HEAD = re.compile(r"^## (?:System )?v?(\d+(?:\.\d+)+) ", re.M)
+
+
 def test_릴리즈_노트의_최신_절이_현재_System_버전이다():
     text = open(RELEASE_NOTE, encoding="utf-8").read()
-    first = re.search(r"^## v([\d.]+) ", text, re.M)
+    first = RELEASE_HEAD.search(text)
     assert first, "버전 절을 찾지 못했다"
     assert first.group(1) == VERSIONS["system"], (
         f"최신 절 v{first.group(1)} 과 현재 버전 v{VERSIONS['system']} 이 다르다"
@@ -156,8 +161,10 @@ def test_지난_릴리즈에_전부_태그가_달려_있다():
         pytest.skip("태그를 읽을 수 없다(얕은 클론이거나 git 이 없다)")
 
     text = open(RELEASE_NOTE, encoding="utf-8").read()
-    versions = re.findall(r"^## (v[\d.]+) ", text, re.M)
-    assert versions, "릴리즈 노트에서 버전 절을 찾지 못했다"
+    # 태그는 v 접두라 맞춰 붙인다
+    versions = ["v" + v for v in RELEASE_HEAD.findall(text)]
+    # 제목 형식이 바뀌어 정규식이 절을 못 읽으면 past 가 비어 검사 없이 통과한다. 그것을 막는다
+    assert len(versions) > 1, f"릴리즈 노트에서 버전 절을 {len(versions)}개밖에 못 찾았다. 제목 형식을 확인할 것"
 
     past = versions[1:]  # 맨 앞(최신)은 면제
     missing = [v for v in past if v not in tags and v not in UNTAGGABLE]
