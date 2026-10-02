@@ -99,7 +99,7 @@ Database 값은 릴리즈 노트와 다른 값(0.2.0.0 대 0.3.0.0)이었다. �
 특정 릴리즈의 컴포넌트 버전이 궁금하면 릴리즈 노트에서 그 절을 찾는다.
 
 ```bash
-grep -A 10 "^## v1.5.5.0 " Release_note.md
+grep -A 10 "^## System 1.5.5.0 " Release_note.md
 ```
 
 ## 기록 위치
