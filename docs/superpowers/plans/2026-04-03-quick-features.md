@@ -13,45 +13,45 @@
 ## File Structure
 
 ### Feature 1: TC 복제 (Clone)
-- Modify: `backend/routes/testcases.py` — POST `/{tc_id}/clone` 엔드포인트 추가
-- Modify: `frontend/src/api/index.ts` — `testCasesApi.clone()` 추가
-- Modify: `frontend/src/components/TestCaseGrid.tsx` — 복제 버튼 + 핸들러
-- Test: `backend/test_v103_features.py` — TC 복제 API 테스트
-- Test: `frontend/src/test/api-functions.test.ts` — clone API 함수 테스트
+- Modify: `backend/routes/testcases.py` - POST `/{tc_id}/clone` 엔드포인트 추가
+- Modify: `frontend/src/api/index.ts` - `testCasesApi.clone()` 추가
+- Modify: `frontend/src/components/TestCaseGrid.tsx` - 복제 버튼 + 핸들러
+- Test: `backend/test_v103_features.py` - TC 복제 API 테스트
+- Test: `frontend/src/test/api-functions.test.ts` - clone API 함수 테스트
 
 ### Feature 2: TC별 테스트 결과 히스토리
-- Create: `backend/routes/tc_result_history.py` — GET `/api/projects/{project_id}/testcases/{tc_id}/result-history`
-- Modify: `backend/main.py` — 라우터 등록
-- Modify: `frontend/src/api/index.ts` — `testCasesApi.resultHistory()` 추가
-- Modify: `frontend/src/types/index.ts` — `TCResultHistory` 인터페이스 추가
-- Modify: `frontend/src/components/TestCaseGrid.tsx` — 결과 히스토리 모달 추가
-- Test: `backend/test_v103_features.py` — 결과 히스토리 API 테스트
+- Create: `backend/routes/tc_result_history.py` - GET `/api/projects/{project_id}/testcases/{tc_id}/result-history`
+- Modify: `backend/main.py` - 라우터 등록
+- Modify: `frontend/src/api/index.ts` - `testCasesApi.resultHistory()` 추가
+- Modify: `frontend/src/types/index.ts` - `TCResultHistory` 인터페이스 추가
+- Modify: `frontend/src/components/TestCaseGrid.tsx` - 결과 히스토리 모달 추가
+- Test: `backend/test_v103_features.py` - 결과 히스토리 API 테스트
 
 ### Feature 3: 대시보드 날짜 필터
-- Modify: `backend/routes/dashboard.py` — 모든 엔드포인트에 `date_from`, `date_to` 파라미터 추가
-- Modify: `frontend/src/api/index.ts` — dashboardApi에 날짜 파라미터 전달
-- Modify: `frontend/src/components/Dashboard.tsx` — 날짜 범위 선택 UI + 필터 적용
-- Test: `backend/test_v103_features.py` — 날짜 필터 API 테스트
+- Modify: `backend/routes/dashboard.py` - 모든 엔드포인트에 `date_from`, `date_to` 파라미터 추가
+- Modify: `frontend/src/api/index.ts` - dashboardApi에 날짜 파라미터 전달
+- Modify: `frontend/src/components/Dashboard.tsx` - 날짜 범위 선택 UI + 필터 적용
+- Test: `backend/test_v103_features.py` - 날짜 필터 API 테스트
 
 ### Feature 4: TC 드래그 앤 드롭 정렬
-- Modify: `backend/routes/testcases.py` — PUT `/reorder` 벌크 순서 변경 엔드포인트
-- Modify: `frontend/src/api/index.ts` — `testCasesApi.reorder()` 추가
-- Modify: `frontend/src/components/TestCaseGrid.tsx` — AG-Grid row drag 활성화 + 핸들러
-- Test: `backend/test_v103_features.py` — reorder API 테스트
+- Modify: `backend/routes/testcases.py` - PUT `/reorder` 벌크 순서 변경 엔드포인트
+- Modify: `frontend/src/api/index.ts` - `testCasesApi.reorder()` 추가
+- Modify: `frontend/src/components/TestCaseGrid.tsx` - AG-Grid row drag 활성화 + 핸들러
+- Test: `backend/test_v103_features.py` - reorder API 테스트
 
 ### Feature 5: 인앱 알림
-- Create: `backend/models.py` — `Notification` 모델 추가
-- Create: `backend/routes/notifications.py` — CRUD 엔드포인트
-- Modify: `backend/main.py` — 라우터 등록
-- Modify: `backend/routes/testruns.py` — 런 완료/FAIL 시 알림 생성
-- Modify: `frontend/src/types/index.ts` — `Notification` 인터페이스
-- Modify: `frontend/src/api/index.ts` — `notificationsApi`
-- Modify: `frontend/src/components/Header.tsx` — 알림 벨 아이콘 + 드롭다운
-- Test: `backend/test_v103_features.py` — 알림 API 테스트
+- Create: `backend/models.py` - `Notification` 모델 추가
+- Create: `backend/routes/notifications.py` - CRUD 엔드포인트
+- Modify: `backend/main.py` - 라우터 등록
+- Modify: `backend/routes/testruns.py` - 런 완료/FAIL 시 알림 생성
+- Modify: `frontend/src/types/index.ts` - `Notification` 인터페이스
+- Modify: `frontend/src/api/index.ts` - `notificationsApi`
+- Modify: `frontend/src/components/Header.tsx` - 알림 벨 아이콘 + 드롭다운
+- Test: `backend/test_v103_features.py` - 알림 API 테스트
 
 ---
 
-## Task 1: TC 복제 (Clone) — 백엔드
+## Task 1: TC 복제 (Clone) - 백엔드
 
 **Files:**
 - Modify: `backend/routes/testcases.py` (line ~567 근처, restore 엔드포인트 뒤)
@@ -289,16 +289,16 @@ Expected: 모든 TC 복제 테스트 PASS
 
 ```bash
 git add backend/routes/testcases.py backend/test_v103_features.py
-git commit -m "feat: TC 복제(clone) API — 단건 + 벌크"
+git commit -m "feat: TC 복제(clone) API - 단건 + 벌크"
 ```
 
 ---
 
-## Task 2: TC 복제 — 프론트엔드
+## Task 2: TC 복제 - 프론트엔드
 
 **Files:**
-- Modify: `frontend/src/api/index.ts` — testCasesApi에 clone/bulkClone 추가
-- Modify: `frontend/src/components/TestCaseGrid.tsx` — 복제 버튼 + 핸들러
+- Modify: `frontend/src/api/index.ts` - testCasesApi에 clone/bulkClone 추가
+- Modify: `frontend/src/components/TestCaseGrid.tsx` - 복제 버튼 + 핸들러
 
 - [ ] **Step 1: API 함수 추가**
 
@@ -375,12 +375,12 @@ const handleCloneSelected = useCallback(async () => {
 
 ```bash
 git add frontend/src/api/index.ts frontend/src/components/TestCaseGrid.tsx
-git commit -m "feat(frontend): TC 복제 버튼 — 서버사이드 clone API 연동"
+git commit -m "feat(frontend): TC 복제 버튼 - 서버사이드 clone API 연동"
 ```
 
 ---
 
-## Task 3: TC별 테스트 결과 히스토리 — 백엔드
+## Task 3: TC별 테스트 결과 히스토리 - 백엔드
 
 **Files:**
 - Create: `backend/routes/tc_result_history.py`
@@ -523,17 +523,17 @@ Expected: TC 결과 히스토리 테스트 PASS
 
 ```bash
 git add backend/routes/tc_result_history.py backend/main.py backend/test_v103_features.py
-git commit -m "feat: TC별 결과 히스토리 API — 런별 결과 타임라인"
+git commit -m "feat: TC별 결과 히스토리 API - 런별 결과 타임라인"
 ```
 
 ---
 
-## Task 4: TC별 테스트 결과 히스토리 — 프론트엔드
+## Task 4: TC별 테스트 결과 히스토리 - 프론트엔드
 
 **Files:**
-- Modify: `frontend/src/types/index.ts` — TCResultHistory 타입
-- Modify: `frontend/src/api/index.ts` — resultHistory API
-- Modify: `frontend/src/components/TestCaseGrid.tsx` — 결과 히스토리 버튼 + 모달
+- Modify: `frontend/src/types/index.ts` - TCResultHistory 타입
+- Modify: `frontend/src/api/index.ts` - resultHistory API
+- Modify: `frontend/src/components/TestCaseGrid.tsx` - 결과 히스토리 버튼 + 모달
 
 - [ ] **Step 1: 타입 추가**
 
@@ -690,15 +690,15 @@ TC 1건 선택 → "결과이력" 클릭 → 모달에 런별 PASS/FAIL 히스�
 
 ```bash
 git add frontend/src/types/index.ts frontend/src/api/index.ts frontend/src/components/TestCaseGrid.tsx
-git commit -m "feat(frontend): TC별 결과 히스토리 모달 — 런별 타임라인 조회"
+git commit -m "feat(frontend): TC별 결과 히스토리 모달 - 런별 타임라인 조회"
 ```
 
 ---
 
-## Task 5: 대시보드 날짜 필터 — 백엔드
+## Task 5: 대시보드 날짜 필터 - 백엔드
 
 **Files:**
-- Modify: `backend/routes/dashboard.py` — 모든 엔드포인트에 date_from/date_to 추가
+- Modify: `backend/routes/dashboard.py` - 모든 엔드포인트에 date_from/date_to 추가
 
 - [ ] **Step 1: 테스트 추가**
 
@@ -841,16 +841,16 @@ Run: `cd backend && python test_v103_features.py`
 
 ```bash
 git add backend/routes/dashboard.py backend/test_v103_features.py
-git commit -m "feat: 대시보드 날짜 필터 — date_from/date_to 파라미터"
+git commit -m "feat: 대시보드 날짜 필터 - date_from/date_to 파라미터"
 ```
 
 ---
 
-## Task 6: 대시보드 날짜 필터 — 프론트엔드
+## Task 6: 대시보드 날짜 필터 - 프론트엔드
 
 **Files:**
-- Modify: `frontend/src/api/index.ts` — dashboardApi에 날짜 파라미터 전달
-- Modify: `frontend/src/components/Dashboard.tsx` — 날짜 범위 선택 UI
+- Modify: `frontend/src/api/index.ts` - dashboardApi에 날짜 파라미터 전달
+- Modify: `frontend/src/components/Dashboard.tsx` - 날짜 범위 선택 UI
 
 - [ ] **Step 1: API 함수 수정**
 
@@ -952,15 +952,15 @@ dependency array에 `dateFrom`, `dateTo` 추가.
 
 ```bash
 git add frontend/src/api/index.ts frontend/src/components/Dashboard.tsx
-git commit -m "feat(frontend): 대시보드 날짜 필터 UI — 프리셋 + 커스텀 범위"
+git commit -m "feat(frontend): 대시보드 날짜 필터 UI - 프리셋 + 커스텀 범위"
 ```
 
 ---
 
-## Task 7: TC 드래그 앤 드롭 정렬 — 백엔드
+## Task 7: TC 드래그 앤 드롭 정렬 - 백엔드
 
 **Files:**
-- Modify: `backend/routes/testcases.py` — PUT `/reorder` 엔드포인트
+- Modify: `backend/routes/testcases.py` - PUT `/reorder` 엔드포인트
 
 - [ ] **Step 1: 테스트 추가**
 
@@ -1048,16 +1048,16 @@ Run: `cd backend && python test_v103_features.py`
 
 ```bash
 git add backend/routes/testcases.py backend/test_v103_features.py
-git commit -m "feat: TC 순서 변경 API — PUT /reorder"
+git commit -m "feat: TC 순서 변경 API - PUT /reorder"
 ```
 
 ---
 
-## Task 8: TC 드래그 앤 드롭 정렬 — 프론트엔드
+## Task 8: TC 드래그 앤 드롭 정렬 - 프론트엔드
 
 **Files:**
-- Modify: `frontend/src/api/index.ts` — testCasesApi.reorder
-- Modify: `frontend/src/components/TestCaseGrid.tsx` — AG-Grid row drag 설정
+- Modify: `frontend/src/api/index.ts` - testCasesApi.reorder
+- Modify: `frontend/src/components/TestCaseGrid.tsx` - AG-Grid row drag 설정
 
 - [ ] **Step 1: API 함수 추가**
 
@@ -1140,18 +1140,18 @@ TC 목록에서 No 컬럼의 드래그 핸들로 행 드래그 → 순서 변경
 
 ```bash
 git add frontend/src/api/index.ts frontend/src/components/TestCaseGrid.tsx
-git commit -m "feat(frontend): TC 드래그 앤 드롭 정렬 — AG-Grid row drag"
+git commit -m "feat(frontend): TC 드래그 앤 드롭 정렬 - AG-Grid row drag"
 ```
 
 ---
 
-## Task 9: 인앱 알림 — 백엔드
+## Task 9: 인앱 알림 - 백엔드
 
 **Files:**
-- Modify: `backend/models.py` — Notification 모델
-- Create: `backend/routes/notifications.py` — CRUD
-- Modify: `backend/main.py` — 라우터 등록
-- Modify: `backend/routes/testruns.py` — 알림 생성 트리거
+- Modify: `backend/models.py` - Notification 모델
+- Create: `backend/routes/notifications.py` - CRUD
+- Modify: `backend/main.py` - 라우터 등록
+- Modify: `backend/routes/testruns.py` - 알림 생성 트리거
 
 - [ ] **Step 1: 테스트 추가**
 
@@ -1371,9 +1371,9 @@ pass_count = db.query(TestResult).filter(
 ).count()
 
 if fail_count > 0:
-    msg = f"🔴 [{run.name}] 완료 — FAIL {fail_count}건 / 전체 {total_count}건"
+    msg = f"🔴 [{run.name}] 완료 - FAIL {fail_count}건 / 전체 {total_count}건"
 else:
-    msg = f"✅ [{run.name}] 완료 — PASS {pass_count}/{total_count}건"
+    msg = f"✅ [{run.name}] 완료 - PASS {pass_count}/{total_count}건"
 
 link = f"/projects/{project_id}?tab=testrun&run={run_id}"
 
@@ -1395,17 +1395,17 @@ Run: `cd backend && python test_v103_features.py`
 
 ```bash
 git add backend/models.py backend/routes/notifications.py backend/routes/testruns.py backend/main.py backend/test_v103_features.py
-git commit -m "feat: 인앱 알림 시스템 — Notification 모델 + 런 완료 트리거"
+git commit -m "feat: 인앱 알림 시스템 - Notification 모델 + 런 완료 트리거"
 ```
 
 ---
 
-## Task 10: 인앱 알림 — 프론트엔드
+## Task 10: 인앱 알림 - 프론트엔드
 
 **Files:**
-- Modify: `frontend/src/types/index.ts` — Notification 타입
-- Modify: `frontend/src/api/index.ts` — notificationsApi
-- Modify: `frontend/src/components/Header.tsx` — 알림 벨 + 드롭다운
+- Modify: `frontend/src/types/index.ts` - Notification 타입
+- Modify: `frontend/src/api/index.ts` - notificationsApi
+- Modify: `frontend/src/components/Header.tsx` - 알림 벨 + 드롭다운
 
 - [ ] **Step 1: 타입 추가**
 
@@ -1600,7 +1600,7 @@ useEffect(() => {
 
 ```bash
 git add frontend/src/types/index.ts frontend/src/api/index.ts frontend/src/components/Header.tsx
-git commit -m "feat(frontend): 인앱 알림 — 헤더 벨 아이콘 + 드롭다운"
+git commit -m "feat(frontend): 인앱 알림 - 헤더 벨 아이콘 + 드롭다운"
 ```
 
 ---

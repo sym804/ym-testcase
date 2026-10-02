@@ -29,12 +29,15 @@ def _version_filter(version: str):
 
 def _latest_run_subquery(project_id: int, db: Session, date_from: str = None, date_to: str = None,
                          version: str = None):
-    """TC별 최신 런의 test_run_id를 구하는 서브쿼리.
+    """TC별로 마지막으로 판정된 런의 test_run_id를 구하는 서브쿼리.
 
     version 을 주면 그 버전 묶음의 수행만 본다(09-30). 예전에는 "전체" 가 프로젝트의 모든
     수행을 섞어 v1.4 결과가 v1.5 현황에 끼었다.
+
+    NS 는 판정이 아니라서 뺀다(SYM-131). 넣으면 새 수행을 만들기만 해도 그 수행이 담은 TC 가
+    전부 최신 NS 가 되어 앞 수행의 PASS/FAIL 이 미수행으로 바뀐다(실측 stockradar: PASS 519 -> 0).
     """
-    run_filter = [TestRun.project_id == project_id]
+    run_filter = [TestRun.project_id == project_id, TestResult.result != TestResultValue.NS]
     if date_from:
         run_filter.append(TestRun.created_at >= datetime.fromisoformat(date_from))
     if date_to:
@@ -153,7 +156,7 @@ def dashboard_summary(
             c = {"pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": total}
         return {"total": total, **c, **_rates(c, total)}
 
-    # 전체 모드: SQL 집계로 TC별 최신 결과 카운트
+    # 전체 모드: SQL 집계로 TC별 마지막 판정(NS 제외) 카운트
     latest = _latest_run_subquery(project_id, db, date_from, date_to, version)
     row = (
         _active_counts_query(db, project_id)
@@ -515,7 +518,7 @@ def get_heatmap(
             for r in query
         ]
 
-    # 전체 모드: TC별 최신 런 결과 기준 FAIL만 집계
+    # 전체 모드: TC별 마지막 판정(NS 제외) 기준 FAIL만 집계
     latest = _latest_run_subquery(project_id, db, date_from, date_to, version)
     query = (
         db.query(

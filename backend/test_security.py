@@ -1809,7 +1809,7 @@ class TestAvailableUsersEndpoint:
 
 
 class TestHeatmapLatestRunOnly:
-    """대시보드 heatmap 전체 모드 최신 결과 기준 검증 (2개)."""
+    """대시보드 heatmap 전체 모드 TC별 마지막 판정 기준 검증 (2개)."""
 
     def test_heatmap_returns_data(self, project_pair):
         """heatmap API 정상 응답 확인"""
@@ -1820,7 +1820,7 @@ class TestHeatmapLatestRunOnly:
         assert isinstance(r.json(), list)
 
     def test_heatmap_latest_only(self, project_pair):
-        """전체 모드 heatmap: 최신 런 결과만 반영되는지 확인"""
+        """전체 모드 heatmap: TC별 마지막 판정만 반영되는지 확인"""
         pub_id, _ = project_pair
         h = auth(store.admin)
         # TC 생성
@@ -1849,9 +1849,9 @@ class TestHeatmapLatestRunOnly:
         r_heat = requests.get(f"{BASE}/api/projects/{pub_id}/dashboard/heatmap", headers=h)
         heat_data = r_heat.json()
         heat_cat = [e for e in heat_data if e.get("category") == "__heat_cat__"]
-        # 최신 런이 PASS이므로 FAIL count가 없어야 함
+        # 마지막 판정이 PASS이므로 FAIL count가 없어야 함
         total_fail = sum(e.get("fail_count", 0) for e in heat_cat)
-        assert total_fail == 0, f"최신 런 PASS인데 heatmap에 FAIL {total_fail}건 표시됨"
+        assert total_fail == 0, f"마지막 판정 PASS인데 heatmap에 FAIL {total_fail}건 표시됨"
         # cleanup
         requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run2_id}", headers=h)
         requests.delete(f"{BASE}/api/projects/{pub_id}/testruns/{run1_id}", headers=h)

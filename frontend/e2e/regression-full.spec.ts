@@ -463,13 +463,13 @@ test.describe("5. TC 관리", () => {
     await expect(noHeader).toHaveAttribute("aria-sort", /ascending|descending/);
   });
 
-  test("TC-TCM-018: 찾기/변경하기", async ({ page }) => {
+  test("TC-TCM-018: 찾기/바꾸기", async ({ page }) => {
     await addSheetAndRows(page, "Replace", 1);
-    // 변경하기 버튼
-    const replaceBtn = page.getByRole("button", { name: "변경하기", exact: true });
+    // 바꾸기 버튼
+    const replaceBtn = page.getByRole("button", { name: "바꾸기", exact: true });
     await expect(replaceBtn).toBeVisible();
     await replaceBtn.click();
-    await expect(page.locator("input[placeholder='변경할 내용...']")).toBeVisible();
+    await expect(page.locator("input[placeholder='바꿀 내용...']")).toBeVisible();
   });
 });
 
