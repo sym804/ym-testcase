@@ -230,3 +230,91 @@ def precheck(src, dst, allow_orphans: set) -> Precheck:
         rows[table] = [dict(r) for r in src.execute(f'SELECT * FROM "{table}" ORDER BY rowid')
                        if r["id"] in ids]
     return Precheck(excluded=excluded, excluded_rows=rows)
+
+
+# ── 복사 ─────────────────────────────────────────────────────────────────────
+
+def _is_json(col) -> bool:
+    from sqlalchemy import JSON
+    return isinstance(col.type, JSON)
+
+
+def _convert(col, value):
+    """원본 값을 대상 칸에 넣을 값으로. 값 규칙은 사전 점검이 이미 확인했다."""
+    from sqlalchemy import Boolean, DateTime
+
+    if value is None:
+        return None
+    if isinstance(col.type, Boolean):
+        return bool(value)
+    if isinstance(col.type, DateTime):
+        return datetime.fromisoformat(value)
+    # JSON 칸은 원문 텍스트를 그대로 넘겨 SQL 에서 CAST 한다. 파이썬 객체로 바꿔 다시 인코딩하면
+    # 'null' 과 SQL NULL 의 구분이 흐려지고, 문자열을 넘기면 JSON 문자열로 이중 인코딩된다.
+    return value
+
+
+def _insert_rows(conn, table, cols, rows) -> None:
+    from sqlalchemy import text
+
+    if not rows:
+        return
+    names = ", ".join(f'"{c.name}"' for c in cols)
+    params = ", ".join(f"CAST(:p{i} AS json)" if _is_json(c) else f":p{i}" for i, c in enumerate(cols))
+    stmt = text(f'INSERT INTO "{table.name}" ({names}) VALUES ({params})')
+    conn.execute(stmt, [{f"p{i}": v for i, v in enumerate(r)} for r in rows])
+
+
+def _self_ref_columns(table) -> list:
+    return [c for c in table.columns if any(fk.column.table is table for fk in c.foreign_keys)]
+
+
+def copy_all(src, conn, excluded: dict) -> dict:
+    """FK 순서로 옮긴다. id 는 원본 그대로. 자기 참조 칸은 비워 넣은 뒤 마지막에 채운다.
+
+    트랜잭션은 부른 쪽이 갖는다. 중간에 실패하면 부른 쪽이 되돌려 대상은 빈 채로 남는다.
+    """
+    from sqlalchemy import text
+
+    src_tables = set(_source_tables(src)) - SOURCE_ONLY
+    counts, deferred = {}, []
+    for table in metadata().sorted_tables:
+        if table.name not in src_tables:
+            continue
+        src_cols = {r[1] for r in src.execute(f'PRAGMA table_info("{table.name}")')}
+        cols = [c for c in table.columns if c.name in src_cols]
+        self_ref = {c.name for c in _self_ref_columns(table)}
+        has_id = "id" in src_cols
+        skip = excluded.get(table.name, set())
+        rows, later = [], []
+        order = "id" if has_id else "rowid"
+        for r in src.execute(f'SELECT * FROM "{table.name}" ORDER BY {order}'):
+            if has_id and r["id"] in skip:
+                continue
+            rows.append([None if c.name in self_ref else _convert(c, r[c.name]) for c in cols])
+            for name in self_ref:
+                if r[name] is not None:
+                    later.append((name, r["id"], r[name]))
+        _insert_rows(conn, table, cols, rows)
+        counts[table.name] = len(rows)
+        deferred += [(table.name, *x) for x in later]
+    for table_name, col, row_id, value in deferred:
+        conn.execute(text(f'UPDATE "{table_name}" SET "{col}" = :v WHERE id = :i'), {"v": value, "i": row_id})
+    return counts
+
+
+def fix_sequences(conn) -> None:
+    """다음 id 가 max(id)+1 이 되게 한다. 빈 테이블은 1 부터. is_called 를 빠뜨리면 하나 건너뛴다."""
+    from sqlalchemy import text
+
+    for table in metadata().sorted_tables:
+        if "id" not in table.columns:
+            continue
+        seq = conn.execute(text("SELECT pg_get_serial_sequence(:t, 'id')"), {"t": table.name}).scalar()
+        if not seq:
+            continue
+        top = conn.execute(text(f'SELECT max(id) FROM "{table.name}"')).scalar()
+        if top is None:
+            conn.execute(text("SELECT setval(:s, 1, false)"), {"s": seq})
+        else:
+            conn.execute(text("SELECT setval(:s, :v, true)"), {"s": seq, "v": top})
