@@ -20,10 +20,12 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Override URL from environment
-db_url = os.getenv("DATABASE_URL")
-if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+# 마이그레이션은 트랜잭션 풀러를 피해 직결(또는 세션 풀러) 주소로 한다.
+# 둘 다 없으면 멈춘다. 빈 값으로 진행하면 엉뚱한 곳에 "성공" 할 수 있다.
+db_url = os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")
+if not db_url:
+    raise RuntimeError("DATABASE_URL_DIRECT 또는 DATABASE_URL 이 필요하다")
+config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:
@@ -32,7 +34,6 @@ def run_migrations_offline() -> None:
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
-        render_as_batch=True,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -48,7 +49,6 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            render_as_batch=True,  # SQLite ALTER TABLE 지원
         )
         with context.begin_transaction():
             context.run_migrations()
