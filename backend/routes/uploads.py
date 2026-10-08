@@ -68,4 +68,7 @@ async def put_content(upload_id: str, request: Request, token: str = Query(...),
             raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {limit // (1024 * 1024)}MB")
         buf.extend(chunk)
     storage.put(row.storage_key, bytes(buf), row.content_type)
+    # ★DB 는 바꾸지 않았다. 행 잠금을 응답 전에 푼다. get_db 의 close 는 응답을 보낸 뒤에 돌아서,
+    #   그대로 두면 곧바로 이어지는 미리보기가 NOWAIT 409 를 받는다(CI 에서 간헐 실패로 드러남).
+    db.rollback()
     return {"upload_id": upload_id, "size": len(buf)}
