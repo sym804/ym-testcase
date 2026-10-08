@@ -37,6 +37,7 @@ TestRail · Kiwi TCMS 대안으로, **작성 → 실행 → 집계 → 리포트
 - [Python 3.11 ~ 3.14](https://www.python.org/downloads/)
 - [Node.js 18+](https://nodejs.org/)
 - [Git](https://git-scm.com/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (로컬 PostgreSQL)
 
 ### 2. 소스 코드 다운로드
 
@@ -69,6 +70,11 @@ SECRET_KEY=my-super-secret-key-abc123xyz
 
 ### 4. 서버 실행
 
+**DB** (레포 루트에서 한 번):
+```bash
+docker compose up -d --wait db
+```
+
 **백엔드** (터미널 1):
 ```bash
 cd backend
@@ -95,6 +101,42 @@ cd frontend && npm install                # 프론트엔드 의존성 변경 시
 ```
 
 이후 서버를 재시작하면 최신 버전이 적용됩니다.
+
+## 배포 (Vercel + Supabase)
+
+팀이 인터넷에서 쓰도록 올릴 때의 구성입니다. 화면과 API 가 한 Vercel 프로젝트, 한 도메인에서 돌고(`vercel.json` 의 Services), 데이터는 Supabase 의 PostgreSQL 과 Storage 에 둡니다.
+
+배포 자격증명은 이 공개 레포에 두지 않습니다. 이 레포를 `upstream` 으로 따르는 비공개 레포를 하나 만들고, 그 레포에 Vercel 과 Supabase 를 연결합니다. 코드 파일은 고치지 않고 `git pull upstream main` 으로 따라갑니다.
+
+### 1. Supabase
+
+- 프로젝트를 만듭니다. 리전은 사용자와 가까운 곳(한국이면 서울)으로 고릅니다.
+- Storage 에 비공개 버킷을 만들고 파일 크기 상한을 50MB 로 둡니다. 서명 업로드 주소는 크기를 강제하지 않으므로 버킷 상한이 마지막 방어선입니다.
+- 접속 주소 두 개를 확인합니다. 앱은 트랜잭션 풀러 주소, 마이그레이션은 직결(또는 세션 풀러) 주소를 씁니다.
+
+### 2. Vercel
+
+- 비공개 레포로 프로젝트를 만듭니다. 설정은 레포의 `vercel.json` 을 그대로 씁니다.
+- 운영(Production)의 Git 자동 배포를 끕니다. 배포는 GitHub Actions 가 마이그레이션 뒤에 합니다.
+- 환경변수(Production, Preview 둘 다):
+
+| 이름 | 값 |
+|---|---|
+| `DATABASE_URL` | Supabase 트랜잭션 풀러 주소 (`postgresql+psycopg2://...:6543/postgres`) |
+| `SECRET_KEY` | 긴 무작위 문자열 |
+| `ENV` | `production` |
+| `STORAGE_BACKEND` | `supabase` |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STORAGE_BUCKET` | Supabase 프로젝트 주소, 서비스 키, 버킷 이름 |
+| `CRON_SECRET` | 긴 무작위 문자열. 매일 정리 작업(`/api/internal/cron/daily`) 인증 |
+| `TRUSTED_PROXY_HEADER` | 플랫폼이 덮어쓰는 클라이언트 IP 헤더. 스테이징에서 확인해 정합니다 |
+
+Preview 는 합성 데이터만 든 별도 Supabase 프로젝트에 연결합니다.
+
+### 3. GitHub Actions (비공개 레포)
+
+- 저장소 변수 `DEPLOY_ENABLED` 를 `true` 로 둡니다. 공개 레포에서는 배포·백업 워크플로가 돌지 않습니다.
+- 비밀값: `DATABASE_URL_DIRECT`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, 백업용 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STORAGE_BUCKET`.
+- `main` 에 푸시하면 테스트, 운영 DB 마이그레이션, Vercel 배포 순서로 돕니다(`.github/workflows/deploy.yml`). 매일 DB 덤프와 Storage 객체를 아티팩트로 남깁니다(`backup.yml`, 14일 보관).
 
 ## 주요 기능
 
@@ -145,9 +187,9 @@ cd frontend && npm install                # 프론트엔드 의존성 변경 시
 | 구분 | 기술 |
 |---|---|
 | Frontend | React 19, TypeScript, Vite, ag-grid, Chart.js |
-| Backend | Python 3.11 ~ 3.14, FastAPI, SQLAlchemy, SQLite |
-| Test | Vitest 570+ (프론트 단위), pytest 470+ (백엔드 API·보안·통합), Playwright 99 (E2E) |
-| Deploy | 셀프호스팅 (로컬 실행) |
+| Backend | Python 3.11 ~ 3.14, FastAPI, SQLAlchemy, PostgreSQL 17 |
+| Test | Vitest 570+ (프론트 단위), pytest 730+ (백엔드 API·보안·통합), Playwright 99 (E2E) |
+| Deploy | 셀프호스팅 (로컬 실행) 또는 Vercel + Supabase |
 
 ## 테스트
 
@@ -163,7 +205,9 @@ cd ../frontend && npx playwright install chromium
 # Frontend 단위 테스트
 cd frontend && npm run test
 
-# Backend 테스트. 테스트용 서버를 8009 에 따로 띄운다(8008 개발 DB 를 건드리지 않는다)
+# Backend 테스트. 로컬 PostgreSQL 이 떠 있어야 한다. 세션마다 임시 DB 를 만들고 지운다.
+# 테스트용 서버는 8009 에 따로 띄운다(8008 개발 서버를 건드리지 않는다)
+docker compose up -d --wait db
 cd backend && TEST_PORT=8009 TEST_BASE_URL=http://127.0.0.1:8009 python -m pytest -q
 
 # E2E 테스트 (서버 실행 상태에서)
