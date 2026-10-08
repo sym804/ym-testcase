@@ -125,3 +125,35 @@ def claim_for_attachment(db: Session, upload_id: str, user: User) -> tuple[str, 
         raise _too_large(PURPOSE_LIMITS["attachment"])
     row.consumed_at = now_kst()
     return row.filename, row.content_type, size, row.storage_key
+
+
+class BytesUpload:
+    """꺼낸 바이트를 UploadFile 과 같은 모양(filename, file, content_type, read)으로 감싼다.
+
+    기존 파서가 UploadFile 의 이 속성들만 쓰므로, upload_id 경로를 위해 파서를 고치지 않는다.
+    """
+
+    def __init__(self, filename: str, data: bytes, content_type: str | None = None):
+        import io
+        self.filename = filename
+        self.content_type = content_type
+        self.file = io.BytesIO(data)
+
+    async def read(self, size: int = -1) -> bytes:
+        return self.file.read(size)
+
+
+def resolve_file(db: Session, user: User, purpose: str, file, upload_id: str | None):
+    """multipart 파일과 upload_id 중 정확히 하나를 받아 UploadFile 모양으로 돌려준다."""
+    # 라우트 함수를 직접 부르면(테스트, 내부 호출) 기본값이 None 이 아니라 FastAPI 의
+    # Query/File 표지 객체로 들어온다. 문자열이 아니면 보내지 않은 것으로 본다.
+    if not isinstance(upload_id, str):
+        upload_id = None
+    if file is not None and not hasattr(file, "filename"):
+        file = None
+    if (file is None) == (upload_id is None):
+        raise HTTPException(status_code=400, detail="파일 또는 upload_id 중 하나만 보냅니다.")
+    if file is not None:
+        return file
+    name, content_type, data = consume(db, upload_id, user, purpose)
+    return BytesUpload(name, data, content_type)

@@ -20,7 +20,8 @@ from schemas import (
     TestResultCreate, TestResultResponse,
 )
 from auth import get_current_user, role_required, check_project_access, get_project_role
-from routes.attachments import UPLOAD_DIR
+from routes.attachments import delete_attachment_objects
+from services.staged_upload import resolve_file
 from services.locks import LockNs, advisory_xact_lock, project_write_lock
 from services.run_sync_service import sync_run_results
 from services.excel_safe import safe_cell
@@ -488,10 +489,11 @@ def submit_results(
 def import_results(
     project_id: int,
     run_id: int,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
     dry_run: bool = Query(False, description="true 면 계산만 하고 저장하지 않는다"),
     keep_executed: bool = Query(True, description="이미 기록된 결과를 미실행(NS)으로 덮어쓰지 않는다"),
     label: Optional[str] = Query(None, max_length=100, description="비고 앞머리. 비우면 형식 이름"),
+    upload_id: Optional[str] = Query(None, description="스테이징 업로드 id. file 대신 보낸다"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("tester")),
 ):
@@ -509,6 +511,7 @@ def import_results(
     if run.status == TestRunStatus.completed:
         raise HTTPException(status_code=400, detail="완료된 테스트 런은 수정할 수 없습니다. 재오픈 후 수정하세요.")
 
+    file = resolve_file(db, current_user, "result_import", file, upload_id)
     fmt, entries = _read_report(file)
     summary = _record_import(run, fmt, entries, db, current_user,
                              dry_run=dry_run, keep_executed=keep_executed, label=label)
@@ -526,7 +529,8 @@ def import_results_by_name(
     version: Optional[str] = Query(None, max_length=50, description="새 회차의 버전. 비우면 직전 회차를 이어받는다"),
     environment: Optional[str] = Query(None, max_length=100, description="새 회차의 환경. 비우면 직전 회차를 이어받는다"),
     sheet_names: Optional[str] = Query(None, description="쉼표 구분 시트 이름. 주면 그 범위로 새 회차를 만든다"),
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    upload_id: Optional[str] = Query(None, description="스테이징 업로드 id. file 대신 보낸다"),
     dry_run: bool = Query(False, description="true 면 회차를 만들지 않고 계산만 한다"),
     keep_executed: bool = Query(True, description="이미 기록된 결과를 미실행(NS)으로 덮어쓰지 않는다"),
     label: Optional[str] = Query(None, max_length=100, description="비고 앞머리. 비우면 형식 이름"),
@@ -548,6 +552,7 @@ def import_results_by_name(
     if not name:
         raise HTTPException(status_code=400, detail="수행 이름을 입력해 주세요.")
     # 회차를 만들기 전에 파일부터 읽는다. 깨진 파일로 빈 회차가 남지 않게.
+    file = resolve_file(db, current_user, "result_import", file, upload_id)
     fmt, entries = _read_report(file)
     sheets = _validate_sheet_names(
         project_id, sheet_names.split(",") if sheet_names is not None else None, db,
@@ -756,14 +761,7 @@ def delete_testrun(
     result_ids = [r.id for r in db.query(TestResult.id).filter(TestResult.test_run_id == run_id).all()]
     if result_ids:
         attachments = db.query(Attachment).filter(Attachment.test_result_id.in_(result_ids)).all()
-        for att in attachments:
-            if att.filepath:
-                full_path = os.path.join(UPLOAD_DIR, att.filepath)
-                if os.path.isfile(full_path):
-                    try:
-                        os.remove(full_path)
-                    except OSError:
-                        pass
+        delete_attachment_objects([att.filepath for att in attachments])
         # bulk delete로 처리 (개별 db.delete()는 cascade와 충돌하여 경고 발생)
         db.query(Attachment).filter(Attachment.test_result_id.in_(result_ids)).delete(synchronize_session=False)
     db.query(TestResult).filter(TestResult.test_run_id == run_id).delete(synchronize_session=False)

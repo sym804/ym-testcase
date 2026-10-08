@@ -3,22 +3,21 @@ import uuid
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User, TestResult, TestRun, Attachment
 from schemas import AttachmentResponse
 from services.upload_guard import read_limited
+from services.staged_upload import claim_for_attachment
+from services.storage import get_storage
 from auth import get_current_user, get_project_role
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/attachments", tags=["attachments"])
-
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # 보안 설정
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
@@ -58,14 +57,15 @@ def _validate_extension(filename: str) -> str:
     return ext
 
 
-def _safe_filepath(base_dir: str, relative_path: str) -> str:
-    """Path traversal 방어: 파일 경로가 UPLOAD_DIR 내에 있는지 검증"""
-    filepath = os.path.join(base_dir, relative_path)
-    abs_filepath = os.path.abspath(filepath)
-    abs_base = os.path.abspath(base_dir)
-    if not abs_filepath.startswith(abs_base + os.sep) and abs_filepath != abs_base:
-        raise HTTPException(status_code=403, detail="Access denied")
-    return abs_filepath
+def delete_attachment_objects(keys: list) -> None:
+    """첨부 객체를 저장소에서 지운다. 실패해도 DB 삭제는 막지 않는다(고아 객체는 정리 대상)."""
+    keys = [k for k in keys if k]
+    if not keys:
+        return
+    try:
+        get_storage().delete(keys)
+    except Exception:  # noqa: BLE001  저장소 장애로 프로젝트·수행 삭제가 막히면 안 된다
+        logger.warning("Failed to delete attachment objects: %s", keys, exc_info=True)
 
 
 def _get_project_id_from_test_result(test_result_id: int, db: Session) -> Optional[int]:
@@ -127,7 +127,8 @@ def _check_attachment_access(
 @router.post("/{test_result_id}", response_model=AttachmentResponse)
 async def upload_attachment(
     test_result_id: int,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    upload_id: Optional[str] = Query(None, description="스테이징 업로드 id. file 대신 보낸다"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -141,30 +142,34 @@ async def upload_attachment(
         raise HTTPException(status_code=404, detail="Project not found")
     _check_attachment_access(project_id, current_user, db, "tester")
 
-    # 확장자 검증 (확장자 없으면 거부)
-    ext = _validate_extension(file.filename)
+    if (file is None) == (upload_id is None):
+        raise HTTPException(status_code=400, detail="파일 또는 upload_id 중 하나만 보냅니다.")
 
-    # 파일 크기 제한. ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온
-    #   뒤라 제한이 있으나 마나다. 넘는 순간 끊는다.
-    content = await read_limited(file, MAX_FILE_SIZE)
-
-    stored_name = f"{uuid.uuid4().hex}{ext}"
-    filepath = _safe_filepath(UPLOAD_DIR, stored_name)
-
-    with open(filepath, "wb") as f:
-        f.write(content)
+    if upload_id is not None:
+        # 저장소에 이미 올라와 있다. 바이트를 읽지 않고 실제 크기만 확인해 키를 그대로 쓴다.
+        filename, content_type, size, stored_key = claim_for_attachment(db, upload_id, current_user)
+        _validate_extension(filename)
+    else:
+        # 확장자 검증 (확장자 없으면 거부)
+        ext = _validate_extension(file.filename)
+        # 파일 크기 제한. ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온
+        #   뒤라 제한이 있으나 마나다. 넘는 순간 끊는다.
+        content = await read_limited(file, MAX_FILE_SIZE)
+        stored_key = f"attachments/{uuid.uuid4().hex}{ext}"
+        get_storage().put(stored_key, content, file.content_type)
+        filename, content_type, size = file.filename, file.content_type, len(content)
 
     logger.info(
         "File uploaded: user=%s project=%d result_id=%d filename=%s size=%d",
-        current_user.username, project_id, test_result_id, file.filename, len(content),
+        current_user.username, project_id, test_result_id, filename, size,
     )
 
     attachment = Attachment(
         test_result_id=test_result_id,
-        filename=file.filename or stored_name,
-        filepath=stored_name,
-        content_type=file.content_type,
-        file_size=len(content),
+        filename=filename or stored_key.rsplit("/", 1)[-1],
+        filepath=stored_key,
+        content_type=content_type,
+        file_size=size,
         uploaded_by=current_user.id,
     )
     db.add(attachment)
@@ -234,8 +239,20 @@ def download_attachment(
         raise HTTPException(status_code=404, detail="Project not found")
     _check_attachment_access(project_id, current_user, db, "viewer")
 
-    # Path traversal 방어
-    filepath = _safe_filepath(UPLOAD_DIR, att.filepath)
+    storage = get_storage()
+    # 배포(Supabase)는 짧은 서명 주소로 넘긴다. 함수가 파일을 중계하면 응답 한도(4.5MB)와
+    # 실행 시간에 걸린다. 권한 확인은 위에서 끝났다.
+    try:
+        url = storage.download_url(att.filepath, att.filename)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if url:
+        return RedirectResponse(url, status_code=302)
+
+    try:
+        filepath = storage.local_path(att.filepath)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Access denied")
     if not os.path.isfile(filepath):
         raise HTTPException(status_code=404, detail="File not found on disk")
 
@@ -265,12 +282,7 @@ def delete_attachment(
         raise HTTPException(status_code=404, detail="Project not found")
     _check_attachment_access(project_id, current_user, db, "tester")
 
-    try:
-        filepath = _safe_filepath(UPLOAD_DIR, att.filepath)
-        if os.path.isfile(filepath):
-            os.remove(filepath)
-    except HTTPException:
-        pass
+    delete_attachment_objects([att.filepath])
 
     db.delete(att)
     db.commit()

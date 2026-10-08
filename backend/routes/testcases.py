@@ -24,6 +24,7 @@ from services.import_service import (
 from services.export_service import export_testcases_excel
 from services.sheet_order import leaf_sheet_order
 from services.upload_guard import read_limited_sync
+from services.staged_upload import resolve_file
 from services.tc_numbering import park_sheet_numbers, renumber_sheet
 from services.run_sync_service import sync_project_in_progress_runs
 
@@ -564,11 +565,13 @@ def clone_testcase(
 @router.post("/import/preview")
 def preview_import_sheets(
     project_id: int,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    upload_id: Optional[str] = Query(None, description="스테이징 업로드 id. file 대신 보낸다"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
 ):
     """엑셀/CSV/Markdown 파일의 시트 목록과 각 시트의 TC 수, 기존 중복 수를 반환한다."""
+    file = resolve_file(db, current_user, "tc_import", file, upload_id)
     if _is_csv_file(file.filename):
         # ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온 뒤다.
         content = read_limited_sync(file.file, MAX_IMPORT_SIZE)
@@ -604,12 +607,14 @@ def preview_import_sheets(
 @router.post("/import", status_code=status.HTTP_201_CREATED)
 def import_testcases(
     project_id: int,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
     sheet_names: Optional[str] = Query(None, description="쉼표 구분 시트명 (미지정 시 전체)"),
+    upload_id: Optional[str] = Query(None, description="스테이징 업로드 id. file 대신 보낸다"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
 ):
     _get_project_or_404(project_id, db)
+    file = resolve_file(db, current_user, "tc_import", file, upload_id)
 
     # CSV 파일 처리
     if _is_csv_file(file.filename):
