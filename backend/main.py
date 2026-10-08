@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
     from alembic import command as alembic_command
     from alembic.script import ScriptDirectory
     from database import engine
-    from services.schema_version import assert_known_revision
+    from services.schema_version import assert_known_revision, schema_status
 
     # script_location 은 alembic.ini 의 %(here)s 기준이라 작업 폴더와 무관하다.
     # 접속 주소는 alembic/env.py 가 환경변수에서 직접 읽는다.
@@ -56,6 +56,15 @@ async def lifespan(app: FastAPI):
     # 서버리스에서는 끈다. 실행 환경마다 동시에 돌기 때문이다. 배포 워크플로가 대신 한다.
     if os.getenv("RUN_MIGRATIONS_ON_STARTUP", "1") == "1":
         alembic_command.upgrade(alembic_cfg, "head")
+        app.state.schema_behind = False
+    else:
+        # 마이그레이션을 직접 하지 않으면, DB 가 코드보다 옛것인지 보고 API 를 503 으로 막는다.
+        # 옛 스키마에서 새 코드가 돌면 없는 칸을 찾다 500 이 나고 이유가 드러나지 않는다.
+        with engine.connect() as conn:
+            status = schema_status(conn, ScriptDirectory.from_config(alembic_cfg))
+        app.state.schema_behind = status in ("empty", "behind")
+        if app.state.schema_behind:
+            logger.error("DB 스키마가 코드보다 옛 버전이다(%s). 배포 마이그레이션을 확인한다.", status)
 
     # 로컬은 기동 때 정리한다. 서버리스는 Cron(/api/internal/cron/daily)이 한다.
     if os.getenv("RUN_MAINTENANCE_ON_STARTUP", "1") == "1":
@@ -82,6 +91,22 @@ app.add_middleware(
     # 서버가 정한 파일 이름을 읽으려면 열어 둬야 한다.
     expose_headers=["Content-Disposition"],
 )
+
+# ── Schema guard (serverless) ────────────────────────────────────────────────
+_SCHEMA_EXEMPT = ("/api/config",)
+
+
+@app.middleware("http")
+async def schema_guard(request: Request, call_next):
+    if (getattr(request.app.state, "schema_behind", False)
+            and request.url.path.startswith("/api/")
+            and request.url.path not in _SCHEMA_EXEMPT):
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "DB 스키마가 코드보다 옛 버전입니다. 배포 마이그레이션을 확인하세요."},
+        )
+    return await call_next(request)
+
 
 # ── Security headers middleware ──────────────────────────────────────────────
 @app.middleware("http")

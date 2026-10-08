@@ -54,3 +54,70 @@ def test_코드가_모르는_새_리비전은_막지_않는다(conn):
     conn.execute(text("CREATE TABLE alembic_version (version_num varchar(32) primary key)"))
     conn.execute(text("INSERT INTO alembic_version VALUES ('0099_future')"))
     assert_known_revision(conn, _script_dir())
+
+
+# ── 서버리스 기동: 스키마가 코드보다 옛것이면 503 ───────────────────────────────
+
+from services.schema_version import schema_status  # noqa: E402
+
+
+def _set_rev(conn, rev):
+    conn.execute(text("CREATE TABLE alembic_version (version_num varchar(32) primary key)"))
+    conn.execute(text("INSERT INTO alembic_version VALUES (:r)"), {"r": rev})
+
+
+def test_빈_DB_는_미초기화(conn):
+    assert schema_status(conn, _script_dir()) == "empty"
+
+
+def test_head_면_current(conn):
+    _set_rev(conn, _script_dir().get_current_head())
+    assert schema_status(conn, _script_dir()) == "current"
+
+
+def test_옛_리비전이면_behind(conn):
+    _set_rev(conn, "0001_pg_baseline")
+    assert schema_status(conn, _script_dir()) == "behind"
+
+
+def test_모르는_새_리비전이면_ahead(conn):
+    _set_rev(conn, "0099_future")
+    assert schema_status(conn, _script_dir()) == "ahead"
+
+
+def test_스키마가_뒤처지면_API_는_503_헬스와_설정은_통과(monkeypatch):
+    from fastapi.testclient import TestClient
+    from main import app
+
+    client = TestClient(app)
+    app.state.schema_behind = True
+    try:
+        r = client.get("/api/projects")
+        assert r.status_code == 503
+        assert "마이그레이션" in r.json()["detail"]
+        assert client.get("/").status_code == 200
+        assert client.get("/api/config").status_code == 200
+    finally:
+        app.state.schema_behind = False
+
+
+def test_마이그레이션을_끈_기동에서_빈_DB_면_API_가_503():
+    import subprocess
+    import sys
+
+    url = testing_db.create_database(prefix="ymtc_sv_boot")
+    code = (
+        "from fastapi.testclient import TestClient\n"
+        "from main import app\n"
+        "with TestClient(app) as c:\n"
+        "    print(c.get('/api/projects').status_code, c.get('/').status_code)\n"
+    )
+    env = dict(os.environ, DATABASE_URL=url, DATABASE_URL_DIRECT="", RUN_MIGRATIONS_ON_STARTUP="0",
+               RUN_MAINTENANCE_ON_STARTUP="0")
+    try:
+        r = subprocess.run([sys.executable, "-c", code], cwd=BACKEND, env=env,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+    finally:
+        testing_db.drop_database(url)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.split()[-2:] == ["503", "200"]

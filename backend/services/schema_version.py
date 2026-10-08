@@ -39,3 +39,20 @@ def assert_known_revision(conn, script_dir: ScriptDirectory) -> None:
     newer = [r for r in current if r not in known]
     if newer:
         logger.warning("DB 스키마 리비전 %s 를 이 코드가 모른다. 코드보다 새 스키마(롤백 상태)로 본다.", newer)
+
+
+def schema_status(conn, script_dir: ScriptDirectory) -> str:
+    """DB 스키마와 코드의 관계. empty / current / behind / ahead.
+
+    ahead 는 코드가 모르는 더 새 리비전(롤백 상태)이다. 막지 않는다.
+    """
+    if "alembic_version" not in inspect(conn).get_table_names():
+        return "empty"
+    current = {r[0] for r in conn.execute(text("SELECT version_num FROM alembic_version"))}
+    if not current:
+        return "empty"
+    known = {rev.revision for rev in script_dir.walk_revisions()}
+    if current - known:
+        return "ahead"
+    heads = set(script_dir.get_heads())
+    return "current" if current == heads else "behind"
