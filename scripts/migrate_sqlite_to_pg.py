@@ -411,3 +411,159 @@ def _verify_sequences(conn, tables) -> list[str]:
             nxt = last + 1 if called else last
             problems.append(f"{table}: 시퀀스 다음 값이 {nxt} 입니다. {(top or 0) + 1} 이어야 합니다")
     return problems
+
+
+# ── 첨부 ─────────────────────────────────────────────────────────────────────
+
+ATTACHMENT_PREFIX = "attachments/"
+
+
+@dataclass
+class AttachmentReport:
+    moved: list = field(default_factory=list)
+    skipped_same: list = field(default_factory=list)
+    #: uploads 에만 있고 DB 행이 없는 파일. 옮기지 않고 목록만 남긴다
+    orphan_files: list = field(default_factory=list)
+
+
+def _sha(data: bytes) -> str:
+    import hashlib
+    return hashlib.sha256(data).hexdigest()
+
+
+def migrate_attachments(conn, uploads_dir: str, storage) -> AttachmentReport:
+    """DB 행이 있는 첨부를 attachments/<파일명> 키로 올리고 filepath 를 바꾼다.
+
+    다시 실행해도 안전하다: 같은 키에 같은 해시가 있으면 건너뛴다. 다른 내용이 있으면 멈춘다.
+    원본 파일은 지우지 않는다. Storage 업로드는 DB 트랜잭션 밖의 일이라 filepath 갱신만 트랜잭션에 든다.
+    """
+    from sqlalchemy import text
+
+    from services.storage import check_key
+
+    rep = AttachmentReport()
+    root = Path(uploads_dir)
+    on_disk = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()} if root.is_dir() else set()
+    referenced = set()
+    rows = conn.execute(text("SELECT id, filepath, content_type FROM attachments ORDER BY id")).all()
+    for att_id, filepath, content_type in rows:
+        name = filepath[len(ATTACHMENT_PREFIX):] if filepath.startswith(ATTACHMENT_PREFIX) else filepath
+        referenced.add(name)
+        key = ATTACHMENT_PREFIX + name
+        try:
+            check_key(key)
+        except ValueError:
+            raise MigrationError([f"첨부 {att_id}: 저장소 키로 쓸 수 없는 파일 이름입니다: {name!r}"])
+        local = root / name
+        if not local.is_file():
+            raise MigrationError([f"첨부 {att_id}: uploads 에 파일이 없습니다: {name}"])
+        data = local.read_bytes()
+        want = _sha(data)
+        if storage.size(key) is not None:
+            if _sha(storage.read(key, len(data) + 1)) != want:
+                raise MigrationError([f"첨부 {att_id}: 저장소의 {key} 가 원본 {name} 과 내용이 다릅니다"])
+            rep.skipped_same.append(att_id)
+        else:
+            storage.put(key, data, content_type)
+            if _sha(storage.read(key, len(data) + 1)) != want:
+                raise MigrationError([f"첨부 {att_id}: 올린 뒤 다시 읽은 {key} 의 해시가 다릅니다"])
+            rep.moved.append(att_id)
+        if filepath != key:
+            conn.execute(text("UPDATE attachments SET filepath = :k WHERE id = :i"), {"k": key, "i": att_id})
+    rep.orphan_files = sorted(on_disk - referenced)
+    return rep
+
+
+# ── 실행 ─────────────────────────────────────────────────────────────────────
+
+def _run_attachments(eng, uploads: str, after_data: bool = False) -> int:
+    from services.storage import get_storage
+
+    try:
+        with eng.begin() as conn:
+            rep = migrate_attachments(conn, uploads, get_storage())
+    except MigrationError:
+        if after_data:
+            print("데이터는 옮겼고 첨부 단계에서 멈췄습니다. 원인을 고친 뒤 --attachments-only 로 다시 실행하세요",
+                  file=sys.stderr)
+        raise
+    print(f"첨부: 이동 {rep.moved}, 이미 있음 {rep.skipped_same}, DB 행 없는 파일(옮기지 않음) {rep.orphan_files}")
+    return 0
+
+
+def _parse_orphan(s: str) -> tuple[str, int]:
+    table, _, rid = s.partition(":")
+    if not table or not rid.isdigit():
+        raise ValueError(f"--allow-orphan 형식은 테이블:id 입니다: {s}")
+    return table, int(rid)
+
+
+def main(argv=None) -> int:
+    import argparse
+
+    p = argparse.ArgumentParser(description="SQLite(v1.10.3.1) -> PostgreSQL 데이터 이관")
+    p.add_argument("--source", required=True, help="원본 SQLite 파일(읽기 전용으로 연다)")
+    p.add_argument("--target", required=True, help="대상 PostgreSQL 주소. 직결 또는 세션 풀러")
+    p.add_argument("--uploads", help="원본 첨부 폴더(backend/uploads). 첨부 행이 있으면 실제 실행에 필요")
+    p.add_argument("--allow-orphan", action="append", default=[], metavar="TABLE:ID",
+                   help="FK 고아 행을 옮기지 않고 제외한다. 여러 번 줄 수 있다")
+    p.add_argument("--excluded-out", default="excluded_rows.json", help="제외한 행을 보관할 JSON")
+    p.add_argument("--dry-run", action="store_true", help="점검·복사·검증 후 되돌린다. 첨부는 건드리지 않는다")
+    p.add_argument("--attachments-only", action="store_true",
+                   help="데이터는 이미 옮겼고 첨부 단계만 다시 돈다(첨부 단계가 실패했을 때)")
+    a = p.parse_args(argv)
+
+    os.environ["DATABASE_URL"] = a.target  # 모델 임포트용
+    os.environ["DATABASE_URL_DIRECT"] = ""
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import NullPool
+
+    try:
+        allow = {_parse_orphan(s) for s in a.allow_orphan}
+        src = open_source(a.source)
+        eng = create_engine(a.target, poolclass=NullPool)
+        if a.attachments_only:
+            if not a.uploads:
+                raise MigrationError(["--attachments-only 에는 --uploads 가 필요합니다"])
+            return _run_attachments(eng, a.uploads)
+        pre = precheck(src, eng, allow)
+        n_att = src.execute("SELECT count(*) FROM attachments").fetchone()[0]
+        if n_att and not a.dry_run and not a.uploads:
+            raise MigrationError([f"첨부 {n_att}건이 있습니다. --uploads 로 원본 첨부 폴더를 주세요"])
+        Path(a.excluded_out).write_text(json.dumps(pre.excluded_rows, ensure_ascii=False, indent=1, default=str),
+                                        encoding="utf-8")
+        with eng.connect() as conn:
+            trans = conn.begin()
+            counts = copy_all(src, conn, pre.excluded)
+            fix_sequences(conn)
+            problems = verify(src, conn, pre.excluded)
+            if problems:
+                trans.rollback()
+                raise MigrationError(["검증 실패. 아무것도 남기지 않았습니다"] + problems)
+            if a.dry_run:
+                trans.rollback()
+            else:
+                trans.commit()
+        for t, n in counts.items():
+            print(f"  {t}: {n}")
+        excluded = {t: sorted(ids) for t, ids in pre.excluded.items()}
+        print(f"제외: {excluded} -> {a.excluded_out}")
+        if a.dry_run:
+            print("dry-run: 점검, 복사, 검증 통과. 되돌렸습니다")
+            return 0
+        print("데이터 이관 완료(검증 통과)")
+        if n_att:
+            return _run_attachments(eng, a.uploads, after_data=True)
+        return 0
+    except (MigrationError, ValueError) as e:
+        problems = e.problems if isinstance(e, MigrationError) else [str(e)]
+        print("이관을 멈췄습니다:", file=sys.stderr)
+        for line in problems:
+            print("  - " + line, file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+    sys.exit(main())
