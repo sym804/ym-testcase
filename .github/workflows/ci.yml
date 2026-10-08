@@ -196,3 +196,7 @@ jobs:
           TEST_DATABASE_ADMIN_URL: postgresql+psycopg2://ymtc:ymtc@localhost:54329/ymtc
         run: python -m pytest -q --tb=short -k "not test_dompurify_installed"
         timeout-minutes: 20
+
+      - name: devctl 단위 테스트
+        run: python -m pytest -q scripts/test_devctl_db.py
+        timeout-minutes: 5

@@ -402,9 +402,9 @@ class TestRunResponse(BaseModel):
     def _round_default(cls, v):
         """비어 있으면 1 라운드로 읽는다.
 
-        ★컬럼은 NOT NULL 로 변경했지만(e5a83f21c760) 마이그레이션 전 DB 를 보는
-          서버가 있으면 여기서 다시 터진다. 목록 응답 하나가 못 만들어지면 그
-          프로젝트의 수행 목록 전체가 500 이 되므로 읽는 쪽도 견디게 둔다.
+        ★컬럼은 NOT NULL 이다(SQLite 시절 e5a83f21c760 에서 바꿨고 기준점도 같다).
+          SQLite 에서 옮겨 온 옛 행에 NULL 이 섞여 있을 수 있어 읽는 쪽도 견디게 둔다.
+          목록 응답 하나가 못 만들어지면 그 프로젝트의 수행 목록 전체가 500 이 된다.
         """
         return 1 if v is None else v
     results: List[TestResultResponse] = []
@@ -436,9 +436,9 @@ class TestRunListResponse(BaseModel):
     def _round_default(cls, v):
         """비어 있으면 1 라운드로 읽는다.
 
-        ★컬럼은 NOT NULL 로 변경했지만(e5a83f21c760) 마이그레이션 전 DB 를 보는
-          서버가 있으면 여기서 다시 터진다. 목록 응답 하나가 못 만들어지면 그
-          프로젝트의 수행 목록 전체가 500 이 되므로 읽는 쪽도 견디게 둔다.
+        ★컬럼은 NOT NULL 이다(SQLite 시절 e5a83f21c760 에서 바꿨고 기준점도 같다).
+          SQLite 에서 옮겨 온 옛 행에 NULL 이 섞여 있을 수 있어 읽는 쪽도 견디게 둔다.
+          목록 응답 하나가 못 만들어지면 그 프로젝트의 수행 목록 전체가 500 이 된다.
         """
         return 1 if v is None else v
 

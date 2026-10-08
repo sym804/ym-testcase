@@ -32,10 +32,16 @@ def migrated_url():
     testing_db.drop_database(url)
 
 
-def test_리비전은_하나다():
-    versions = os.path.join(BACKEND, "alembic", "versions")
-    files = sorted(f for f in os.listdir(versions) if f.endswith(".py"))
-    assert files == ["0001_postgresql_baseline.py"]
+def test_기준점이_첫_리비전이고_옛_SQLite_리비전은_없다():
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from services.schema_version import LEGACY_SQLITE_REVISIONS
+
+    cfg = Config(os.path.join(BACKEND, "alembic.ini"))
+    revs = {r.revision: r for r in ScriptDirectory.from_config(cfg).walk_revisions()}
+    bases = [r for r in revs.values() if r.down_revision is None]
+    assert [b.revision for b in bases] == ["0001_pg_baseline"]
+    assert not (set(revs) & LEGACY_SQLITE_REVISIONS)
 
 
 def test_모델과_차이가_없다(migrated_url):
@@ -44,7 +50,8 @@ def test_모델과_차이가_없다(migrated_url):
 
     eng = create_engine(migrated_url)
     with eng.connect() as conn:
-        diff = compare_metadata(MigrationContext.configure(conn), Base.metadata)
+        ctx = MigrationContext.configure(conn, opts={"compare_server_default": True, "compare_type": True})
+        diff = compare_metadata(ctx, Base.metadata)
     eng.dispose()
     assert diff == []
 
@@ -76,3 +83,28 @@ def test_FK_삭제_동작이_모델과_같다(migrated_url):
             got = db_fks[key].upper() if db_fks.get(key) else None
             assert got == want, (table.name, key, got, want)
     eng.dispose()
+
+
+def test_enum_값이_모델과_같다(migrated_url):
+    """compare_metadata 는 enum 값 목록을 비교하지 않는다. 단위 테스트는 create_all 로
+    스키마를 만들어서 기준점과 모델의 enum 이 어긋나도 안 보인다."""
+    import enum as _enum
+
+    import models
+    from sqlalchemy import Enum as SAEnum
+
+    want = {}
+    for table in models.Base.metadata.sorted_tables:
+        for col in table.columns:
+            if isinstance(col.type, SAEnum) and col.type.name:
+                want[col.type.name] = list(col.type.enums)
+    eng = create_engine(migrated_url)
+    with eng.connect() as conn:
+        got = {}
+        for name, label in conn.execute(text(
+            "SELECT t.typname, e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid "
+            "ORDER BY t.typname, e.enumsortorder"
+        )):
+            got.setdefault(name, []).append(label)
+    eng.dispose()
+    assert got == want

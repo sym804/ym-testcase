@@ -247,17 +247,69 @@ def test_park_moves_zero_behind_imported_rows(session):
     assert _state(s, pid, "결제") == [(new, 1), (old, 2)]
 
 
-def test_소프트_삭제가_사이에_끼어도_살아_있는_TC_가_1부터_이어진다(session):
-    """PostgreSQL 은 유니크 제약을 행마다 즉시 검사한다. 비켜 두기 없이 쓰면 걸린다."""
+def test_소프트_삭제가_섞여도_목표_번호를_쥔_행과_부딪치지_않는다(session):
+    """살아 있는 행이 서로의 목표 번호를 쥐고 있어도(3 -> 2 인데 2 가 아직 있다) 매겨진다.
+
+    ★이 테스트는 비켜 두기를 빼도 대개 통과한다(2026-10-08 확인). PostgreSQL 이 순위
+      부분 질의 순서대로 갱신하면 번호가 줄어드는 방향이라 충돌이 안 난다. 그 순서는
+      실행 계획에 달린 것이라 보장이 아니므로 구현은 두 단계를 유지한다. 여기서는
+      삭제된 행이 섞인 상태의 결과만 고정한다.
+    """
     from services.tc_numbering import renumber_sheet
 
     s, pid, uid = session
-    a = _add(s, pid, uid, "S", 5, "TC-A")
-    _add(s, pid, uid, "S", 2, "TC-B", deleted=True)
-    c = _add(s, pid, uid, "S", 9, "TC-C")
-    d = _add(s, pid, uid, "S", 7, "TC-D")
+    # 삽입 순서를 번호와 거꾸로 둔다. PostgreSQL 은 대개 물리 순서로 갱신하므로,
+    # 먼저 넣은 행(3 -> 2)이 아직 2 를 쥔 행보다 먼저 바뀌어 충돌이 드러난다.
+    d = _add(s, pid, uid, "S", 4, "TC-D")
+    c = _add(s, pid, uid, "S", 3, "TC-C")
+    b = _add(s, pid, uid, "S", 2, "TC-B")
+    _add(s, pid, uid, "S", 1, "TC-DEL", deleted=True)
 
     renumber_sheet(pid, "S", s)
     s.expire_all()
 
-    assert _state(s, pid, "S") == [(a, 1), (d, 2), (c, 3)]
+    assert _state(s, pid, "S") == [(b, 1), (c, 2), (d, 3)]
+
+
+def test_다른_프로젝트의_같은_시트_이름은_건드리지_않는다(session):
+    import models
+    from services.tc_numbering import renumber_sheet
+
+    s, pid, uid = session
+    other = models.Project(name="P2", created_by=uid)
+    s.add(other)
+    s.flush()
+    x = _add(s, other.id, uid, "S", 7, "TC-X")
+    _add(s, pid, uid, "S", 5, "TC-A")
+
+    renumber_sheet(pid, "S", s)
+    s.expire_all()
+
+    assert _state(s, other.id, "S") == [(x, 7)]
+
+
+def test_두_번_돌려도_같다(session):
+    from services.tc_numbering import renumber_sheet
+
+    s, pid, uid = session
+    for no in (9, 4, 6):
+        _add(s, pid, uid, "S", no, f"TC-{no}")
+    renumber_sheet(pid, "S", s)
+    s.expire_all()
+    first = _state(s, pid, "S")
+    renumber_sheet(pid, "S", s)
+    s.expire_all()
+    assert _state(s, pid, "S") == first
+
+
+def test_500행_역순도_한_번에_매긴다(session):
+    """순위를 한 번만 매기는지 본다. 바꾼 값 위에서 다시 매기면 순서가 뒤섞인다."""
+    from sqlalchemy import text
+    from services.tc_numbering import renumber_sheet
+
+    s, pid, uid = session
+    ids = [_add(s, pid, uid, "S", n, f"TC-{n}") for n in range(1, 501)]
+    s.execute(text("UPDATE test_cases SET no = 1001 - no WHERE project_id = :p"), {"p": pid})
+    renumber_sheet(pid, "S", s)
+    s.expire_all()
+    assert _state(s, pid, "S") == [(i, 501 - k) for k, i in enumerate(ids, start=1)][::-1]
