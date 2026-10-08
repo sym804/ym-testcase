@@ -110,7 +110,7 @@ _TC_ID_INDEX = "uq_test_cases_project_tc_id"
 @app.exception_handler(IntegrityError)
 async def integrity_error_handler(request: Request, exc: IntegrityError):
     detail = str(getattr(exc, "orig", exc))
-    if _TC_ID_INDEX in detail or "test_cases.project_id, test_cases.tc_id" in detail:
+    if _TC_ID_INDEX in detail:
         logger.info("TC ID 중복 거절: %s %s", request.method, request.url.path)
         return JSONResponse(
             status_code=409,
