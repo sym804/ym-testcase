@@ -108,3 +108,43 @@ def test_concurrent_bulk_clone_gives_distinct_numbers(token, seeded):
     nos = _nos(token, pid, "결제")
     assert len(nos) == len(set(nos)), f"같은 시트에 같은 번호가 둘 이상이다: {nos}"
     assert nos == list(range(1, FANOUT + 2)), f"번호가 이어지지 않는다: {nos}"
+
+
+def test_API_키로_동시에_복제해도_번호가_겹치지_않는다(token, seeded):
+    """API 키 인증은 사용 시각을 커밋한 뒤 잠금을 잡는다. 그 순서에서도 잠금이 유지되는지 본다."""
+    pid, tc_id = seeded
+    r = requests.post(f"{BASE}/api/auth/api-keys", headers=auth(token),
+                      json={"name": "clone-race", "expires_days": 30})
+    assert r.status_code == 201, r.text
+    key_h = {"Authorization": "Bearer " + r.json()["key"]}
+    barrier = threading.Barrier(FANOUT)
+
+    def clone(_):
+        barrier.wait()
+        return requests.post(f"{BASE}/api/projects/{pid}/testcases/{tc_id}/clone", headers=key_h)
+
+    with ThreadPoolExecutor(max_workers=FANOUT) as pool:
+        statuses = [r.status_code for r in pool.map(clone, range(FANOUT))]
+    assert statuses == [201] * FANOUT, f"API 키 동시 복제 중 실패가 있다: {statuses}"
+    assert _nos(token, pid, "결제") == list(range(1, FANOUT + 2))
+
+
+def test_다음_회차를_동시에_만들어도_회차가_겹치지_않는다(token, seeded):
+    """다음 회차는 max(round)+1 이다. 유니크 제약이 없어(같은 회차는 정상 흐름) 잠금만이 막는다."""
+    pid, _ = seeded
+    h = auth(token)
+    r = requests.post(f"{BASE}/api/projects/{pid}/testruns", headers=h, json={"name": "회귀"})
+    assert r.status_code == 201, r.text
+    run_id = r.json()["id"]
+    barrier = threading.Barrier(FANOUT)
+
+    def next_round(_):
+        barrier.wait()
+        return requests.post(f"{BASE}/api/projects/{pid}/testruns/{run_id}/clone",
+                             headers=h, params={"next_round": "true"})
+
+    with ThreadPoolExecutor(max_workers=FANOUT) as pool:
+        responses = list(pool.map(next_round, range(FANOUT)))
+    assert [x.status_code for x in responses] == [201] * FANOUT, [x.text for x in responses]
+    rounds = sorted(x.json()["round"] for x in responses)
+    assert rounds == list(range(2, FANOUT + 2)), f"회차가 겹치거나 빈다: {rounds}"
