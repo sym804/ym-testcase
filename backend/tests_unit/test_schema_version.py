@@ -86,31 +86,29 @@ def test_모르는_새_리비전이면_ahead(conn):
 
 
 def test_스키마가_뒤처지면_API_는_503_헬스와_설정은_통과(monkeypatch):
-    from fastapi.testclient import TestClient
+    from asgi_testing import asgi_get
     from main import app
 
-    client = TestClient(app)
     app.state.schema_behind = True
     try:
-        r = client.get("/api/projects")
-        assert r.status_code == 503
-        assert "마이그레이션" in r.json()["detail"]
-        assert client.get("/").status_code == 200
-        assert client.get("/api/config").status_code == 200
+        status, body = asgi_get(app, "/api/projects")
+        assert status == 503
+        assert "마이그레이션" in body["detail"]
+        assert asgi_get(app, "/")[0] == 200
+        assert asgi_get(app, "/api/config")[0] == 200
     finally:
         app.state.schema_behind = False
 
 
-def test_마이그레이션을_끈_기동에서_빈_DB_면_API_가_503():
+def test_마이그레이션을_끈_서버에서_빈_DB_면_API_가_503():
     import subprocess
     import sys
 
     url = testing_db.create_database(prefix="ymtc_sv_boot")
     code = (
-        "from fastapi.testclient import TestClient\n"
+        "from asgi_testing import asgi_get\n"
         "from main import app\n"
-        "with TestClient(app) as c:\n"
-        "    print(c.get('/api/projects').status_code, c.get('/').status_code)\n"
+        "print(asgi_get(app, '/api/projects')[0], asgi_get(app, '/')[0])\n"
     )
     env = dict(os.environ, DATABASE_URL=url, DATABASE_URL_DIRECT="", RUN_MIGRATIONS_ON_STARTUP="0",
                RUN_MAINTENANCE_ON_STARTUP="0")
@@ -130,22 +128,21 @@ def test_옛_SQLite_리비전은_legacy(conn):
 
 def test_뒤처짐_판정은_시간이_지나면_다시_본다(monkeypatch):
     """한번 뒤처짐으로 판정한 인스턴스가 마이그레이션 뒤에도 계속 503 을 내지 않게."""
-    from fastapi.testclient import TestClient
+    from asgi_testing import asgi_get
     import main
 
     monkeypatch.setenv("RUN_MIGRATIONS_ON_STARTUP", "0")
-    client = TestClient(main.app)
     main.app.state.schema_behind = True
     main.app.state.schema_checked_at = 0.0  # 오래전에 본 것으로
     try:
-        r = client.get("/api/projects")
-        assert r.status_code != 503, r.text  # 세션 DB 는 head 라 다시 보면 통과
+        status, body = asgi_get(main.app, "/api/projects")
+        assert status != 503, body  # 세션 DB 는 head 라 다시 보면 통과
     finally:
         main.app.state.schema_behind = False
 
 
 def test_판정이_실패하면_503(monkeypatch):
-    from fastapi.testclient import TestClient
+    from asgi_testing import asgi_get
     import main
 
     def boom(_app):
@@ -153,13 +150,12 @@ def test_판정이_실패하면_503(monkeypatch):
 
     monkeypatch.setenv("RUN_MIGRATIONS_ON_STARTUP", "0")
     monkeypatch.setattr(main, "_check_schema", boom)
-    client = TestClient(main.app, raise_server_exceptions=False)
     state = main.app.state
     saved = {k: getattr(state, k) for k in ("schema_behind", "schema_checked_at") if hasattr(state, k)}
     for k in saved:
         delattr(state, k)
     try:
-        assert client.get("/api/projects").status_code == 503
+        assert asgi_get(main.app, "/api/projects")[0] == 503
     finally:
         for k, v in saved.items():
             setattr(state, k, v)
