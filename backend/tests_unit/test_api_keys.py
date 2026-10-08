@@ -29,7 +29,6 @@ from auth import hash_password
 from database import get_db
 from main import app
 from models import ApiKey, Project, User, UserRole, now_kst
-from routes import auth as auth_routes
 
 PW = "Passw0rd!long"
 
@@ -95,7 +94,8 @@ def env(pg_engine, tmp_path, server):
             s.close()
 
     app.dependency_overrides[get_db] = _db
-    auth_routes._login_failures.clear()
+    from services import rate_limit
+    rate_limit.clear_all()
     yield server, db
     app.dependency_overrides.clear()
     db.close()
