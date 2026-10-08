@@ -443,7 +443,9 @@ def migrate_attachments(conn, uploads_dir: str, storage) -> AttachmentReport:
 
     rep = AttachmentReport()
     root = Path(uploads_dir)
-    on_disk = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()} if root.is_dir() else set()
+    # .gitkeep 같은 숨김 파일은 첨부가 아니다
+    on_disk = {p.relative_to(root).as_posix() for p in root.rglob("*")
+               if p.is_file() and not p.name.startswith(".")} if root.is_dir() else set()
     referenced = set()
     rows = conn.execute(text("SELECT id, filepath, content_type FROM attachments ORDER BY id")).all()
     for att_id, filepath, content_type in rows:
