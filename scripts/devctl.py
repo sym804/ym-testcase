@@ -99,7 +99,7 @@ def start_backend() -> None:
             stdout=f, stderr=subprocess.STDOUT,
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if IS_WINDOWS else 0,
         )
-    ok = wait_until_up(f"{BACKEND_URL}/docs")
+    ok = wait_until_up(f"{BACKEND_URL}/api/docs")
     print(f"  백엔드 {BACKEND_URL} {'기동' if ok else '응답 없음 - ' + log}")
 
 
@@ -168,7 +168,7 @@ def cmd_down(args) -> int:
 
 def cmd_status(args) -> int:
     for name, port, url in (
-        ("백엔드", BACKEND_PORT, f"{BACKEND_URL}/docs"),
+        ("백엔드", BACKEND_PORT, f"{BACKEND_URL}/api/docs"),
         ("프론트", FRONTEND_PORT, FRONTEND_URL),
     ):
         pids = listening_pids(port)
