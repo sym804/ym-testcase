@@ -72,6 +72,17 @@ class LocalStorage:
             if os.path.isfile(path):
                 os.remove(path)
 
+    def list_keys(self, prefix: str = "") -> list[str]:
+        """백업용. 모든 객체 키."""
+        base = self.root
+        out = []
+        for dirpath, _dirs, files in os.walk(base):
+            for f in files:
+                rel = os.path.relpath(os.path.join(dirpath, f), base).replace(os.sep, "/")
+                if rel.startswith(prefix):
+                    out.append(rel)
+        return out
+
     def local_path(self, key: str) -> str:
         """로컬 다운로드 스트리밍용 실제 경로."""
         return self._path(key)
@@ -135,6 +146,24 @@ class SupabaseStorage:
     def delete(self, keys: list[str]) -> None:
         if keys:
             self._json("DELETE", f"/object/{self.bucket}", {"prefixes": [check_key(k) for k in keys]})
+
+    def list_keys(self, prefix: str = "") -> list[str]:
+        """백업용. 폴더(id 가 없는 항목)를 따라 내려가며 모든 객체 키를 모은다."""
+        out: list[str] = []
+        stack = [prefix.strip("/")]
+        while stack:
+            folder = stack.pop()
+            offset = 0
+            while True:
+                items = self._json("POST", f"/object/list/{self.bucket}",
+                                   {"prefix": folder, "limit": 1000, "offset": offset})
+                for it in items:
+                    path = f"{folder}/{it['name']}" if folder else it["name"]
+                    (stack.append if it.get("id") is None else out.append)(path)
+                if len(items) < 1000:
+                    break
+                offset += 1000
+        return out
 
     def upload_target(self, key: str, content_type: str | None) -> dict | None:
         res = self._json("POST", f"/object/upload/sign/{self.bucket}/{urllib.parse.quote(check_key(key))}")

@@ -1,0 +1,72 @@
+# 운영 배포. 순서를 강제한다: 테스트 -> 운영 DB 마이그레이션 -> Vercel 배포.
+# 공개 레포에서는 돌지 않는다. 조직의 비공개 레포에서 저장소 변수 DEPLOY_ENABLED=true 로 켠다.
+# 필요한 비밀값: DATABASE_URL_DIRECT, VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+# Vercel 의 Git 자동 배포는 운영(Production)에 대해 끈다. 안 끄면 마이그레이션 전에 새 코드가 뜬다.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ymtc
+          POSTGRES_PASSWORD: ymtc
+          POSTGRES_DB: ymtc
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ymtc -d ymtc"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 백엔드 의존성
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: 백엔드 테스트
+        working-directory: backend
+        env:
+          TEST_ADMIN_PASSWORD: test1234
+          TEST_DATABASE_ADMIN_URL: postgresql+psycopg2://ymtc:ymtc@localhost:54329/ymtc
+        run: python -m pytest -q --tb=short -k "not test_dompurify_installed"
+        timeout-minutes: 20
+
+      # 직결(또는 세션 풀러) 주소로 한다. 트랜잭션 풀러로는 DDL 을 하지 않는다.
+      - name: 운영 DB 마이그레이션
+        working-directory: backend
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DIRECT }}
+        run: python -m alembic upgrade head
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Vercel 배포
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npm install --global vercel@latest
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          vercel build --prod --token="$VERCEL_TOKEN"
+          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
