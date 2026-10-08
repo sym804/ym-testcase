@@ -166,7 +166,6 @@ class TestCase(Base):
         Index(
             "uq_test_cases_project_tc_id", "project_id", "tc_id",
             unique=True,
-            sqlite_where=text("deleted_at IS NULL"),
             postgresql_where=text("deleted_at IS NULL"),
         ),
         # no 는 시트 안 순번이라 겹치면 안 된다. 규칙만 두면 어긋난다. 신규 생성,
@@ -175,7 +174,6 @@ class TestCase(Base):
         Index(
             "uq_test_cases_sheet_no", "project_id", "sheet_name", "no",
             unique=True,
-            sqlite_where=text("deleted_at IS NULL"),
             postgresql_where=text("deleted_at IS NULL"),
         ),
     )
