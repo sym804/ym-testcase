@@ -36,6 +36,12 @@ from routes import uploads as upload_routes
 from routes import internal as internal_routes
 # Import models so Base.metadata knows about all tables
 import models  # noqa: F401
+from services.runtime_env import check_serverless_config, env_flag
+
+# ★lifespan 이 아니라 임포트 시점에 검사한다. 서버리스 런타임이 ASGI lifespan 을
+#   부른다는 보장이 없다. 콜드 스타트마다 모듈은 반드시 임포트된다.
+logging.basicConfig()
+check_serverless_config()
 
 
 @asynccontextmanager
@@ -44,7 +50,7 @@ async def lifespan(app: FastAPI):
     from alembic import command as alembic_command
     from alembic.script import ScriptDirectory
     from database import engine
-    from services.schema_version import assert_known_revision, schema_status
+    from services.schema_version import assert_known_revision
 
     # script_location 은 alembic.ini 의 %(here)s 기준이라 작업 폴더와 무관하다.
     # 접속 주소는 alembic/env.py 가 환경변수에서 직접 읽는다.
@@ -54,20 +60,14 @@ async def lifespan(app: FastAPI):
         assert_known_revision(conn, ScriptDirectory.from_config(alembic_cfg))
 
     # 서버리스에서는 끈다. 실행 환경마다 동시에 돌기 때문이다. 배포 워크플로가 대신 한다.
-    if os.getenv("RUN_MIGRATIONS_ON_STARTUP", "1") == "1":
+    if env_flag("RUN_MIGRATIONS_ON_STARTUP"):
         alembic_command.upgrade(alembic_cfg, "head")
         app.state.schema_behind = False
     else:
-        # 마이그레이션을 직접 하지 않으면, DB 가 코드보다 옛것인지 보고 API 를 503 으로 막는다.
-        # 옛 스키마에서 새 코드가 돌면 없는 칸을 찾다 500 이 나고 이유가 드러나지 않는다.
-        with engine.connect() as conn:
-            status = schema_status(conn, ScriptDirectory.from_config(alembic_cfg))
-        app.state.schema_behind = status in ("empty", "behind")
-        if app.state.schema_behind:
-            logger.error("DB 스키마가 코드보다 옛 버전이다(%s). 배포 마이그레이션을 확인한다.", status)
+        _check_schema(app)
 
     # 로컬은 기동 때 정리한다. 서버리스는 Cron(/api/internal/cron/daily)이 한다.
-    if os.getenv("RUN_MAINTENANCE_ON_STARTUP", "1") == "1":
+    if env_flag("RUN_MAINTENANCE_ON_STARTUP"):
         _purge_old_deleted_testcases()
     yield
 
@@ -96,8 +96,32 @@ app.add_middleware(
 _SCHEMA_EXEMPT = ("/api/config",)
 
 
+def _check_schema(target_app) -> None:
+    """DB 스키마가 코드보다 옛것인지 판정해 둔다. 마이그레이션을 직접 하지 않는 기동에서만.
+
+    옛 스키마에서 새 코드가 돌면 없는 칸을 찾다 500 이 나고 이유가 드러나지 않는다.
+    """
+    from alembic.config import Config as AlembicConfig
+    from alembic.script import ScriptDirectory
+    from database import engine
+    from services.schema_version import schema_status
+
+    cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), "alembic.ini"))
+    with engine.connect() as conn:
+        status = schema_status(conn, ScriptDirectory.from_config(cfg))
+    target_app.state.schema_behind = status in ("empty", "behind")
+    if target_app.state.schema_behind:
+        logger.error("DB 스키마가 코드보다 옛 버전이다(%s). 배포 마이그레이션을 확인한다.", status)
+
+
 @app.middleware("http")
 async def schema_guard(request: Request, call_next):
+    # lifespan 을 부르지 않는 런타임에서는 첫 요청 때 한 번 판정한다.
+    if not hasattr(request.app.state, "schema_behind"):
+        if env_flag("RUN_MIGRATIONS_ON_STARTUP"):
+            request.app.state.schema_behind = False
+        else:
+            _check_schema(request.app)
     if (getattr(request.app.state, "schema_behind", False)
             and request.url.path.startswith("/api/")
             and request.url.path not in _SCHEMA_EXEMPT):

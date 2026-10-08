@@ -30,7 +30,9 @@ DATABASE_URL = require_database_url()
 _engine_kwargs = {"pool_pre_ping": True}
 # 서버리스는 실행 환경이 수시로 생기고 사라져 풀을 들고 있을 이유가 없다.
 # 연결 재사용은 Supabase 풀러가 맡는다.
-if os.getenv("DB_POOL") == "null":
+from services.runtime_env import env_value  # noqa: E402
+
+if env_value("DB_POOL") == "null":
     _engine_kwargs["poolclass"] = NullPool
 
 engine = create_engine(DATABASE_URL, **_engine_kwargs)
