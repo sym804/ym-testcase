@@ -100,16 +100,63 @@ if (o["run-id"]) {
   if (o.sheets !== undefined) params.set("sheet_names", o.sheets);
 }
 
-const form = new FormData();
-form.append("file", new Blob([readFileSync(file)]), basename(file));
+const content = readFileSync(file);
 
+// 스테이징 업로드: 서버가 지원하면 업로드 주소를 받아 파일을 그곳에 직접 올리고 upload_id 만 보낸다.
+// 배포(Vercel)는 요청 본문을 4.5MB 까지만 받아 큰 결과 파일은 이 길로만 올라간다.
+// 옛 서버(404)는 예전처럼 multipart 로 보낸다.
+async function stageUpload() {
+  let r;
+  try {
+    r = await fetch(`${base}/api/uploads`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        purpose: "result_import",
+        filename: basename(file),
+        size: content.length,
+        content_type: "application/octet-stream",
+      }),
+    });
+  } catch (e) {
+    fail(`서버에 연결하지 못했습니다 (${base}): ${e.cause?.code || e.message}`);
+  }
+  if (r.status === 404 || r.status === 405) return null;
+  const t = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const detail = typeof t.detail === "string" ? t.detail : JSON.stringify(t.detail ?? t);
+    fail(`HTTP ${r.status}: ${detail}`);
+  }
+  // 발급 주소는 저장소의 절대 주소(배포)이거나 서버의 상대 주소(로컬)다. 저장소에는 API 키를 싣지 않는다.
+  const url = /^https?:\/\//.test(t.url) ? t.url : `${base}${t.url}`;
+  let put;
+  try {
+    put = await fetch(url, { method: t.method || "PUT", headers: t.headers || {}, body: content });
+  } catch (e) {
+    fail(`결과 파일을 올리지 못했습니다: ${e.cause?.code || e.message}`);
+  }
+  if (!put.ok) fail(`결과 파일을 올리지 못했습니다: HTTP ${put.status}`);
+  return t.upload_id;
+}
+
+const uploadId = await stageUpload();
 let res;
 try {
-  res = await fetch(`${base}${path}?${params}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}` },
-    body: form,
-  });
+  if (uploadId) {
+    params.set("upload_id", uploadId);
+    res = await fetch(`${base}${path}?${params}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}` },
+    });
+  } else {
+    const form = new FormData();
+    form.append("file", new Blob([content]), basename(file));
+    res = await fetch(`${base}${path}?${params}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}` },
+      body: form,
+    });
+  }
 } catch (e) {
   fail(`서버에 연결하지 못했습니다 (${base}): ${e.cause?.code || e.message}`);
 }

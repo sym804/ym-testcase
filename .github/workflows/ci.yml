@@ -197,6 +197,6 @@ jobs:
         run: python -m pytest -q --tb=short -k "not test_dompurify_installed"
         timeout-minutes: 20
 
-      - name: devctl 단위 테스트
-        run: python -m pytest -q scripts/test_devctl_db.py
+      - name: 스크립트 테스트 (devctl, CI 업로드 CLI)
+        run: python -m pytest -q scripts/test_devctl_db.py scripts/test_ymtc_upload.py
         timeout-minutes: 5
