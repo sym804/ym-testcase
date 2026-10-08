@@ -34,14 +34,11 @@ def _models():
 
 
 @pytest.fixture
-def session(tmp_path):
-    from sqlalchemy import create_engine
+def session(pg_engine, tmp_path):
     from sqlalchemy.orm import sessionmaker
 
     m = _models()
-    url = f"sqlite:///{(tmp_path / 'round.db').as_posix()}"
-    engine = create_engine(url)
-    m.Base.metadata.create_all(engine)
+    engine = pg_engine
     s = sessionmaker(bind=engine)()
     yield s, engine
     s.close()

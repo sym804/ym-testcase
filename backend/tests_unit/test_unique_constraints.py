@@ -13,18 +13,15 @@ BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BACKEND not in sys.path:
     sys.path.insert(0, BACKEND)
 
-from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
-from models import Base, Project, ProjectMember, TestCaseSheet, User
+from models import Project, ProjectMember, TestCaseSheet, User
 
 
 @pytest.fixture
-def db(tmp_path):
-    url = f"sqlite:///{tmp_path / 'uniq.db'}".replace("\\", "/")
-    engine = create_engine(url, connect_args={"check_same_thread": False})
-    Base.metadata.create_all(engine)
+def db(pg_engine, tmp_path):
+    engine = pg_engine
     session = sessionmaker(bind=engine)()
     yield session
     session.close()

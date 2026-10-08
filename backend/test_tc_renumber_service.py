@@ -18,16 +18,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 @pytest.fixture
-def session(tmp_path):
+def session(pg_engine, tmp_path):
     """모델 그대로 만든 DB. 유니크 인덱스가 걸려 있다."""
-    from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
     import models
 
-    url = f"sqlite:///{(tmp_path / 'renumber.db').as_posix()}"
-    engine = create_engine(url)
-    models.Base.metadata.create_all(engine)
+    engine = pg_engine
     s = sessionmaker(bind=engine)()
 
     user = models.User(username="u", password_hash="x", display_name="U")

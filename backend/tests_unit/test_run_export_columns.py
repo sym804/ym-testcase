@@ -19,11 +19,11 @@ if BACKEND not in sys.path:
 
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
-from sqlalchemy import create_engine, event
+from sqlalchemy import event
 from sqlalchemy.orm import sessionmaker
 
 from models import (
-    Base, Project, TestCase, TestCaseSheet, TestResult, TestRun, TestResultValue, User,
+    Project, TestCase, TestCaseSheet, TestResult, TestRun, TestResultValue, User,
 )
 from routes.reports import report_excel
 from routes.testruns import export_testrun_excel
@@ -33,19 +33,9 @@ PRECONDITION = chr(10).join(["1. 로그인한 상태", "2. TC-002 의 사전조�
 
 
 @pytest.fixture
-def db(tmp_path):
-    engine = create_engine(
-        f"sqlite:///{(tmp_path / 'run_export.db').as_posix()}",
-        connect_args={"check_same_thread": False},
-    )
+def db(pg_engine, tmp_path):
+    engine = pg_engine
 
-    @event.listens_for(engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
-
-    Base.metadata.create_all(engine)
     s = sessionmaker(bind=engine)()
     yield s
     s.close()

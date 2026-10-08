@@ -16,10 +16,9 @@ if BACKEND not in sys.path:
     sys.path.insert(0, BACKEND)
 
 from fastapi import HTTPException
-from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from models import Base, Project, TestCase, TestCaseSheet, TestResult, TestResultValue, TestRun, User
+from models import Project, TestCase, TestCaseSheet, TestResult, TestResultValue, TestRun, User
 from routes.testruns import submit_results
 from schemas import TestResultCreate
 
@@ -27,16 +26,9 @@ R = TestResultValue
 
 
 @pytest.fixture
-def env(tmp_path):
-    engine = create_engine(f"sqlite:///{(tmp_path / 'lock.db').as_posix()}", connect_args={"check_same_thread": False})
+def env(pg_engine, tmp_path):
+    engine = pg_engine
 
-    @event.listens_for(engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
-
-    Base.metadata.create_all(engine)
     db = sessionmaker(bind=engine)()
     a = User(username="a", password_hash="x", display_name="A", role="admin")
     b = User(username="b", password_hash="x", display_name="B", role="admin")

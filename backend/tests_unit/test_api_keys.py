@@ -23,13 +23,12 @@ BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BACKEND not in sys.path:
     sys.path.insert(0, BACKEND)
 
-from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from auth import hash_password
 from database import get_db
 from main import app
-from models import ApiKey, Base, Project, User, UserRole, now_kst
+from models import ApiKey, Project, User, UserRole, now_kst
 from routes import auth as auth_routes
 
 PW = "Passw0rd!long"
@@ -76,16 +75,9 @@ def server():
 
 
 @pytest.fixture
-def env(tmp_path, server):
-    engine = create_engine(f"sqlite:///{(tmp_path / 'keys.db').as_posix()}", connect_args={"check_same_thread": False})
+def env(pg_engine, tmp_path, server):
+    engine = pg_engine
 
-    @event.listens_for(engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
-
-    Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     db = Session()
     admin = User(username="boss", password_hash=hash_password(PW), display_name="B", role=UserRole.admin)
