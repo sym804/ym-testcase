@@ -123,8 +123,30 @@ def claim_for_attachment(db: Session, upload_id: str, user: User) -> tuple[str, 
         raise HTTPException(status_code=400, detail="파일이 아직 올라오지 않았습니다.")
     if size > PURPOSE_LIMITS["attachment"]:
         raise _too_large(PURPOSE_LIMITS["attachment"])
-    row.consumed_at = now_kst()
-    return row.filename, row.content_type, size, row.storage_key
+    filename, content_type, key = row.filename, row.content_type, row.storage_key
+    # ★스테이징 기록을 지운다. 이 객체는 이제 첨부의 것이라 스테이징 정리 대상이 아니다.
+    #   기록을 남겨 두면 정리 작업이 하루 뒤 첨부 파일을 지운다(QA 2인 지적, 재현).
+    db.delete(row)
+    return filename, content_type, size, key
+
+
+#: 처리되지 않았거나 처리가 끝난 가져오기 업로드를 지우는 기준
+STAGED_TTL = timedelta(days=1)
+
+
+def cleanup_staging(db: Session) -> int:
+    """하루 지난 스테이징 업로드의 객체와 기록을 지운다. 커밋은 부른 쪽이 한다.
+
+    첨부로 쓰인 업로드는 claim 때 기록이 지워지므로 여기 남아 있지 않다. 남은 것은
+    버려진 업로드와 처리가 끝난 가져오기 파일뿐이다. Cron 과 로컬 기동 정리가 같이 쓴다.
+    """
+    stale = db.query(StagedUpload).filter(StagedUpload.created_at < now_kst() - STAGED_TTL).all()
+    if not stale:
+        return 0
+    get_storage().delete([row.storage_key for row in stale])
+    for row in stale:
+        db.delete(row)
+    return len(stale)
 
 
 class BytesUpload:

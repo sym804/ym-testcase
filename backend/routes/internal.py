@@ -7,28 +7,20 @@
 import hmac
 import logging
 import os
-from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import StagedUpload, now_kst
-from services import rate_limit
 from services.locks import LockNs
-from services.purge_service import purge_deleted_testcases
+from services.maintenance import run_daily
 from services.staged_upload import PURPOSE_LIMITS
-from services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["internal"])
 
-#: 처리되지 않은 스테이징 업로드를 지우는 기준
-STAGED_TTL = timedelta(days=1)
-#: 횟수 제한 기록 보존 기간. 가장 긴 창(접수 1시간)보다 넉넉하게
-RATE_LIMIT_KEEP_SEC = 2 * 24 * 3600
 
 
 @router.get("/api/config")
@@ -61,20 +53,4 @@ def cron_daily(request: Request, db: Session = Depends(get_db)):
     if not got:
         return {"skipped": "running"}
 
-    cutoff = now_kst() - STAGED_TTL
-    stale = db.query(StagedUpload).filter(StagedUpload.created_at < cutoff).all()
-    keys = [row.storage_key for row in stale]
-    try:
-        get_storage().delete(keys)
-    except Exception:  # noqa: BLE001  객체 삭제 실패는 다음 날 다시 시도한다
-        logger.warning("Failed to delete stale staged objects: %d", len(keys), exc_info=True)
-        stale = []
-    for row in stale:
-        db.delete(row)
-
-    purged = purge_deleted_testcases(db, commit=False)
-    db.commit()
-    events = rate_limit.purge_older_than(RATE_LIMIT_KEEP_SEC, engine=db.get_bind())
-    result = {"staged_uploads": len(stale), "testcases": purged, "rate_limit_events": events}
-    logger.info("cron daily: %s", result)
-    return result
+    return run_daily(db)

@@ -187,7 +187,7 @@ def delete_project(
         result_ids = [r.id for r in db.query(TestResult.id).filter(TestResult.test_run_id.in_(run_ids)).all()]
         if result_ids:
             attachments = db.query(Attachment).filter(Attachment.test_result_id.in_(result_ids)).all()
-            delete_attachment_objects([att.filepath for att in attachments])
+            delete_attachment_objects([att.filepath for att in attachments], db)
 
     db.delete(project)
     db.commit()

@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User, TestResult, TestRun, Attachment
+from models import User, TestResult, TestRun, Attachment, StorageDeletion
 from schemas import AttachmentResponse
 from services.upload_guard import read_limited
 from services.staged_upload import claim_for_attachment
@@ -57,15 +57,20 @@ def _validate_extension(filename: str) -> str:
     return ext
 
 
-def delete_attachment_objects(keys: list) -> None:
-    """첨부 객체를 저장소에서 지운다. 실패해도 DB 삭제는 막지 않는다(고아 객체는 정리 대상)."""
+def delete_attachment_objects(keys: list, db: Session) -> None:
+    """첨부 객체를 저장소에서 지운다. 실패해도 DB 삭제는 막지 않는다.
+
+    ★실패한 키는 storage_deletions 에 남긴다. 첨부 기록이 지워지면 객체를 다시 찾을 수
+      없으므로, 일일 정리(services/maintenance.py)가 이 기록으로 다시 지운다.
+    """
     keys = [k for k in keys if k]
     if not keys:
         return
     try:
         get_storage().delete(keys)
     except Exception:  # noqa: BLE001  저장소 장애로 프로젝트·수행 삭제가 막히면 안 된다
-        logger.warning("Failed to delete attachment objects: %s", keys, exc_info=True)
+        logger.warning("Failed to delete attachment objects, queued for retry: %d", len(keys), exc_info=True)
+        db.add_all([StorageDeletion(storage_key=k) for k in keys])
 
 
 def _get_project_id_from_test_result(test_result_id: int, db: Session) -> Optional[int]:
@@ -282,7 +287,7 @@ def delete_attachment(
         raise HTTPException(status_code=404, detail="Project not found")
     _check_attachment_access(project_id, current_user, db, "tester")
 
-    delete_attachment_objects([att.filepath])
+    delete_attachment_objects([att.filepath], db)
 
     db.delete(att)
     db.commit()

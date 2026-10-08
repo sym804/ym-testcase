@@ -159,3 +159,29 @@ def test_프로젝트를_지우면_첨부_객체도_지운다(h):
     db.close()
     assert requests.delete(f"{BASE}/api/projects/{pid}", headers=h).status_code in (200, 204)
     assert get_storage().size(key) is None
+
+
+def test_upload_id_로_붙인_첨부는_하루가_지나_Cron_이_돌아도_남는다(h, project, monkeypatch):
+    """claim 한 스테이징 키가 첨부 파일 경로가 된다. Cron 이 그 객체를 지우면 첨부가 사라진다."""
+    from datetime import timedelta
+
+    from database import SessionLocal
+    from models import Attachment, StagedUpload, now_kst
+    from services.storage import get_storage
+
+    _, result_id = _run_with_results(h, project)
+    uid = _staged(h, "attachment", "shot.png", PNG)
+    att = requests.post(f"{BASE}/api/attachments/{result_id}", headers=h, params={"upload_id": uid}).json()
+    db = SessionLocal()
+    db.query(StagedUpload).filter(StagedUpload.id == uid).update(
+        {"created_at": now_kst() - timedelta(days=2)})
+    db.commit()
+    key = db.query(Attachment).filter(Attachment.id == att["id"]).one().filepath
+    db.close()
+
+    monkeypatch.setenv("CRON_SECRET", "s3cret")
+    r = requests.get(f"{BASE}/api/internal/cron/daily", headers={"Authorization": "Bearer s3cret"})
+    assert r.status_code == 200, r.text
+    assert get_storage().size(key) == len(PNG), "Cron 이 첨부 객체를 지웠다"
+    d = requests.get(f"{BASE}/api/attachments/download/{att['id']}", headers=h)
+    assert d.status_code == 200 and d.content == PNG
