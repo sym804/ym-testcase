@@ -8,8 +8,11 @@ vi.mock("../api/client", () => ({
   },
 }));
 
+// 업로드는 스테이징으로 먼저 올리고 upload_id 만 보낸다. 그 흐름은 uploads.test.ts 가 본다.
+vi.mock("../api/uploads", () => ({ stageUpload: vi.fn().mockResolvedValue("uid-1") }));
 import client from "../api/client";
 import { testCasesApi } from "../api";
+import { stageUpload } from "../api/uploads";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -78,7 +81,7 @@ describe("testCasesApi", () => {
   });
 
   describe("previewImport", () => {
-    it("POST /api/projects/{id}/testcases/import/preview 를 FormData와 함께 호출한다", async () => {
+    it("POST /api/projects/{id}/testcases/import/preview 를 upload_id 와 함께 호출한다", async () => {
       const preview = { sheets: [{ name: "Sheet1", tc_count: 15 }] };
       vi.mocked(client.post).mockResolvedValue({ data: preview });
 
@@ -90,13 +93,11 @@ describe("testCasesApi", () => {
 
       expect(client.post).toHaveBeenCalledWith(
         "/api/projects/5/testcases/import/preview",
-        expect.any(FormData),
-        { headers: { "Content-Type": "multipart/form-data" } }
+        null,
+        { params: { upload_id: "uid-1" } }
       );
-      // FormData에 file이 포함되어 있는지 확인
-      const callArgs = vi.mocked(client.post).mock.calls[0];
-      const formData = callArgs[1] as FormData;
-      expect(formData.get("file")).toBe(file);
+      // 파일은 스테이징 업로드로 같은 목적에 넘겼는지 확인
+      expect(stageUpload).toHaveBeenCalledWith("tc_import", file);
       expect(result).toEqual(preview);
     });
   });
@@ -112,11 +113,8 @@ describe("testCasesApi", () => {
 
       expect(client.post).toHaveBeenCalledWith(
         "/api/projects/6/testcases/import",
-        expect.any(FormData),
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-          params: { sheet_names: "기능,UI" },
-        }
+        null,
+        { params: { sheet_names: "기능,UI", upload_id: "uid-1" } }
       );
       expect(result).toEqual(importResult);
     });
@@ -133,11 +131,8 @@ describe("testCasesApi", () => {
 
       expect(client.post).toHaveBeenCalledWith(
         "/api/projects/6/testcases/import",
-        expect.any(FormData),
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-          params: {},
-        }
+        null,
+        { params: { upload_id: "uid-1" } }
       );
       expect(result).toEqual(importResult);
     });

@@ -10,6 +10,8 @@ vi.mock("../api/client", () => ({
   },
 }));
 
+// 업로드는 스테이징으로 먼저 올리고 upload_id 만 보낸다. 그 흐름은 uploads.test.ts 가 본다.
+vi.mock("../api/uploads", () => ({ stageUpload: vi.fn().mockResolvedValue("uid-1") }));
 import client from "../api/client";
 import {
   authApi,
@@ -196,15 +198,15 @@ describe("testCasesApi", () => {
     expect(result).toEqual(tc);
   });
 
-  it("importExcel sends FormData with file and sheet_names param", async () => {
+  it("importExcel sends upload_id and sheet_names param", async () => {
     const resp = { created: 5, updated: 2, imported: 7, sheets: [] };
     mockPost.mockResolvedValueOnce({ data: resp });
     const file = new File(["content"], "test.xlsx");
     const result = await testCasesApi.importExcel(1, file, ["Sheet1", "Sheet2"]);
     expect(mockPost).toHaveBeenCalledWith(
       "/api/projects/1/testcases/import",
-      expect.any(FormData),
-      { headers: { "Content-Type": "multipart/form-data" }, params: { sheet_names: "Sheet1,Sheet2" } }
+      null,
+      { params: { sheet_names: "Sheet1,Sheet2", upload_id: "uid-1" } }
     );
     expect(result).toEqual(resp);
   });
@@ -216,21 +218,21 @@ describe("testCasesApi", () => {
     const result = await testCasesApi.importExcel(1, file);
     expect(mockPost).toHaveBeenCalledWith(
       "/api/projects/1/testcases/import",
-      expect.any(FormData),
-      { headers: { "Content-Type": "multipart/form-data" }, params: {} }
+      null,
+      { params: { upload_id: "uid-1" } }
     );
     expect(result).toEqual(resp);
   });
 
-  it("previewImport sends FormData", async () => {
+  it("previewImport sends upload_id", async () => {
     const resp = { sheets: [{ name: "S1", tc_count: 10, existing: 3 }] };
     mockPost.mockResolvedValueOnce({ data: resp });
     const file = new File(["content"], "test.xlsx");
     const result = await testCasesApi.previewImport(1, file);
     expect(mockPost).toHaveBeenCalledWith(
       "/api/projects/1/testcases/import/preview",
-      expect.any(FormData),
-      { headers: { "Content-Type": "multipart/form-data" } }
+      null,
+      { params: { upload_id: "uid-1" } }
     );
     expect(result).toEqual(resp);
   });
@@ -551,15 +553,15 @@ describe("attachmentsApi", () => {
     expect(result).toEqual(attachments);
   });
 
-  it("upload sends FormData with file", async () => {
+  it("upload sends upload_id", async () => {
     const attachment = { id: 1, filename: "test.png" };
     mockPost.mockResolvedValueOnce({ data: attachment });
     const file = new File(["img"], "test.png");
     const result = await attachmentsApi.upload(10, file);
     expect(mockPost).toHaveBeenCalledWith(
       "/api/attachments/10",
-      expect.any(FormData),
-      { headers: { "Content-Type": "multipart/form-data" } }
+      null,
+      { params: { upload_id: "uid-1" } }
     );
     expect(result).toEqual(attachment);
   });

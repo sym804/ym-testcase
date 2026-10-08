@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { tooLargeMessage } from "../api/uploads";
 import toast from "react-hot-toast";
 import { testRunsApi } from "../api";
 import { translateError } from "../utils/errorMessage";
@@ -46,7 +47,7 @@ export default function ResultImportModal({ projectId, run, onClose, onApplied }
       }
     } catch (err) {
       const detail = errorDetail(err);
-      toast.error(detail ? translateError(detail) : t("importFailed"));
+      toast.error(tooLargeMessage(err, t) ?? (detail ? translateError(detail) : t("importFailed")));
     } finally {
       setBusy(false);
     }

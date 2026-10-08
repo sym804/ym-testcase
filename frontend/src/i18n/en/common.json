@@ -70,5 +70,7 @@
   },
   "selectProject": "Select project",
   "selectRow": "Select this project",
-  "addRowCount": "Rows to add"
+  "addRowCount": "Rows to add",
+  "uploadTooLarge": "File is too large. The limit is {{mb}}MB.",
+  "uploadTooLargeNoLimit": "File is too large."
 }
