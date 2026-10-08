@@ -340,3 +340,119 @@ def test_검증기는_틀린_대상을_잡는다(tmp_path, dst, mig, sql, word):
     _tamper(dst, sql)
     problems = _verify(mig, src, pre, dst)
     assert any(word in p for p in problems), problems
+
+
+# ── Task 4: 첨부 이관과 실행 진입점 ─────────────────────────────────────────
+
+PNG_BYTES = b"\x89PNG-test"
+
+
+def _uploads(tmp_path, files):
+    d = tmp_path / "uploads"
+    d.mkdir(exist_ok=True)
+    for name, data in files.items():
+        (d / name).write_bytes(data)
+    return str(d)
+
+
+def _committed(mig, tmp_path, dst):
+    _copied(mig, tmp_path, dst)
+
+
+def test_첨부를_새_키로_올리고_해시를_대조한_뒤_filepath_를_바꾼다(tmp_path, dst, mig):
+    from services.storage import LocalStorage
+    _committed(mig, tmp_path, dst)
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES, "orphan.png": b"x", "old.jpg": b"y"})
+    st = LocalStorage(str(tmp_path / "store"))
+    with dst.begin() as conn:
+        rep = mig.migrate_attachments(conn, up, st)
+    assert rep.moved == [1] and rep.skipped_same == []
+    assert rep.orphan_files == ["old.jpg", "orphan.png"]
+    assert _q(dst, "SELECT filepath FROM attachments WHERE id = 1") == [("attachments/abc.png",)]
+    assert st.read("attachments/abc.png", 100) == PNG_BYTES
+    assert os.path.exists(os.path.join(up, "abc.png")), "원본 파일을 지우면 안 된다"
+
+
+def test_다시_실행하면_건너뛴다(tmp_path, dst, mig):
+    from services.storage import LocalStorage
+    _committed(mig, tmp_path, dst)
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    st = LocalStorage(str(tmp_path / "store"))
+    with dst.begin() as conn:
+        mig.migrate_attachments(conn, up, st)
+    with dst.begin() as conn:
+        rep = mig.migrate_attachments(conn, up, st)
+    assert rep.moved == [] and rep.skipped_same == [1]
+
+
+def test_같은_키에_다른_내용이_있으면_멈춘다(tmp_path, dst, mig):
+    from services.storage import LocalStorage
+    _committed(mig, tmp_path, dst)
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    st = LocalStorage(str(tmp_path / "store"))
+    st.put("attachments/abc.png", b"different", "image/png")
+    with pytest.raises(mig.MigrationError, match="abc.png"):
+        with dst.begin() as conn:
+            mig.migrate_attachments(conn, up, st)
+    assert _q(dst, "SELECT filepath FROM attachments WHERE id = 1") == [("abc.png",)]
+
+
+def test_행은_있는데_파일이_없으면_멈춘다(tmp_path, dst, mig):
+    from services.storage import LocalStorage
+    _committed(mig, tmp_path, dst)
+    up = _uploads(tmp_path, {})
+    with pytest.raises(mig.MigrationError, match="abc.png"):
+        with dst.begin() as conn:
+            mig.migrate_attachments(conn, up, LocalStorage(str(tmp_path / "store")))
+
+
+def _argv(src, url, *extra):
+    return ["--source", src, "--target", url, "--allow-orphan", "test_case_history:347", *extra]
+
+
+def test_dry_run_은_검증까지_하고_되돌린다(tmp_path, dst, mig, target_url):
+    out = tmp_path / "excluded.json"
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--dry-run", "--excluded-out", str(out)))
+    assert code == 0
+    assert _q(dst, "SELECT count(*) FROM test_cases") == [(0,)]
+    saved = json.loads(out.read_text(encoding="utf-8"))
+    assert saved["test_case_history"][0]["id"] == 347
+
+
+def test_실행하면_데이터와_첨부를_옮긴다(tmp_path, dst, mig, target_url, monkeypatch):
+    monkeypatch.setenv("STORAGE_BACKEND", "local")
+    monkeypatch.setenv("UPLOAD_DIR", str(tmp_path / "store"))
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--uploads", up,
+                          "--excluded-out", str(tmp_path / "ex.json")))
+    assert code == 0
+    assert _q(dst, "SELECT count(*) FROM test_cases") == [(3,)]
+    assert _q(dst, "SELECT filepath FROM attachments") == [("attachments/abc.png",)]
+
+
+def test_첨부가_있는데_uploads_를_안_주면_아무것도_쓰지_않고_멈춘다(tmp_path, dst, mig, target_url):
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--excluded-out", str(tmp_path / "ex.json")))
+    assert code == 1
+    assert _q(dst, "SELECT count(*) FROM users") == [(0,)]
+
+
+def test_점검에_걸리면_종료코드_1_이고_대상은_비어_있다(tmp_path, dst, mig, target_url):
+    code = mig.main(["--source", make_legacy_db(tmp_path), "--target", target_url, "--dry-run",
+                     "--excluded-out", str(tmp_path / "ex.json")])
+    assert code == 1
+    assert _q(dst, "SELECT count(*) FROM users") == [(0,)]
+
+
+def test_첨부_단계만_다시_돌릴_수_있다(tmp_path, dst, mig, target_url, monkeypatch):
+    """데이터 커밋 뒤 첨부 단계가 실패하면, 대상이 이미 차 있어 전체 재실행은 사전 점검에서 막힌다."""
+    monkeypatch.setenv("STORAGE_BACKEND", "local")
+    monkeypatch.setenv("UPLOAD_DIR", str(tmp_path / "store"))
+    src = make_legacy_db(tmp_path)
+    empty = _uploads(tmp_path, {})
+    assert mig.main(_argv(src, target_url, "--uploads", empty, "--excluded-out", str(tmp_path / "ex.json"))) == 1
+    assert _q(dst, "SELECT filepath FROM attachments") == [("abc.png",)]  # 데이터는 들어갔고 첨부만 남았다
+
+    (tmp_path / "uploads" / "abc.png").write_bytes(PNG_BYTES)
+    assert mig.main(["--source", src, "--target", target_url, "--uploads", str(tmp_path / "uploads"),
+                     "--attachments-only"]) == 0
+    assert _q(dst, "SELECT filepath FROM attachments") == [("attachments/abc.png",)]
