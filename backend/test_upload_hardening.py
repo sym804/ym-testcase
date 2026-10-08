@@ -262,3 +262,30 @@ def test_dry_run_은_반환_전에_잠금을_푼다(h, project):
         assert _advisory_free(int(LockNs.RUN_RESULTS), run_id), "dry run 이 응답 뒤까지 회차 잠금을 쥐고 있다"
     finally:
         db.close()
+
+
+def test_업로드_PUT_은_반환_전에_업로드_잠금을_푼다(h):
+    """CI 에서 미리보기가 PUT 직후 409 를 받아 가져오기 E2E 가 간헐 실패했다(2026-10-09)."""
+    import asyncio
+    from database import SessionLocal
+    from routes.uploads import put_content
+    from services.staged_upload import upload_token
+    from models import StagedUpload
+
+    t = _issue(h, "tc_import", "t.csv", len(CSV))
+    uid = t["upload_id"]
+
+    class _Req:
+        async def stream(self):
+            yield CSV
+
+    db = SessionLocal()
+    try:
+        row = db.query(StagedUpload).filter(StagedUpload.id == uid).one()
+        token = upload_token(row)
+        db.rollback()
+        out = asyncio.run(put_content(uid, _Req(), token=token, db=db))
+        assert out["size"] == len(CSV)
+        assert _row_lockable(uid), "PUT 이 응답 뒤까지 스테이징 행을 잠그고 있다"
+    finally:
+        db.close()

@@ -131,6 +131,15 @@ jobs:
           --reporter=list
         timeout-minutes: 15
 
+      # 실패한 E2E 의 스크린샷과 페이지 스냅샷. CI 에서만 나는 실패를 로컬에서 재현하지 못할 때 쓴다
+      - name: E2E 실패 기록 보관
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results-${{ github.run_id }}
+          path: frontend/test-results
+          retention-days: 7
+
   install-matrix:
     name: Backend install (Python 3.12 / 3.14)
     runs-on: ubuntu-latest
