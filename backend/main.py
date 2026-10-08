@@ -79,6 +79,10 @@ app = FastAPI(
     description="Your Method, Your Test Case Manager",
     version="1.10.3.0",
     lifespan=lifespan,
+    # 배포는 /api/* 만 백엔드로 보낸다(vercel.json). 문서도 그 아래에 둔다.
+    docs_url="/api/docs",
+    redoc_url=None,
+    openapi_url="/api/openapi.json",
 )
 
 # CORS - use CORS_ORIGINS env var in production (comma-separated)

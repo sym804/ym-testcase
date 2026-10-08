@@ -31,7 +31,7 @@ run_dev.bat                    # Windows
 
 - 백엔드: http://localhost:8008 (8000 아님)
 - 프론트엔드: http://localhost:5173
-- API 문서: http://localhost:8008/docs
+- API 문서: http://localhost:8008/api/docs
 
 ### 첫 번째 사용자
 

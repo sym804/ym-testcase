@@ -353,7 +353,7 @@ npx tsc --noEmit`}</pre>
           <section id="api-ref" style={s.section}>
             <h2 style={s.h2}>{t("apiRef.title")}</h2>
             <div style={s.infoBox}>
-              {t("apiRef.swaggerInfo")} <a href="http://localhost:8008/docs" target="_blank" rel="noreferrer" style={{ color: "#2563EB" }}>http://localhost:8008/docs</a> {t("apiRef.swaggerInfoSuffix")}
+              {t("apiRef.swaggerInfo")} <a href="/api/docs" target="_blank" rel="noreferrer" style={{ color: "#2563EB" }}>/api/docs</a> {t("apiRef.swaggerInfoSuffix")}
             </div>
 
             {[

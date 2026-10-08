@@ -198,7 +198,7 @@ def _server():
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
 
-    _wait_for_server(f"{base_url}/docs")
+    _wait_for_server(f"{base_url}/api/docs")
 
     # admin 계정 시드
     _seed_admin(base_url, admin_pw)
