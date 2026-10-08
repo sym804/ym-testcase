@@ -151,32 +151,39 @@ RLS 의 영향을 받지 않는다. RLS 는 Supabase REST 노출 차단용이지
 이스케이프 문자로 쓰므로 검색어의 `%`, `_`, `\` 이스케이프를 확인한다.
 
 `services/run_sync_service.py` 의 SQLite 분기와, 전환 후 낡게 되는 "SQLite 전제" 주석
-(`services/first_admin.py`, `routes/testcases.py:428`, `database.py`, `.claude/skills/dev/SKILL.md` 등)을 정리한다.
+(`routes/testcases.py:428`, `database.py`, `.claude/skills/dev/SKILL.md` 등)을 정리한다.
 
 ## 동시성 계약
 
 SQLite 는 쓰기를 한 줄로 세워서 "읽고 판단한 뒤 쓰는" 코드가 우연히 안전했다. PostgreSQL 의
 READ COMMITTED 에서는 두 트랜잭션이 같은 값을 읽고 둘 다 쓴다. 바꿀 지점과 방법은 아래와 같다.
 
-번호 매기기는 프로젝트 단위 `pg_advisory_xact_lock` 으로 줄을 세운다. 잠금은 번호나 존재 여부를
-**읽기 전에** 잡는다. 대상은 TC 생성, 복제, 복원, 시트 이동, 엑셀 가져오기, 재정렬, 기본 시트 생성,
-시트 순서(`routes/sheets.py:384`), 다음 회차(`routes/testruns.py:791`)다. 잠금 키는 두 정수 형태로
-용도와 프로젝트 id 를 나눈다. 트랜잭션 잠금이라 같은 트랜잭션 안에서는 트랜잭션 풀러에서도 유지된다.
-중간 `commit()` 뒤의 작업은 잠금이 풀린 새 트랜잭션이므로, 잠금 구간 안의 `commit()` 을 정리한다.
+번호 매기기는 프로젝트 단위 `pg_advisory_xact_lock` 으로 줄을 세운다(`services/locks.py`). 잠금은
+번호나 존재 여부를 **읽기 전에** 잡는다. 대상은 TC 생성, 복제, 복원, 삭제, 재정렬, 시트 생성·이름
+변경·이동·삭제, 수행 생성, 다음 회차(`routes/testruns.py` 의 런 복제와 이름으로 결과 올리기)다.
+잠금 키는 두 정수 형태로 용도와 대상 id 를 나눈다. 트랜잭션 잠금이라 같은 트랜잭션 안에서는 트랜잭션
+풀러에서도 유지된다. 중간 `commit()` 뒤의 작업은 잠금이 풀린 새 트랜잭션이다.
 
-다음 회차는 유니크 제약도 없어 지금은 같은 회차가 둘 생길 수 있다. `(project_id, name, round)`
-유니크를 추가한다. 추가 전에 기존 데이터의 중복이 0건인지 확인한다.
+잠금 구간은 번호를 건드리는 부분으로 줄인다. 시트 이동이 없는 TC 수정(셀 자동 저장)과 일괄 수정은
+잠그지 않고, 이동이 있을 때만 그 자리에서 잡는다. 엑셀 가져오기는 업로드 수신과 워크북 로딩 뒤에 잡는다.
+잠금 대기는 `LOCK_WAIT_TIMEOUT_MS`(기본 10초)를 넘으면 409 와 재시도 안내로 끝낸다. 기다리는 요청은
+DB 연결을 쥐고 있어서, 상한이 없으면 긴 작업 하나가 다른 프로젝트의 연결까지 말린다.
 
-최초 관리자 판정(`services/first_admin.py`)은 전역 advisory lock 을 따로 쓴다. 공개 가입 자체를
-없애는 것은 하위 프로젝트 2 의 일이다.
+다음 회차에는 유니크 제약을 걸지 않는다. 수행 생성은 회차 기본값이 1이라 같은 이름으로 다시 만들면
+같은 회차가 생기는 것이 정상 흐름이고, 대시보드는 그 경우 가장 최근 수행을 쓴다
+(`tests_unit/test_dashboard_rounds.py`). 자동으로 정하는 다음 회차의 경쟁은 프로젝트 잠금이 막는다.
 
-실행 결과 수정의 충돌 검사(`routes/testruns.py:291`)는 수정 시각을 읽어 비교한 뒤 따로 UPDATE 한다.
-두 사람이 동시에 같은 결과를 고치면 둘 다 통과한다. 수정 시각이 내가 본 값일 때만 UPDATE 하는
-조건부 UPDATE 로 바꾸고, 영향 행이 0이면 충돌로 응답한다.
+최초 관리자 판정은 전역 advisory lock 으로 가입을 줄 세운다(`routes/auth.py` 의 `register`). 삽입 뒤
+강등하던 옛 방식은 지웠다. bcrypt 는 잠금 밖에서 한다. 공개 가입 자체를 없애는 것은 하위 프로젝트 2 의 일이다.
 
-1회용 코드 소비(`routes/account_requests.py:253`)는 조회, 검증, 소비 사이에 잠금이 없어 같은 코드로
+결과를 쓰는 세 경로(저장 `submit_results`, 파일 가져오기 `_record_import`, 누락 행 동기화
+`sync_run_results`)는 수행 단위 잠금을 먼저 잡는다. 가져오기가 결과를 읽고 판단한 사이 사람이 저장한
+값을 덮는 경쟁과, 누락 행을 서로 다른 순서로 넣는 교착을 막는다. 동기화는 넣을 행이 있을 때만 잡는다.
+저장은 그 안에서 결과 행을 `SELECT ... FOR UPDATE` 로 잠그고 읽어 충돌 검사(수정 시각 비교)를 한다.
+
+1회용 코드 소비(`routes/account_requests.py`)는 조회, 검증, 소비 사이에 잠금이 없어 같은 코드로
 두 번 비밀번호를 바꿀 수 있다. 요청 행을 `SELECT ... FOR UPDATE` 로 잠근 뒤 재검증하고 소비한다.
-하위 프로젝트 2 의 가입 코드도 이 함수를 쓴다.
+관리자 승인과 반려도 같은 행을 잠그고 상태를 본다. 하위 프로젝트 2 의 가입 코드도 이 방식을 쓴다.
 
 결과 행 일괄 생성은 이미 `ON CONFLICT DO NOTHING`(`services/run_sync_service.py:27`)이라 그대로 둔다.
 
@@ -184,7 +191,9 @@ READ COMMITTED 에서는 두 트랜잭션이 같은 값을 읽고 둘 다 쓴다
 
 로그인 실패 잠금(`routes/auth.py:28` `_login_failures`)과 계정 요청 제출 제한
 (`routes/account_requests.py:42` `_submit_hits`)은 프로세스 메모리에 있다. 실행 환경이 여러 개면
-각자 따로 센다. 둘 다 DB 테이블 하나(키, 시각)로 옮기고 오래된 행은 Cron 정리에서 지운다.
+각자 따로 센다. 둘 다 DB 테이블 `rate_limit_events`(버킷, 키, 시각)로 옮기고 오래된 행은 Cron 정리에서
+지운다. 기록은 요청 세션과 별도 트랜잭션으로 써서 실패 응답(401, 429)의 롤백에 휩쓸리지 않게 하고, 같은
+키는 요청 동안 advisory lock 으로 잠가 확인과 기록 사이에 동시 요청이 한도를 넘지 못하게 한다.
 
 두 제한 모두 `request.client.host` 를 키로 쓴다. Vercel 에서 이 값이 무엇으로 오는지 정해지지 않았다.
 상수로 오면 조직 전체가 한 IP 로 묶여 함께 잠기고, `X-Forwarded-For` 를 그대로 믿으면 위조된다.
@@ -220,7 +229,8 @@ Vercel 엣지의 413 은 JSON 이 아니므로 응답 형식에 기대지 않는
 
 DB 의 시각은 지금처럼 KST naive(`models.py` 의 `now_kst`)로 둔다. `timestamptz` 로 바꾸거나 UTC 로
 해석하면 기존 값이 9시간 어긋난다. 리포트 파일명과 생성 시각(`routes/reports.py:534`, `:770` 의
-`datetime.now()`)은 Vercel 에서 UTC 가 되므로 `ZoneInfo("Asia/Seoul")` 을 명시한다.
+`datetime.now()`)은 Vercel 에서 UTC 가 되므로 `models.now_kst` 와 같은 고정 오프셋(UTC+9)으로 낸다.
+`zoneinfo` 는 시간대 DB(`tzdata`)가 없는 환경에서 실패하고, 한국은 서머타임이 없다.
 
 PostgreSQL 과 SQLite 는 NULL 정렬 위치가 다르다(`resolved_at DESC` 등). 정렬에 nullable 칸이 들어가는
 쿼리는 `nulls_last()` 같은 명시로 지금 결과를 고정한다. 한글과 영문이 섞인 문자열 정렬은 DB collation
