@@ -293,3 +293,50 @@ def test_중간에_실패하면_대상은_빈_채로_남는다(tmp_path, dst, mi
             mig.copy_all(src, conn, pre.excluded)
     assert _q(dst, "SELECT count(*) FROM users") == [(0,)]
     assert _q(dst, "SELECT count(*) FROM projects") == [(0,)]
+
+
+# ── Task 3: 독립 검증 ───────────────────────────────────────────────────────
+
+def _copied(mig, tmp_path, dst):
+    src = mig.open_source(make_legacy_db(tmp_path))
+    pre = mig.precheck(src, dst, {("test_case_history", 347)})
+    with dst.begin() as conn:
+        mig.copy_all(src, conn, pre.excluded)
+        mig.fix_sequences(conn)
+    return src, pre
+
+
+def _verify(mig, src, pre, dst):
+    with dst.connect() as conn:
+        return mig.verify(src, conn, pre.excluded)
+
+
+def _tamper(dst, sql):
+    from sqlalchemy import text
+    with dst.begin() as conn:
+        conn.execute(text(sql))
+
+
+def test_그대로_옮긴_결과는_불일치가_없다(tmp_path, dst, mig):
+    src, pre = _copied(mig, tmp_path, dst)
+    assert _verify(mig, src, pre, dst) == []
+
+
+@pytest.mark.parametrize("sql, word", [
+    ("DELETE FROM attachments", "attachments"),
+    ("UPDATE test_cases SET tc_id = 'TC-9' WHERE id = 10", "test_cases.tc_id"),
+    ("UPDATE test_cases SET deleted_at = '2026-03-20 09:00:00.5001' WHERE id = 12", "test_cases.deleted_at"),
+    ("UPDATE users SET must_change_password = false WHERE id = 2", "users.must_change_password"),
+    ("UPDATE test_cases SET custom_fields = to_json('{\"env\": \"QA\", \"n\": 1.5}'::text) WHERE id = 12",
+     "test_cases.custom_fields"),
+    ("UPDATE test_cases SET custom_fields = NULL WHERE id = 11", "test_cases.custom_fields"),
+    ("UPDATE test_cases SET custom_fields = 'null'::json WHERE id = 10", "test_cases.custom_fields"),
+    ("UPDATE test_results SET duration_sec = 0.2 WHERE id = 7", "test_results.duration_sec"),
+    ("SELECT setval(pg_get_serial_sequence('users', 'id'), 3, true)", "users"),
+    ("SELECT setval(pg_get_serial_sequence('test_plans', 'id'), 1, true)", "test_plans"),
+])
+def test_검증기는_틀린_대상을_잡는다(tmp_path, dst, mig, sql, word):
+    src, pre = _copied(mig, tmp_path, dst)
+    _tamper(dst, sql)
+    problems = _verify(mig, src, pre, dst)
+    assert any(word in p for p in problems), problems

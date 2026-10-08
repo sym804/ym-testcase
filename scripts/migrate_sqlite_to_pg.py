@@ -318,3 +318,96 @@ def fix_sequences(conn) -> None:
             conn.execute(text("SELECT setval(:s, 1, false)"), {"s": seq})
         else:
             conn.execute(text("SELECT setval(:s, :v, true)"), {"s": seq, "v": top})
+
+
+# ── 독립 검증 ────────────────────────────────────────────────────────────────
+# 복사 쪽 변환 함수(_convert, _insert_rows)를 쓰지 않는다. 같은 변환으로 만든 값끼리 비교하면
+# 변환의 버그(예: JSON 이중 인코딩)가 그대로 통과한다. 대상은 DB 가 내는 ::text 로 읽고,
+# 원본 원문에서 그 텍스트가 어떻게 나와야 하는지를 대상 칸의 실제 DB 타입으로 따로 만든다.
+
+def _expected_timestamp_text(raw: str) -> str:
+    """PostgreSQL timestamp 의 텍스트는 소수 끝의 0 을 지우고, 소수가 0 이면 점째 뺀다."""
+    s = raw.replace("T", " ")
+    if "." not in s:
+        return s
+    head, frac = s.split(".", 1)
+    frac = frac.rstrip("0")
+    return head + ("." + frac if frac else "")
+
+
+def _same(data_type: str, raw, got) -> bool:
+    if raw is None or got is None:
+        return raw is None and got is None
+    if data_type == "boolean":
+        return {0: "false", 1: "true"}.get(raw) == got
+    if data_type.startswith("timestamp"):
+        return _expected_timestamp_text(raw) == got
+    if data_type in ("json", "jsonb"):
+        return json.loads(raw) == json.loads(got)
+    if data_type in ("double precision", "real", "numeric"):
+        return float(raw) == float(got)
+    return str(raw) == got
+
+
+def verify(src, conn, excluded: dict) -> list[str]:
+    """불일치 사유 목록. 비어 있으면 통과."""
+    from sqlalchemy import text
+
+    types = {(t, c): d for t, c, d in conn.execute(text(
+        "SELECT table_name, column_name, data_type FROM information_schema.columns "
+        "WHERE table_schema = 'public'"))}
+    target_tables = {t for t, _ in types}
+    problems = []
+    for table in sorted(set(_source_tables(src)) - SOURCE_ONLY):
+        if table not in target_tables:
+            problems.append(f"{table}: 대상에 테이블이 없습니다")
+            continue
+        cols = [r[1] for r in src.execute(f'PRAGMA table_info("{table}")')]
+        skip = excluded.get(table, set())
+        src_rows = [r for r in src.execute(f'SELECT * FROM "{table}"')
+                    if not ("id" in cols and r["id"] in skip)]
+        select = ", ".join(f'"{c}"::text' for c in cols)
+        tgt_rows = conn.execute(text(f'SELECT {select} FROM "{table}"')).all()
+        if len(src_rows) != len(tgt_rows):
+            problems.append(f"{table}: 행 수가 다릅니다. 원본 {len(src_rows)}(제외 {len(skip)}행 뺀 값) 대상 {len(tgt_rows)}")
+        if "id" not in cols:
+            want = sorted(tuple(str(r[c]) for c in cols) for r in src_rows)
+            have = sorted(tuple(r) for r in tgt_rows)
+            if want != have:
+                problems.append(f"{table}: 행 내용이 다릅니다")
+            continue
+        idx = cols.index("id")
+        tgt = {int(r[idx]): r for r in tgt_rows}
+        missing = [r["id"] for r in src_rows if r["id"] not in tgt]
+        if missing:
+            problems.append(f"{table}: 대상에 없는 id {missing[:_SAMPLE]}")
+        for i, c in enumerate(cols):
+            dtype = types.get((table, c))
+            if dtype is None:
+                problems.append(f"{table}.{c}: 대상에 칸이 없습니다")
+                continue
+            bad = [(r["id"], r[c], tgt[r["id"]][i]) for r in src_rows
+                   if r["id"] in tgt and not _same(dtype, r[c], tgt[r["id"]][i])]
+            if bad:
+                problems.append(f"{table}.{c}: {len(bad)}건 다릅니다. 예 {bad[:2]}")
+    problems += _verify_sequences(conn, target_tables)
+    return problems
+
+
+def _verify_sequences(conn, tables) -> list[str]:
+    from sqlalchemy import text
+
+    problems = []
+    for table in sorted(tables):
+        seq = conn.execute(text("SELECT pg_get_serial_sequence(:t, 'id')"), {"t": table}).scalar() \
+            if conn.execute(text("SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+                                 "AND table_name = :t AND column_name = 'id'"), {"t": table}).first() else None
+        if not seq:
+            continue
+        last, called = conn.execute(text(f"SELECT last_value, is_called FROM {seq}")).one()
+        top = conn.execute(text(f'SELECT max(id) FROM "{table}"')).scalar()
+        want = (top, True) if top is not None else (1, False)
+        if (last, called) != want:
+            nxt = last + 1 if called else last
+            problems.append(f"{table}: 시퀀스 다음 값이 {nxt} 입니다. {(top or 0) + 1} 이어야 합니다")
+    return problems
