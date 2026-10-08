@@ -38,30 +38,21 @@ import models  # noqa: F401
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Run Alembic migrations
     from alembic.config import Config as AlembicConfig
     from alembic import command as alembic_command
+    from alembic.script import ScriptDirectory
     from database import engine
+    from services.schema_version import assert_known_revision
 
+    # script_location 은 alembic.ini 의 %(here)s 기준이라 작업 폴더와 무관하다.
+    # 접속 주소는 alembic/env.py 가 환경변수에서 직접 읽는다.
     alembic_cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), "alembic.ini"))
-    db_url = os.getenv("DATABASE_URL", "sqlite:///./tc_manager.db")
-    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
 
-    # 기존 pre-Alembic DB 감지: 테이블은 있는데 alembic_version이 없으면 stamp
-    from sqlalchemy import inspect as sa_inspect
-    inspector = sa_inspect(engine)
-    tables = inspector.get_table_names()
-    if tables and "alembic_version" not in tables:
-        # ★검증 없이 stamp 하지 않는다. 구버전 스키마가 "최신" 으로 표시되면 그
-        #   사이 마이그레이션이 전부 건너뛰어지고, 그 뒤 요청이 없는 컬럼을 찾다가
-        #   죽거나 중복을 그대로 받는다. 어느 시점인지 모르는 DB 를 자동으로
-        #   맞추려 들면 더 망가지므로, 최신이 아니면 멈추고 사람에게 알린다.
-        from services.schema_guard import assert_schema_is_current
+    with engine.connect() as conn:
+        assert_known_revision(conn, ScriptDirectory.from_config(alembic_cfg))
 
-        assert_schema_is_current(inspector)
-        logger.info("Pre-Alembic DB detected - stamping head")
-        alembic_command.stamp(alembic_cfg, "head")
-    else:
+    # 서버리스에서는 끈다. 실행 환경마다 동시에 돌기 때문이다. 배포 워크플로가 대신 한다.
+    if os.getenv("RUN_MIGRATIONS_ON_STARTUP", "1") == "1":
         alembic_command.upgrade(alembic_cfg, "head")
 
     _purge_old_deleted_testcases()
