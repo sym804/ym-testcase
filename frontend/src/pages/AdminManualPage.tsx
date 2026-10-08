@@ -96,6 +96,12 @@ export default function AdminManualPage() {
           <section id="install" style={s.section}>
             <h2 style={s.h2}>{t("install.title")}</h2>
 
+            <h3 style={s.h3}>{t("install.dbTitle")}</h3>
+            <div style={s.codeBlock}>
+              <pre style={s.code}>{`# repo root. PostgreSQL 17 on 127.0.0.1:54329 (user/password/db: ymtc)
+docker compose up -d --wait db`}</pre>
+            </div>
+
             <h3 style={s.h3}>{t("install.devTitle")}</h3>
             <div style={s.codeBlock}>
               <div style={s.codeTitle}>run_dev.bat (Windows)</div>
@@ -146,10 +152,15 @@ npx tsc --noEmit`}</pre>
               <tbody>
                 <tr><td style={s.tdCode}>SECRET_KEY</td><td style={s.td}>{t("env.secretKeyDefault")}</td><td style={s.td}>{t("env.secretKeyDesc")}</td><td style={s.tdWarn}>{t("env.secretKeyRequired")}</td></tr>
                 <tr><td style={s.tdCode}>ENV</td><td style={s.td}>development</td><td style={s.td}>{t("env.envDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
-                <tr><td style={s.tdCode}>DATABASE_URL</td><td style={s.td}>sqlite:///./tc_manager.db</td><td style={s.td}>{t("env.dbDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>DATABASE_URL</td><td style={s.td}>{t("env.dbDefault")}</td><td style={s.td}>{t("env.dbDesc")}</td><td style={s.tdWarn}>{t("env.required")}</td></tr>
+                <tr><td style={s.tdCode}>DATABASE_URL_DIRECT</td><td style={s.td}>-</td><td style={s.td}>{t("env.dbDirectDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
                 <tr><td style={s.tdCode}>TOKEN_EXPIRE_HOURS</td><td style={s.td}>2</td><td style={s.td}>{t("env.tokenDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
                 <tr><td style={s.tdCode}>CORS_ORIGINS</td><td style={s.td}>http://localhost:5173, http://localhost:3000</td><td style={s.td}>{t("env.corsDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
-                <tr><td style={s.tdCode}>UPLOAD_DIR</td><td style={s.td}>./uploads</td><td style={s.td}>{t("env.uploadDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>UPLOAD_DIR</td><td style={s.td}>backend/uploads</td><td style={s.td}>{t("env.uploadDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>STORAGE_BACKEND</td><td style={s.td}>local</td><td style={s.td}>{t("env.storageDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STORAGE_BUCKET</td><td style={s.td}>-</td><td style={s.td}>{t("env.supabaseDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>CRON_SECRET</td><td style={s.td}>-</td><td style={s.td}>{t("env.cronDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>TRUSTED_PROXY_HEADER</td><td style={s.td}>-</td><td style={s.td}>{t("env.proxyDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
               </tbody>
             </table>
             <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("env.warn1") }} />
@@ -490,7 +501,7 @@ npx tsc --noEmit`}</pre>
                 <tr><th style={s.th}>{t("troubleshoot.th1")}</th><th style={s.th}>{t("troubleshoot.th2")}</th><th style={s.th}>{t("troubleshoot.th3")}</th></tr>
               </thead>
               <tbody>
-                {([1,2,3,4,5,6,7,8,9,10,11] as const).map(n => (
+                {([1,2,3,4,5,6,7,8,9,10,11,12] as const).map(n => (
                   <tr key={n}><td style={s.td}>{t(`troubleshoot.r${n}s`)}</td><td style={s.td}>{t(`troubleshoot.r${n}c`)}</td><td style={s.td}>{t(`troubleshoot.r${n}f`)}</td></tr>
                 ))}
               </tbody>
@@ -504,22 +515,22 @@ npx tsc --noEmit`}</pre>
             <h3 style={s.h3}>{t("backup.backupTitle")}</h3>
             <div style={s.codeBlock}>
               <div style={s.codeTitle}>{t("backup.backupCodeTitle")}</div>
-              <pre style={s.code}>{`# Database backup
-cp backend/tc_manager.db backup/tc_manager_$(date +%Y%m%d).db
+              <pre style={s.code}>{`# Database backup (local Docker)
+docker compose exec -T db pg_dump -U ymtc --format=custom ymtc > backup/ymtc_$(date +%Y%m%d).dump
 
-# Attachments backup
+# Attachments backup (local storage)
 cp -r backend/uploads backup/uploads_$(date +%Y%m%d)`}</pre>
             </div>
 
             <h3 style={s.h3}>{t("backup.restoreTitle")}</h3>
             <div style={s.codeBlock}>
-              <pre style={s.code}>{`# Database recovery
-cp backup/tc_manager_20260316.db backend/tc_manager.db
+              <pre style={s.code}>{`# Stop the server first, then restore into the database
+docker compose exec -T db pg_restore -U ymtc -d ymtc --clean --if-exists < backup/ymtc_20261009.dump
 
 # Attachments recovery
-cp -r backup/uploads_20260316/* backend/uploads/
+cp -r backup/uploads_20261009/* backend/uploads/
 
-# Restart server (stop the running uvicorn and start it again)`}</pre>
+# Start the server again`}</pre>
             </div>
 
             <div style={s.tipBox} dangerouslySetInnerHTML={{ __html: t("backup.tip1") }} />

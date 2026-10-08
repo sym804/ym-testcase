@@ -102,6 +102,33 @@ cd frontend && npm install                # 프론트엔드 의존성 변경 시
 
 이후 서버를 재시작하면 최신 버전이 적용됩니다.
 
+#### SQLite 버전(v1.10.3.1 이하)에서 올라올 때
+
+2.0 부터 DB 가 PostgreSQL 입니다. `git pull` 전에 Docker 를 설치하세요. `backend/.env` 의 `DATABASE_URL` 이 `sqlite:///` 이면 서버가 시작하지 않습니다.
+
+SQLite 를 계속 쓰려면 `git checkout sqlite-legacy` 로 옛 버전에 머뭅니다. 이 브랜치는 더 고치지 않습니다.
+
+기존 데이터를 옮기는 순서입니다. 원본 SQLite 와 `backend/uploads/` 는 지우지 않습니다.
+
+1. 서버를 내리고 `backend/tc_manager.db` 와 `backend/uploads/` 를 따로 복사해 둡니다
+2. `docker compose up -d --wait db` 로 PostgreSQL 을 띄우고, `backend/.env` 의 `DATABASE_URL` 을 `.env.example` 의 PostgreSQL 주소로 바꿉니다
+3. 빈 스키마를 만들고 먼저 점검만 합니다(`--dry-run` 은 아무것도 남기지 않습니다)
+
+```bash
+cd backend && python -m alembic upgrade head && cd ..
+python scripts/migrate_sqlite_to_pg.py --source backend/tc_manager.db \
+  --target postgresql+psycopg2://ymtc:ymtc@127.0.0.1:54329/ymtc --uploads backend/uploads --dry-run
+```
+
+4. 통과하면 `--dry-run` 을 빼고 `--storage local` 을 붙여 다시 실행합니다. 첨부는 `backend/uploads/attachments/` 에 복사됩니다. 이미 지워진 TC 를 가리키는 이력 같은 고아 행이 있으면 스크립트가 목록을 내고 멈춥니다. 옮기지 않아도 되는 행이면 `--allow-orphan 테이블:id` 로 제외하고, 제외한 행은 `excluded_rows.json` 에 남습니다
+5. 옛 서버(SQLite 버전)와 새 서버를 같이 띄우고 응답을 비교합니다. 프로젝트 목록, 대시보드, 리포트가 모두 같아야 합니다
+
+```bash
+CMP_PASSWORD=<관리자 비밀번호> python scripts/compare_api.py --a <옛 서버 주소> --b <새 서버 주소> --username admin
+```
+
+Supabase 로 옮길 때는 `--target` 에 직결 또는 세션 풀러 주소를 쓰고 `--storage supabase` 를 붙입니다. 직결 주소가 IPv6 로만 열리는 네트워크라면 세션 풀러(5432) 주소를 씁니다. `SUPABASE_URL` 의 프로젝트가 `--target` 과 다르면 스크립트가 멈춥니다.
+
 ## 배포 (Vercel + Supabase)
 
 팀이 인터넷에서 쓰도록 올릴 때의 구성입니다. 화면과 API 가 한 Vercel 프로젝트, 한 도메인에서 돌고(`vercel.json` 의 Services), 데이터는 Supabase 의 PostgreSQL 과 Storage 에 둡니다.
