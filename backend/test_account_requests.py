@@ -548,4 +548,5 @@ def test_같은_코드를_동시에_쓰면_하나만_성공한다(admin_headers,
 
     with ThreadPoolExecutor(n) as pool:
         codes = sorted(pool.map(use, range(n)))
-    assert codes.count(200) == 1, codes
+    # 나머지는 401 이어야 한다. 500 이나 429 가 섞여도 "하나만 성공" 은 맞지만 결함이다.
+    assert codes == [200] + [401] * (n - 1), codes

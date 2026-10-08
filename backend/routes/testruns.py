@@ -101,6 +101,9 @@ def create_testrun(
     payload: TestRunCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("tester")),
+    # TC 생성·동기화와 줄 세운다. 안 그러면 수행이 TC 목록을 읽은 뒤 새 TC 가 커밋되고,
+    # 그 TC 의 동기화는 아직 커밋 전인 이 수행을 못 봐 결과 행이 빠진다(QA1 지적).
+    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 

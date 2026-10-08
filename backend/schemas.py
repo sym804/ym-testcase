@@ -18,7 +18,9 @@ class UserCreate(BaseModel):
 
 
 class UserLogin(BaseModel):
-    username: str
+    # users.username 은 100자. 넘는 입력은 존재할 수 없는 계정이라 422 로 막는다
+    # (횟수 제한 기록 키 칸 255자를 넘겨 500 이 나던 경로).
+    username: str = Field(..., max_length=100)
     password: str
     remember_me: bool = False
 
@@ -107,7 +109,7 @@ class AccountRequestApproveResult(BaseModel):
 
 
 class ResetPasswordWithCode(BaseModel):
-    username: str
+    username: str = Field(..., max_length=100)
     code: str
     new_password: str = Field(..., min_length=8)
 
