@@ -1,8 +1,6 @@
 """pytest 전역 설정 - 테스트 세션 동안 uvicorn 서버를 자동으로 시작/종료"""
 import atexit
 import os
-import shutil
-import tempfile
 import threading
 import time
 
@@ -50,7 +48,6 @@ def _server_already_running(port: int) -> bool:
 #   os.getenv 를 읽는다)은 임시 DB 로 마이그레이션하고 앱 세션은 개발 DB 를 본다
 #   (2026-09-07 실측: CI 223 errors, 로컬 184 errors).
 #   conftest 는 어떤 테스트 모듈보다 먼저 임포트되므로 여기가 유일하게 안전한 자리다.
-DEV_DB_SUFFIX = "/tc_manager.db"
 TEST_PORT = int(os.getenv("TEST_PORT", "8008"))
 
 # ★테스트가 실제로 요청을 보내는 곳은 TEST_BASE_URL 이다. 서버를 띄우는 포트와
@@ -67,32 +64,49 @@ def _request_port() -> int:
         return _guard.DEFAULT_REQUEST_PORT
     return urlparse(base).port or 80
 
+import testing_db
+
 #: 개발 서버가 이미 떠 있으면 HTTP 는 그 서버의 DB 로 간다. 그때 in-process engine 만
 #: 임시 DB 로 돌리면 한 테스트가 두 DB 를 보게 되므로 손대지 않는다.
 USING_RUNNING_DEV_SERVER = _server_already_running(TEST_PORT)
 
-
-def _needs_temp_db(url) -> bool:
-    if not url:
-        return True
-    #: 셸에 개발 DB 가 박혀 있으면 그대로 쓰지 않는다. 되돌릴 수 없는 쓰기가 들어간다.
-    #: 일부러 쓰려면 test_run_tc_sync.py 와 같은 이름의 opt-in 을 준다.
-    return url.endswith(DEV_DB_SUFFIX) and os.getenv("ALLOW_DEV_DB") != "1"
+SESSION_DATABASE_URL = None
+SESSION_DATABASE_NAME = None
 
 
 def _isolate_database_url():
-    if USING_RUNNING_DEV_SERVER or not _needs_temp_db(os.getenv("DATABASE_URL")):
-        return None
-    tmp_dir = tempfile.mkdtemp(prefix="ymtc-test-db-")
-    path = os.path.join(tmp_dir, "ymtc_test.db").replace("\\", "/")
-    os.environ["DATABASE_URL"] = f"sqlite:///{path}"
-    #: ignore_errors 를 켠다. Windows 에서 SQLite 핸들이 아직 열려 있으면 삭제가
-    #: 실패하는데, 임시 폴더가 남는 것은 테스트 결과를 변경하지 않는다.
-    atexit.register(shutil.rmtree, tmp_dir, True)
-    return tmp_dir
+    """세션 전용 임시 DB 를 만들고 DATABASE_URL 을 거기로 박는다.
+
+    ★셸이나 .env 의 DATABASE_URL 은 보지 않는다. 운영 주소가 들어 있어도 쓰지 않는다.
+      관리 주소(TEST_DATABASE_ADMIN_URL)는 testing_db 가 로컬 호스트만 허용한다.
+      SQLite 시절에는 `/tc_manager.db` 로 끝나는 주소만 격리해서, 다른 주소는 그대로 썼다.
+    ★스키마는 alembic upgrade 로 올린다. 서버가 lifespan 에서 다시 upgrade 해도 이미
+      head 라 아무 일도 없다. create_all 이 아니라 기준점으로 올려야 마이그레이션도 검증된다.
+    """
+    global SESSION_DATABASE_URL, SESSION_DATABASE_NAME
+    if USING_RUNNING_DEV_SERVER:
+        return
+    import subprocess
+    import sys
+
+    from sqlalchemy.engine import make_url
+
+    url = testing_db.create_database(prefix="ymtc_test")
+    os.environ["DATABASE_URL"] = url
+    os.environ.pop("DATABASE_URL_DIRECT", None)
+    r = subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"],
+                       cwd=os.path.dirname(os.path.abspath(__file__)),
+                       env=dict(os.environ), capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    if r.returncode != 0:
+        testing_db.drop_database(url)
+        raise RuntimeError("테스트 DB 마이그레이션 실패: " + r.stderr)
+    SESSION_DATABASE_URL = url
+    SESSION_DATABASE_NAME = make_url(url).database
+    atexit.register(testing_db.drop_database, url)
 
 
-TEST_DB_DIR = _isolate_database_url()
+_isolate_database_url()
 
 # 개발 DB 를 건드릴 위험이 실제로 있는지 알린다. 테스트 파일이 이 값으로 건너뛴다.
 #
@@ -103,6 +117,8 @@ TEST_DB_DIR = _isolate_database_url()
 #   위험한 것은 "이미 떠 있는 개발 서버를 그대로 쓰는" 경우뿐이다.
 import dev_db_guard
 
+dev_db_guard.USING_RUNNING_DEV_SERVER = USING_RUNNING_DEV_SERVER
+dev_db_guard.SESSION_DATABASE_NAME = SESSION_DATABASE_NAME
 dev_db_guard.DEV_DB_AT_RISK = (
     _server_already_running(_request_port()) and os.getenv("ALLOW_DEV_DB") != "1"
 )
@@ -169,3 +185,27 @@ def _server():
     yield
     server.should_exit = True
     thread.join(timeout=5)
+
+
+@pytest.fixture
+def pg_engine():
+    """테스트 하나 전용 스키마. SQLite 시절 tmp_path 마다 새 DB 파일을 만들던 자리다."""
+    base = SESSION_DATABASE_URL or testing_db.create_database(prefix="ymtc_unit")
+    eng = testing_db.schema_engine(base)
+    try:
+        yield eng
+    finally:
+        testing_db.dispose_schema_engine(eng)
+        if SESSION_DATABASE_URL is None:
+            testing_db.drop_database(base)
+
+
+@pytest.fixture
+def pg_session(pg_engine):
+    from sqlalchemy.orm import sessionmaker
+
+    session = sessionmaker(bind=pg_engine, autoflush=False)()
+    try:
+        yield session
+    finally:
+        session.close()

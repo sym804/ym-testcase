@@ -15,6 +15,10 @@ SKIP_REASON = (
     "격리해서 돌리려면 개발 서버를 내리거나 TEST_PORT 를 비어 있는 포트로 지정한다."
 )
 
+#: 이미 떠 있는 서버를 그대로 쓰는가, 세션 임시 DB 이름. conftest 가 채운다.
+USING_RUNNING_DEV_SERVER = False
+SESSION_DATABASE_NAME = None
+
 #: 테스트 모듈이 TEST_BASE_URL 없이 쓰는 기본 주소의 포트.
 #: ★conftest 의 TEST_PORT 로 떨어지면 안 된다. TEST_PORT=8009 만 주고
 #:   TEST_BASE_URL 을 안 주면 판정은 8009(비어 있음)를 보고 안전하다고 하는데,
