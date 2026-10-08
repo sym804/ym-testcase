@@ -27,7 +27,8 @@ import urllib.request
 sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BACKEND_PORT = 8008
+# 다른 체크아웃(worktree)과 겹치지 않게 덮을 수 있다. up 은 이 포트에서 듣는 프로세스를 내린다.
+BACKEND_PORT = int(os.getenv("DEVCTL_BACKEND_PORT", "8008"))
 FRONTEND_PORT = 5173
 BACKEND_URL = f"http://127.0.0.1:{BACKEND_PORT}"
 # vite 는 localhost 에 바인딩한다. 127.0.0.1 로 부르면 연결이 거부된다.

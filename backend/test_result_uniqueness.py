@@ -145,6 +145,3 @@ def test_완료된_런은_동기화하지_않는다(db):
     db.commit()
     assert _sync_service().sync_run_results(run, db) == 0
     assert db.query(_app_models().TestResult).count() == 0
-
-
-# ── 마이그레이션의 병합 규칙 ──────────────────────────────────────────────────
