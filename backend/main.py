@@ -33,6 +33,7 @@ from routes import tc_result_history as tc_result_history_routes
 from routes import account_requests as account_request_routes
 from routes import api_keys as api_key_routes
 from routes import uploads as upload_routes
+from routes import internal as internal_routes
 # Import models so Base.metadata knows about all tables
 import models  # noqa: F401
 
@@ -56,7 +57,9 @@ async def lifespan(app: FastAPI):
     if os.getenv("RUN_MIGRATIONS_ON_STARTUP", "1") == "1":
         alembic_command.upgrade(alembic_cfg, "head")
 
-    _purge_old_deleted_testcases()
+    # 로컬은 기동 때 정리한다. 서버리스는 Cron(/api/internal/cron/daily)이 한다.
+    if os.getenv("RUN_MAINTENANCE_ON_STARTUP", "1") == "1":
+        _purge_old_deleted_testcases()
     yield
 
 
@@ -152,6 +155,7 @@ app.include_router(tc_result_history_routes.router)
 app.include_router(account_request_routes.router)
 app.include_router(api_key_routes.router)
 app.include_router(upload_routes.router)
+app.include_router(internal_routes.router)
 
 
 

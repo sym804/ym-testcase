@@ -1,6 +1,6 @@
 """소프트 삭제된 TC 의 완전 삭제.
 
-`main.py` 의 기동 훅에서 부른다. 세션을 인자로 받아 테스트에서 임시 DB 로
+`main.py` 의 기동 훅(로컬)과 Cron 엔드포인트(`routes/internal.py`)에서 부른다. 세션을 인자로 받아 테스트에서 임시 DB 로
 돌릴 수 있게 해 둔다.
 """
 from datetime import timedelta
@@ -13,7 +13,7 @@ from models import TestCase, TestResult, now_kst
 PURGE_AFTER_DAYS = 7
 
 
-def purge_deleted_testcases(db: Session) -> int:
+def purge_deleted_testcases(db: Session, commit: bool = True) -> int:
     """기한이 지난 소프트 삭제 TC 를 지우고, 지운 건수를 돌려준다.
 
     ★수행 기록에 한 번이라도 들어간 TC 는 남긴다. 리포트와 런 상세는 "그때의
@@ -36,6 +36,6 @@ def purge_deleted_testcases(db: Session) -> int:
     )
     for tc in old:
         db.delete(tc)
-    if old:
+    if old and commit:
         db.commit()
     return len(old)
