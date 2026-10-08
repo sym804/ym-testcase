@@ -117,6 +117,7 @@ cd frontend && npm install                # 프론트엔드 의존성 변경 시
 ### 2. Vercel
 
 - 비공개 레포로 프로젝트를 만듭니다. 설정은 레포의 `vercel.json` 을 그대로 씁니다.
+- 회사 업무에 쓰면 Vercel 약관상 Hobby 가 아니라 Pro 요금제 대상입니다.
 - 운영(Production)의 Git 자동 배포를 끕니다. 배포는 GitHub Actions 가 마이그레이션 뒤에 합니다.
 - 환경변수(Production, Preview 둘 다):
 
@@ -130,13 +131,19 @@ cd frontend && npm install                # 프론트엔드 의존성 변경 시
 | `CRON_SECRET` | 긴 무작위 문자열. 매일 정리 작업(`/api/internal/cron/daily`) 인증 |
 | `TRUSTED_PROXY_HEADER` | 플랫폼이 덮어쓰는 클라이언트 IP 헤더. 스테이징에서 확인해 정합니다 |
 
-Preview 는 합성 데이터만 든 별도 Supabase 프로젝트에 연결합니다.
+Preview 는 합성 데이터만 든 별도 Supabase 프로젝트에 연결합니다. 배포 워크플로는 운영 DB 만 마이그레이션하므로, 스키마를 바꾸는 브랜치의 Preview 는 그 DB 에 직접 올린 뒤 확인합니다. 올리기 전에는 API 가 503(스키마가 코드보다 옛 버전)을 냅니다.
+
+```bash
+cd backend
+DATABASE_URL_DIRECT=<Preview DB 직결 주소> python -m alembic upgrade head
+```
 
 ### 3. GitHub Actions (비공개 레포)
 
 - 저장소 변수 `DEPLOY_ENABLED` 를 `true` 로 둡니다. 공개 레포에서는 배포·백업 워크플로가 돌지 않습니다.
 - 비밀값: `DATABASE_URL_DIRECT`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, 백업용 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STORAGE_BUCKET`.
-- `main` 에 푸시하면 테스트, 운영 DB 마이그레이션, Vercel 배포 순서로 돕니다(`.github/workflows/deploy.yml`). 매일 DB 덤프와 Storage 객체를 아티팩트로 남깁니다(`backup.yml`, 14일 보관).
+- `main` 에 푸시하면 CI(백엔드, 프론트, E2E)가 먼저 돌고, 성공한 커밋만 배포됩니다. 배포는 Vercel 빌드, 운영 DB 마이그레이션, 빌드 산출물 배포 순서입니다(`.github/workflows/deploy.yml`). 빌드가 실패하면 DB 는 그대로입니다. 다시 배포하려면 그 커밋의 CI 를 다시 돌립니다.
+- 매일 DB 덤프(`public` 스키마)와 Storage 객체를 아티팩트로 남깁니다(`backup.yml`, 14일 보관). 스테이징 업로드는 담지 않습니다. 읽지 못한 객체가 있으면 나머지를 담고 실패로 끝나며, 목록은 zip 안의 `_manifest.txt` 에 있습니다.
 
 ## 주요 기능
 

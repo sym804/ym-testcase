@@ -66,3 +66,34 @@ def test_Swagger_는_api_아래():
     from main import app
     assert app.docs_url == "/api/docs"
     assert app.openapi_url == "/api/openapi.json"
+
+
+def _csp_directives():
+    headers = _cfg()["services"]["frontend"]["headers"]
+    flat = {h["key"]: h["value"] for rule in headers for h in rule["headers"]}
+    out = {}
+    for part in flat["Content-Security-Policy"].split(";"):
+        words = part.split()
+        if words:
+            out[words[0]] = words[1:]
+    return out
+
+
+def test_index_html_이_부르는_외부_출처를_CSP_가_허용한다():
+    """index.html 의 외부 스타일·스크립트가 CSP 에 막히면 배포에서만 깨진다(로컬은 CSP 가 없다)."""
+    html = open(os.path.join(ROOT, "frontend", "index.html"), encoding="utf-8").read()
+    csp = _csp_directives()
+
+    def origin(url):
+        m = re.match(r"(https://[^/]+)", url)
+        return m.group(1)
+
+    for tag in re.findall(r"<link\b[^>]*>", html):
+        href = re.search(r'href="(https://[^"]+)"', tag)
+        if href and 'rel="stylesheet"' in tag:
+            assert origin(href.group(1)) in csp["style-src"], tag
+        # crossorigin preconnect 는 글꼴 파일 출처다(Google Fonts 의 CSS 가 그 출처의 woff2 를 부른다).
+        if href and 'rel="preconnect"' in tag and "crossorigin" in tag:
+            assert origin(href.group(1)) in csp["font-src"], tag
+    for src in re.findall(r'<script\b[^>]*src="(https://[^"]+)"', html):
+        assert origin(src) in csp["script-src"], src

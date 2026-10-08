@@ -49,7 +49,7 @@ YM TestCase는 테스트 케이스(TC)의 작성, 관리, 테스트 수행, 결�
 | 항목 | URL |
 |---|---|
 | **YM TestCase** | http://localhost:5173 (개발) |
-| **API 문서 (Swagger)** | http://localhost:8000/docs |
+| **API 문서 (Swagger)** | http://localhost:8008/api/docs |
 | **사용자 매뉴얼** | http://localhost:5173/manual |
 | **운영 매뉴얼 (Admin)** | http://localhost:5173/admin-manual |
 

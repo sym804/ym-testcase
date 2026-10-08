@@ -1,6 +1,7 @@
 import axios from "axios";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+// 끝 슬래시를 뗀다. 업로드 PUT 과 미리보기 img 는 axios 를 거치지 않고 문자열로 이어 붙인다.
+export const API_BASE_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));

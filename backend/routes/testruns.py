@@ -514,7 +514,10 @@ def import_results(
     fmt, entries = _read_report(file)
     summary = _record_import(run, fmt, entries, db, current_user,
                              dry_run=dry_run, keep_executed=keep_executed, label=label)
-    if not dry_run:
+    if dry_run:
+        # ★잠금(스테이징 행, 회차)을 응답 전에 푼다. get_db 의 close 는 응답을 보낸 뒤에 돈다.
+        db.rollback()
+    else:
         db.commit()
     return summary
 

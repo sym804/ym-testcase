@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { tooLargeMessage } from "../api/uploads";
+import { uploadErrorMessage } from "../api/uploads";
 import toast from "react-hot-toast";
 import { testRunsApi } from "../api";
-import { translateError } from "../utils/errorMessage";
 import type { ResultImportSummary, TestRun } from "../types";
 
 interface ResultImportModalProps {
@@ -13,9 +12,6 @@ interface ResultImportModalProps {
   /** 적용이 끝나면 부른다. 수행 상세를 다시 읽는 데 쓴다. */
   onApplied: () => void;
 }
-
-const errorDetail = (err: unknown) =>
-  (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
 
 /**
  * 자동화 결과 파일(Playwright JSON · JUnit XML)을 이 수행의 결과로 가져온다.
@@ -46,8 +42,7 @@ export default function ResultImportModal({ projectId, run, onClose, onApplied }
         onClose();
       }
     } catch (err) {
-      const detail = errorDetail(err);
-      toast.error(tooLargeMessage(err, t) ?? (detail ? translateError(detail) : t("importFailed")));
+      toast.error(uploadErrorMessage(err, t, t("importFailed")));
     } finally {
       setBusy(false);
     }

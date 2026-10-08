@@ -127,6 +127,7 @@ jobs:
           e2e/regression-full.spec.ts
           e2e/tc-management.spec.ts
           e2e/v060-features.spec.ts
+          e2e/uploads.spec.ts
           --reporter=list
         timeout-minutes: 15
 
@@ -197,6 +198,6 @@ jobs:
         run: python -m pytest -q --tb=short -k "not test_dompurify_installed"
         timeout-minutes: 20
 
-      - name: 스크립트 테스트 (devctl, CI 업로드 CLI)
-        run: python -m pytest -q scripts/test_devctl_db.py scripts/test_ymtc_upload.py
+      - name: 스크립트 테스트 (devctl, CI 업로드 CLI, Storage 백업)
+        run: python -m pytest -q scripts/test_devctl_db.py scripts/test_ymtc_upload.py scripts/test_backup_storage.py
         timeout-minutes: 5

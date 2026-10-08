@@ -221,7 +221,7 @@ npx tsc -b
 
 ## 10. API 엔드포인트 (57개)
 
-API 문서(Swagger UI): `http://localhost:8008/docs`
+API 문서(Swagger UI): `http://localhost:8008/api/docs`
 
 ### 인증 (Auth)
 

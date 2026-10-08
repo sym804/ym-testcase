@@ -19,7 +19,7 @@ start "YM TestCase Frontend" cmd /c "cd frontend && npm run dev"
 echo.
 echo Backend:  http://localhost:8008
 echo Frontend: http://localhost:5173
-echo API Docs: http://localhost:8008/docs
+echo API Docs: http://localhost:8008/api/docs
 echo.
 echo Press any key to stop...
 pause >nul

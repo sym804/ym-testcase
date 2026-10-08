@@ -100,15 +100,17 @@ def test_스키마가_뒤처지면_API_는_503_헬스와_설정은_통과(monkey
         app.state.schema_behind = False
 
 
-def test_마이그레이션을_끈_서버에서_빈_DB_면_API_가_503():
+def test_마이그레이션을_끈_기동에서_빈_DB_면_API_가_503():
+    """lifespan 을 거쳐 기동한다(로컬·Docker 경로). 서버리스(lifespan 없음)는 test_runtime_env 가 본다."""
     import subprocess
     import sys
 
     url = testing_db.create_database(prefix="ymtc_sv_boot")
     code = (
-        "from asgi_testing import asgi_get\n"
+        "from asgi_testing import asgi_get_many\n"
         "from main import app\n"
-        "print(asgi_get(app, '/api/projects')[0], asgi_get(app, '/')[0])\n"
+        "res = asgi_get_many(app, ['/api/projects', '/'], lifespan=True)\n"
+        "print(res[0][0], res[1][0])\n"
     )
     env = dict(os.environ, DATABASE_URL=url, DATABASE_URL_DIRECT="", RUN_MIGRATIONS_ON_STARTUP="0",
                RUN_MAINTENANCE_ON_STARTUP="0")

@@ -6,7 +6,7 @@ vi.mock("../api/client", () => ({
 }));
 
 import client from "../api/client";
-import { stageUpload, UploadTooLargeError, resetUploadCache, tooLargeMessage } from "../api/uploads";
+import { stageUpload, UploadTooLargeError, resetUploadCache, tooLargeMessage, uploadErrorMessage } from "../api/uploads";
 
 const LIMITS = { upload_limits: { attachment: 100, tc_import: 50, result_import: 80 }, direct_upload: false };
 
@@ -99,5 +99,21 @@ describe("tooLargeMessage", () => {
   it("다른 오류는 null", () => {
     expect(tooLargeMessage({ response: { status: 500 } }, t)).toBeNull();
     expect(tooLargeMessage(new Error("x"), t)).toBeNull();
+  });
+});
+
+describe("uploadErrorMessage", () => {
+  const t = ((key: string, opts?: Record<string, unknown>) => `${key}${opts ? JSON.stringify(opts) : ""}`) as never;
+
+  it("413 은 용량 초과 안내가 이긴다", () => {
+    expect(uploadErrorMessage({ response: { status: 413, data: { detail: "x" } } }, t, "fallback")).toBe("common:uploadTooLargeNoLimit");
+  });
+
+  it("서버 detail 이 있으면 그것을 보여준다", () => {
+    expect(uploadErrorMessage({ response: { status: 400, data: { detail: "시트가 비어 있습니다" } } }, t, "fallback")).toBe("시트가 비어 있습니다");
+  });
+
+  it("detail 이 없으면 주어진 기본 문구", () => {
+    expect(uploadErrorMessage(new Error("network"), t, "fallback")).toBe("fallback");
   });
 });

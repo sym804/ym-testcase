@@ -572,6 +572,9 @@ def preview_import_sheets(
 ):
     """엑셀/CSV/Markdown 파일의 시트 목록과 각 시트의 TC 수, 기존 중복 수를 반환한다."""
     file = resolve_file(db, current_user, "tc_import", file, upload_id)
+    # ★미리보기는 커밋하지 않는다. 꺼낼 때 잡은 스테이징 행 잠금을 여기서 푼다. get_db 의 close 는
+    #   응답을 보낸 뒤에 돌아서, 그대로 두면 곧바로 이어지는 가져오기가 409 를 받는다.
+    db.rollback()
     if _is_csv_file(file.filename):
         # ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온 뒤다.
         content = read_limited_sync(file.file, MAX_IMPORT_SIZE)

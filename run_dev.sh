@@ -34,7 +34,7 @@ cd ..
 echo ""
 echo "Backend:  http://localhost:8008"
 echo "Frontend: http://localhost:5173"
-echo "API Docs: http://localhost:8008/docs"
+echo "API Docs: http://localhost:8008/api/docs"
 echo ""
 echo "Press Ctrl+C to stop..."
 

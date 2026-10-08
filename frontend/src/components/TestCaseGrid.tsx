@@ -10,7 +10,7 @@ import {
   type CellKeyDownEvent,
 } from "ag-grid-community";
 import { useTranslation } from "react-i18next";
-import { tooLargeMessage } from "../api/uploads";
+import { uploadErrorMessage } from "../api/uploads";
 import { testCasesApi, historyApi, customFieldsApi, filtersApi } from "../api";
 import type { TestCase, TestCaseHistory, Project, SheetNode, CustomFieldDef, FilterCondition, TCResultHistory } from "../types";
 import { AG_GRID_LOCALE_KO } from "../agGridLocaleKo";
@@ -895,8 +895,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       setSelectedSheets(new Set(preview.sheets.map((s) => s.name)));
     } catch (err) {
       console.error("Import error:", err);
-      const errDetail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      toast.error(tooLargeMessage(err, t) ?? (errDetail ? translateError(errDetail) : t("importReadFailed")));
+      toast.error(uploadErrorMessage(err, t, t("importReadFailed")));
     }
   };
 
@@ -925,7 +924,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       setImportSheets([]);
     } catch (err) {
       console.error(err);
-      toast.error(t("importFailed"));
+      toast.error(uploadErrorMessage(err, t, t("importFailed")));
     } finally {
       setImportLoading(false);
     }

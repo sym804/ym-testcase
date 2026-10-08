@@ -1,6 +1,6 @@
 # 매일 백업: DB 덤프와 Storage 객체. Supabase 의 DB 백업에는 Storage 객체가 들어가지 않는다.
 # 공개 레포에서는 돌지 않는다. 조직의 비공개 레포에서 DEPLOY_ENABLED=true 로 켠다.
-# 아티팩트는 비공개 레포에만 남는다. 보관 기간은 14일.
+# 아티팩트는 비공개 레포에만 남는다. 보관 기간은 14일. 레포 읽기 권한이 있으면 내려받을 수 있다.
 # 필요한 비밀값: DATABASE_URL_DIRECT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STORAGE_BUCKET
 name: Backup
 
@@ -11,24 +11,36 @@ on:
 
 jobs:
   backup:
-    if: vars.DEPLOY_ENABLED == 'true'
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      github.event.repository.private == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       # 서버와 같은 메이저의 pg_dump 를 쓴다(러너 기본 클라이언트는 버전이 다를 수 있다).
+      # 앱 데이터만 담는다. auth, storage 같은 Supabase 관리 스키마는 복원 때 권한 충돌을 낸다.
       - name: DB 덤프
         env:
           DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
         run: |
           url="${DATABASE_URL_DIRECT/postgresql+psycopg2:/postgresql:}"
-          docker run --rm postgres:17 pg_dump --format=custom --no-owner "$url" > db.dump
+          docker run --rm postgres:17 pg_dump --format=custom --no-owner --schema=public "$url" > db.dump
           ls -l db.dump
+
+      # Storage 백업이 실패해도 DB 덤프는 남도록 먼저 올린다.
+      - name: DB 덤프 보관
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-db-${{ github.run_id }}
+          path: db.dump
+          retention-days: 14
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
+      # 실패한 객체가 있으면 나머지를 다 담은 뒤 실패로 끝난다. 목록은 zip 의 _manifest.txt.
       - name: Storage 객체 백업
         env:
           STORAGE_BACKEND: supabase
@@ -40,10 +52,10 @@ jobs:
           pip install -r backend/requirements.txt
           python scripts/backup_storage.py storage-backup.zip
 
-      - uses: actions/upload-artifact@v4
+      - name: Storage 백업 보관
+        if: ${{ !cancelled() && hashFiles('storage-backup.zip') != '' }}
+        uses: actions/upload-artifact@v4
         with:
-          name: backup-${{ github.run_id }}
-          path: |
-            db.dump
-            storage-backup.zip
+          name: backup-storage-${{ github.run_id }}
+          path: storage-backup.zip
           retention-days: 14
