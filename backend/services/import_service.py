@@ -634,8 +634,9 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
 
 
 from services.upload_guard import read_limited_sync
+from services.staged_upload import PURPOSE_LIMITS
 
-MAX_IMPORT_SIZE = 10 * 1024 * 1024  # 10MB
+MAX_IMPORT_SIZE = PURPOSE_LIMITS["tc_import"]  # 10MB, 스테이징 업로드와 같은 값
 
 
 def _load_workbook_from_upload(file: UploadFile):

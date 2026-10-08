@@ -11,7 +11,7 @@ from database import get_db
 from models import User, TestResult, TestRun, Attachment, StorageDeletion
 from schemas import AttachmentResponse
 from services.upload_guard import read_limited
-from services.staged_upload import claim_for_attachment
+from services.staged_upload import PURPOSE_LIMITS, claim_for_attachment
 from services.storage import get_storage
 from auth import get_current_user, get_project_role
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/attachments", tags=["attachments"])
 
 # 보안 설정
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_FILE_SIZE = PURPOSE_LIMITS["attachment"]  # 50MB, 스테이징 업로드와 같은 값
 ALLOWED_EXTENSIONS = {
     ".txt", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",
     ".xlsx", ".xls", ".csv", ".doc", ".docx", ".pptx", ".zip", ".log",

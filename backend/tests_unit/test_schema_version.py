@@ -121,3 +121,45 @@ def test_마이그레이션을_끈_기동에서_빈_DB_면_API_가_503():
         testing_db.drop_database(url)
     assert r.returncode == 0, r.stderr
     assert r.stdout.split()[-2:] == ["503", "200"]
+
+
+def test_옛_SQLite_리비전은_legacy(conn):
+    _set_rev(conn, "5e0b8c2d4f17")
+    assert schema_status(conn, _script_dir()) == "legacy"
+
+
+def test_뒤처짐_판정은_시간이_지나면_다시_본다(monkeypatch):
+    """한번 뒤처짐으로 판정한 인스턴스가 마이그레이션 뒤에도 계속 503 을 내지 않게."""
+    from fastapi.testclient import TestClient
+    import main
+
+    monkeypatch.setenv("RUN_MIGRATIONS_ON_STARTUP", "0")
+    client = TestClient(main.app)
+    main.app.state.schema_behind = True
+    main.app.state.schema_checked_at = 0.0  # 오래전에 본 것으로
+    try:
+        r = client.get("/api/projects")
+        assert r.status_code != 503, r.text  # 세션 DB 는 head 라 다시 보면 통과
+    finally:
+        main.app.state.schema_behind = False
+
+
+def test_판정이_실패하면_503(monkeypatch):
+    from fastapi.testclient import TestClient
+    import main
+
+    def boom(_app):
+        raise RuntimeError("db down")
+
+    monkeypatch.setenv("RUN_MIGRATIONS_ON_STARTUP", "0")
+    monkeypatch.setattr(main, "_check_schema", boom)
+    client = TestClient(main.app, raise_server_exceptions=False)
+    state = main.app.state
+    saved = {k: getattr(state, k) for k in ("schema_behind", "schema_checked_at") if hasattr(state, k)}
+    for k in saved:
+        delattr(state, k)
+    try:
+        assert client.get("/api/projects").status_code == 503
+    finally:
+        for k, v in saved.items():
+            setattr(state, k, v)
