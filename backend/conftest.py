@@ -111,6 +111,21 @@ def _isolate_database_url():
 
 _isolate_database_url()
 
+
+def _isolate_upload_dir():
+    """첨부·업로드를 레포의 backend/uploads 가 아니라 세션 임시 폴더에 쓴다."""
+    if USING_RUNNING_DEV_SERVER:
+        return
+    import shutil
+    import tempfile
+    d = tempfile.mkdtemp(prefix="ymtc-test-uploads-")
+    os.environ["UPLOAD_DIR"] = d
+    os.environ["STORAGE_BACKEND"] = "local"
+    atexit.register(shutil.rmtree, d, True)
+
+
+_isolate_upload_dir()
+
 # 개발 DB 를 건드릴 위험이 실제로 있는지 알린다. 테스트 파일이 이 값으로 건너뛴다.
 #
 # ★포트 번호로 판정하면 안 된다. 기본 포트가 8008 이라는 이유로 건너뛰던 파일들이

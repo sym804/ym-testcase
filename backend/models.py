@@ -529,3 +529,28 @@ class RateLimitEvent(Base):
     __table_args__ = (
         Index("ix_rate_limit_events_bucket_key_created", "bucket", "key", "created_at"),
     )
+
+
+# ── StagedUpload ──────────────────────────────────────────────────────────────
+
+class StagedUpload(Base):
+    """클라이언트가 저장소에 직접 올리는 파일의 발급 기록.
+
+    서버리스 함수는 요청 본문을 4.5MB 까지만 받으므로, 큰 파일은 저장소에 먼저 올리고 처리
+    요청은 이 id 만 보낸다. 누가 무엇에 쓰려고 올렸는지를 여기서 대조한다.
+    """
+    __tablename__ = "staged_uploads"
+
+    id = Column(String(32), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    purpose = Column(String(32), nullable=False)
+    filename = Column(String(255), nullable=False)
+    content_type = Column(String(255), nullable=True)
+    declared_size = Column(Integer, nullable=False)
+    storage_key = Column(String(512), nullable=False)
+    created_at = Column(DateTime, default=now_kst, nullable=False)
+    consumed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_staged_uploads_created", "created_at"),
+    )
