@@ -61,10 +61,9 @@ def test_lifespan_없이도_옛_스키마면_503():
     """Vercel 이 ASGI lifespan 을 부르지 않아도 첫 요청에서 판정한다."""
     url = testing_db.create_database(prefix="ymtc_rt")
     code = (
-        "from fastapi.testclient import TestClient\n"
+        "from asgi_testing import asgi_get\n"
         "from main import app\n"
-        "c = TestClient(app)\n"
-        "print(c.get('/api/projects').status_code, c.get('/api/config').status_code)\n"
+        "print(asgi_get(app, '/api/projects')[0], asgi_get(app, '/api/config')[0])\n"
     )
     try:
         r = _run(code, VERCEL="1", TRUSTED_PROXY_HEADER="x-real-ip", DATABASE_URL=url, **SUPA)

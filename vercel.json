@@ -32,7 +32,7 @@
       "functions": {
         "main.py": {
           "maxDuration": 60,
-          "excludeFiles": "{**/test_*.py,tests_unit/**,conftest.py,testing_db.py,dev_db_guard.py,uploads/**,**/*.db,**/*.db-*,**/*.log,**/*.bak*,**/__pycache__/**}"
+          "excludeFiles": "{**/test_*.py,tests_unit/**,conftest.py,testing_db.py,asgi_testing.py,dev_db_guard.py,uploads/**,**/*.db,**/*.db-*,**/*.log,**/*.bak*,**/__pycache__/**}"
         }
       }
     }
