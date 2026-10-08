@@ -245,3 +245,19 @@ def test_park_moves_zero_behind_imported_rows(session):
     s.flush()
 
     assert _state(s, pid, "결제") == [(new, 1), (old, 2)]
+
+
+def test_소프트_삭제가_사이에_끼어도_살아_있는_TC_가_1부터_이어진다(session):
+    """PostgreSQL 은 유니크 제약을 행마다 즉시 검사한다. 비켜 두기 없이 쓰면 걸린다."""
+    from services.tc_numbering import renumber_sheet
+
+    s, pid, uid = session
+    a = _add(s, pid, uid, "S", 5, "TC-A")
+    _add(s, pid, uid, "S", 2, "TC-B", deleted=True)
+    c = _add(s, pid, uid, "S", 9, "TC-C")
+    d = _add(s, pid, uid, "S", 7, "TC-D")
+
+    renumber_sheet(pid, "S", s)
+    s.expire_all()
+
+    assert _state(s, pid, "S") == [(a, 1), (d, 2), (c, 3)]

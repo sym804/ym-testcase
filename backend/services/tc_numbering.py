@@ -7,7 +7,7 @@
 번호를 넣는 길이 넷이다(신규 생성, 복제, 임포트, 드래그 정렬). 앞의 셋은 서버가
 번호를 정하지만 임포트는 파일이 들고 온 값을 순서로만 쓰므로, 끝나고 한 번 훑는다.
 
-★`uq_test_cases_sheet_no` 가 살아 있는 행에 걸려 있고 SQLite 는 행 단위로 검사한다.
+★`uq_test_cases_sheet_no` 가 살아 있는 행에 걸려 있고 유니크 제약은 행 단위로 즉시 검사된다.
   그래서 번호를 옮기는 모든 곳이 "어떤 중간 상태에서도 두 행이 같은 번호를 갖지
   않는다" 를 지켜야 한다. 여기서는 한 번 비켜 둔 뒤 최종 값을 쓴다.
 
@@ -70,32 +70,36 @@ def park_sheet_numbers(project_id: int, sheet_name: str, db: Session) -> None:
 
 
 def renumber_sheet(project_id: int, sheet_name: str, db: Session) -> None:
-    """한 시트의 no 를 1 부터 다시 매긴다. 지금 차례는 변경하지 않는다."""
-    db.execute(text("DROP TABLE IF EXISTS temp._tc_rank"))
-    # ★순위를 CTE 로 두지 않고 임시 테이블에 담는다. 갱신 대상과 같은 테이블을 읽는
-    #   CTE 는 SQLite 가 인라인으로 펼치면 행마다 다시 평가되어, 이미 바꾼 값 위에서
-    #   순위를 매기게 된다. materialize 여부는 최적화기 판단이라 버전에 따라 달라진다.
-    #   `MATERIALIZED` 키워드는 3.35 부터라 배포 환경을 가릴 수 있어 쓰지 않는다.
+    """한 시트의 no 를 1 부터 다시 매긴다. 지금 차례는 변경하지 않는다.
+
+    ★두 문장으로 나눈다. 유니크 제약은 행마다 즉시 검사되므로, 목표 번호를 다른 행이
+      아직 쥐고 있으면 걸린다. 먼저 전부 비켜 두고 그 다음에 쓴다.
+    ★순위는 첫 문장에서 한 번만 매긴다. UPDATE ... FROM 의 부분 질의는 문장 시작 시점의
+      스냅숏을 읽으므로 이미 바꾼 값 위에서 순위가 다시 매겨지지 않는다. 둘째 문장은
+      비켜 둔 값에서 순위를 되읽는다(no = -floor - rn).
+    ★임시 테이블을 쓰지 않는다. SQLite 시절에는 `temp._tc_rank` 에 순위를 담았는데,
+      `temp.` 는 SQLite 전용 스키마 이름이고 트랜잭션 풀러에서는 임시 테이블 자체가
+      다른 요청과 섞일 수 있다.
+    """
+    floor = _park_floor(project_id, sheet_name, db)
     db.execute(
         text(f"""
-            CREATE TEMP TABLE _tc_rank AS
-            SELECT id, ROW_NUMBER() OVER (ORDER BY {_ORDER}) AS rn
-            FROM test_cases
+            UPDATE test_cases AS t
+            SET no = -:floor - r.rn
+            FROM (
+                SELECT id, ROW_NUMBER() OVER (ORDER BY {_ORDER}) AS rn
+                FROM test_cases
+                WHERE project_id = :pid AND sheet_name = :sheet
+            ) AS r
+            WHERE t.id = r.id
+        """),
+        {"pid": project_id, "sheet": sheet_name, "floor": floor},
+    )
+    db.execute(
+        text("""
+            UPDATE test_cases
+            SET no = -no - :floor
             WHERE project_id = :pid AND sheet_name = :sheet
         """),
-        {"pid": project_id, "sheet": sheet_name},
+        {"pid": project_id, "sheet": sheet_name, "floor": floor},
     )
-    # ★한 문장으로 바로 쓰면 안 된다. UPDATE 에는 순서가 없어서, 목표 번호를 이미
-    #   다른 행이 쥐고 있는 상태에서 쓰게 되면 유니크 제약에 걸린다. 먼저 전부
-    #   비켜 두고 그 다음에 쓴다.
-    db.execute(text("""
-        UPDATE test_cases
-        SET no = -:floor - (SELECT rn FROM _tc_rank WHERE _tc_rank.id = test_cases.id)
-        WHERE EXISTS (SELECT 1 FROM _tc_rank WHERE _tc_rank.id = test_cases.id)
-    """), {"floor": _park_floor(project_id, sheet_name, db)})
-    db.execute(text("""
-        UPDATE test_cases
-        SET no = (SELECT rn FROM _tc_rank WHERE _tc_rank.id = test_cases.id)
-        WHERE EXISTS (SELECT 1 FROM _tc_rank WHERE _tc_rank.id = test_cases.id)
-    """))
-    db.execute(text("DROP TABLE temp._tc_rank"))
