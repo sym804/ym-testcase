@@ -120,6 +120,23 @@ VALID_FIELDS = {
 }
 
 
+#: 정수 칸. 문자열 연산(포함/빈 값)이 의미가 없고 값은 정수로 바꿔 비교한다.
+#: SQLite 는 타입을 섞어도 넘어갔지만 PostgreSQL 은 연산자 오류로 500 을 낸다.
+INT_FIELDS = {"no"}
+_INT_OPERATORS = {"eq", "neq", "gt", "lt", "gte", "lte", "in"}
+
+
+def _to_int(value):
+    if isinstance(value, bool):
+        raise HTTPException(status_code=400, detail=f"숫자 칸에는 정수만 쓸 수 있습니다: {value!r}")
+    if isinstance(value, int):
+        return value
+    s = str(value).strip() if value is not None else ""
+    if not s.lstrip("-").isdigit():
+        raise HTTPException(status_code=400, detail=f"숫자 칸에는 정수만 쓸 수 있습니다: {value!r}")
+    return int(s)
+
+
 def _apply_condition(q, field: str, operator: str, value):
     """단일 조건을 쿼리에 적용"""
     if field not in VALID_FIELDS:
@@ -128,6 +145,14 @@ def _apply_condition(q, field: str, operator: str, value):
     col = getattr(TestCase, field, None)
     if col is None:
         return q
+
+    if field in INT_FIELDS:
+        if operator not in _INT_OPERATORS:
+            raise HTTPException(status_code=400, detail=f"숫자 칸에는 '{operator}' 조건을 쓸 수 없습니다")
+        if operator == "in":
+            value = [_to_int(v) for v in value] if isinstance(value, list) else value
+        else:
+            value = _to_int(value)
 
     if operator == "eq":
         return q.filter(col == value)
