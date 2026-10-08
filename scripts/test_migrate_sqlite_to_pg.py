@@ -207,3 +207,89 @@ def test_대상이_비어_있지_않으면_멈춘다(tmp_path, dst, mig):
         conn.execute(text("INSERT INTO users (username, password_hash, display_name, role, must_change_password, "
                           "token_version) VALUES ('x', 'x', 'x', 'user', false, 0)"))
     assert "users" in _problems(mig, make_legacy_db(tmp_path), dst)
+
+
+# ── Task 2: 복사와 시퀀스 ───────────────────────────────────────────────────
+
+def _copy(mig, src_path, dst, allow=frozenset({("test_case_history", 347)})):
+    src = mig.open_source(src_path)
+    pre = mig.precheck(src, dst, set(allow))
+    with dst.begin() as conn:
+        counts = mig.copy_all(src, conn, pre.excluded)
+        mig.fix_sequences(conn)
+    return counts
+
+
+def _q(dst, sql, **kw):
+    from sqlalchemy import text
+    with dst.connect() as conn:
+        return conn.execute(text(sql), kw).all()
+
+
+def test_id_를_보존하고_제외_행은_빼고_넣는다(tmp_path, dst, mig):
+    counts = _copy(mig, make_legacy_db(tmp_path), dst)
+    assert counts["test_case_history"] == 1 and counts["test_cases"] == 3
+    assert _q(dst, "SELECT id FROM test_case_history") == [(1,)]
+    assert [r[0] for r in _q(dst, "SELECT id FROM test_cases ORDER BY id")] == [10, 11, 12]
+    assert _q(dst, "SELECT test_case_id FROM test_results WHERE id = 7") == [(10,)]
+
+
+def test_custom_fields_는_SQL_NULL_과_JSON_null_과_객체를_구분해_옮긴다(tmp_path, dst, mig):
+    _copy(mig, make_legacy_db(tmp_path), dst)
+    rows = dict(_q(dst, "SELECT id, json_typeof(custom_fields) FROM test_cases"))
+    assert rows == {10: None, 11: "null", 12: "object"}
+    assert _q(dst, "SELECT custom_fields->>'env' FROM test_cases WHERE id = 12") == [("QA",)]
+    assert _q(dst, "SELECT json_typeof(sheet_names) FROM test_runs") == [("array",)]
+
+
+def test_불리언_시각_enum_은_타입에_맞게_들어간다(tmp_path, dst, mig):
+    from datetime import datetime
+    _copy(mig, make_legacy_db(tmp_path), dst)
+    assert _q(dst, "SELECT must_change_password, token_version FROM users WHERE id = 2") == [(True, 3)]
+    assert _q(dst, "SELECT deleted_at FROM test_cases WHERE id = 12") == [(datetime(2026, 3, 20, 9, 0, 0, 500000),)]
+    assert _q(dst, "SELECT result::text FROM test_results ORDER BY id") == [("PASS",), ("NS",)]
+
+
+def test_자기_참조는_부모가_뒤_id_여도_들어간다(tmp_path, dst, mig):
+    rows = base_rows()
+    rows["test_case_sheets"] = [
+        {"id": 1, "project_id": 5, "name": "자식", "sort_order": 0, "created_at": TS, "parent_id": 2, "is_folder": 0},
+        {"id": 2, "project_id": 5, "name": "폴더", "sort_order": 1, "created_at": TS, "parent_id": None, "is_folder": 1},
+    ]
+    rows["test_runs"].append(dict(rows["test_runs"][0], id=4, round=2, compare_run_id=6))
+    rows["test_runs"].append(dict(rows["test_runs"][0], id=6, round=3, compare_run_id=None))
+    _copy(mig, make_legacy_db(tmp_path, rows), dst)
+    assert _q(dst, "SELECT parent_id FROM test_case_sheets WHERE id = 1") == [(2,)]
+    assert _q(dst, "SELECT compare_run_id FROM test_runs WHERE id = 4") == [(6,)]
+
+
+def test_시퀀스는_다음_id_가_max_더하기_1_빈_테이블은_1(tmp_path, dst, mig):
+    _copy(mig, make_legacy_db(tmp_path), dst)
+    with dst.begin() as conn:
+        from sqlalchemy import text
+        tc = conn.execute(text("INSERT INTO test_case_sheets (project_id, name, sort_order, is_folder) "
+                               "VALUES (5, 'new', 9, false) RETURNING id")).scalar()
+        plan = conn.execute(text("INSERT INTO test_plans (project_id, name, created_by) "
+                                 "VALUES (5, 'p', 1) RETURNING id")).scalar()
+    assert (tc, plan) == (2, 1)
+
+
+def test_중간에_실패하면_대상은_빈_채로_남는다(tmp_path, dst, mig, monkeypatch):
+    src_path = make_legacy_db(tmp_path)
+    src = mig.open_source(src_path)
+    pre = mig.precheck(src, dst, {("test_case_history", 347)})
+    real = mig._insert_rows
+    calls = {"n": 0}
+
+    def boom(conn, table, cols, rows):
+        calls["n"] += 1
+        if calls["n"] == 3:
+            raise RuntimeError("강제 실패")
+        return real(conn, table, cols, rows)
+
+    monkeypatch.setattr(mig, "_insert_rows", boom)
+    with pytest.raises(RuntimeError):
+        with dst.begin() as conn:
+            mig.copy_all(src, conn, pre.excluded)
+    assert _q(dst, "SELECT count(*) FROM users") == [(0,)]
+    assert _q(dst, "SELECT count(*) FROM projects") == [(0,)]
