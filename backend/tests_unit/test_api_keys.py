@@ -95,7 +95,7 @@ def env(pg_engine, tmp_path, server):
 
     app.dependency_overrides[get_db] = _db
     from services import rate_limit
-    rate_limit.clear_all()
+    rate_limit.clear_all(engine=engine)
     yield server, db
     app.dependency_overrides.clear()
     db.close()

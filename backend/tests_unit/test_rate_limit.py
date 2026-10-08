@@ -41,3 +41,20 @@ def test_오래된_행을_지운다(pg_engine):
     rate_limit.record("account_submit", "y", engine=pg_engine)
     assert rate_limit.purge_older_than(3600, engine=pg_engine) == 1
     assert rate_limit.count_recent("account_submit", "y", 300, engine=pg_engine) == 1
+
+
+def test_로그인_제한은_요청_세션의_DB_를_본다(pg_engine, pg_session):
+    """기본 엔진이 아니라 요청 세션이 붙은 DB 에서 센다. 테스트가 get_db 를 바꿔도,
+    서버리스에서 연결이 달라도 같은 DB 를 본다(QA2: 기본 엔진은 개발 DB 를 가리킬 수 있다)."""
+    import pytest
+    from fastapi import HTTPException
+    from starlette.requests import Request
+
+    from routes.auth import LOGIN_MAX_FAILURES, _check_rate_limit, _rate_limit_key
+
+    req = Request({"type": "http", "headers": [], "client": ("10.9.9.9", 1)})
+    for _ in range(LOGIN_MAX_FAILURES):
+        rate_limit.record("login", _rate_limit_key(req, "u"), engine=pg_engine)
+    with pytest.raises(HTTPException) as e:
+        _check_rate_limit(req, "u", pg_session)
+    assert e.value.status_code == 429

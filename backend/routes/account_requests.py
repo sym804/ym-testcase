@@ -23,6 +23,7 @@ from auth import hash_password, verify_password, role_required, get_session_user
 from routes.auth import _check_rate_limit, _clear_failures, _record_failure
 from services import rate_limit
 from services.client_ip import client_ip
+from services.locks import LockNs, keyed_xact_lock
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +46,18 @@ SUBMIT_WINDOW_SEC = 3600
 BUCKET_SUBMIT = "account_submit"
 
 
-def _check_submit_limit(request: Request):
-    """성공/실패 무관하게 접수 시도를 센다. 1시간 10회."""
+def _check_submit_limit(request: Request, db: Session):
+    """성공/실패 무관하게 접수 시도를 센다. 1시간 10회.
+
+    요청 세션의 DB 에서 세고, 같은 키를 요청 동안 잠가 확인과 기록 사이를 줄 세운다.
+    """
     key = client_ip(request)
-    if rate_limit.count_recent(BUCKET_SUBMIT, key, SUBMIT_WINDOW_SEC) >= SUBMIT_MAX_PER_WINDOW:
+    keyed_xact_lock(db, LockNs.RATE_LIMIT, f"{BUCKET_SUBMIT}:{key}")
+    engine = db.get_bind()
+    if rate_limit.count_recent(BUCKET_SUBMIT, key, SUBMIT_WINDOW_SEC, engine=engine) >= SUBMIT_MAX_PER_WINDOW:
         logger.warning("Account request rate limit exceeded: %s", key)
         raise HTTPException(status_code=429, detail="요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.")
-    rate_limit.record(BUCKET_SUBMIT, key)
+    rate_limit.record(BUCKET_SUBMIT, key, engine=engine)
 
 
 @router.post("/account-requests", response_model=AccountRequestAck,
@@ -61,7 +67,7 @@ def submit_account_request(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    _check_submit_limit(request)
+    _check_submit_limit(request, db)
 
     try:
         req_type = AccountRequestType(payload.request_type)
@@ -140,7 +146,9 @@ def approve_account_request(
 ):
     # ★재설정 코드를 응답으로 돌려준다. 유출된 관리자 키로 남의 계정을 가져갈 수 없게 세션으로만 받는다.
     get_session_user(request, current_user)
-    req = db.query(AccountRequest).filter(AccountRequest.id == request_id).first()
+    # ★행을 잠그고 상태를 본다. 잠그지 않으면 두 승인이 둘 다 pending 을 보거나, 코드 소비로
+    #   completed 가 된 행을 늦게 끝난 승인이 다시 approved 로 되살린다.
+    req = db.query(AccountRequest).filter(AccountRequest.id == request_id).with_for_update().first()
     if not req:
         raise HTTPException(status_code=404, detail="요청을 찾을 수 없습니다.")
     if req.status is not AccountRequestStatus.pending:
@@ -184,7 +192,9 @@ def reject_account_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(role_required("admin")),
 ):
-    req = db.query(AccountRequest).filter(AccountRequest.id == request_id).first()
+    # ★행을 잠그고 상태를 본다. 잠그지 않으면 두 승인이 둘 다 pending 을 보거나, 코드 소비로
+    #   completed 가 된 행을 늦게 끝난 승인이 다시 approved 로 되살린다.
+    req = db.query(AccountRequest).filter(AccountRequest.id == request_id).with_for_update().first()
     if not req:
         raise HTTPException(status_code=404, detail="요청을 찾을 수 없습니다.")
     if req.status is not AccountRequestStatus.pending:
@@ -216,13 +226,13 @@ def reset_password_with_code(
     계정 존재 여부와 승인 여부가 새어 나간다. 응답 본문뿐 아니라 응답 시간도
     같아야 하므로 모든 실패 경로가 bcrypt 대조를 한 번씩 지불한다.
     """
-    _check_rate_limit(request, payload.username)
+    _check_rate_limit(request, payload.username, db)
     fail = HTTPException(status_code=401, detail="코드가 올바르지 않거나 만료되었습니다.")
 
     user = db.query(User).filter(User.username == payload.username).first()
     if not user:
         verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화. 위 _DUMMY_HASH 주석 참고
-        _record_failure(request, payload.username)
+        _record_failure(request, payload.username, db)
         raise fail
 
     approved = (
@@ -245,16 +255,16 @@ def reset_password_with_code(
     req = approved[0] if approved else None
     if not req or not req.code_hash:
         verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화
-        _record_failure(request, payload.username)
+        _record_failure(request, payload.username, db)
         raise fail
 
     if req.code_expires_at is None or req.code_expires_at < now_kst():
         verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화
-        _record_failure(request, payload.username)
+        _record_failure(request, payload.username, db)
         raise fail
 
     if not verify_password(payload.code, req.code_hash):
-        _record_failure(request, payload.username)
+        _record_failure(request, payload.username, db)
         raise fail
 
     user.password_hash = hash_password(payload.new_password)
@@ -273,7 +283,7 @@ def reset_password_with_code(
     db.commit()
     # 코드를 몇 번 잘못 입력했다가 성공한 사용자가 그 실패 기록 때문에 곧바로
     # 로그인에서 잠기는 것을 막는다. 로그인 성공 경로와 같은 처리다.
-    _clear_failures(request, payload.username)
+    _clear_failures(request, payload.username, db)
     logger.info("Password reset via code: user=%s request=%s retired=%s",
                 user.username, req.id, len(approved))
     return {"message": "비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요."}

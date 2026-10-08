@@ -20,6 +20,7 @@ class LockNs(IntEnum):
     PROJECT_WRITE = 1
     FIRST_ADMIN = 2
     CRON = 3
+    RATE_LIMIT = 4
 
 
 def advisory_xact_lock(db: Session, ns: LockNs, key: int = 0) -> None:
@@ -33,3 +34,8 @@ def project_write_lock(project_id: int, db: Session = Depends(get_db)) -> None:
     라우트마다 따로 잠그면 빠뜨린다. 프로젝트 단위로 한 번에 잡는다.
     """
     advisory_xact_lock(db, LockNs.PROJECT_WRITE, project_id)
+
+
+def keyed_xact_lock(db: Session, ns: LockNs, key: str) -> None:
+    """문자열 키를 해시해 잠근다. 같은 키의 확인과 기록 사이를 줄 세운다."""
+    db.execute(text("SELECT pg_advisory_xact_lock(:ns, hashtext(:key))"), {"ns": int(ns), "key": key})
