@@ -157,7 +157,7 @@ def update_project(
 
     update_data = payload.model_dump(exclude_unset=True)
 
-    # field_config는 JSON 문자열로 저장 (SQLite TEXT 컬럼)
+    # field_config는 JSON 문자열로 저장 (Text 컬럼, 읽을 때 json.loads)
     if "field_config" in update_data:
         import json as _json
         fc_val = update_data.pop("field_config")
