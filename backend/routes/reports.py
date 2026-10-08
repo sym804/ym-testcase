@@ -1,7 +1,7 @@
 import io
 import re
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -31,6 +31,20 @@ router = APIRouter(
     tags=["reports"],
 )
 
+
+
+# models.now_kst 와 같은 고정 오프셋. 한국은 서머타임이 없고, zoneinfo 는 시간대 DB(tzdata)가
+# 없는 환경에서 실패한다.
+KST = timezone(timedelta(hours=9))
+
+
+def report_now(now=None):
+    """리포트에 찍는 현재 시각. 서버 시간대(Vercel 함수는 UTC)와 무관하게 KST 다.
+
+    DB 의 시각(models.now_kst)과 같은 형태로 맞추려고 시간대 정보를 뗀다.
+    """
+    base = now or datetime.now(tz=KST)
+    return base.astimezone(KST).replace(tzinfo=None)
 
 def _get_project_or_404(project_id: int, db: Session) -> Project:
     project = db.query(Project).filter(Project.id == project_id).first()
@@ -531,7 +545,7 @@ def report_filename(project_name: str, run: TestRun, ext: str, when: datetime = 
     예: Starfort_계정·세션정책_Test_Report_20260930.pdf (09-30 사용자 형식). 날짜는 내려받는 날이다.
     예전 이름 {프로젝트}_Report_R{회차} 는 어느 테스트인지 몰라 파일만 보고 구분할 수 없었다.
     """
-    day = (when or datetime.now()).strftime("%Y%m%d")
+    day = (when or report_now()).strftime("%Y%m%d")
     project = _safe_name(project_name) or "report"
     return f"{project}_{_safe_name(_run_slug(project_name, run))}_Test_Report_{day}.{ext}"
 
@@ -767,7 +781,7 @@ def report_pdf(
     run = _get_run_or_404(project_id, run_id, db)
     data = _build_report_data(run, db)
     T = REPORT_TEXT[_report_lang(lang)]
-    generated_at = _fmt_dt(datetime.now().isoformat())
+    generated_at = _fmt_dt(report_now().isoformat())
 
     class ReportPDF(FPDF):
         def footer(self):
