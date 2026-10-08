@@ -77,7 +77,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YM TestCase API",
     description="Your Method, Your Test Case Manager",
-    version="1.10.3.0",
+    version="2.0.0.0",
     lifespan=lifespan,
     # 배포는 /api/* 만 백엔드로 보낸다(vercel.json). 문서도 그 아래에 둔다.
     docs_url="/api/docs",
