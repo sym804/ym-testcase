@@ -21,7 +21,7 @@
   "architecture": {
     "title": "1. System Architecture",
     "infraTitle": "Infrastructure",
-    "li1": "SQLite (default) / PostgreSQL",
+    "li1": "PostgreSQL 17 (Docker locally, Supabase in deployment)",
     "li2": "JWT auth (httpOnly cookie + CSRF token)",
     "li3": "bcrypt password hashing",
     "li4": "Vite 7 (build tool)",
@@ -38,7 +38,8 @@
     "title": "2. Installation & Running",
     "devTitle": "2-1. Development Environment",
     "macTitle": "2-2. Mac/Linux",
-    "prodTitle": "2-3. Production Build"
+    "prodTitle": "2-3. Production Build",
+    "dbTitle": "2-0. Start the database (Docker)"
   },
   "env": {
     "title": "3. Environment Variables",
@@ -51,17 +52,24 @@
     "secretKeyRequired": "Required in production",
     "envDesc": "Environment mode. Error if SECRET_KEY is not set in production",
     "optional": "Optional",
-    "dbDesc": "Database connection string",
+    "dbDesc": "PostgreSQL URL. Local example: postgresql+psycopg2://ymtc:ymtc@127.0.0.1:54329/ymtc. In deployment, the Supabase transaction pooler",
     "tokenDesc": "JWT token expiration time (hours)",
     "corsDesc": "Allowed CORS origins (comma-separated)",
     "uploadDesc": "Attachment storage directory",
-    "warn1": "<strong>Warning:</strong> In production, you must set <code>SECRET_KEY</code> to a unique value. The server will fail to start if not set."
+    "warn1": "<strong>Warning:</strong> In production, you must set <code>SECRET_KEY</code> to a unique value. The server will fail to start if not set.",
+    "dbDefault": "(required)",
+    "required": "Required",
+    "dbDirectDesc": "Direct (or session pooler) URL used only for migrations. Falls back to DATABASE_URL when empty",
+    "storageDesc": "Storage for attachments and import files. local or supabase (deployment)",
+    "supabaseDesc": "Supabase project URL, service key, bucket name. Used when STORAGE_BACKEND=supabase",
+    "cronDesc": "Secret for the daily maintenance job (/api/internal/cron/daily)",
+    "proxyDesc": "Proxy header carrying the client IP. Use only a header the platform overwrites"
   },
   "database": {
     "title": "4. Database",
-    "li1": "Default: SQLite (<code>backend/tc_manager.db</code>)",
-    "li2": "Tables are auto-created by SQLAlchemy on first server startup.",
-    "li3": "To switch to PostgreSQL, change the <code>DATABASE_URL</code> environment variable.",
+    "li1": "PostgreSQL 17. Locally, start it from the repo root with <code>docker compose up -d --wait db</code> (127.0.0.1:54329)",
+    "li2": "Alembic migrations create the schema. The local server runs <code>alembic upgrade head</code> on startup; in deployment the Deploy workflow runs it before deploying.",
+    "li3": "Move SQLite data from v1.10.3.1 and earlier with <code>scripts/migrate_sqlite_to_pg.py</code>. The SQLite version remains on the <code>sqlite-legacy</code> branch.",
     "tablesTitle": "4-1. Main Tables",
     "th1": "Table",
     "th2": "Description",
@@ -177,7 +185,7 @@
     "th1": "Item",
     "th2": "Setting",
     "storagePath": "Storage path",
-    "storagePathVal": "<code>UPLOAD_DIR</code> environment variable (default: <code>./uploads</code>)",
+    "storagePathVal": "Local: <code>UPLOAD_DIR</code> (default: <code>backend/uploads</code>). Deployment: private Supabase Storage bucket (<code>STORAGE_BACKEND=supabase</code>)",
     "fileSize": "File size limit",
     "fileSizeVal": "50MB",
     "imageExt": "Allowed extensions (images)",
@@ -379,22 +387,25 @@
     "r8s": "Custom field column not visible",
     "r8c": "No custom field definitions exist",
     "r8f": "Create custom-fields via API then refresh",
-    "r9s": "Child sheets remain after sheet deletion",
-    "r9c": "SQLite FK not enabled (older version)",
-    "r9f": "Restart server (check PRAGMA foreign_keys=ON in database.py)",
+    "r9s": "Every API returns 503 (DB schema older than the code)",
+    "r9c": "New code pulled without running the DB migration",
+    "r9f": "Run python -m alembic upgrade head in backend. In deployment the Deploy workflow does it",
     "r10s": "Test plan progress shows 0",
     "r10c": "test_plan_id not linked to TestRun",
     "r10f": "Ensure test_plan_id is set when creating Run",
     "r11s": "PDF report Korean text garbled",
     "r11c": "Korean font not installed",
-    "r11f": "Verify Malgun Gothic font is installed"
+    "r11f": "Verify Malgun Gothic font is installed",
+    "r12s": "\"Another operation is in progress\" when saving",
+    "r12c": "Concurrent sheet or test case structure changes in the same project waited too long for a lock",
+    "r12f": "Retry shortly. If it happens often, raise LOCK_WAIT_TIMEOUT_MS (default 10000)"
   },
   "backup": {
     "title": "12. Backup & Recovery",
     "backupTitle": "12-1. Data Backup",
-    "backupCodeTitle": "SQLite Backup",
+    "backupCodeTitle": "PostgreSQL and attachment backup",
     "restoreTitle": "12-2. Recovery",
-    "tip1": "<strong>Recommendation:</strong> Set up a regular backup schedule. Back up the SQLite file and the uploads directory together. Consider adding automated backups to a cron job or CI/CD pipeline."
+    "tip1": "<strong>Deployment:</strong> the Backup workflow in the private repo keeps a daily DB dump (public schema) and the Storage objects as artifacts (14 days). Supabase DB backups do not include Storage objects, so keep both."
   },
   "footer": "YM TestCase v1.0 | Admin Manual"
 }

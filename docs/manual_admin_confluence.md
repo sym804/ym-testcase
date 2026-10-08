@@ -13,7 +13,7 @@
 |---|---|---|
 | **Backend** | FastAPI (Python 3.10+), SQLAlchemy ORM, Uvicorn ASGI | 포트 8008 |
 | **Frontend** | React 18, TypeScript, Vite, AG Grid, Chart.js | 포트 5173 (개발) / 80 (프로덕션) |
-| **Database** | SQLite (기본) / PostgreSQL (프로덕션 권장) | `tc_manager.db` |
+| **Database** | PostgreSQL 17 | 로컬은 Docker(127.0.0.1:54329), 배포는 Supabase |
 | **인증** | JWT (HS256), bcrypt 해싱 | 토큰 만료 2시간 |
 
 ---
@@ -23,6 +23,9 @@
 ### 2-1. 개발 환경 실행
 
 ```bash
+# DB 시작 (레포 루트, Docker 필요)
+docker compose up -d --wait db
+
 # Backend 시작
 cd backend
 pip install -r requirements.txt
@@ -53,10 +56,16 @@ npx tsc -b
 |---|---|---|---|
 | `SECRET_KEY` | (자동 생성/dev) | JWT 서명 키. **프로덕션 필수 설정** | ⚠️ 프로덕션 필수 |
 | `ENV` | development | 환경 구분. production 시 SECRET_KEY 미설정 에러 | 선택 |
-| `DATABASE_URL` | sqlite:///./tc_manager.db | DB 연결 문자열 | 선택 |
+| `DATABASE_URL` | (필수) | PostgreSQL 주소. 로컬 예: `postgresql+psycopg2://ymtc:ymtc@127.0.0.1:54329/ymtc`, 배포는 Supabase 트랜잭션 풀러 | 필수 |
+| `DATABASE_URL_DIRECT` | - | 마이그레이션 전용 직결(또는 세션 풀러) 주소. 비우면 DATABASE_URL | 선택 |
 | `TOKEN_EXPIRE_HOURS` | 2 | JWT 토큰 만료 시간 (시간) | 선택 |
 | `CORS_ORIGINS` | http://localhost:5173,http://localhost:3000 | CORS 허용 오리진 (콤마 구분) | 선택 |
-| `UPLOAD_DIR` | ./uploads | 첨부파일 저장 디렉토리 | 선택 |
+| `UPLOAD_DIR` | backend/uploads | 로컬 저장소의 첨부·가져오기 파일 디렉토리 | 선택 |
+| `STORAGE_BACKEND` | local | `local` 또는 `supabase`(배포) | 선택 |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STORAGE_BUCKET` | - | STORAGE_BACKEND=supabase 일 때 Supabase 프로젝트 주소, 서비스 키, 버킷 | 선택 |
+| `CRON_SECRET` | - | 매일 정리 작업(`/api/internal/cron/daily`) 인증 값 | 선택 |
+| `TRUSTED_PROXY_HEADER` | - | 클라이언트 IP 를 담는 프록시 헤더. 플랫폼이 덮어쓰는 헤더만 | 선택 |
+| `LOCK_WAIT_TIMEOUT_MS` | 10000 | 동시 편집 잠금 대기 상한. 넘으면 409 안내 | 선택 |
 
 ⚠️ **주의**: 프로덕션 환경에서는 반드시 `SECRET_KEY`를 고유한 값으로 설정하세요. 미설정 시 서버 시작이 실패합니다.
 
@@ -64,9 +73,9 @@ npx tsc -b
 
 ## 4. 데이터베이스
 
-- 기본: SQLite (`backend/tc_manager.db`)
-- 테이블은 서버 최초 시작 시 SQLAlchemy가 자동 생성
-- PostgreSQL 전환 시 `DATABASE_URL` 환경변수 변경
+- PostgreSQL 17. 로컬은 레포 루트에서 `docker compose up -d --wait db`
+- 스키마는 Alembic 마이그레이션이 만든다. 로컬 서버는 시작할 때 `alembic upgrade head`, 배포는 Deploy 워크플로가 배포 전에 실행
+- v1.10.3.1 까지의 SQLite 데이터는 `scripts/migrate_sqlite_to_pg.py` 로 옮긴다. SQLite 버전은 `sqlite-legacy` 브랜치
 
 ### 4-1. 주요 테이블
 
@@ -190,7 +199,7 @@ npx tsc -b
 
 | 항목 | 설정 |
 |---|---|
-| 저장 경로 | `UPLOAD_DIR` 환경변수 (기본: `./uploads`) |
+| 저장 경로 | 로컬: `UPLOAD_DIR` (기본: `backend/uploads`). 배포: Supabase Storage 비공개 버킷 |
 | 파일 크기 제한 | 50MB |
 | 허용 확장자 (이미지) | .png, .jpg, .jpeg, .gif, .bmp, .webp |
 | 허용 확장자 (문서) | .pdf, .doc, .docx, .xlsx, .xls, .pptx |
@@ -339,6 +348,8 @@ API 문서(Swagger UI): `http://localhost:8008/api/docs`
 | 한글 깨짐 | 소스 파일 인코딩 문제 | UTF-8로 재저장 후 빌드 |
 | Excel Import 실패 | 헤더 매핑 실패 | 지원 헤더 형식 확인 |
 | PDF 한글 깨짐 | 서버에 한글 폰트 미설치 | Malgun Gothic 설치 |
+| 모든 API 가 503 | DB 스키마가 코드보다 옛 버전 | backend 에서 `python -m alembic upgrade head` |
+| 저장 시 "다른 작업이 진행 중입니다" | 같은 프로젝트의 구조 변경이 동시에 몰림 | 잠시 뒤 다시 시도. 잦으면 `LOCK_WAIT_TIMEOUT_MS` 상향 |
 
 ---
 
@@ -346,14 +357,16 @@ API 문서(Swagger UI): `http://localhost:8008/api/docs`
 
 ### 12-1. 백업 대상
 
-1. 데이터베이스: `backend/tc_manager.db`
-2. 첨부파일: `backend/uploads/` 디렉토리
+1. 데이터베이스: PostgreSQL (`pg_dump`)
+2. 첨부파일: 로컬은 `backend/uploads/`, 배포는 Supabase Storage 버킷
+
+배포에서는 비공개 레포의 Backup 워크플로가 매일 둘을 아티팩트로 남긴다(14일 보관). Supabase 의 DB 백업에는 Storage 객체가 들어가지 않는다.
 
 ### 12-2. 백업 명령
 
 ```bash
-# DB 백업
-cp backend/tc_manager.db backup/tc_manager_$(date +%Y%m%d).db
+# DB 백업 (로컬 Docker)
+docker compose exec -T db pg_dump -U ymtc --format=custom ymtc > backup/ymtc_$(date +%Y%m%d).dump
 
 # 첨부파일 백업
 cp -r backend/uploads backup/uploads_$(date +%Y%m%d)
@@ -362,16 +375,16 @@ cp -r backend/uploads backup/uploads_$(date +%Y%m%d)
 ### 12-3. 복구
 
 ```bash
-# 데이터베이스 복구
-cp backup/tc_manager_20260316.db backend/tc_manager.db
+# 서버를 먼저 내린 뒤 DB 복구
+docker compose exec -T db pg_restore -U ymtc -d ymtc --clean --if-exists < backup/ymtc_20261009.dump
 
 # 첨부파일 복구
-cp -r backup/uploads_20260316/* backend/uploads/
+cp -r backup/uploads_20261009/* backend/uploads/
 
-# 서버 재시작 (실행 중인 uvicorn 을 끄고 다시 띄운다)
+# 서버 다시 시작
 ```
 
-💡 **권장**: 정기적인 백업 스케줄 설정 (일 1회). SQLite 파일과 uploads 디렉토리를 함께 백업해야 합니다.
+💡 **권장**: 정기적인 백업 스케줄 설정 (일 1회). DB 덤프와 첨부 파일을 함께 백업해야 합니다.
 
 ---
 

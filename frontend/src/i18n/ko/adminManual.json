@@ -21,7 +21,7 @@
   "architecture": {
     "title": "1. 시스템 구성",
     "infraTitle": "인프라",
-    "li1": "SQLite (기본) / PostgreSQL",
+    "li1": "PostgreSQL 17 (로컬은 Docker, 배포는 Supabase)",
     "li2": "JWT 인증 (httpOnly 쿠키 + CSRF 토큰)",
     "li3": "bcrypt 비밀번호 해싱",
     "li4": "Vite 7 (빌드 도구)",
@@ -38,7 +38,8 @@
     "title": "2. 설치 및 실행",
     "devTitle": "2-1. 개발 환경 실행",
     "macTitle": "2-2. Mac/Linux 실행",
-    "prodTitle": "2-3. 프로덕션 빌드"
+    "prodTitle": "2-3. 프로덕션 빌드",
+    "dbTitle": "2-0. DB 실행 (Docker)"
   },
   "env": {
     "title": "3. 환경 변수",
@@ -51,17 +52,24 @@
     "secretKeyRequired": "프로덕션 필수",
     "envDesc": "환경 구분. production 시 SECRET_KEY 미설정 시 에러",
     "optional": "선택",
-    "dbDesc": "데이터베이스 연결 문자열",
+    "dbDesc": "PostgreSQL 주소. 로컬 예: postgresql+psycopg2://ymtc:ymtc@127.0.0.1:54329/ymtc. 배포는 Supabase 트랜잭션 풀러",
     "tokenDesc": "JWT 토큰 만료 시간 (시간)",
     "corsDesc": "허용할 CORS 오리진 (콤마 구분)",
     "uploadDesc": "첨부파일 저장 디렉토리",
-    "warn1": "<strong>주의:</strong> 프로덕션 환경에서는 반드시 <code>SECRET_KEY</code>를 고유한 값으로 설정하세요. 미설정 시 서버 시작이 실패합니다."
+    "warn1": "<strong>주의:</strong> 프로덕션 환경에서는 반드시 <code>SECRET_KEY</code>를 고유한 값으로 설정하세요. 미설정 시 서버 시작이 실패합니다.",
+    "dbDefault": "(필수)",
+    "required": "필수",
+    "dbDirectDesc": "마이그레이션 전용 직결(또는 세션 풀러) 주소. 비우면 DATABASE_URL 을 씁니다",
+    "storageDesc": "첨부·가져오기 파일 저장소. local 또는 supabase(배포)",
+    "supabaseDesc": "Supabase 프로젝트 주소, 서비스 키, 버킷 이름. STORAGE_BACKEND=supabase 일 때",
+    "cronDesc": "매일 정리 작업(/api/internal/cron/daily) 인증 값",
+    "proxyDesc": "클라이언트 IP 를 담는 프록시 헤더. 배포 플랫폼이 덮어쓰는 헤더만 쓰세요"
   },
   "database": {
     "title": "4. 데이터베이스",
-    "li1": "기본: SQLite (<code>backend/tc_manager.db</code>)",
-    "li2": "테이블은 서버 최초 시작 시 SQLAlchemy가 자동 생성합니다.",
-    "li3": "PostgreSQL 전환 시 <code>DATABASE_URL</code> 환경변수를 변경하세요.",
+    "li1": "PostgreSQL 17. 로컬은 레포 루트에서 <code>docker compose up -d --wait db</code> 로 띄웁니다(127.0.0.1:54329).",
+    "li2": "스키마는 Alembic 마이그레이션이 만듭니다. 로컬 서버는 시작할 때 <code>alembic upgrade head</code> 를 실행하고, 배포에서는 Deploy 워크플로가 배포 전에 실행합니다.",
+    "li3": "v1.10.3.1 까지의 SQLite 데이터는 <code>scripts/migrate_sqlite_to_pg.py</code> 로 옮깁니다. SQLite 버전은 <code>sqlite-legacy</code> 브랜치에 남아 있습니다.",
     "tablesTitle": "4-1. 주요 테이블",
     "th1": "테이블",
     "th2": "설명",
@@ -177,7 +185,7 @@
     "th1": "항목",
     "th2": "설정",
     "storagePath": "저장 경로",
-    "storagePathVal": "<code>UPLOAD_DIR</code> 환경변수 (기본: <code>./uploads</code>)",
+    "storagePathVal": "로컬: <code>UPLOAD_DIR</code> (기본: <code>backend/uploads</code>). 배포: Supabase Storage 비공개 버킷 (<code>STORAGE_BACKEND=supabase</code>)",
     "fileSize": "파일 크기 제한",
     "fileSizeVal": "50MB",
     "imageExt": "허용 확장자 (이미지)",
@@ -379,22 +387,25 @@
     "r8s": "커스텀 필드 컬럼 안 보임",
     "r8c": "커스텀 필드 정의가 없음",
     "r8f": "API로 custom-fields 생성 후 새로고침",
-    "r9s": "시트 삭제 시 하위 시트 남음",
-    "r9c": "SQLite FK 미활성화 (구버전)",
-    "r9f": "서버 재시작 (database.py에서 PRAGMA foreign_keys=ON 확인)",
+    "r9s": "모든 API 가 503 (DB 스키마가 코드보다 옛 버전)",
+    "r9c": "새 코드를 받았지만 DB 마이그레이션을 하지 않음",
+    "r9f": "backend 에서 python -m alembic upgrade head 를 실행하세요. 배포에서는 Deploy 워크플로가 실행합니다",
     "r10s": "테스트 플랜 progress 0",
     "r10c": "TestRun에 test_plan_id 미연결",
     "r10f": "Run 생성 시 test_plan_id 지정 확인",
     "r11s": "PDF 리포트 한글 깨짐",
     "r11c": "한글 폰트 미설치",
-    "r11f": "Malgun Gothic 폰트 설치 확인"
+    "r11f": "Malgun Gothic 폰트 설치 확인",
+    "r12s": "저장할 때 \"다른 작업이 진행 중입니다\" 안내",
+    "r12c": "같은 프로젝트의 시트·TC 구조 변경이 동시에 몰려 잠금 대기가 길어짐",
+    "r12f": "잠시 뒤 다시 시도하세요. 자주 나면 LOCK_WAIT_TIMEOUT_MS(기본 10000) 를 늘리세요"
   },
   "backup": {
     "title": "12. 백업/복구",
     "backupTitle": "12-1. 데이터 백업",
-    "backupCodeTitle": "SQLite 백업",
+    "backupCodeTitle": "PostgreSQL 과 첨부 백업",
     "restoreTitle": "12-2. 복구",
-    "tip1": "<strong>권장사항:</strong> 정기적인 백업 스케줄을 설정하세요. SQLite 파일과 uploads 디렉토리를 함께 백업해야 합니다. 크론잡이나 CI/CD 파이프라인에 자동 백업을 추가하는 것을 추천합니다."
+    "tip1": "<strong>배포:</strong> 비공개 레포의 Backup 워크플로가 매일 DB 덤프(public 스키마)와 Storage 객체를 아티팩트로 남깁니다(14일 보관). Supabase 의 DB 백업에는 Storage 객체가 들어가지 않으므로 둘을 함께 보관하세요."
   },
   "footer": "YM TestCase v1.0 | 운영 매뉴얼 (Admin 전용)"
 }
