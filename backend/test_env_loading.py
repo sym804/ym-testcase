@@ -16,6 +16,9 @@ def _run(env_file, code):
     env["ENV_FILE"] = str(env_file)
     for key in ("SECRET_KEY", "TOKEN_EXPIRE_HOURS", "CORS_ORIGINS", "ENV", "DATABASE_URL"):
         env.pop(key, None)
+    # DATABASE_URL 은 필수다(database.py). 이 파일이 보는 값이 아니므로 접속하지 않는
+    # 자리표시 주소를 준다. 엔진은 지연 접속이라 임포트만으로는 연결하지 않는다.
+    env["DATABASE_URL"] = "postgresql+psycopg2://u:p@127.0.0.1:1/env_loading"
     return subprocess.run(
         [sys.executable, "-c", code],
         cwd=BACKEND_DIR,
