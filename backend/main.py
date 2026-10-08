@@ -209,13 +209,13 @@ app.include_router(internal_routes.router)
 
 
 def _purge_old_deleted_testcases():
-    """기한이 지난 소프트 삭제 TC 정리. 실제 판정은 purge_service 가 한다."""
+    """로컬 기동 정리. Cron 과 같은 일일 정리(services/maintenance.py)를 돈다."""
     from database import SessionLocal
-    from services.purge_service import purge_deleted_testcases
+    from services.maintenance import run_daily
 
     db = SessionLocal()
     try:
-        purge_deleted_testcases(db)
+        run_daily(db)
     finally:
         db.close()
 

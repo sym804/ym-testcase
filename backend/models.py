@@ -554,3 +554,18 @@ class StagedUpload(Base):
     __table_args__ = (
         Index("ix_staged_uploads_created", "created_at"),
     )
+
+
+# ── StorageDeletion ───────────────────────────────────────────────────────────
+
+class StorageDeletion(Base):
+    """지우지 못한 저장소 객체. 일일 정리가 다시 시도한다.
+
+    첨부·프로젝트·수행을 지울 때 저장소가 실패해도 DB 삭제는 진행한다. 그러면 객체를
+    가리키는 기록이 사라져 다시 찾을 수 없으므로, 키를 여기 남긴다.
+    """
+    __tablename__ = "storage_deletions"
+
+    id = Column(Integer, primary_key=True)
+    storage_key = Column(String(512), nullable=False)
+    created_at = Column(DateTime, default=now_kst, nullable=False)

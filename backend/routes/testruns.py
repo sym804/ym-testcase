@@ -761,7 +761,7 @@ def delete_testrun(
     result_ids = [r.id for r in db.query(TestResult.id).filter(TestResult.test_run_id == run_id).all()]
     if result_ids:
         attachments = db.query(Attachment).filter(Attachment.test_result_id.in_(result_ids)).all()
-        delete_attachment_objects([att.filepath for att in attachments])
+        delete_attachment_objects([att.filepath for att in attachments], db)
         # bulk delete로 처리 (개별 db.delete()는 cascade와 충돌하여 경고 발생)
         db.query(Attachment).filter(Attachment.test_result_id.in_(result_ids)).delete(synchronize_session=False)
     db.query(TestResult).filter(TestResult.test_run_id == run_id).delete(synchronize_session=False)
