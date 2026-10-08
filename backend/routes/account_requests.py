@@ -5,8 +5,6 @@
 """
 import logging
 import secrets
-import time
-from collections import defaultdict
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -23,6 +21,8 @@ from schemas import (
 )
 from auth import hash_password, verify_password, role_required, get_session_user, revoke_user_api_keys
 from routes.auth import _check_rate_limit, _clear_failures, _record_failure
+from services import rate_limit
+from services.client_ip import client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -38,45 +38,20 @@ CODE_TTL_HOURS = 24
 # 결과를 쓰지 않는다고 지우면 타이밍 차이가 그대로 되살아난다.
 _DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
 
-# 접수 남용 방어. auth.py 의 _login_failures 는 실패만 세므로 여기에 쓸 수 없다.
-_submit_hits: dict[str, list[float]] = defaultdict(list)
+# 접수 남용 방어. auth.py 의 로그인 제한은 실패만 세므로 여기에 쓸 수 없다.
+# ★DB 에 센다(services/rate_limit). 메모리에 세면 서버리스 인스턴스마다 따로 센다.
 SUBMIT_MAX_PER_WINDOW = 10
 SUBMIT_WINDOW_SEC = 3600
-_MAX_SUBMIT_KEYS = 10000
-_last_submit_purge: float = 0.0
-
-
-def _client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
-
-
-def _purge_submit_keys():
-    global _last_submit_purge
-    now = time.time()
-    if now - _last_submit_purge < 60:
-        return
-    _last_submit_purge = now
-    expired = [
-        k for k, hits in _submit_hits.items()
-        if not hits or now - max(hits) >= SUBMIT_WINDOW_SEC
-    ]
-    for k in expired:
-        del _submit_hits[k]
+BUCKET_SUBMIT = "account_submit"
 
 
 def _check_submit_limit(request: Request):
     """성공/실패 무관하게 접수 시도를 센다. 1시간 10회."""
-    _purge_submit_keys()
-    if len(_submit_hits) >= _MAX_SUBMIT_KEYS:
-        oldest = min(_submit_hits, key=lambda k: _submit_hits[k][-1] if _submit_hits[k] else 0)
-        del _submit_hits[oldest]
-    key = _client_ip(request)
-    now = time.time()
-    _submit_hits[key] = [t for t in _submit_hits[key] if now - t < SUBMIT_WINDOW_SEC]
-    if len(_submit_hits[key]) >= SUBMIT_MAX_PER_WINDOW:
+    key = client_ip(request)
+    if rate_limit.count_recent(BUCKET_SUBMIT, key, SUBMIT_WINDOW_SEC) >= SUBMIT_MAX_PER_WINDOW:
         logger.warning("Account request rate limit exceeded: %s", key)
         raise HTTPException(status_code=429, detail="요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.")
-    _submit_hits[key].append(now)
+    rate_limit.record(BUCKET_SUBMIT, key)
 
 
 @router.post("/account-requests", response_model=AccountRequestAck,
@@ -119,7 +94,7 @@ def submit_account_request(
             note=payload.note,
         ))
         db.commit()
-        logger.info("Account request submitted: type=%s ip=%s", req_type.value, _client_ip(request))
+        logger.info("Account request submitted: type=%s ip=%s", req_type.value, client_ip(request))
     else:
         # 행은 새로 만들지 않되 내용은 새 제출로 갱신한다. 연락처를 잘못 적어 다시 보낸
         # 경우 이전 값을 그대로 두면 관리자가 닿을 수 없는 연락처만 보게 되고,
@@ -130,7 +105,7 @@ def submit_account_request(
             existing.note = payload.note
         db.commit()
         logger.info("Account request updated (duplicate suppressed): type=%s ip=%s",
-                    req_type.value, _client_ip(request))
+                    req_type.value, client_ip(request))
 
     # 응답은 두 경로가 완전히 같아야 한다. 다르면 접수 여부로 계정 존재가 새어 나간다.
     return AccountRequestAck(message=ACK_MESSAGE)

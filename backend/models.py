@@ -8,7 +8,7 @@ def now_kst():
     return datetime.now(KST).replace(tzinfo=None)
 
 from sqlalchemy import (
-    Boolean, Column, Integer, String, Text, DateTime, Float, ForeignKey, Enum as SAEnum, JSON, Index, text
+    Boolean, Column, Integer, String, Text, DateTime, Float, ForeignKey, Enum as SAEnum, JSON, Index, text, func
 )
 from sqlalchemy.orm import relationship
 
@@ -510,4 +510,24 @@ class ApiKey(Base):
 
     __table_args__ = (
         Index("ix_api_keys_user_id", "user_id"),
+    )
+
+
+# ── RateLimitEvent ────────────────────────────────────────────────────────────
+
+class RateLimitEvent(Base):
+    """로그인 실패, 계정 요청 접수 같은 횟수 제한의 기록.
+
+    프로세스 메모리에 세면 서버리스 인스턴스마다 따로 세고, 인스턴스가 꺼지면 사라진다.
+    시각은 DB 시계(now())를 써서 인스턴스마다 시계가 달라도 같은 기준으로 센다.
+    """
+    __tablename__ = "rate_limit_events"
+
+    id = Column(Integer, primary_key=True)
+    bucket = Column(String(32), nullable=False)
+    key = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_rate_limit_events_bucket_key_created", "bucket", "key", "created_at"),
     )

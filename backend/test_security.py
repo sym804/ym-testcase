@@ -679,10 +679,12 @@ class TestCodeSecurity:
         assert "_check_attachment_access" in code
         assert "_get_project_id_from_test_result" in code
 
-    def test_rate_limit_memory_protection(self):
-        code = self._read("routes/auth.py")
-        assert "_MAX_RATE_LIMIT_KEYS" in code
-        assert "_purge_expired_keys" in code
+    def test_rate_limit_is_shared_and_bounded(self):
+        # 횟수 제한은 DB 에 센다(서버리스 인스턴스끼리 공유). 무한히 쌓이지 않도록
+        # 오래된 기록 정리 함수가 있어야 한다. 정리 동작은 tests_unit/test_rate_limit.py 가 본다.
+        assert "rate_limit.count_recent" in self._read("routes/auth.py")
+        assert "rate_limit.count_recent" in self._read("routes/account_requests.py")
+        assert "def purge_older_than" in self._read("services/rate_limit.py")
 
     def test_pinned_dependencies(self):
         assert "fastapi==" in self._read("requirements.txt")

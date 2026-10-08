@@ -1,8 +1,6 @@
 import logging
 import secrets
 import string
-import time
-from collections import defaultdict
 from datetime import timedelta
 from typing import List
 
@@ -10,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from database import get_db
+from services import rate_limit
+from services.client_ip import client_ip
 from services.locks import LockNs, advisory_xact_lock
 from models import User, UserRole
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
@@ -25,42 +25,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # Rate Limiting (실패한 로그인만 누적, IP+username 기준)
-_login_failures: dict[str, list[float]] = defaultdict(list)
+# ★DB 에 센다(services/rate_limit). 프로세스 메모리에 세면 서버리스 인스턴스마다
+#   따로 세서 잠금이 사실상 걸리지 않고, 인스턴스가 꺼지면 기록도 사라진다.
 LOGIN_MAX_FAILURES = 10
 LOGIN_WINDOW_SEC = 300  # 5분
-_MAX_RATE_LIMIT_KEYS = 10000  # 메모리 보호: 최대 키 수
-_last_purge_time: float = 0.0
+BUCKET_LOGIN = "login"
 
 
 def _rate_limit_key(request: Request, username: str = "") -> str:
     """IP + username 조합 키"""
-    client_ip = request.client.host if request.client else "unknown"
-    return f"{client_ip}:{username}" if username else client_ip
-
-
-def _purge_expired_keys():
-    """만료된 키를 주기적으로 정리 (60초마다)"""
-    global _last_purge_time
-    now = time.time()
-    if now - _last_purge_time < 60:
-        return
-    _last_purge_time = now
-    expired = [
-        k for k, timestamps in _login_failures.items()
-        if not timestamps or now - max(timestamps) >= LOGIN_WINDOW_SEC
-    ]
-    for k in expired:
-        del _login_failures[k]
+    ip = client_ip(request)
+    return f"{ip}:{username}" if username else ip
 
 
 def _check_rate_limit(request: Request, username: str = ""):
     """5분간 실패 10회 이상이면 차단"""
-    _purge_expired_keys()
     key = _rate_limit_key(request, username)
-    now = time.time()
-    # 윈도우 밖의 기록 제거
-    _login_failures[key] = [t for t in _login_failures[key] if now - t < LOGIN_WINDOW_SEC]
-    if len(_login_failures[key]) >= LOGIN_MAX_FAILURES:
+    if rate_limit.count_recent(BUCKET_LOGIN, key, LOGIN_WINDOW_SEC) >= LOGIN_MAX_FAILURES:
         logger.warning("Rate limit exceeded: %s", key)
         raise HTTPException(
             status_code=429,
@@ -70,20 +51,12 @@ def _check_rate_limit(request: Request, username: str = ""):
 
 def _record_failure(request: Request, username: str = ""):
     """실패한 로그인만 기록"""
-    # 키 수 제한: 초과 시 가장 오래된 키부터 제거
-    # TODO: 현재 O(n) min() 탐색이지만, _MAX_RATE_LIMIT_KEYS=10000 수준에서는 문제 없음.
-    #       대규모 환경에서는 OrderedDict 또는 TTL 캐시로 교체 검토.
-    if len(_login_failures) >= _MAX_RATE_LIMIT_KEYS:
-        oldest_key = min(_login_failures, key=lambda k: _login_failures[k][-1] if _login_failures[k] else 0)
-        del _login_failures[oldest_key]
-    key = _rate_limit_key(request, username)
-    _login_failures[key].append(time.time())
+    rate_limit.record(BUCKET_LOGIN, _rate_limit_key(request, username))
 
 
 def _clear_failures(request: Request, username: str = ""):
     """로그인 성공 시 해당 키의 실패 기록 초기화"""
-    key = _rate_limit_key(request, username)
-    _login_failures.pop(key, None)
+    rate_limit.clear(BUCKET_LOGIN, _rate_limit_key(request, username))
 
 
 @router.get("/check-username")

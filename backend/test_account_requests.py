@@ -3,7 +3,6 @@
 실행: cd backend && python -m pytest test_account_requests.py -v
 """
 import os
-import time
 
 import pytest
 import requests
@@ -23,10 +22,10 @@ def _reset_submit_limit():
     """접수 제한은 IP 기준 1시간 10회다. 테스트가 같은 IP 로 그 예산을 나눠 쓰면
     뒤쪽 테스트가 429 로 죽는다. 프로덕션 한도는 그대로 두고 테스트만 격리한다.
 
-    ★임포트 실패를 삼키지 않는다. 저장 위치가 바뀌어 이 이름이 사라지면 초기화가
-      조용히 멈추고 뒤쪽 테스트가 429 로 간헐 실패한다. 그때는 여기가 먼저 깨져야 한다."""
-    from routes.account_requests import _submit_hits
-    _submit_hits.clear()
+    ★제한 기록은 DB(rate_limit_events)에 있다. 메모리 카운터를 비우던 시절에는 임포트
+      실패를 삼켜서, 저장 위치가 바뀌자 초기화가 조용히 멈출 수 있었다."""
+    from services import rate_limit
+    rate_limit.clear_all()
     yield
 
 
@@ -495,12 +494,16 @@ def test_resubmit_updates_contact_on_existing_pending(admin_headers):
 
 
 def test_submit_rate_limit_returns_429():
-    """접수 제한이 실제로 동작하는지 카운터를 직접 채워 확인한다.
+    """접수 제한이 실제로 동작하는지 기록을 직접 채워 확인한다.
 
-    HTTP 로 11번 두드리면 느리고, autouse 픽스처가 매 테스트 앞에서 카운터를
+    HTTP 로 11번 두드리면 느리고, autouse 픽스처가 매 테스트 앞에서 기록을
     비우기 때문에 그 방식으로는 429 경로에 영영 닿지 못한다.
     """
-    from routes.account_requests import _submit_hits, SUBMIT_MAX_PER_WINDOW
+    from sqlalchemy import text
+
+    from database import engine
+    from routes.account_requests import BUCKET_SUBMIT, SUBMIT_MAX_PER_WINDOW
+    from services import rate_limit
 
     payload = {
         "request_type": "reset_password",
@@ -508,18 +511,21 @@ def test_submit_rate_limit_returns_429():
         "contact": "메신저 rate",
     }
 
-    _submit_hits.clear()
+    rate_limit.clear_all()
     assert _submit(payload).status_code == 201
-    # 카운터 키는 서버가 본 클라이언트 IP 표기다. 환경마다 다르므로 실측해서 쓴다
-    assert len(_submit_hits) == 1, f"접수 카운터가 기록되지 않았다: {dict(_submit_hits)}"
-    key = next(iter(_submit_hits))
+    # 키는 서버가 본 클라이언트 IP 표기다. 환경마다 다르므로 실측해서 쓴다
+    with engine.connect() as c:
+        keys = [r[0] for r in c.execute(text(
+            "SELECT DISTINCT key FROM rate_limit_events WHERE bucket = :b"), {"b": BUCKET_SUBMIT})]
+    assert len(keys) == 1, f"접수 기록이 남지 않았다: {keys}"
 
     try:
-        _submit_hits[key] = [time.time()] * SUBMIT_MAX_PER_WINDOW
+        for _ in range(SUBMIT_MAX_PER_WINDOW):
+            rate_limit.record(BUCKET_SUBMIT, keys[0])
         r = _submit(payload)
         assert r.status_code == 429, f"한도를 넘겼는데 {r.status_code} 가 나왔다: {r.text}"
     finally:
-        _submit_hits.clear()
+        rate_limit.clear_all()
 
 
 def test_같은_코드를_동시에_쓰면_하나만_성공한다(admin_headers, normal_user):
