@@ -3,7 +3,7 @@
 서버리스 함수의 디스크는 꺼지면 사라지므로 배포에서는 Supabase Storage 비공개 버킷을 쓴다.
 `STORAGE_BACKEND=supabase` 면 Supabase, 아니면 로컬 디스크(`UPLOAD_DIR`, 기본 backend/uploads).
 
-★Supabase 는 표준 라이브러리 urllib 로 REST 를 직접 부른다. 쓰는 경로가 다섯 개라 클라이언트
+★Supabase 는 표준 라이브러리 urllib 로 REST 를 직접 부른다. 쓰는 경로가 여섯 개라 클라이언트
   라이브러리를 들일 이유가 없다. 경로는 공식 Python 클라이언트(storage3)와 같다.
 ★서비스 키는 서버에서만 쓴다. 클라이언트에 주는 주소(직접 업로드, 서명 다운로드)는
   Supabase 가 발급한 토큰만 담고 서비스 키는 담지 않는다.
@@ -23,9 +23,16 @@ _KEY_RE = re.compile(r"^[A-Za-z0-9_.\-]+(/[A-Za-z0-9_.\-]+)*$")
 
 def check_key(key: str) -> str:
     """키는 ASCII 영숫자와 `_ . -` 와 `/` 만. 경로 이탈(`..`)과 절대 경로를 막는다."""
-    if not key or not _KEY_RE.match(key) or any(part in ("", ".", "..") for part in key.split("/")):
+    if not key or not _KEY_RE.fullmatch(key) or any(part in ("", ".", "..") for part in key.split("/")):
         raise ValueError(f"잘못된 저장소 키: {key!r}")
     return key
+
+
+class StorageUnavailable(Exception):
+    """저장소에 닿지 못했거나 저장소가 오류를 냈다. 앱은 503 으로 바꿔 응답한다.
+
+    메시지에 서비스 키나 서명 주소를 넣지 않는다(로그에 남는다).
+    """
 
 
 def _too_large(max_bytes: int) -> HTTPException:
@@ -86,7 +93,14 @@ class SupabaseStorage:
         h = {"Authorization": f"Bearer {self.key}", "apikey": self.key}
         h.update(headers or {})
         req = urllib.request.Request(self.base + path, data=data, method=method, headers=h)
-        return urllib.request.urlopen(req, timeout=30)
+        try:
+            return urllib.request.urlopen(req, timeout=30)
+        except urllib.error.HTTPError as e:
+            if method == "HEAD" and e.code in (400, 404):
+                raise
+            raise StorageUnavailable(f"storage {method} failed: HTTP {e.code}") from None
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            raise StorageUnavailable(f"storage {method} failed: {type(e).__name__}") from None
 
     def _json(self, method: str, path: str, payload: dict | None = None) -> dict:
         data = json.dumps(payload).encode() if payload is not None else None

@@ -13,6 +13,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
+from services.storage import StorageUnavailable
+
 from routes import auth as auth_routes
 from routes import projects as project_routes
 from routes import testcases as testcase_routes
@@ -171,6 +173,13 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
         )
     logger.error("Integrity error on %s %s: %s", request.method, request.url.path, detail)
     return JSONResponse(status_code=409, content={"detail": "데이터 제약 조건에 걸렸습니다."})
+
+
+@app.exception_handler(StorageUnavailable)
+async def storage_unavailable_handler(request: Request, exc: StorageUnavailable):
+    logger.error("Storage unavailable on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(status_code=503,
+                        content={"detail": "파일 저장소에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."})
 
 
 @app.exception_handler(Exception)
