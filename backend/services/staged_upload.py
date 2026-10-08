@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from jose import JWTError, jwt
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from models import StagedUpload, User, now_kst
@@ -92,7 +93,14 @@ def upload_target(row: StagedUpload) -> dict:
 
 
 def _get(db: Session, upload_id: str, user: User, purpose: str) -> StagedUpload:
-    row = db.query(StagedUpload).filter(StagedUpload.id == upload_id).with_for_update().first()
+    # NOWAIT: 첨부 라우트는 async 라 잠금을 기다리면 이벤트 루프가 멈춘다. 동시에 같은
+    # 업로드를 쓰려 하면 하나는 바로 409 로 끝난다.
+    try:
+        row = (db.query(StagedUpload).filter(StagedUpload.id == upload_id)
+               .with_for_update(nowait=True).first())
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="같은 업로드를 처리하는 중입니다.")
     if row is None:
         raise HTTPException(status_code=404, detail="업로드를 찾을 수 없습니다.")
     if row.user_id != user.id:
