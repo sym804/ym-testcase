@@ -101,7 +101,6 @@ portfolio/
 ui_design/
 CLAUDE.md
 LICENSE_AGPL
-docker-compose.yml
 /.env.example
 
 # ── 로컬 QA 자격증명·데이터 (공개 저장소에 올리지 않는다) ──

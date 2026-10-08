@@ -1,0 +1,21 @@
+# 로컬 개발과 테스트용 PostgreSQL. 운영은 Supabase 이고 이 파일과 무관하다.
+# 메이저 버전은 Supabase 와 맞춘다(docs/superpowers/specs/2026-10-08-postgresql-vercel-supabase-design.md).
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ymtc
+      POSTGRES_PASSWORD: ymtc
+      POSTGRES_DB: ymtc
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - ymtc-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ymtc -d ymtc"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  ymtc-pg:
