@@ -206,3 +206,51 @@ def test_저장소에_닿지_못하면_StorageUnavailable(monkeypatch):
     with pytest.raises(storage_mod.StorageUnavailable) as e:
         storage_mod.get_storage().put("k/x.bin", b"x", None)
     assert "SERVICE-KEY" not in str(e.value)
+
+
+# ── 백업용 목록 ──────────────────────────────────────────────────────────────
+
+class _ListFake(BaseHTTPRequestHandler):
+    """POST /object/list/{bucket} 를 흉내 낸다. id 가 None 이면 폴더다."""
+    tree = {
+        "": [{"name": "attachments", "id": None}, {"name": "root.png", "id": "1"}],
+        "attachments": [{"name": "a.png", "id": "2"}, {"name": "sub", "id": None}],
+        "attachments/sub": [{"name": "b.png", "id": "3"}],
+    }
+    bodies = []
+
+    def log_message(self, *a):
+        pass
+
+    def do_POST(self):
+        n = int(self.headers.get("content-length") or 0)
+        body = json.loads(self.rfile.read(n) or b"{}")
+        _ListFake.bodies.append((self.path, body))
+        items = _ListFake.tree.get(body.get("prefix", ""), [])
+        data = json.dumps(items[body.get("offset", 0):body.get("offset", 0) + body.get("limit", 100)]).encode()
+        self.send_response(200)
+        self.send_header("content-length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+
+def test_목록은_폴더를_따라_내려가_모든_키를_준다(monkeypatch):
+    _ListFake.bodies = []
+    srv = HTTPServer(("127.0.0.1", 0), _ListFake)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setenv("STORAGE_BACKEND", "supabase")
+    monkeypatch.setenv("SUPABASE_URL", f"http://127.0.0.1:{srv.server_address[1]}")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "K")
+    monkeypatch.setenv("STORAGE_BUCKET", "bkt")
+    try:
+        keys = sorted(storage_mod.get_storage().list_keys())
+    finally:
+        srv.shutdown()
+    assert keys == ["attachments/a.png", "attachments/sub/b.png", "root.png"]
+    assert all(p == "/storage/v1/object/list/bkt" for p, _ in _ListFake.bodies)
+
+
+def test_로컬_목록(local):
+    local.put("a/1.png", b"1", None)
+    local.put("a/b/2.png", b"2", None)
+    assert sorted(local.list_keys()) == ["a/1.png", "a/b/2.png"]

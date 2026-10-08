@@ -1,0 +1,49 @@
+# 매일 백업: DB 덤프와 Storage 객체. Supabase 의 DB 백업에는 Storage 객체가 들어가지 않는다.
+# 공개 레포에서는 돌지 않는다. 조직의 비공개 레포에서 DEPLOY_ENABLED=true 로 켠다.
+# 아티팩트는 비공개 레포에만 남는다. 보관 기간은 14일.
+# 필요한 비밀값: DATABASE_URL_DIRECT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STORAGE_BUCKET
+name: Backup
+
+on:
+  schedule:
+    - cron: "30 18 * * *"  # 03:30 KST
+  workflow_dispatch:
+
+jobs:
+  backup:
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 서버와 같은 메이저의 pg_dump 를 쓴다(러너 기본 클라이언트는 버전이 다를 수 있다).
+      - name: DB 덤프
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
+        run: |
+          url="${DATABASE_URL_DIRECT/postgresql+psycopg2:/postgresql:}"
+          docker run --rm postgres:17 pg_dump --format=custom --no-owner "$url" > db.dump
+          ls -l db.dump
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Storage 객체 백업
+        env:
+          STORAGE_BACKEND: supabase
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          STORAGE_BUCKET: ${{ secrets.STORAGE_BUCKET }}
+          DATABASE_URL: postgresql+psycopg2://unused@127.0.0.1:1/unused
+        run: |
+          pip install -r backend/requirements.txt
+          python scripts/backup_storage.py storage-backup.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ github.run_id }}
+          path: |
+            db.dump
+            storage-backup.zip
+          retention-days: 14
