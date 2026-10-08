@@ -66,3 +66,10 @@ def test_스키마_엔진은_서로_격리된다():
             testing_db.dispose_schema_engine(b)
     finally:
         testing_db.drop_database(base)
+
+
+@pytest.mark.parametrize("query", ["host=203.0.113.9", "hostaddr=203.0.113.9", "service=prod"])
+def test_쿼리로_접속_대상을_바꾸는_주소는_거부한다(monkeypatch, query):
+    monkeypatch.setenv("TEST_DATABASE_ADMIN_URL", f"postgresql+psycopg2://u:p@localhost:54329/postgres?{query}")
+    with pytest.raises(RuntimeError, match="로컬"):
+        testing_db.admin_url()
