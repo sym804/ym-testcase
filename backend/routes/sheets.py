@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User, Project, TestCase, TestCaseSheet, now_kst
+from services.locks import project_write_lock
 from auth import check_project_access
 
 router = APIRouter(
@@ -143,6 +144,7 @@ def create_sheet(
     payload: _SheetCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     """빈 시트를 생성한다. parent_id로 부모 시트 지정 가능."""
     _get_project_or_404(project_id, db)
@@ -194,6 +196,7 @@ def rename_sheet(
     payload: _SheetRename,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     """시트 이름을 변경한다."""
     _get_project_or_404(project_id, db)
@@ -274,6 +277,7 @@ def move_sheet(
     payload: _SheetMove,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     """시트를 다른 부모 아래로 이동하거나 순서를 변경한다."""
     _get_project_or_404(project_id, db)
@@ -313,6 +317,7 @@ def delete_sheet(
     sheet_name: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     """시트와 속한 모든 TC를 삭제한다. 하위 시트도 함께 삭제."""
     _get_project_or_404(project_id, db)

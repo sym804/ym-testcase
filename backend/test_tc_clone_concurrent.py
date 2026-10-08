@@ -1,11 +1,13 @@
 """동시에 복제해도 같은 시트에서 번호가 겹치지 않는다.
 
-max(no) 를 읽고 +1 해서 넣으면 두 요청이 같은 값을 읽는 창이 생긴다. `no` 에
-유니크 제약이 없어 DB 도 막아 주지 않는다.
+max(no) 를 읽고 +1 해서 넣으면 두 요청이 같은 값을 읽는 창이 생긴다. 유니크 제약이
+실패 쪽을 409 로 만들어 번호는 이어지지만 그 요청은 실패한다. 그래서 성공 건수를
+정확히 본다(모두 201). 프로젝트 단위 advisory lock 이 요청을 줄 세운다.
 
 실행: cd backend && TEST_PORT=8009 TEST_BASE_URL=http://127.0.0.1:8009 python -m pytest test_tc_clone_concurrent.py -v
 """
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -68,14 +70,17 @@ def test_concurrent_clone_gives_distinct_numbers(token, seeded):
     pid, tc_id = seeded
     h = auth(token)
 
+    barrier = threading.Barrier(FANOUT)
+
     def clone(_):
+        barrier.wait()
         return requests.post(f"{BASE}/api/projects/{pid}/testcases/{tc_id}/clone", headers=h)
 
     with ThreadPoolExecutor(max_workers=FANOUT) as pool:
         responses = list(pool.map(clone, range(FANOUT)))
 
-    created = [r.json()["no"] for r in responses if r.status_code == 201]
-    assert created, f"복제가 한 건도 성공하지 않았다: {[r.status_code for r in responses]}"
+    statuses = [r.status_code for r in responses]
+    assert statuses == [201] * FANOUT, f"동시 복제 중 실패가 있다: {statuses}"
 
     nos = _nos(token, pid, "결제")
     assert len(nos) == len(set(nos)), f"같은 시트에 같은 번호가 둘 이상이다: {nos}"
@@ -87,15 +92,19 @@ def test_concurrent_bulk_clone_gives_distinct_numbers(token, seeded):
     pid, tc_id = seeded
     h = auth(token)
 
+    barrier = threading.Barrier(FANOUT)
+
     def bulk(_):
+        barrier.wait()
         return requests.post(f"{BASE}/api/projects/{pid}/testcases/bulk-clone",
                              headers=h, json={"ids": [tc_id]})
 
     with ThreadPoolExecutor(max_workers=FANOUT) as pool:
         responses = list(pool.map(bulk, range(FANOUT)))
 
-    assert any(r.status_code == 201 for r in responses), \
-        f"복제가 한 건도 성공하지 않았다: {[r.status_code for r in responses]}"
+    statuses = [r.status_code for r in responses]
+    assert statuses == [201] * FANOUT, f"동시 일괄 복제 중 실패가 있다: {statuses}"
 
     nos = _nos(token, pid, "결제")
     assert len(nos) == len(set(nos)), f"같은 시트에 같은 번호가 둘 이상이다: {nos}"
+    assert nos == list(range(1, FANOUT + 2)), f"번호가 이어지지 않는다: {nos}"

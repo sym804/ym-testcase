@@ -21,6 +21,7 @@ from schemas import (
 )
 from auth import get_current_user, role_required, check_project_access, get_project_role
 from routes.attachments import UPLOAD_DIR
+from services.locks import project_write_lock
 from services.run_sync_service import sync_run_results
 from services.excel_safe import safe_cell
 from services.sheet_order import leaf_sheet_order, sort_results_for_export
@@ -521,6 +522,7 @@ def import_results_by_name(
     label: Optional[str] = Query(None, max_length=100, description="비고 앞머리. 비우면 형식 이름"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("tester")),
+    _lock: None = Depends(project_write_lock),
 ):
     """수행 id 없이 이름으로 결과 파일을 올린다. CI 가 회차를 미리 만들어 둘 필요가 없게 한다.
 
@@ -764,6 +766,7 @@ def clone_testrun(
     next_round: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("tester")),
+    _lock: None = Depends(project_write_lock),
 ):
     """Clone an existing test run with all its test results reset to NS.
 
