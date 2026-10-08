@@ -18,20 +18,12 @@ def insert_results_ignoring_duplicates(db: Session, rows: list[dict]) -> int:
     ★조회해서 없는 것만 골라 넣어도, 그 사이에 다른 요청이 같은 것을 넣을 수 있다.
       예외로 처리하면 세션 전체가 죽어 나머지 행까지 못 넣는다. DB 가 충돌 행만
       조용히 버리게 하는 편이 맞다.
-    ★방언을 보고 고른다. SQLite 와 PostgreSQL 둘 다 같은 의미를 지원한다.
-      PostgreSQL 전환(SYM-6) 때 이 함수만 그대로 돌면 된다.
+    ★PostgreSQL 의 ON CONFLICT DO NOTHING 을 쓴다.
     """
     if not rows:
         return 0
-    dialect = db.get_bind().dialect.name
-    if dialect == "postgresql":
-        from sqlalchemy.dialects.postgresql import insert as _insert
-    elif dialect == "sqlite":
-        from sqlalchemy.dialects.sqlite import insert as _insert
-    else:
-        # ★모르는 방언을 SQLite 로 취급하면 조용히 틀린 SQL 을 낸다. 차라리 멈춘다.
-        raise NotImplementedError(
-            f"on_conflict_do_nothing 을 지원하지 않는 방언: {dialect}")
+    from sqlalchemy.dialects.postgresql import insert as _insert
+
     stmt = _insert(TestResult).values(rows).on_conflict_do_nothing(
         index_elements=["test_run_id", "test_case_id"]
     )
