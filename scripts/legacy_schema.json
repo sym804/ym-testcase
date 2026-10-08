@@ -1,0 +1,243 @@
+{
+  "account_requests": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["request_type", "VARCHAR(14)", true, 0],
+      ["status", "VARCHAR(9)", true, 0],
+      ["claimed_username", "VARCHAR(100)", false, 0],
+      ["claimed_display_name", "VARCHAR(100)", false, 0],
+      ["contact", "VARCHAR(200)", true, 0],
+      ["note", "TEXT", false, 0],
+      ["user_id", "INTEGER", false, 0],
+      ["code_hash", "VARCHAR(255)", false, 0],
+      ["code_expires_at", "DATETIME", false, 0],
+      ["created_at", "DATETIME", false, 0],
+      ["resolved_at", "DATETIME", false, 0],
+      ["resolved_by_id", "INTEGER", false, 0]
+    ],
+    "foreign_keys": [["resolved_by_id", "users", "id"], ["user_id", "users", "id"]]
+  },
+  "alembic_version": {
+    "columns": [
+      ["version_num", "VARCHAR(32)", true, 1]
+    ],
+    "foreign_keys": []
+  },
+  "api_keys": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["user_id", "INTEGER", true, 0],
+      ["name", "VARCHAR(100)", true, 0],
+      ["key_id", "VARCHAR(16)", true, 0],
+      ["key_hash", "VARCHAR(64)", true, 0],
+      ["created_at", "DATETIME", false, 0],
+      ["last_used_at", "DATETIME", false, 0],
+      ["expires_at", "DATETIME", false, 0],
+      ["revoked_at", "DATETIME", false, 0]
+    ],
+    "foreign_keys": [["user_id", "users", "id"]]
+  },
+  "attachments": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["test_result_id", "INTEGER", true, 0],
+      ["filename", "VARCHAR(500)", true, 0],
+      ["filepath", "VARCHAR(1000)", true, 0],
+      ["content_type", "VARCHAR(200)", false, 0],
+      ["file_size", "INTEGER", false, 0],
+      ["uploaded_by", "INTEGER", true, 0],
+      ["uploaded_at", "DATETIME", false, 0]
+    ],
+    "foreign_keys": [["test_result_id", "test_results", "id"], ["uploaded_by", "users", "id"]]
+  },
+  "custom_field_defs": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["project_id", "INTEGER", true, 0],
+      ["field_name", "VARCHAR(100)", true, 0],
+      ["field_type", "VARCHAR(20)", true, 0],
+      ["options", "JSON", false, 0],
+      ["sort_order", "INTEGER", true, 0],
+      ["is_required", "BOOLEAN", true, 0],
+      ["created_at", "DATETIME", false, 0]
+    ],
+    "foreign_keys": [["project_id", "projects", "id"]]
+  },
+  "project_members": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["project_id", "INTEGER", true, 0],
+      ["user_id", "INTEGER", true, 0],
+      ["role", "VARCHAR(6)", true, 0],
+      ["added_at", "DATETIME", false, 0]
+    ],
+    "foreign_keys": [["project_id", "projects", "id"], ["user_id", "users", "id"]]
+  },
+  "projects": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["name", "VARCHAR(200)", true, 0],
+      ["description", "TEXT", false, 0],
+      ["jira_base_url", "VARCHAR(500)", false, 0],
+      ["created_by", "INTEGER", true, 0],
+      ["created_at", "DATETIME", false, 0],
+      ["updated_at", "DATETIME", false, 0],
+      ["is_private", "BOOLEAN", true, 0],
+      ["field_config", "TEXT", false, 0],
+      ["issue_tracker", "VARCHAR(20)", false, 0]
+    ],
+    "foreign_keys": [["created_by", "users", "id"]]
+  },
+  "run_issue_test_cases": {
+    "columns": [
+      ["run_issue_id", "INTEGER", true, 1],
+      ["test_case_id", "INTEGER", true, 2]
+    ],
+    "foreign_keys": [["run_issue_id", "run_issues", "id"], ["test_case_id", "test_cases", "id"]]
+  },
+  "run_issues": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["test_run_id", "INTEGER", true, 0],
+      ["issue_key", "VARCHAR(50)", false, 0],
+      ["title", "VARCHAR(500)", true, 0],
+      ["url", "VARCHAR(1000)", true, 0],
+      ["status", "VARCHAR(50)", false, 0],
+      ["note", "TEXT", false, 0],
+      ["origin_run_id", "INTEGER", false, 0],
+      ["origin_round", "INTEGER", false, 0],
+      ["verdict", "VARCHAR(20)", false, 0],
+      ["created_by", "INTEGER", true, 0],
+      ["created_at", "DATETIME", false, 0],
+      ["updated_at", "DATETIME", false, 0]
+    ],
+    "foreign_keys": [["created_by", "users", "id"], ["origin_run_id", "test_runs", "id"], ["test_run_id", "test_runs", "id"]]
+  },
+  "saved_filters": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["project_id", "INTEGER", true, 0],
+      ["name", "VARCHAR(200)", true, 0],
+      ["conditions", "JSON", true, 0],
+      ["logic", "VARCHAR(3)", true, 0],
+      ["created_by", "INTEGER", true, 0],
+      ["created_at", "DATETIME", false, 0]
+    ],
+    "foreign_keys": [["created_by", "users", "id"], ["project_id", "projects", "id"]]
+  },
+  "test_case_history": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["test_case_id", "INTEGER", true, 0],
+      ["changed_by", "INTEGER", true, 0],
+      ["changed_at", "DATETIME", false, 0],
+      ["field_name", "VARCHAR(100)", true, 0],
+      ["old_value", "TEXT", false, 0],
+      ["new_value", "TEXT", false, 0]
+    ],
+    "foreign_keys": [["changed_by", "users", "id"], ["test_case_id", "test_cases", "id"]]
+  },
+  "test_case_sheets": {
+    "columns": [
+      ["id", "INTEGER", false, 1],
+      ["project_id", "INTEGER", true, 0],
+      ["name", "VARCHAR(100)", true, 0],
+      ["sort_order", "INTEGER", true, 0],
+      ["created_at", "DATETIME", false, 0],
+      ["parent_id", "INTEGER", false, 0],
+      ["is_folder", "BOOLEAN", true, 0]
+    ],
+    "foreign_keys": [["parent_id", "test_case_sheets", "id"], ["project_id", "projects", "id"]]
+  },
+  "test_cases": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["project_id", "INTEGER", true, 0],
+      ["no", "INTEGER", true, 0],
+      ["tc_id", "VARCHAR(50)", true, 0],
+      ["type", "VARCHAR(50)", false, 0],
+      ["category", "VARCHAR(200)", false, 0],
+      ["depth1", "VARCHAR(200)", false, 0],
+      ["depth2", "VARCHAR(200)", false, 0],
+      ["priority", "VARCHAR(20)", false, 0],
+      ["test_type", "VARCHAR(50)", false, 0],
+      ["precondition", "TEXT", false, 0],
+      ["test_steps", "TEXT", false, 0],
+      ["expected_result", "TEXT", false, 0],
+      ["remarks", "TEXT", false, 0],
+      ["created_at", "DATETIME", false, 0],
+      ["updated_at", "DATETIME", false, 0],
+      ["created_by", "INTEGER", true, 0],
+      ["r1", "VARCHAR(10)", false, 0],
+      ["r2", "VARCHAR(10)", false, 0],
+      ["r3", "VARCHAR(10)", false, 0],
+      ["deleted_at", "DATETIME", false, 0],
+      ["sheet_name", "VARCHAR(100)", true, 0],
+      ["custom_fields", "TEXT", false, 0]
+    ],
+    "foreign_keys": [["created_by", "users", "id"], ["project_id", "projects", "id"]]
+  },
+  "test_plans": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["project_id", "INTEGER", true, 0],
+      ["name", "VARCHAR(200)", true, 0],
+      ["milestone", "VARCHAR(200)", false, 0],
+      ["description", "TEXT", false, 0],
+      ["start_date", "DATETIME", false, 0],
+      ["end_date", "DATETIME", false, 0],
+      ["created_by", "INTEGER", true, 0],
+      ["created_at", "DATETIME", false, 0],
+      ["updated_at", "DATETIME", false, 0]
+    ],
+    "foreign_keys": [["created_by", "users", "id"], ["project_id", "projects", "id"]]
+  },
+  "test_results": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["test_run_id", "INTEGER", true, 0],
+      ["test_case_id", "INTEGER", true, 0],
+      ["result", "VARCHAR(5)", true, 0],
+      ["actual_result", "TEXT", false, 0],
+      ["issue_link", "VARCHAR(500)", false, 0],
+      ["remarks", "TEXT", false, 0],
+      ["executed_by", "INTEGER", true, 0],
+      ["executed_at", "DATETIME", false, 0],
+      ["started_at", "DATETIME", false, 0],
+      ["finished_at", "DATETIME", false, 0],
+      ["duration_sec", "FLOAT", false, 0]
+    ],
+    "foreign_keys": [["executed_by", "users", "id"], ["test_case_id", "test_cases", "id"], ["test_run_id", "test_runs", "id"]]
+  },
+  "test_runs": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["project_id", "INTEGER", true, 0],
+      ["name", "VARCHAR(200)", true, 0],
+      ["version", "VARCHAR(50)", false, 0],
+      ["environment", "VARCHAR(100)", false, 0],
+      ["round", "INTEGER", true, 0],
+      ["status", "VARCHAR(11)", false, 0],
+      ["created_by", "INTEGER", true, 0],
+      ["created_at", "DATETIME", false, 0],
+      ["completed_at", "DATETIME", false, 0],
+      ["test_plan_id", "INTEGER", false, 0],
+      ["sheet_names", "JSON", false, 0],
+      ["compare_run_id", "INTEGER", false, 0]
+    ],
+    "foreign_keys": [["compare_run_id", "test_runs", "id"], ["created_by", "users", "id"], ["project_id", "projects", "id"], ["test_plan_id", "test_plans", "id"]]
+  },
+  "users": {
+    "columns": [
+      ["id", "INTEGER", true, 1],
+      ["username", "VARCHAR(100)", true, 0],
+      ["password_hash", "VARCHAR(255)", true, 0],
+      ["display_name", "VARCHAR(100)", true, 0],
+      ["role", "VARCHAR(6)", true, 0],
+      ["created_at", "DATETIME", false, 0],
+      ["must_change_password", "BOOLEAN", true, 0],
+      ["token_version", "INTEGER", true, 0]
+    ],
+    "foreign_keys": []
+  }
+}
