@@ -21,13 +21,56 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v1.10.3.1  (2026-10-02)
-├── Frontend       v1.10.2.0
-├── Backend        v1.10.3.0
-└── Database       v0.11.0.0
+YM TestCase System  v2.0.0.0  (2026-10-09)
+├── Frontend       v1.11.0.0
+├── Backend        v2.0.0.0
+└── Database       v1.0.0.0
 ```
 
 ---
+
+## System 2.0.0.0 - [feat] PostgreSQL 단일화와 Vercel + Supabase 배포 (2026-10-09)
+
+### 컴포넌트 버전
+
+| 컴포넌트 | 이전 | 이후 | 변경 |
+|---|---|---|---|
+| System | 1.10.3.1 | **2.0.0.0** | system +1 |
+| Frontend | 1.10.2.0 | **1.11.0.0** | feature +1 |
+| Backend | 1.10.3.0 | **2.0.0.0** | system +1 |
+| Database | 0.11.0.0 | **1.0.0.0** | system +1 |
+
+### 이슈
+
+- SYM-6 PostgreSQL 전환 준비 (enhancement/major/db)
+- SYM-136 동시에 가입하면 첫 관리자가 여러 명 생긴다 (bug/critical/security)
+- SYM-137 1회용 코드를 동시 요청으로 여러 번 쓸 수 있다 (bug/critical/security)
+- SYM-138 로그인 실패 제한을 동시 요청으로 넘을 수 있다 (bug/major/security)
+- SYM-139 같은 수행 결과를 동시에 저장하면 한쪽이 조용히 덮어쓴다 (bug/major/backend)
+- SYM-140 동시에 TC 를 복제하면 일부가 409 로 실패한다 (bug/major/backend)
+- SYM-141 TC 번호 다시 매기기가 SQLite 전용 임시 테이블에 의존한다 (bug/major/db)
+- SYM-142 고급 필터 조건 타입이 다르면 500 이 난다 (bug/minor/backend)
+- SYM-143 백엔드 테스트가 개발 DB 를 건드리는지 판정이 SQLite 파일 기준이다 (bug/major/etc)
+- SYM-144 API 문서(Swagger) 화면이 빈 화면이다 (bug/minor/backend)
+- SYM-145 파일을 올린 직후 미리보기가 409 로 실패할 수 있다 (bug/major/backend)
+
+### 변경
+
+- DB 를 PostgreSQL 17 로 단일화. SQLite 버전은 `sqlite-legacy` 브랜치(유지보수 없음)
+- 동시 편집: 프로젝트 쓰기 잠금, 가입·1회용 코드·결과 저장 잠금. 대기 10초를 넘으면 409 와 안내
+- 첨부와 가져오기 파일은 서버가 발급한 주소로 직접 업로드(첨부 50MB, TC 10MB, 결과 20MB). 저장소는 로컬 디스크 또는 Supabase Storage
+- 배포: `vercel.json` Services, 매일 정리 Cron, CI 성공 뒤 배포, 매일 DB·Storage 백업
+- 이관: `scripts/migrate_sqlite_to_pg.py`(점검, 복사, 독립 검증), `scripts/compare_api.py`
+- API 문서 주소 `/api/docs`
+
+### 영향
+
+- 로컬 실행에 Docker(PostgreSQL)가 필요. `DATABASE_URL` 이 SQLite 면 서버가 시작하지 않음
+- 기존 데이터는 이관해야 보임. 리허설에서 응답 61개가 SQLite 버전과 같음
+
+### 조치
+
+- README "SQLite 버전에서 올라올 때" 순서로 DB 실행, `.env` 교체, 이관
 
 ## System 1.10.3.1 - [chore] 릴리즈 노트 제목 형식 통일 (2026-10-02)
 
