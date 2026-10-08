@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from database import get_db
+from services.locks import LockNs, advisory_xact_lock
 from models import User, UserRole
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
 from auth import (
@@ -18,7 +19,6 @@ from auth import (
     COOKIE_SECURE, COOKIE_SAMESITE, COOKIE_MAX_AGE, ACCESS_TOKEN_EXPIRE_HOURS,
     REMEMBER_ME_DAYS,
 )
-from services.first_admin import demote_if_not_first
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,10 @@ def check_username(username: str, db: Session = Depends(get_db)):
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
+    # ★가입을 전역 잠금으로 줄 세운다. 잠금은 커밋까지 유지되므로 다음 가입은 앞선
+    #   가입이 커밋된 뒤에 아이디 중복과 사용자 수를 본다. 삽입 뒤 강등하던 방식은
+    #   SQLite 의 쓰기 잠금에 기대고 있어서 PostgreSQL 에서는 서로의 미커밋 행을 못 봤다.
+    advisory_xact_lock(db, LockNs.FIRST_ADMIN)
     existing = db.query(User).filter(User.username == payload.username).first()
     if existing:
         raise HTTPException(
@@ -114,11 +118,6 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         must_change_password=False,
     )
     db.add(user)
-    # ★관리자 판정을 삽입 뒤에 한 번 더 한다. count()==0 만 보면 같은 순간에 들어온
-    #   두 가입이 둘 다 0 을 보고 둘 다 관리자가 된다. 먼저 만들어진 사용자가
-    #   있으면 경쟁에서 진 쪽이므로 일반 사용자로 돌린다.
-    db.flush()
-    demote_if_not_first(db, user)
     db.commit()
     db.refresh(user)
     return user
