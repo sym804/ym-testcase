@@ -22,10 +22,9 @@ if BACKEND not in sys.path:
 
 from fastapi import HTTPException
 from openpyxl import load_workbook
-from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from models import Base, Project, TestCase, TestCaseSheet, TestResult, TestResultValue, TestRun, User
+from models import Project, TestCase, TestCaseSheet, TestResult, TestResultValue, TestRun, User
 from routes.reports import report_excel, report_json, report_pdf
 from routes.testruns import update_testrun
 from schemas import TestRunUpdate
@@ -35,19 +34,9 @@ BASE = datetime(2026, 9, 1, 10, 0)
 
 
 @pytest.fixture
-def db(tmp_path):
-    engine = create_engine(
-        f"sqlite:///{(tmp_path / 'cmp.db').as_posix()}",
-        connect_args={"check_same_thread": False},
-    )
+def db(pg_engine, tmp_path):
+    engine = pg_engine
 
-    @event.listens_for(engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
-
-    Base.metadata.create_all(engine)
     s = sessionmaker(bind=engine)()
     yield s
     s.close()

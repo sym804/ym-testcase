@@ -18,29 +18,20 @@ BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BACKEND not in sys.path:
     sys.path.insert(0, BACKEND)
 
-from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from models import (
-    Base, Project, TestCase, TestResult, TestRun, TestResultValue, User, now_kst,
+    Project, TestCase, TestResult, TestRun, TestResultValue, User, now_kst,
 )
 from services.purge_service import purge_deleted_testcases
 
 
 @pytest.fixture
-def db(tmp_path):
-    url = f"sqlite:///{tmp_path / 'purge.db'}".replace("\\", "/")
-    engine = create_engine(url, connect_args={"check_same_thread": False})
+def db(pg_engine, tmp_path):
+    engine = pg_engine
 
     # 운영과 같게 외래키를 켠다. 꺼 두면 cascade 가 돌지 않아 이 테스트가
     # 통과해도 실제 동작을 보증하지 못한다.
-    @event.listens_for(engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
-
-    Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     yield session
     session.close()

@@ -11,8 +11,6 @@ import asyncio
 import io
 import os
 import re
-import sqlite3
-import subprocess
 import sys
 
 import pytest
@@ -24,11 +22,10 @@ if BACKEND not in sys.path:
 from fastapi import HTTPException
 from openpyxl import load_workbook
 from pydantic import ValidationError
-from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from models import (
-    Base, Project, RunIssue, TestCase, TestCaseSheet, TestResult, TestResultValue, TestRun, User,
+    Project, RunIssue, TestCase, TestCaseSheet, TestResult, TestResultValue, TestRun, User,
 )
 from routes.reports import report_excel, report_json, report_pdf
 from routes.run_issues import (
@@ -42,19 +39,9 @@ JIRA = "https://acme.atlassian.net/browse/PROJ-12"
 
 
 @pytest.fixture
-def db(tmp_path):
-    engine = create_engine(
-        f"sqlite:///{(tmp_path / 'issues.db').as_posix()}",
-        connect_args={"check_same_thread": False},
-    )
+def db(pg_engine, tmp_path):
+    engine = pg_engine
 
-    @event.listens_for(engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
-
-    Base.metadata.create_all(engine)
     s = sessionmaker(bind=engine)()
     yield s
     s.close()
@@ -354,58 +341,6 @@ def test_PDF_에_한글_이슈가_실린다(db, made):
 
 
 # ── 마이그레이션 ─────────────────────────────────────────────────────────────
-
-def _alembic(db_path: str, *args: str):
-    env = dict(os.environ)
-    env["DATABASE_URL"] = f"sqlite:///{db_path.replace(os.sep, '/')}"
-    proc = subprocess.run(
-        [sys.executable, "-m", "alembic", *args],
-        cwd=BACKEND, env=env, capture_output=True, text=True,
-        encoding="utf-8", errors="replace",
-    )
-    assert proc.returncode == 0, f"alembic {args} 실패:\n{proc.stdout}\n{proc.stderr}"
-
-
-def test_마이그레이션은_추가만_한다(tmp_path):
-    path = str(tmp_path / "mig.db")
-    _alembic(path, "upgrade", "c2f8a90b3d14")
-    conn = sqlite3.connect(path)
-    conn.execute(
-        "INSERT INTO users (id, username, password_hash, display_name, role, must_change_password, token_version)"
-        " VALUES (1, 'u', 'x', 'U', 'admin', 0, 0)"
-    )
-    conn.execute(
-        "INSERT INTO projects (id, name, created_by, is_private, jira_base_url)"
-        " VALUES (1, 'P', 1, 0, 'https://linear.app/sym')"
-    )
-    conn.commit()
-    conn.close()
-
-    _alembic(path, "upgrade", "head")
-    conn = sqlite3.connect(path)
-    assert conn.execute("SELECT jira_base_url, issue_tracker FROM projects").fetchall() == [
-        ("https://linear.app/sym", None)
-    ]
-    indexes = {r[1]: r[2] for r in conn.execute("PRAGMA index_list(run_issues)")}
-    assert indexes.get("uq_run_issues_run_url") == 1
-    fks = conn.execute("PRAGMA foreign_key_list(run_issues)").fetchall()
-    assert any(fk[2] == "test_runs" and fk[6] == "CASCADE" for fk in fks)
-    link_fks = {fk[2]: fk[6] for fk in conn.execute("PRAGMA foreign_key_list(run_issue_test_cases)")}
-    assert link_fks == {"run_issues": "CASCADE", "test_cases": "CASCADE"}
-    # 발견 수행 · 발견 회차 · 판정. 발견 수행이 지워지면 연결만 푼다(회차 숫자는 남는다).
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(run_issues)")}
-    assert {"origin_run_id", "origin_round", "verdict"} <= cols
-    origin_fk = [fk for fk in fks if fk[3] == "origin_run_id"]
-    assert [(fk[2], fk[6]) for fk in origin_fk] == [("test_runs", "SET NULL")]
-    # 비교 대상 수행. batch 로 test_runs 를 다시 만들지 않고 ADD COLUMN 으로 붙였다.
-    compare_fk = [fk for fk in conn.execute("PRAGMA foreign_key_list(test_runs)") if fk[3] == "compare_run_id"]
-    assert [(fk[2], fk[6]) for fk in compare_fk] == [("test_runs", "SET NULL")]
-    conn.close()
-
-    _alembic(path, "downgrade", "c2f8a90b3d14")
-
-
-# ── 연관 TC ──────────────────────────────────────────────────────────────────
 
 def test_연관_TC_는_없어도_되고_여럿이어도_된다(db, made):
     _add_tc(db, made, "ASP-02", 2)

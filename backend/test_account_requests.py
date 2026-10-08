@@ -21,12 +21,12 @@ if dev_db_guard.DEV_DB_AT_RISK:
 @pytest.fixture(autouse=True)
 def _reset_submit_limit():
     """접수 제한은 IP 기준 1시간 10회다. 테스트가 같은 IP 로 그 예산을 나눠 쓰면
-    뒤쪽 테스트가 429 로 죽는다. 프로덕션 한도는 그대로 두고 테스트만 격리한다."""
-    try:
-        from routes.account_requests import _submit_hits
-        _submit_hits.clear()
-    except ImportError:
-        pass
+    뒤쪽 테스트가 429 로 죽는다. 프로덕션 한도는 그대로 두고 테스트만 격리한다.
+
+    ★임포트 실패를 삼키지 않는다. 저장 위치가 바뀌어 이 이름이 사라지면 초기화가
+      조용히 멈추고 뒤쪽 테스트가 429 로 간헐 실패한다. 그때는 여기가 먼저 깨져야 한다."""
+    from routes.account_requests import _submit_hits
+    _submit_hits.clear()
     yield
 
 

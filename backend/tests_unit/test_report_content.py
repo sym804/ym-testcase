@@ -21,11 +21,10 @@ if BACKEND not in sys.path:
     sys.path.insert(0, BACKEND)
 
 from openpyxl import load_workbook
-from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from models import (
-    Base, Project, TestCase, TestCaseSheet, TestResult, TestRun, TestResultValue, User,
+    Project, TestCase, TestCaseSheet, TestResult, TestRun, TestResultValue, User,
 )
 from routes.reports import (
     _load_pdf_font, priority_sort_key, report_excel, report_filename, report_json, report_pdf,
@@ -35,19 +34,9 @@ R = TestResultValue
 
 
 @pytest.fixture
-def db(tmp_path):
-    engine = create_engine(
-        f"sqlite:///{(tmp_path / 'report.db').as_posix()}",
-        connect_args={"check_same_thread": False},
-    )
+def db(pg_engine, tmp_path):
+    engine = pg_engine
 
-    @event.listens_for(engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
-
-    Base.metadata.create_all(engine)
     s = sessionmaker(bind=engine)()
     yield s
     s.close()

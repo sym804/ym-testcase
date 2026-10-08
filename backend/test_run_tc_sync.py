@@ -263,19 +263,6 @@ def test_viewer_read_does_not_write(token, project, viewer_token):
     assert dropped in run_tc_ids(token, project, run_id), "tester 조회에서 보정이 동작하지 않았다"
 
 
-def test_busy_timeout_is_configured(token):
-    """SQLite busy_timeout 이 30초 이상으로 설정되어 있다
-
-    다중 요청이 동시에 쓸 때 즉시 database is locked 로 실패하지 않아야 한다.
-    """
-    from database import engine
-    from sqlalchemy import text
-
-    with engine.connect() as conn:
-        timeout = conn.execute(text("PRAGMA busy_timeout")).scalar()
-    assert timeout >= 30000, f"busy_timeout 이 너무 짧다: {timeout}ms"
-
-
 def test_sync_is_idempotent(token, project):
     """반복 조회해도 결과 행이 중복 생성되지 않는다"""
     make_tc(token, project, 1, "TC-001")

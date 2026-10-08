@@ -71,11 +71,11 @@ def test_real_env_var_wins_over_env_file(tmp_path):
 def test_database_url_env_var_not_clobbered_by_env_file(tmp_path):
     """conftest 가 미리 지정한 DATABASE_URL 을 .env 가 덮어쓰지 않는다"""
     env_file = tmp_path / ".env"
-    env_file.write_text("DATABASE_URL=sqlite:///./from_file.db\n", encoding="utf-8")
+    env_file.write_text("DATABASE_URL=postgresql+psycopg2://u:p@127.0.0.1:1/from_file\n", encoding="utf-8")
 
     env = dict(os.environ)
     env["ENV_FILE"] = str(env_file)
-    env["DATABASE_URL"] = "sqlite:///./from_real_env.db"
+    env["DATABASE_URL"] = "postgresql+psycopg2://u:p@127.0.0.1:1/from_real_env"
     r = subprocess.run(
         [sys.executable, "-c", "import database; print(database.DATABASE_URL)"],
         cwd=BACKEND_DIR, env=env, capture_output=True, text=True,
@@ -83,7 +83,7 @@ def test_database_url_env_var_not_clobbered_by_env_file(tmp_path):
     )
 
     assert r.returncode == 0, r.stderr
-    assert r.stdout.strip() == "sqlite:///./from_real_env.db"
+    assert r.stdout.strip() == "postgresql+psycopg2://u:p@127.0.0.1:1/from_real_env"
 
 
 def test_env_file_supplies_cors_origins_via_main(tmp_path):

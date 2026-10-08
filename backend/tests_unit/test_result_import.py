@@ -20,10 +20,9 @@ if BACKEND not in sys.path:
     sys.path.insert(0, BACKEND)
 
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from models import Base, Project, TestCase, TestCaseSheet, TestResult, TestResultValue, TestRun, TestRunStatus, User
+from models import Project, TestCase, TestCaseSheet, TestResult, TestResultValue, TestRun, TestRunStatus, User
 from routes.testruns import import_results
 from services.result_import import (
     ImportFormatError, aggregate, match_tc_id, parse_report,
@@ -185,16 +184,9 @@ def test_실패_메시지_CDATA_안의_DOCTYPE_문자열은_거절하지_않는�
 # ── 저장 ─────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def env(tmp_path):
-    engine = create_engine(f"sqlite:///{(tmp_path / 'imp.db').as_posix()}", connect_args={"check_same_thread": False})
+def env(pg_engine, tmp_path):
+    engine = pg_engine
 
-    @event.listens_for(engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
-
-    Base.metadata.create_all(engine)
     db = sessionmaker(bind=engine)()
     a = User(username="a", password_hash="x", display_name="A", role="admin")
     db.add(a)

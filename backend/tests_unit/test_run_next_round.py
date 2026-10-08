@@ -14,26 +14,18 @@ BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BACKEND not in sys.path:
     sys.path.insert(0, BACKEND)
 
-from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from models import Base, Project, TestCase, TestCaseSheet, TestPlan, TestResult, TestResultValue, TestRun, User
+from models import Project, TestCase, TestCaseSheet, TestPlan, TestResult, TestResultValue, TestRun, User
 from routes.testruns import clone_testrun, list_testruns
 
 R = TestResultValue
 
 
 @pytest.fixture
-def db(tmp_path):
-    engine = create_engine(f"sqlite:///{(tmp_path / 'nr.db').as_posix()}", connect_args={"check_same_thread": False})
+def db(pg_engine, tmp_path):
+    engine = pg_engine
 
-    @event.listens_for(engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
-
-    Base.metadata.create_all(engine)
     s = sessionmaker(bind=engine)()
     yield s
     s.close()

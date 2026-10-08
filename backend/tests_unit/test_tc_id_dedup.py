@@ -13,10 +13,9 @@ if BACKEND not in sys.path:
     sys.path.insert(0, BACKEND)
 
 from openpyxl import Workbook
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from models import Base, Project, TestCase, TestCaseSheet, User
+from models import Project, TestCase, TestCaseSheet, User
 from services.import_service import _parse_csv, _parse_md_table, _parse_md_tables, _parse_sheet
 from services.tc_id_service import TC_ID_MAX_LEN, allocate_tc_id
 
@@ -59,10 +58,8 @@ def test_같은_루프에서_연달아_채번한다():
 # ── 임포트 ────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def db(tmp_path):
-    db_path = str(tmp_path / "probe.db").replace("\\", "/")
-    engine = create_engine(f"sqlite:///{db_path}")
-    Base.metadata.create_all(engine)
+def db(pg_engine):
+    engine = pg_engine
     session = sessionmaker(bind=engine)()
     session.add(User(id=1, username="u", password_hash="x", display_name="u", role="admin"))
     session.add(Project(id=1, name="P", created_by=1))
