@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from services import rate_limit
 from services.client_ip import client_ip
-from services.locks import LockNs, advisory_xact_lock
+from services.locks import LockNs, advisory_xact_lock, keyed_xact_lock
 from models import User, UserRole
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
 from auth import (
@@ -38,10 +38,17 @@ def _rate_limit_key(request: Request, username: str = "") -> str:
     return f"{ip}:{username}" if username else ip
 
 
-def _check_rate_limit(request: Request, username: str = ""):
-    """5분간 실패 10회 이상이면 차단"""
+def _check_rate_limit(request: Request, username: str, db: Session):
+    """5분간 실패 10회 이상이면 차단
+
+    ★요청 세션이 붙은 DB 에서 센다. 기본 엔진을 쓰면 테스트나 다른 연결 설정에서
+      엉뚱한 DB(개발 DB)를 본다.
+    ★같은 키를 요청 트랜잭션 동안 잠근다. 잠그지 않으면 9회일 때 동시에 온 요청이
+      모두 9 를 보고 통과해 한도를 넘는다. 잠금은 요청이 끝날 때(커밋·롤백) 풀린다.
+    """
     key = _rate_limit_key(request, username)
-    if rate_limit.count_recent(BUCKET_LOGIN, key, LOGIN_WINDOW_SEC) >= LOGIN_MAX_FAILURES:
+    keyed_xact_lock(db, LockNs.RATE_LIMIT, f"{BUCKET_LOGIN}:{key}")
+    if rate_limit.count_recent(BUCKET_LOGIN, key, LOGIN_WINDOW_SEC, engine=db.get_bind()) >= LOGIN_MAX_FAILURES:
         logger.warning("Rate limit exceeded: %s", key)
         raise HTTPException(
             status_code=429,
@@ -49,14 +56,14 @@ def _check_rate_limit(request: Request, username: str = ""):
         )
 
 
-def _record_failure(request: Request, username: str = ""):
+def _record_failure(request: Request, username: str, db: Session):
     """실패한 로그인만 기록"""
-    rate_limit.record(BUCKET_LOGIN, _rate_limit_key(request, username))
+    rate_limit.record(BUCKET_LOGIN, _rate_limit_key(request, username), engine=db.get_bind())
 
 
-def _clear_failures(request: Request, username: str = ""):
+def _clear_failures(request: Request, username: str, db: Session):
     """로그인 성공 시 해당 키의 실패 기록 초기화"""
-    rate_limit.clear(BUCKET_LOGIN, _rate_limit_key(request, username))
+    rate_limit.clear(BUCKET_LOGIN, _rate_limit_key(request, username), engine=db.get_bind())
 
 
 @router.get("/check-username")
@@ -70,6 +77,8 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     # ★가입을 전역 잠금으로 줄 세운다. 잠금은 커밋까지 유지되므로 다음 가입은 앞선
     #   가입이 커밋된 뒤에 아이디 중복과 사용자 수를 본다. 삽입 뒤 강등하던 방식은
     #   SQLite 의 쓰기 잠금에 기대고 있어서 PostgreSQL 에서는 서로의 미커밋 행을 못 봤다.
+    # bcrypt 는 잠금 밖에서 한다. 잠금 구간이 길면 가입 연타에 모든 가입이 줄을 선다.
+    password_hash = hash_password(payload.password)
     advisory_xact_lock(db, LockNs.FIRST_ADMIN)
     existing = db.query(User).filter(User.username == payload.username).first()
     if existing:
@@ -85,7 +94,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 
     user = User(
         username=payload.username,
-        password_hash=hash_password(payload.password),
+        password_hash=password_hash,
         display_name=payload.display_name,
         role=initial_role,
         must_change_password=False,
@@ -98,20 +107,19 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(payload: UserLogin, request: Request, response: Response, db: Session = Depends(get_db)):
-    _check_rate_limit(request, payload.username)
+    _check_rate_limit(request, payload.username, db)
 
     user = db.query(User).filter(User.username == payload.username).first()
     if not user or not verify_password(payload.password, user.password_hash):
-        client_ip = request.client.host if request.client else "unknown"
-        logger.warning("Failed login attempt: user=%s ip=%s", payload.username, client_ip)
-        _record_failure(request, payload.username)
+        logger.warning("Failed login attempt: user=%s ip=%s", payload.username, client_ip(request))
+        _record_failure(request, payload.username, db)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="아이디 또는 비밀번호가 올바르지 않습니다.",
         )
 
     # 성공 시 실패 카운트 초기화
-    _clear_failures(request, payload.username)
+    _clear_failures(request, payload.username, db)
     logger.info("User logged in: %s (remember_me=%s)", user.username, payload.remember_me)
 
     # remember_me: 30일, 일반: 기본 만료
