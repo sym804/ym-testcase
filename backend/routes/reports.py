@@ -1,7 +1,7 @@
 import io
 import re
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,7 +17,7 @@ import logging
 from database import get_db
 from models import (
     User, Project, TestRun, TestResult, TestCase, TestResultValue,
-    ISSUE_GROUP_ORDER, issue_group,
+    ISSUE_GROUP_ORDER, issue_group, KST, now_kst,
 )
 from services.excel_safe import safe_cell
 from services.issue_key import find_issue_refs
@@ -33,18 +33,14 @@ router = APIRouter(
 
 
 
-# models.now_kst 와 같은 고정 오프셋. 한국은 서머타임이 없고, zoneinfo 는 시간대 DB(tzdata)가
-# 없는 환경에서 실패한다.
-KST = timezone(timedelta(hours=9))
-
-
 def report_now(now=None):
     """리포트에 찍는 현재 시각. 서버 시간대(Vercel 함수는 UTC)와 무관하게 KST 다.
 
-    DB 의 시각(models.now_kst)과 같은 형태로 맞추려고 시간대 정보를 뗀다.
+    DB 의 시각과 같은 형태(KST, 시간대 정보 없음)로 낸다. 기준은 models.now_kst 하나다.
     """
-    base = now or datetime.now(tz=KST)
-    return base.astimezone(KST).replace(tzinfo=None)
+    if now is None:
+        return now_kst()
+    return now.astimezone(KST).replace(tzinfo=None)
 
 def _get_project_or_404(project_id: int, db: Session) -> Project:
     project = db.query(Project).filter(Project.id == project_id).first()

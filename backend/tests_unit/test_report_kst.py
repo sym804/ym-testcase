@@ -1,23 +1,25 @@
 """리포트 파일명 날짜와 생성 시각은 서버 시간대와 무관하게 KST 다. Vercel 함수는 UTC 다."""
-import os
-import subprocess
-import sys
+import datetime as dt
+from types import SimpleNamespace
 
-BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-CODE = (
-    "import datetime, routes.reports as r;"
-    "t = datetime.datetime(2026, 10, 8, 16, 30, tzinfo=datetime.timezone.utc);"
-    "print(r.report_now(t).strftime('%Y%m%d %H'));"
-    "print(r.report_now().tzinfo)"
-)
+import routes.reports as reports
 
 
-def test_UTC_서버에서도_KST_날짜():
-    env = dict(os.environ, TZ="UTC", DATABASE_URL="postgresql+psycopg2://u:p@127.0.0.1:1/x")
-    r = subprocess.run([sys.executable, "-c", CODE], cwd=BACKEND, env=env,
-                       capture_output=True, text=True, encoding="utf-8", errors="replace")
-    assert r.returncode == 0, r.stderr
-    day, tz = r.stdout.split("\n")[:2]
-    assert day == "20261009 01"
-    assert tz == "None", "DB 값(KST naive)과 같은 형태로 낸다"
+def test_UTC_시각을_KST_로_바꾼다():
+    t = dt.datetime(2026, 10, 8, 16, 30, tzinfo=dt.timezone.utc)
+    assert reports.report_now(t) == dt.datetime(2026, 10, 9, 1, 30)
+
+
+def test_인자가_없으면_models_now_kst_와_같은_기준():
+    a = reports.report_now()
+    b = reports.now_kst()
+    assert a.tzinfo is None
+    assert abs((b - a).total_seconds()) < 5
+
+
+def test_파일명_날짜는_report_now_에서_온다(monkeypatch):
+    """호출부가 datetime.now() 로 돌아가면(서버 시간대 의존) 이 테스트가 깨진다."""
+    monkeypatch.setattr(reports, "report_now", lambda now=None: dt.datetime(2031, 1, 2, 3, 4))
+    run = SimpleNamespace(name="회귀", round=1, version=None, id=1)
+    name = reports.report_filename("P", run, "pdf")
+    assert "20310102" in name, name
