@@ -1,4 +1,5 @@
 import client from "./client";
+import { stageUpload } from "./uploads";
 import type {
   User,
   Project,
@@ -183,25 +184,25 @@ export const testCasesApi = {
     return res.data;
   },
 
+  // 파일은 스테이징 업로드로 먼저 올리고 upload_id 만 보낸다(배포의 요청 본문 4.5MB 한도).
   importExcel: async (projectId: number, file: File, sheetNames?: string[]) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const params = sheetNames?.length ? { sheet_names: sheetNames.join(",") } : {};
+    const upload_id = await stageUpload("tc_import", file);
+    const params = sheetNames?.length ? { sheet_names: sheetNames.join(","), upload_id } : { upload_id };
     const res = await client.post<{ created: number; updated: number; renamed?: number; imported: number; sheets: { sheet: string; created: number; updated: number; renamed?: number }[] }>(
       `/api/projects/${projectId}/testcases/import`,
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" }, params }
+      null,
+      { params }
     );
     return res.data;
   },
 
+  // 미리보기와 가져오기는 같은 파일이면 같은 upload_id 를 쓴다(stageUpload 가 한 번만 올린다).
   previewImport: async (projectId: number, file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
+    const upload_id = await stageUpload("tc_import", file);
     const res = await client.post<{ sheets: { name: string; tc_count: number; existing: number }[] }>(
       `/api/projects/${projectId}/testcases/import/preview`,
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
+      null,
+      { params: { upload_id } }
     );
     return res.data;
   },
@@ -319,17 +320,16 @@ export const testRunsApi = {
     file: File,
     opts: { dryRun: boolean; keepExecuted: boolean; label?: string }
   ) => {
-    const formData = new FormData();
-    formData.append("file", file);
     const params: Record<string, string> = {
       dry_run: String(opts.dryRun),
       keep_executed: String(opts.keepExecuted),
+      upload_id: await stageUpload("result_import", file),
     };
     if (opts.label?.trim()) params.label = opts.label.trim();
     const res = await client.post<ResultImportSummary>(
       `/api/projects/${projectId}/testruns/${runId}/results/import`,
-      formData,
-      { params, headers: { "Content-Type": "multipart/form-data" } }
+      null,
+      { params }
     );
     return res.data;
   },
@@ -524,13 +524,10 @@ export const attachmentsApi = {
   },
 
   upload: async (testResultId: number, file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await client.post<Attachment>(
-      `/api/attachments/${testResultId}`,
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
-    );
+    const upload_id = await stageUpload("attachment", file);
+    const res = await client.post<Attachment>(`/api/attachments/${testResultId}`, null, {
+      params: { upload_id },
+    });
     return res.data;
   },
 

@@ -13,6 +13,7 @@ import {
   type CellValueChangedEvent,
 } from "ag-grid-community";
 import { useTranslation } from "react-i18next";
+import { API_BASE_URL } from "../api/client";
 import { testRunsApi, testCasesApi, attachmentsApi } from "../api";
 import type { TestRun, TestResult } from "../types";
 import { TestRunStatus } from "../types";
@@ -851,17 +852,11 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                     title={att.filename}
                     onClick={(e) => {
                       e.stopPropagation();
-                      fetch(`/api/attachments/download/${att.id}`, {
-                        credentials: "include",
-                      })
-                        .then((res) => {
-                          if (!res.ok) throw new Error("Failed");
-                          return res.blob();
-                        })
-                        .then((blob) => {
-                          setPreviewImage({ url: URL.createObjectURL(blob), filename: att.filename });
-                        })
-                        .catch(() => toast.error(t("imageLoadFailed")));
+                      // ★fetch 로 blob 을 받지 않고 주소를 그대로 img 에 준다. 배포에서는 다운로드가
+                      //   저장소 서명 주소로 302 되는데, fetch(credentials: include) 는 교차 출처
+                      //   리다이렉트에서 CORS 에 막힌다. img 는 CORS 없이 따라간다. 실패는 img 의
+                      //   onError 가 알린다.
+                      setPreviewImage({ url: `${API_BASE_URL}${attachmentsApi.downloadUrl(att.id)}`, filename: att.filename });
                     }}
                   >
                     {att.filename}

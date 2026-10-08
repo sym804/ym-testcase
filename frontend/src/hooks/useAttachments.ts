@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { GridApi } from "ag-grid-community";
 import { attachmentsApi } from "../api";
+import { tooLargeMessage } from "../api/uploads";
 import type { Attachment } from "../types";
 import toast from "react-hot-toast";
 import type { TFunction } from "i18next";
@@ -64,8 +65,8 @@ export function useAttachments(
       }));
       gridApiRef.current?.refreshCells({ force: true });
       toast.success(t("imageAttached"));
-    } catch {
-      toast.error(t("uploadFailed"));
+    } catch (err) {
+      toast.error(tooLargeMessage(err, t) ?? t("uploadFailed"));
     }
     e.target.value = "";
     setUploadTargetResultId(null);
@@ -98,8 +99,8 @@ export function useAttachments(
         setAttachmentsMap((prev) => ({ ...prev, [resultId]: [...(prev[resultId] || []), att] }));
         gridApiRef.current?.refreshCells({ force: true });
         toast.success(t("fileAttached", { name: file.name }));
-      } catch {
-        toast.error(t("fileUploadFailed", { name: file.name }));
+      } catch (err) {
+        toast.error(tooLargeMessage(err, t) ?? t("fileUploadFailed", { name: file.name }));
       }
     }
   }, [gridApiRef, t]);
