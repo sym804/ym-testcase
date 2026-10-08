@@ -520,3 +520,26 @@ def test_submit_rate_limit_returns_429():
         assert r.status_code == 429, f"한도를 넘겼는데 {r.status_code} 가 나왔다: {r.text}"
     finally:
         _submit_hits.clear()
+
+
+def test_같은_코드를_동시에_쓰면_하나만_성공한다(admin_headers, normal_user):
+    """조회와 소비 사이에 잠금이 없으면 같은 코드로 두 요청이 동시에 통과한다.
+
+    두 요청 모두 원래 비밀번호로 되돌리는 값을 보내 다른 테스트에 영향을 남기지 않는다.
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    _, code = _issue_code(admin_headers, normal_user["username"], normal_user["id"])
+    n = 4
+    barrier = threading.Barrier(n)
+
+    def use(_):
+        barrier.wait()
+        return requests.post(f"{BASE}/api/auth/reset-password/verify", json={
+            "username": normal_user["username"], "code": code, "new_password": "origin1234",
+        }).status_code
+
+    with ThreadPoolExecutor(n) as pool:
+        codes = sorted(pool.map(use, range(n)))
+    assert codes.count(200) == 1, codes

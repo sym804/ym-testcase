@@ -259,7 +259,12 @@ def reset_password_with_code(
         )
         # 승인 시각 기준이다. 접수 순서와 승인 순서가 다를 수 있어 created_at 으로
         # 고르면 관리자가 마지막에 건네준 코드가 401 이 난다.
-        .order_by(AccountRequest.resolved_at.desc(), AccountRequest.id.desc())
+        # nulls_last: PostgreSQL 은 DESC 에서 NULL 을 맨 앞에 둔다(SQLite 는 맨 뒤).
+        .order_by(AccountRequest.resolved_at.desc().nulls_last(), AccountRequest.id.desc())
+        # ★행을 잠그고 고른다. 잠그지 않으면 같은 코드로 동시에 온 요청이 모두 통과해
+        #   각자 비밀번호를 바꾼다(PostgreSQL 전환 후 4건 동시 4건 성공 재현). 기다린 쪽은
+        #   앞선 커밋으로 status 가 바뀐 행을 다시 평가해 목록에서 빠진다.
+        .with_for_update()
         .all()
     )
     req = approved[0] if approved else None
