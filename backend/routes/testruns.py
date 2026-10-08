@@ -384,11 +384,14 @@ def submit_results(
             )
 
     # Prefetch existing results in a single query (N+1 방지)
+    # ★행을 잠그고 읽는다. 잠그지 않으면 두 요청이 같은 executed_at 을 보고 둘 다 아래
+    #   충돌 검사를 통과해 늦게 끝난 쪽이 덮는다(PostgreSQL 전환 후 6명 동시 저장 6건 성공 재현).
+    #   잠금을 기다린 쪽은 앞선 커밋 뒤의 값을 다시 읽어 검사에 걸린다. 교착을 피하려고 id 순서로 잠근다.
     existing_map: dict[int, TestResult] = {}
     existing_results = db.query(TestResult).filter(
         TestResult.test_run_id == run_id,
         TestResult.test_case_id.in_(tc_ids),
-    ).all()
+    ).order_by(TestResult.id).with_for_update().all()
     for er in existing_results:
         existing_map[er.test_case_id] = er
 
