@@ -641,7 +641,10 @@ class TestCodeSecurity:
         assert 'allow_headers=["*"]' not in self._read("main.py")
 
     def test_path_traversal_defense(self):
-        assert "_safe_filepath" in self._read("routes/attachments.py")
+        # 경로 이탈 방어는 저장소 키 검증(check_key)에 있다. 거부 동작은
+        # tests_unit/test_storage.py::test_키_규칙을_어기면_거부 가 본다.
+        assert "def check_key" in self._read("services/storage.py")
+        assert "get_storage()" in self._read("routes/attachments.py")
 
     def test_file_size_limit(self):
         assert "MAX_FILE_SIZE" in self._read("routes/attachments.py")
