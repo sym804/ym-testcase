@@ -6,7 +6,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "0003_rate_limit_events"
-down_revision = "0002_unique_run_round"
+down_revision = "0001_pg_baseline"
 branch_labels = None
 depends_on = None
 
