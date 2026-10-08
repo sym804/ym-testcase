@@ -68,6 +68,7 @@ def test_모듈_임포트만으로_폴더를_만들지_않는다(tmp_path):
 class _Fake(BaseHTTPRequestHandler):
     calls = []
     objects = {}
+    dup_status = 400
 
     def log_message(self, *a):
         pass
@@ -99,7 +100,16 @@ class _Fake(BaseHTTPRequestHandler):
             key = self.path[len("/storage/v1/object/sign/"):]
             return self._send(200, {"signedURL": f"/object/sign/{key}?token=DL"})
         if self.path.startswith("/storage/v1/object/"):
-            _Fake.objects[self.path[len("/storage/v1/object/"):]] = body
+            key = self.path[len("/storage/v1/object/"):]
+            if key.endswith("badreq.bin"):
+                return self._send(400, {"statusCode": "400", "error": "InvalidRequest"})
+            if self.headers.get("x-upsert") == "false" and key in _Fake.objects:
+                # Supabase 는 버전에 따라 409 또는 400 + statusCode "409" 로 중복을 알린다
+                if _Fake.dup_status == 409:
+                    return self._send(409, {"statusCode": "409", "error": "Duplicate"})
+                return self._send(400, {"statusCode": "409", "error": "Duplicate",
+                                        "message": "The resource already exists"})
+            _Fake.objects[key] = body
             return self._send(200, {"Key": self.path})
         self._send(404)
 
@@ -132,7 +142,7 @@ class _Fake(BaseHTTPRequestHandler):
 
 @pytest.fixture
 def supa(monkeypatch):
-    _Fake.calls, _Fake.objects = [], {}
+    _Fake.calls, _Fake.objects, _Fake.dup_status = [], {}, 400
     srv = HTTPServer(("127.0.0.1", 0), _Fake)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{srv.server_address[1]}"
@@ -254,3 +264,31 @@ def test_로컬_목록(local):
     local.put("a/1.png", b"1", None)
     local.put("a/b/2.png", b"2", None)
     assert sorted(local.list_keys()) == ["a/1.png", "a/b/2.png"]
+
+
+# ── 덮어쓰지 않는 업로드 (이관용) ─────────────────────────────────────────────
+
+def test_로컬_put_new_는_있으면_StorageConflict(local):
+    st = local
+    st.put_new("attachments/a.png", b"one", "image/png")
+    with pytest.raises(storage_mod.StorageConflict):
+        st.put_new("attachments/a.png", b"two", "image/png")
+    assert st.read("attachments/a.png", 10) == b"one"
+
+
+@pytest.mark.parametrize("dup_status", [400, 409])
+def test_supabase_put_new_는_upsert_없이_올리고_중복이면_StorageConflict(supa, dup_status):
+    st, _ = supa
+    _Fake.dup_status = dup_status
+    st.put_new("attachments/a.png", b"one", "image/png")
+    h = {k.lower(): v for k, v in _Fake.calls[-1]["headers"].items()}
+    assert h["x-upsert"] == "false"
+    with pytest.raises(storage_mod.StorageConflict):
+        st.put_new("attachments/a.png", b"two", "image/png")
+    assert _Fake.objects["bkt/attachments/a.png"] == b"one"
+
+
+def test_supabase_put_new_의_다른_400_은_저장소_오류(supa):
+    st, _ = supa
+    with pytest.raises(storage_mod.StorageUnavailable):
+        st.put_new("k/badreq.bin", b"one", None)

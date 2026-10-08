@@ -181,6 +181,23 @@ def test_분류_요약은_옛_SQLite_와_같은_순서다(db):
     assert got == [None, "API", "DB 검증", "E2E", "검색", "결제", "공통 환경", "단위 테스트", "백엔드 API", "프론트엔드"]
 
 
+def test_분류_요약_순서는_대소문자와_공백도_옛_SQLite_와_같다(db):
+    """코드포인트 순이다. DB collation(en_US 등)을 따르면 "api" 와 "B" 의 순서가 뒤집힌다."""
+    cats = ["api", "B", "", "  ", " API", "API", None]
+    made = _make(db, [(f"T{i}", "High", c, R.PASS, None, None, "t1") for i, c in enumerate(cats)])
+    got = [c["category"] for c in _json(db, made)["category_summary"]]
+    assert got == [None, "API", "B", "api"]
+
+
+def test_같은_등급의_다른_우선순위_이름은_코드포인트_순(db):
+    """High, 높음, p1 은 같은 등급이다. 동점이면 DB 반환 순서가 아니라 이름 순으로 고정한다."""
+    made = _make(db, [("T1", "높음", "c", R.PASS, None, None, "t1"),
+                      ("T2", "p1", "c", R.PASS, None, None, "t1"),
+                      ("T3", "High", "c", R.PASS, None, None, "t1")])
+    got = [p["priority"] for p in _json(db, made)["priority_summary"]]
+    assert got == ["High", "p1", "높음"]
+
+
 def test_수행자는_미수행_행을_세지_않는다(db):
     """결과 행은 런을 만들 때 NS 로 미리 생긴다. 세면 런을 만든 사람이 다 한 것처럼 나온다."""
     made = _make(db, [

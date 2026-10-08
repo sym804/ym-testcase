@@ -118,3 +118,8 @@ backups/
 
 # ── 수동 QA 스크래치 스크립트 (계정 문자열이 박혀 있다) ──
 frontend/_*.mjs
+
+# 로컬 작업 기록과 백업(.env 사본 포함). 공개 레포에 올리지 않는다
+.superpowers/
+# 이관 스크립트가 남기는 제외 행(실 데이터 원문)
+excluded_rows*.json

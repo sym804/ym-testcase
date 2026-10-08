@@ -203,5 +203,5 @@ jobs:
           TEST_DATABASE_ADMIN_URL: postgresql+psycopg2://ymtc:ymtc@localhost:54329/ymtc
         run: >-
           python -m pytest -q scripts/test_devctl_db.py scripts/test_ymtc_upload.py
-          scripts/test_backup_storage.py scripts/test_migrate_sqlite_to_pg.py
+          scripts/test_backup_storage.py scripts/test_migrate_sqlite_to_pg.py scripts/test_compare_api.py
         timeout-minutes: 5

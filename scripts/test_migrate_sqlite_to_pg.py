@@ -423,7 +423,7 @@ def test_실행하면_데이터와_첨부를_옮긴다(tmp_path, dst, mig, targe
     monkeypatch.setenv("STORAGE_BACKEND", "local")
     monkeypatch.setenv("UPLOAD_DIR", str(tmp_path / "store"))
     up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
-    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--uploads", up,
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--uploads", up, "--storage", "local",
                           "--excluded-out", str(tmp_path / "ex.json")))
     assert code == 0
     assert _q(dst, "SELECT count(*) FROM test_cases") == [(3,)]
@@ -449,10 +449,249 @@ def test_첨부_단계만_다시_돌릴_수_있다(tmp_path, dst, mig, target_ur
     monkeypatch.setenv("UPLOAD_DIR", str(tmp_path / "store"))
     src = make_legacy_db(tmp_path)
     empty = _uploads(tmp_path, {})
-    assert mig.main(_argv(src, target_url, "--uploads", empty, "--excluded-out", str(tmp_path / "ex.json"))) == 1
+    assert mig.main(_argv(src, target_url, "--uploads", empty, "--storage", "local",
+                          "--excluded-out", str(tmp_path / "ex.json"))) == 1
     assert _q(dst, "SELECT filepath FROM attachments") == [("abc.png",)]  # 데이터는 들어갔고 첨부만 남았다
 
     (tmp_path / "uploads" / "abc.png").write_bytes(PNG_BYTES)
     assert mig.main(["--source", src, "--target", target_url, "--uploads", str(tmp_path / "uploads"),
-                     "--attachments-only"]) == 0
+                     "--storage", "local", "--attachments-only"]) == 0
     assert _q(dst, "SELECT filepath FROM attachments") == [("attachments/abc.png",)]
+
+
+# ── QA 2인 지적 (Codex) ─────────────────────────────────────────────────────
+
+def test_dry_run_은_시퀀스도_건드리지_않는다(tmp_path, dst, mig, target_url):
+    """setval 은 트랜잭션을 되돌려도 남는다(실측). dry-run 뒤 다음 id 가 1 이어야 한다."""
+    assert mig.main(_argv(make_legacy_db(tmp_path), target_url, "--dry-run",
+                          "--excluded-out", str(tmp_path / "ex.json"))) == 0
+    assert _q(dst, "SELECT last_value, is_called FROM users_id_seq") == [(1, False)]
+    assert _q(dst, "SELECT last_value, is_called FROM test_cases_id_seq") == [(1, False)]
+
+
+def test_첨부만_다시_돌리기와_dry_run_은_같이_쓸_수_없다(tmp_path, dst, mig, target_url, monkeypatch):
+    monkeypatch.setenv("STORAGE_BACKEND", "local")
+    monkeypatch.setenv("UPLOAD_DIR", str(tmp_path / "store"))
+    _copied(mig, tmp_path, dst)
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    code = mig.main(["--source", make_legacy_db(tmp_path, name="b.db"), "--target", target_url,
+                     "--uploads", up, "--attachments-only", "--dry-run"])
+    assert code == 1
+    assert not (tmp_path / "store").exists()
+    assert _q(dst, "SELECT filepath FROM attachments") == [("abc.png",)]
+
+
+class _BlindStorage:
+    """HEAD 가 400 이거나 Content-Length 가 없어 size() 가 늘 None 인 저장소."""
+
+    def __init__(self, objects):
+        self.objects = dict(objects)
+
+    def size(self, key):
+        return None
+
+    def read(self, key, max_bytes):
+        return self.objects[key]
+
+    def put(self, key, data, content_type):
+        self.objects[key] = data
+
+    def put_new(self, key, data, content_type):
+        from services.storage import StorageConflict
+        if key in self.objects:
+            raise StorageConflict(key)
+        self.objects[key] = data
+
+
+def test_존재_판정이_안_되는_저장소에서도_다른_내용을_덮어쓰지_않는다(tmp_path, dst, mig):
+    _copied(mig, tmp_path, dst)
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    st = _BlindStorage({"attachments/abc.png": b"someone else"})
+    with pytest.raises(mig.MigrationError, match="abc.png"):
+        with dst.begin() as conn:
+            mig.migrate_attachments(conn, up, st)
+    assert st.objects["attachments/abc.png"] == b"someone else"
+
+
+def test_존재_판정이_안_되는_저장소에서_같은_내용이면_건너뛴다(tmp_path, dst, mig):
+    _copied(mig, tmp_path, dst)
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    st = _BlindStorage({"attachments/abc.png": PNG_BYTES})
+    with dst.begin() as conn:
+        rep = mig.migrate_attachments(conn, up, st)
+    assert rep.skipped_same == [1]
+
+
+@pytest.mark.parametrize("table, col, bad", [
+    ("test_cases", "no", "oops"),
+    ("test_cases", "no", 2147483648),
+    ("test_results", "duration_sec", "abc"),
+    ("test_results", "duration_sec", float("inf")),
+    ("test_cases", "custom_fields", '{"a": NaN}'),
+    ("test_cases", "created_at", "2026-03-16"),
+    ("test_cases", "created_at", "2026-03-16T11:18:16+09:00"),
+    ("test_cases", "created_at", "2026-03-16 11:18:16.1234567"),
+])
+def test_숫자_시각_JSON_변형도_사전에_막는다(tmp_path, dst, mig, table, col, bad):
+    rows = base_rows()
+    rows[table][0][col] = bad
+    assert col in _problems(mig, make_legacy_db(tmp_path, rows), dst)
+
+
+def test_T_구분자_시각은_받아서_그대로_옮긴다(tmp_path, dst, mig):
+    rows = base_rows()
+    rows["test_cases"][0]["created_at"] = "2026-03-16T11:18:16.5"
+    src = mig.open_source(make_legacy_db(tmp_path, rows))
+    pre = mig.precheck(src, dst, {("test_case_history", 347)})
+    with dst.begin() as conn:
+        mig.copy_all(src, conn, pre.excluded)
+        mig.fix_sequences(conn)
+    with dst.connect() as conn:
+        assert mig.verify(src, conn, pre.excluded) == []
+
+
+def test_검증기는_JSON_의_true_가_1_로_바뀐_것을_잡는다(tmp_path, dst, mig):
+    rows = base_rows()
+    rows["test_cases"][2]["custom_fields"] = '{"flag": true, "n": 0}'
+    src = mig.open_source(make_legacy_db(tmp_path, rows))
+    pre = mig.precheck(src, dst, {("test_case_history", 347)})
+    with dst.begin() as conn:
+        mig.copy_all(src, conn, pre.excluded)
+        mig.fix_sequences(conn)
+    _tamper(dst, "UPDATE test_cases SET custom_fields = '{\"flag\": 1, \"n\": false}'::json WHERE id = 12")
+    with dst.connect() as conn:
+        problems = mig.verify(src, conn, pre.excluded)
+    assert any("test_cases.custom_fields" in p for p in problems), problems
+
+
+def test_검증기는_연관_테이블_변조를_잡는다(tmp_path, dst, mig):
+    rows = base_rows()
+    rows["run_issues"] = [{"id": 1, "test_run_id": 3, "issue_key": "X-1", "title": "t", "url": "u", "created_by": 1, "created_at": TS}]
+    rows["run_issue_test_cases"] = [{"run_issue_id": 1, "test_case_id": 10}]
+    src = mig.open_source(make_legacy_db(tmp_path, rows))
+    pre = mig.precheck(src, dst, {("test_case_history", 347)})
+    with dst.begin() as conn:
+        mig.copy_all(src, conn, pre.excluded)
+        mig.fix_sequences(conn)
+    _tamper(dst, "UPDATE run_issue_test_cases SET test_case_id = 11")
+    with dst.connect() as conn:
+        assert any("run_issue_test_cases" in p for p in mig.verify(src, conn, pre.excluded))
+
+
+def test_대상에_필요한_테이블이_없으면_멈춘다(tmp_path, dst, mig):
+    _tamper(dst, "ALTER TABLE saved_filters RENAME TO saved_filters_away")
+    try:
+        assert "saved_filters" in _problems(mig, make_legacy_db(tmp_path), dst)
+    finally:
+        _tamper(dst, "ALTER TABLE saved_filters_away RENAME TO saved_filters")
+
+
+def test_대상에_모델_밖_테이블이_차_있어도_멈춘다(tmp_path, dst, mig):
+    _tamper(dst, "CREATE TABLE zz_extra (id int); INSERT INTO zz_extra VALUES (1)")
+    try:
+        assert "zz_extra" in _problems(mig, make_legacy_db(tmp_path), dst)
+    finally:
+        _tamper(dst, "DROP TABLE zz_extra")
+
+
+def test_데이터_커밋_뒤_저장소_장애면_복구_명령을_안내한다(tmp_path, dst, mig, target_url, monkeypatch, capsys):
+    from services import storage as storage_mod
+
+    class Down:
+        def size(self, key):
+            raise storage_mod.StorageUnavailable("storage HEAD failed: HTTP 503")
+
+        def put_new(self, key, data, content_type):
+            raise storage_mod.StorageUnavailable("storage POST failed: HTTP 503")
+
+        put = put_new
+
+        def read(self, key, max_bytes):
+            raise storage_mod.StorageUnavailable("storage GET failed: HTTP 503")
+
+    monkeypatch.setattr(storage_mod, "get_storage", lambda: Down())
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--uploads", up, "--storage", "local",
+                          "--excluded-out", str(tmp_path / "ex.json")))
+    assert code == 1
+    assert "--attachments-only" in capsys.readouterr().err
+    assert _q(dst, "SELECT count(*) FROM test_cases") == [(3,)]
+
+
+
+# ── QA 2인 지적 (QA2) ───────────────────────────────────────────────────────
+
+def test_첨부가_있는데_저장소를_안_정하면_아무것도_쓰지_않고_멈춘다(tmp_path, dst, mig, target_url, capsys):
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--uploads", up,
+                          "--excluded-out", str(tmp_path / "ex.json")))
+    assert code == 1 and "--storage" in capsys.readouterr().err
+    assert _q(dst, "SELECT count(*) FROM users") == [(0,)]
+
+
+def test_supabase_저장소는_대상_DB_와_같은_프로젝트여야_한다(tmp_path, dst, mig, target_url, monkeypatch, capsys):
+    """리허설 대상(임시 프로젝트)에 이관하면서 첨부를 운영 버킷에 올리는 사고를 막는다."""
+    monkeypatch.setenv("SUPABASE_URL", "https://prodref123.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "k")
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--uploads", up, "--storage", "supabase",
+                          "--excluded-out", str(tmp_path / "ex.json")))
+    assert code == 1 and "prodref123" in capsys.readouterr().err
+    assert _q(dst, "SELECT count(*) FROM users") == [(0,)]
+
+
+def test_supabase_프로젝트_ref_판정(mig):
+    assert mig.supabase_ref("https://abcd1234.supabase.co") == "abcd1234"
+    assert mig.target_matches_ref("postgresql+psycopg2://postgres:pw@db.abcd1234.supabase.co:5432/postgres", "abcd1234")
+    assert mig.target_matches_ref(
+        "postgresql+psycopg2://postgres.abcd1234:pw@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres", "abcd1234")
+    assert not mig.target_matches_ref("postgresql+psycopg2://postgres.zzzz:pw@aws-0.pooler.supabase.com/postgres", "abcd1234")
+
+
+def test_원본은_한_시점의_스냅샷으로_읽는다(tmp_path, mig):
+    """이관 중 원본에 쓰기가 들어와도 점검·복사·검증이 같은 데이터를 본다."""
+    path = make_legacy_db(tmp_path)
+    src = mig.open_source(path)
+    before = src.execute("SELECT count(*) FROM users").fetchone()[0]
+    w = sqlite3.connect(path, timeout=0.2)
+    try:
+        w.execute("INSERT INTO users (id, username, password_hash, display_name, role, must_change_password, "
+                  "token_version) VALUES (99, 'late', 'x', 'x', 'user', 0, 0)")
+        w.commit()
+    except sqlite3.OperationalError:
+        pass  # 읽기 트랜잭션이 쓰기를 막은 경우도 통과
+    finally:
+        w.close()
+    assert src.execute("SELECT count(*) FROM users").fetchone()[0] == before
+
+
+def test_id_없는_테이블의_고아는_제외할_수_없다고_알린다(tmp_path, dst, mig):
+    rows = base_rows()
+    rows["run_issues"] = [{"id": 1, "test_run_id": 3, "issue_key": "X-1", "title": "t", "url": "u",
+                           "created_by": 1, "created_at": TS}]
+    rows["run_issue_test_cases"] = [{"run_issue_id": 1, "test_case_id": 999}]
+    msg = _problems(mig, make_legacy_db(tmp_path, rows), dst,
+                    allow={("test_case_history", 347), ("run_issue_test_cases", 1)})
+    assert "run_issue_test_cases" in msg
+
+
+def test_대상_제약에_걸리면_문장으로_알리고_대상은_비어_있다(tmp_path, dst, mig, target_url, capsys):
+    rows = base_rows()
+    rows["test_case_sheets"].append(dict(rows["test_case_sheets"][0], id=2))  # 같은 프로젝트에 같은 시트 이름
+    code = mig.main(_argv(make_legacy_db(tmp_path, rows), target_url, "--dry-run",
+                          "--excluded-out", str(tmp_path / "ex.json")))
+    err = capsys.readouterr().err
+    assert code == 1 and "Traceback" not in err and "test_case_sheets" in err
+    assert _q(dst, "SELECT count(*) FROM users") == [(0,)]
+
+
+def test_로컬_저장소가_uploads_와_같은_폴더면_재실행_때_새_키를_고아로_보지_않는다(tmp_path, dst, mig):
+    from services.storage import LocalStorage
+    _copied(mig, tmp_path, dst)
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    st = LocalStorage(up)  # 로컬 앱은 backend/uploads 를 저장소 루트로 쓴다
+    with dst.begin() as conn:
+        mig.migrate_attachments(conn, up, st)
+    with dst.begin() as conn:
+        rep = mig.migrate_attachments(conn, up, st)
+    assert rep.orphan_files == []

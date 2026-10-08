@@ -154,7 +154,8 @@ def priority_sort_key(priority) -> tuple:
     rank = _PRIORITY_RANK.get(text.lower())
     if rank is None:
         return (1, 0, text)
-    return (0, rank, "")
+    # 같은 등급의 다른 이름(High, 높음, p1)은 이름의 코드포인트 순. SQLite 시절의 GROUP BY 순서와 같다
+    return (0, rank, text)
 
 
 def _rate(passed: int, executed: int):

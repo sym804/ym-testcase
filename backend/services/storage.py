@@ -28,6 +28,10 @@ def check_key(key: str) -> str:
     return key
 
 
+class StorageConflict(Exception):
+    """put_new: 같은 키에 이미 객체가 있다. 덮어쓰지 않았다."""
+
+
 class StorageUnavailable(Exception):
     """저장소에 닿지 못했거나 저장소가 오류를 냈다. 앱은 503 으로 바꿔 응답한다.
 
@@ -54,6 +58,16 @@ class LocalStorage:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as f:
             f.write(data)
+
+    def put_new(self, key: str, data: bytes, content_type: str | None) -> None:
+        """없을 때만 쓴다. 있으면 StorageConflict. 존재 확인과 쓰기가 한 번의 open 이다."""
+        path = self._path(key)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
+            with open(path, "xb") as f:
+                f.write(data)
+        except FileExistsError:
+            raise StorageConflict(key) from None
 
     def read(self, key: str, max_bytes: int) -> bytes:
         with open(self._path(key), "rb") as f:
@@ -125,6 +139,31 @@ class SupabaseStorage:
         headers = {"content-type": content_type or "application/octet-stream", "x-upsert": "true"}
         with self._req("POST", self._obj(key), data, headers):
             pass
+
+    def put_new(self, key: str, data: bytes, content_type: str | None) -> None:
+        """없을 때만 쓴다(x-upsert false). 있으면 StorageConflict.
+
+        ★존재 확인을 HEAD(size) 로 하지 않는다. size() 는 HEAD 400 과 Content-Length 없음도
+          None 으로 돌려줘서, 그걸 '없음' 으로 읽고 올리면 남의 객체를 덮어쓸 수 있다(QA 지적).
+          Supabase 는 버전에 따라 중복을 409 또는 400 + statusCode "409" 로 알린다.
+        """
+        headers = {"content-type": content_type or "application/octet-stream", "x-upsert": "false"}
+        h = {"Authorization": f"Bearer {self.key}", "apikey": self.key, **headers}
+        req = urllib.request.Request(self.base + self._obj(key), data=data, method="POST", headers=h)
+        try:
+            with urllib.request.urlopen(req, timeout=30):
+                return
+        except urllib.error.HTTPError as e:
+            body = e.read() or b""
+            try:
+                status = str(json.loads(body).get("statusCode", ""))
+            except (ValueError, AttributeError):
+                status = ""
+            if e.code == 409 or (e.code == 400 and status == "409"):
+                raise StorageConflict(key) from None
+            raise StorageUnavailable(f"storage POST failed: HTTP {e.code}") from None
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            raise StorageUnavailable(f"storage POST failed: {type(e).__name__}") from None
 
     def read(self, key: str, max_bytes: int) -> bytes:
         with self._req("GET", self._obj(key)) as r:
