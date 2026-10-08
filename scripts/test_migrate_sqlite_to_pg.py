@@ -362,7 +362,7 @@ def _committed(mig, tmp_path, dst):
 def test_첨부를_새_키로_올리고_해시를_대조한_뒤_filepath_를_바꾼다(tmp_path, dst, mig):
     from services.storage import LocalStorage
     _committed(mig, tmp_path, dst)
-    up = _uploads(tmp_path, {"abc.png": PNG_BYTES, "orphan.png": b"x", "old.jpg": b"y"})
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES, "orphan.png": b"x", "old.jpg": b"y", ".gitkeep": b""})
     st = LocalStorage(str(tmp_path / "store"))
     with dst.begin() as conn:
         rep = mig.migrate_attachments(conn, up, st)

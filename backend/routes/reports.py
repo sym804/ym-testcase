@@ -112,6 +112,9 @@ def _category_summary_sql(run_id: int, db: Session) -> list:
     # ★이름을 여기서 정하지 않는다. 예전에는 "Uncategorized" 로 박아서 요약 표는
     #   "Uncategorized", 실패·차단 목록은 "-" 로 같은 TC 가 다르게 불렸다.
     #   JSON 은 null 로 보내 화면이 번역하고, PDF/엑셀은 REPORT_TEXT 의 unset_category 를 쓴다.
+    # ★순서는 SQLite 시절과 같게 고정한다: NULL 먼저, 그다음 원래 값의 코드포인트 순.
+    #   SQLite 는 GROUP BY 키 순으로 내줬고 PostgreSQL 은 해시 집계라 순서가 정해지지 않는다.
+    rows = sorted(rows, key=lambda r: (r.category is not None, r.category or ""))
     merged: dict = {}
     for r in rows:
         name = (r.category or "").strip() or None

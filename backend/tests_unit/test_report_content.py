@@ -169,6 +169,18 @@ def test_분류별_합격률(db):
     assert rows["검색"]["pass_rate"] is None
 
 
+def test_분류_요약은_옛_SQLite_와_같은_순서다(db):
+    """미분류(NULL) 먼저, 그다음 원래 값의 코드포인트 순(영문이 한글보다 앞).
+
+    SQLite 는 GROUP BY 키 순서로 내줬고 PostgreSQL 은 해시 집계라 순서가 없다.
+    이관 리허설에서 같은 데이터의 리포트 13건이 이 순서만 달랐다.
+    """
+    cats = ["프론트엔드", "백엔드 API", "E2E", None, "DB 검증", "공통 환경", "단위 테스트", "API", "검색", "결제"]
+    made = _make(db, [(f"T{i}", "High", c, R.PASS, None, None, "t1") for i, c in enumerate(cats)])
+    got = [c["category"] for c in _json(db, made)["category_summary"]]
+    assert got == [None, "API", "DB 검증", "E2E", "검색", "결제", "공통 환경", "단위 테스트", "백엔드 API", "프론트엔드"]
+
+
 def test_수행자는_미수행_행을_세지_않는다(db):
     """결과 행은 런을 만들 때 NS 로 미리 생긴다. 세면 런을 만든 사람이 다 한 것처럼 나온다."""
     made = _make(db, [
