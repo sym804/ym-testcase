@@ -1,5 +1,5 @@
 import client from "./client";
-import { stageUpload } from "./uploads";
+import { withStagedUpload } from "./uploads";
 import type {
   User,
   Project,
@@ -185,27 +185,27 @@ export const testCasesApi = {
   },
 
   // 파일은 스테이징 업로드로 먼저 올리고 upload_id 만 보낸다(배포의 요청 본문 4.5MB 한도).
-  importExcel: async (projectId: number, file: File, sheetNames?: string[]) => {
-    const upload_id = await stageUpload("tc_import", file);
-    const params = sheetNames?.length ? { sheet_names: sheetNames.join(","), upload_id } : { upload_id };
-    const res = await client.post<{ created: number; updated: number; renamed?: number; imported: number; sheets: { sheet: string; created: number; updated: number; renamed?: number }[] }>(
-      `/api/projects/${projectId}/testcases/import`,
-      null,
-      { params }
-    );
-    return res.data;
-  },
+  importExcel: (projectId: number, file: File, sheetNames?: string[]) =>
+    withStagedUpload("tc_import", file, true, async (upload_id) => {
+      const params = sheetNames?.length ? { sheet_names: sheetNames.join(","), upload_id } : { upload_id };
+      const res = await client.post<{ created: number; updated: number; renamed?: number; imported: number; sheets: { sheet: string; created: number; updated: number; renamed?: number }[] }>(
+        `/api/projects/${projectId}/testcases/import`,
+        null,
+        { params }
+      );
+      return res.data;
+    }),
 
-  // 미리보기와 가져오기는 같은 파일이면 같은 upload_id 를 쓴다(stageUpload 가 한 번만 올린다).
-  previewImport: async (projectId: number, file: File) => {
-    const upload_id = await stageUpload("tc_import", file);
-    const res = await client.post<{ sheets: { name: string; tc_count: number; existing: number }[] }>(
-      `/api/projects/${projectId}/testcases/import/preview`,
-      null,
-      { params: { upload_id } }
-    );
-    return res.data;
-  },
+  // 미리보기와 가져오기는 같은 파일이면 같은 upload_id 를 쓴다(한 번만 올린다). 미리보기는 id 를 소비하지 않는다.
+  previewImport: (projectId: number, file: File) =>
+    withStagedUpload("tc_import", file, false, async (upload_id) => {
+      const res = await client.post<{ sheets: { name: string; tc_count: number; existing: number }[] }>(
+        `/api/projects/${projectId}/testcases/import/preview`,
+        null,
+        { params: { upload_id } }
+      );
+      return res.data;
+    }),
 
   createSheet: async (projectId: number, name: string, parentId?: number | null, isFolder: boolean = false) => {
     const res = await client.post<SheetNode>(
@@ -319,20 +319,22 @@ export const testRunsApi = {
     runId: number,
     file: File,
     opts: { dryRun: boolean; keepExecuted: boolean; label?: string }
-  ) => {
-    const params: Record<string, string> = {
-      dry_run: String(opts.dryRun),
-      keep_executed: String(opts.keepExecuted),
-      upload_id: await stageUpload("result_import", file),
-    };
-    if (opts.label?.trim()) params.label = opts.label.trim();
-    const res = await client.post<ResultImportSummary>(
-      `/api/projects/${projectId}/testruns/${runId}/results/import`,
-      null,
-      { params }
-    );
-    return res.data;
-  },
+  ) =>
+    // dry run 은 id 를 소비하지 않아 뒤이은 적용이 같은 id 를 쓴다.
+    withStagedUpload("result_import", file, !opts.dryRun, async (upload_id) => {
+      const params: Record<string, string> = {
+        dry_run: String(opts.dryRun),
+        keep_executed: String(opts.keepExecuted),
+        upload_id,
+      };
+      if (opts.label?.trim()) params.label = opts.label.trim();
+      const res = await client.post<ResultImportSummary>(
+        `/api/projects/${projectId}/testruns/${runId}/results/import`,
+        null,
+        { params }
+      );
+      return res.data;
+    }),
 
   complete: async (projectId: number, runId: number) => {
     const res = await client.put<TestRun>(
@@ -523,13 +525,13 @@ export const attachmentsApi = {
     return res.data;
   },
 
-  upload: async (testResultId: number, file: File) => {
-    const upload_id = await stageUpload("attachment", file);
-    const res = await client.post<Attachment>(`/api/attachments/${testResultId}`, null, {
-      params: { upload_id },
-    });
-    return res.data;
-  },
+  upload: (testResultId: number, file: File) =>
+    withStagedUpload("attachment", file, true, async (upload_id) => {
+      const res = await client.post<Attachment>(`/api/attachments/${testResultId}`, null, {
+        params: { upload_id },
+      });
+      return res.data;
+    }),
 
   downloadUrl: (attachmentId: number) =>
     `/api/attachments/download/${attachmentId}`,

@@ -3,6 +3,7 @@
 // 로컬은 발급 주소가 백엔드 자신이라 흐름이 같다.
 import type { TFunction } from "i18next";
 import client, { API_BASE_URL } from "./client";
+import { translateError } from "../utils/errorMessage";
 
 export type UploadPurpose = "attachment" | "tc_import" | "result_import";
 
@@ -81,6 +82,35 @@ export function stageUpload(purpose: UploadPurpose, file: File): Promise<string>
   return p;
 }
 
+export function forgetUpload(purpose: UploadPurpose, file: File) {
+  cache.get(file)?.delete(purpose);
+}
+
+// 서버가 이 id 를 더는 받지 않는 응답. 404 는 만료로 지워졌거나 첨부가 가져간 것, 409 는 이미 처리된 것.
+const STALE_STATUSES = new Set([404, 409, 410]);
+
+// 파일을 올리고 그 upload_id 로 처리 요청(fn)을 보낸다.
+// consumes: 이 요청이 성공하면 서버가 id 를 처리 완료로 표시한다(가져오기 적용, 첨부). 그 뒤에는
+// 같은 File 이라도 새로 올려야 하므로 캐시를 지운다. 미리보기와 dry run 은 id 를 남긴다.
+// 처리 요청이 실패해도 consumes 면 지운다. 응답만 잃고 서버는 커밋했을 수 있어서다.
+export async function withStagedUpload<T>(
+  purpose: UploadPurpose,
+  file: File,
+  consumes: boolean,
+  fn: (uploadId: string) => Promise<T>,
+): Promise<T> {
+  const uploadId = await stageUpload(purpose, file);
+  try {
+    const result = await fn(uploadId);
+    if (consumes) forgetUpload(purpose, file);
+    return result;
+  } catch (err) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (consumes || (status !== undefined && STALE_STATUSES.has(status))) forgetUpload(purpose, file);
+    throw err;
+  }
+}
+
 export function formatLimitMb(bytes: number | null): string {
   return bytes ? String(Math.floor(bytes / (1024 * 1024))) : "";
 }
@@ -93,4 +123,12 @@ export function tooLargeMessage(err: unknown, t: TFunction): string | null {
   }
   const status = (err as { response?: { status?: number } })?.response?.status;
   return status === 413 ? t("common:uploadTooLargeNoLimit") : null;
+}
+
+// 업로드가 끼는 요청의 오류 문구. 용량 초과, 서버 detail, 기본 문구 순서로 고른다.
+export function uploadErrorMessage(err: unknown, t: TFunction, fallback: string): string {
+  const tooLarge = tooLargeMessage(err, t);
+  if (tooLarge) return tooLarge;
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  return typeof detail === "string" && detail ? translateError(detail) : fallback;
 }

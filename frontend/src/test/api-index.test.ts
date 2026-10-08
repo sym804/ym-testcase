@@ -11,7 +11,14 @@ vi.mock("../api/client", () => ({
 }));
 
 // 업로드는 스테이징으로 먼저 올리고 upload_id 만 보낸다. 그 흐름은 uploads.test.ts 가 본다.
-vi.mock("../api/uploads", () => ({ stageUpload: vi.fn().mockResolvedValue("uid-1") }));
+vi.mock("../api/uploads", () => {
+  const stageUpload = vi.fn().mockResolvedValue("uid-1");
+  return {
+    stageUpload,
+    withStagedUpload: vi.fn(async (purpose: string, file: File, _consumes: boolean, fn: (id: string) => Promise<unknown>) =>
+      fn(await stageUpload(purpose, file))),
+  };
+});
 import client from "../api/client";
 import {
   authApi,

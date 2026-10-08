@@ -66,7 +66,13 @@
     "filterNameRequired": "Please enter a filter name.",
     "invalidFilterLogic": "Logic must be AND or OR.",
     "filterNotFound": "Filter not found.",
-    "tcIdTaken": "That TC ID is already in use. Please pick another."
+    "tcIdTaken": "That TC ID is already in use. Please pick another.",
+    "uploadNotFound": "Upload not found. Please select the file again.",
+    "uploadAlreadyUsed": "This upload has already been processed. Please select the file again.",
+    "uploadBusy": "This upload is being processed. Please try again shortly.",
+    "uploadNotReceived": "The file has not been uploaded yet. Please try again.",
+    "busy": "Another operation is in progress. Please try again shortly.",
+    "storageUnavailable": "Cannot reach file storage. Please try again shortly."
   },
   "selectProject": "Select project",
   "selectRow": "Select this project",

@@ -1504,7 +1504,11 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                 objectFit: "contain",
                 borderRadius: 8,
               }}
-              onError={() => toast.error(t("imageDisplayFailed"))}
+              onError={() => {
+                // 권한이 없거나 저장소에 없는 파일이면 깨진 이미지 모달을 남기지 않고 닫는다.
+                toast.error(t("imageLoadFailed"));
+                setPreviewImage(null);
+              }}
             />
           </div>
         </div>

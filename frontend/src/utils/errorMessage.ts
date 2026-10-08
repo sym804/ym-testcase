@@ -36,6 +36,13 @@ const ERROR_MAP: Record<string, string> = {
   "필터 이름을 입력해 주세요.": "errors.filterNameRequired",
   "logic은 AND 또는 OR이어야 합니다.": "errors.invalidFilterLogic",
   "필터를 찾을 수 없습니다.": "errors.filterNotFound",
+  // Uploads, locks, storage
+  "업로드를 찾을 수 없습니다.": "errors.uploadNotFound",
+  "이미 처리한 업로드입니다.": "errors.uploadAlreadyUsed",
+  "같은 업로드를 처리하는 중입니다.": "errors.uploadBusy",
+  "파일이 아직 올라오지 않았습니다.": "errors.uploadNotReceived",
+  "다른 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.": "errors.busy",
+  "파일 저장소에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.": "errors.storageUnavailable",
 };
 
 export function translateError(backendDetail: string): string {

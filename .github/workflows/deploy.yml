@@ -1,13 +1,17 @@
-# 운영 배포. 순서를 강제한다: 테스트 -> 운영 DB 마이그레이션 -> Vercel 배포.
+# 운영 배포. 같은 커밋의 CI(백엔드·프론트·E2E)가 성공한 뒤에만 돈다.
+# 순서를 강제한다: Vercel 빌드 -> 운영 DB 마이그레이션 -> 빌드한 산출물 배포.
+# 빌드가 실패하면 DB 를 건드리기 전에 멈춘다.
 # 공개 레포에서는 돌지 않는다. 조직의 비공개 레포에서 저장소 변수 DEPLOY_ENABLED=true 로 켠다.
 # 필요한 비밀값: DATABASE_URL_DIRECT, VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
 # Vercel 의 Git 자동 배포는 운영(Production)에 대해 끈다. 안 끄면 마이그레이션 전에 새 코드가 뜬다.
+# 다시 배포하려면 해당 커밋의 CI 를 다시 돌린다.
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-  workflow_dispatch:
 
 concurrency:
   group: deploy-production
@@ -15,38 +19,39 @@ concurrency:
 
 jobs:
   deploy:
-    if: vars.DEPLOY_ENABLED == 'true'
+    # fork PR 의 CI 도 workflow_run 을 깨운다. 같은 레포의 push 로 돈 CI 만 받는다.
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      github.event.repository.private == true &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     environment: production
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: ymtc
-          POSTGRES_PASSWORD: ymtc
-          POSTGRES_DB: ymtc
-        ports: ["54329:5432"]
-        options: >-
-          --health-cmd "pg_isready -U ymtc -d ymtc"
-          --health-interval 2s --health-timeout 3s --health-retries 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: 백엔드 의존성
-        working-directory: backend
-        run: pip install -r requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-      - name: 백엔드 테스트
-        working-directory: backend
+      - name: Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Vercel 빌드
         env:
-          TEST_ADMIN_PASSWORD: test1234
-          TEST_DATABASE_ADMIN_URL: postgresql+psycopg2://ymtc:ymtc@localhost:54329/ymtc
-        run: python -m pytest -q --tb=short -k "not test_dompurify_installed"
-        timeout-minutes: 20
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          vercel build --prod --token="$VERCEL_TOKEN"
 
       # 직결(또는 세션 풀러) 주소로 한다. 트랜잭션 풀러로는 DDL 을 하지 않는다.
       - name: 운영 DB 마이그레이션
@@ -54,19 +59,13 @@ jobs:
         env:
           DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
           DATABASE_URL: ${{ secrets.DATABASE_URL_DIRECT }}
-        run: python -m alembic upgrade head
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+        run: |
+          pip install -r requirements.txt
+          python -m alembic upgrade head
 
       - name: Vercel 배포
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          npm install --global vercel@latest
-          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-          vercel build --prod --token="$VERCEL_TOKEN"
-          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"

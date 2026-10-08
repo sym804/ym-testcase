@@ -153,6 +153,28 @@ async def schema_guard(request: Request, call_next):
 
 
 # ── Security headers middleware ──────────────────────────────────────────────
+_API_CSP = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: blob:; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'"
+)
+# Swagger UI 페이지만. FastAPI 가 CDN(jsdelivr) 스크립트와 인라인 초기화 스크립트를 내므로
+# 전역 CSP 를 그대로 주면 빈 화면이 된다. 이 페이지는 사용자 입력을 담지 않는다.
+_DOCS_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "img-src 'self' data: https://fastapi.tiangolo.com; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'"
+)
+
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -161,13 +183,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: blob:; "
-        "font-src 'self'; "
-        "connect-src 'self'; "
-        "frame-ancestors 'none'"
+        _DOCS_CSP if request.url.path == app.docs_url else _API_CSP
     )
     if os.getenv("ENV") == "production":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

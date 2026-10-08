@@ -194,3 +194,71 @@ def test_저장소_장애면_503(h, project, monkeypatch):
     r = requests.get(f"{BASE}/api/attachments/download/{att_id}", headers=h)
     assert r.status_code == 503, r.text
     assert "저장소" in r.json()["detail"]
+
+
+# ── 잠금 해제 시점 ──────────────────────────────────────────────────────────
+# FastAPI 는 get_db 정리(close)를 응답을 보낸 뒤에 한다. 커밋하지 않는 요청(미리보기, dry run)이
+# 잠금을 쥔 채 응답하면, 곧바로 이어지는 가져오기가 NOWAIT 잠금에 걸려 409 를 받는다.
+# 라우트 함수를 직접 불러 "반환한 시점" 에 잠금이 풀려 있는지 본다(응답 전송 = 반환 직후).
+
+def _row_lockable(upload_id: str) -> bool:
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    from database import SessionLocal
+    other = SessionLocal()
+    try:
+        other.execute(text("SELECT id FROM staged_uploads WHERE id = :i FOR UPDATE NOWAIT"), {"i": upload_id})
+        return True
+    except OperationalError:
+        return False
+    finally:
+        other.rollback()
+        other.close()
+
+
+def _advisory_free(ns: int, key: int) -> bool:
+    from sqlalchemy import text
+    from database import SessionLocal
+    other = SessionLocal()
+    try:
+        return bool(other.execute(text("SELECT pg_try_advisory_xact_lock(:n, :k)"), {"n": ns, "k": key}).scalar())
+    finally:
+        other.rollback()
+        other.close()
+
+
+def _admin_user(db):
+    from models import User
+    return db.query(User).filter(User.username == "admin").one()
+
+
+def test_미리보기는_반환_전에_업로드_잠금을_푼다(h, project):
+    from database import SessionLocal
+    from routes.testcases import preview_import_sheets
+
+    uid = _staged(h, "tc_import", "t.csv", CSV)
+    db = SessionLocal()
+    try:
+        out = preview_import_sheets(project, file=None, upload_id=uid, db=db, current_user=_admin_user(db))
+        assert out["sheets"]
+        assert _row_lockable(uid), "미리보기가 응답 뒤까지 스테이징 행을 잠그고 있다"
+    finally:
+        db.close()
+
+
+def test_dry_run_은_반환_전에_잠금을_푼다(h, project):
+    from database import SessionLocal
+    from routes.testruns import import_results
+    from services.locks import LockNs
+
+    run_id, _ = _result_id(h, project)
+    uid = _staged(h, "result_import", "j.xml", JUNIT)
+    db = SessionLocal()
+    try:
+        out = import_results(project, run_id, file=None, dry_run=True, keep_executed=True, label=None,
+                             upload_id=uid, db=db, current_user=_admin_user(db))
+        assert out is not None
+        assert _row_lockable(uid), "dry run 이 응답 뒤까지 스테이징 행을 잠그고 있다"
+        assert _advisory_free(int(LockNs.RUN_RESULTS), run_id), "dry run 이 응답 뒤까지 회차 잠금을 쥐고 있다"
+    finally:
+        db.close()
