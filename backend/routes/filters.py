@@ -126,15 +126,29 @@ INT_FIELDS = {"no"}
 _INT_OPERATORS = {"eq", "neq", "gt", "lt", "gte", "lte", "in"}
 
 
+#: PostgreSQL INTEGER 범위. 넘는 값은 비교 전에 거절한다(DB 오류로 500 이 나지 않게).
+_INT_MIN, _INT_MAX = -(2 ** 31), 2 ** 31 - 1
+
+
 def _to_int(value):
+    def bad():
+        return HTTPException(status_code=400, detail=f"숫자 칸에는 정수만 쓸 수 있습니다: {value!r}")
     if isinstance(value, bool):
-        raise HTTPException(status_code=400, detail=f"숫자 칸에는 정수만 쓸 수 있습니다: {value!r}")
+        raise bad()
     if isinstance(value, int):
-        return value
-    s = str(value).strip() if value is not None else ""
-    if not s.lstrip("-").isdigit():
-        raise HTTPException(status_code=400, detail=f"숫자 칸에는 정수만 쓸 수 있습니다: {value!r}")
-    return int(s)
+        n = value
+    else:
+        s = str(value).strip() if value is not None else ""
+        # isdigit 은 '²' 같은 문자도 숫자로 본다. ASCII 숫자만 받는다.
+        if not s or len(s) > 11 or not all(c in "0123456789" for c in s.lstrip("-")) or s.count("-") > 1:
+            raise bad()
+        try:
+            n = int(s)
+        except ValueError:
+            raise bad()
+    if not (_INT_MIN <= n <= _INT_MAX):
+        raise bad()
+    return n
 
 
 def _apply_condition(q, field: str, operator: str, value):
@@ -150,9 +164,19 @@ def _apply_condition(q, field: str, operator: str, value):
         if operator not in _INT_OPERATORS:
             raise HTTPException(status_code=400, detail=f"숫자 칸에는 '{operator}' 조건을 쓸 수 없습니다")
         if operator == "in":
-            value = [_to_int(v) for v in value] if isinstance(value, list) else value
+            # ★리스트가 아니면 조건이 조용히 빠져, OR 묶음에서는 결과가 전체로 넓어진다.
+            if not isinstance(value, list):
+                raise HTTPException(status_code=400, detail="'in' 조건에는 목록을 줍니다")
+            value = [_to_int(v) for v in value]
         else:
             value = _to_int(value)
+    elif operator == "in":
+        if not isinstance(value, list):
+            raise HTTPException(status_code=400, detail="'in' 조건에는 목록을 줍니다")
+        value = [str(v) for v in value]
+    elif value is not None and not isinstance(value, str):
+        # 문자열 칸에 숫자를 주면 PostgreSQL 은 varchar = integer 로 500 을 낸다.
+        value = str(value)
 
     if operator == "eq":
         return q.filter(col == value)

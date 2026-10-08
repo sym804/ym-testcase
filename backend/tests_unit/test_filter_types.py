@@ -37,3 +37,21 @@ def test_정수_칸_in_은_정수로_바꾼다(pg_session):
 
 def test_문자열_칸의_포함은_그대로(pg_session):
     assert _apply_condition(pg_session.query(TestCase), "tc_id", "contains", "TC").all() == []
+
+
+@pytest.mark.parametrize("value", ["--5", "²", "9" * 400])
+def test_정수로_못_바꾸는_값은_500_이_아니라_400(pg_session, value):
+    with pytest.raises(HTTPException) as e:
+        _apply_condition(pg_session.query(TestCase), "no", "eq", value)
+    assert e.value.status_code == 400
+
+
+@pytest.mark.parametrize("value", ["1", 1, {"a": 1}])
+def test_in_은_리스트만_받는다(pg_session, value):
+    with pytest.raises(HTTPException) as e:
+        _apply_condition(pg_session.query(TestCase), "no", "in", value)
+    assert e.value.status_code == 400
+
+
+def test_문자열_칸에_숫자를_줘도_500_이_아니다(pg_session):
+    assert _apply_condition(pg_session.query(TestCase), "tc_id", "eq", 5).all() == []
