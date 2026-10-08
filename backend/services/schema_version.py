@@ -42,15 +42,18 @@ def assert_known_revision(conn, script_dir: ScriptDirectory) -> None:
 
 
 def schema_status(conn, script_dir: ScriptDirectory) -> str:
-    """DB 스키마와 코드의 관계. empty / current / behind / ahead.
+    """DB 스키마와 코드의 관계. empty / current / behind / ahead / legacy.
 
     ahead 는 코드가 모르는 더 새 리비전(롤백 상태)이다. 막지 않는다.
+    legacy 는 SQLite 시절 이력이다. 이 코드로는 돌 수 없다.
     """
     if "alembic_version" not in inspect(conn).get_table_names():
         return "empty"
     current = {r[0] for r in conn.execute(text("SELECT version_num FROM alembic_version"))}
     if not current:
         return "empty"
+    if current & LEGACY_SQLITE_REVISIONS:
+        return "legacy"
     known = {rev.revision for rev in script_dir.walk_revisions()}
     if current - known:
         return "ahead"

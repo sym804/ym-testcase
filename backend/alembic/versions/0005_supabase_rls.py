@@ -25,7 +25,7 @@ def _present_roles(bind) -> list[str]:
 
 
 def _tables(bind) -> list[str]:
-    rows = bind.execute(sa.text("SELECT tablename FROM pg_tables WHERE schemaname = current_schema()"))
+    rows = bind.execute(sa.text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'"))
     return [r[0] for r in rows]
 
 
@@ -35,9 +35,10 @@ def upgrade() -> None:
     if "anon" not in roles:
         return
     who = ", ".join(roles)
-    schema = _schema(bind)
+    # Supabase 가 REST 로 노출하는 스키마는 public 이다. search_path 와 무관하게 public 을 본다.
+    schema = '"public"'
     for table in _tables(bind):
-        op.execute(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY')
+        op.execute(f'ALTER TABLE "public"."{table}" ENABLE ROW LEVEL SECURITY')
     op.execute(f"REVOKE ALL ON ALL TABLES IN SCHEMA {schema} FROM {who}")
     op.execute(f"REVOKE ALL ON ALL SEQUENCES IN SCHEMA {schema} FROM {who}")
     # 이 역할(마이그레이션을 돌리는 소유자)이 앞으로 만드는 객체에도 기본 권한을 주지 않는다.
@@ -45,14 +46,9 @@ def upgrade() -> None:
     op.execute(f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} REVOKE ALL ON SEQUENCES FROM {who}")
 
 
-def _schema(bind) -> str:
-    name = bind.execute(sa.text("SELECT current_schema()")).scalar()
-    return f'"{name}"'
-
-
 def downgrade() -> None:
     bind = op.get_bind()
     if "anon" not in _present_roles(bind):
         return
     for table in _tables(bind):
-        op.execute(f'ALTER TABLE "{table}" DISABLE ROW LEVEL SECURITY')
+        op.execute(f'ALTER TABLE "public"."{table}" DISABLE ROW LEVEL SECURITY')

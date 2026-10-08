@@ -1,5 +1,4 @@
 import io
-import os
 from datetime import datetime
 from models import now_kst
 from typing import List, Optional
@@ -21,7 +20,7 @@ from schemas import (
 )
 from auth import get_current_user, role_required, check_project_access, get_project_role
 from routes.attachments import delete_attachment_objects
-from services.staged_upload import resolve_file
+from services.staged_upload import PURPOSE_LIMITS, resolve_file
 from services.locks import LockNs, advisory_xact_lock, project_write_lock
 from services.run_sync_service import sync_run_results
 from services.excel_safe import safe_cell
@@ -33,7 +32,7 @@ from services.result_import import (
 )
 
 #: 자동화 결과 파일 상한. 전량 스위트(230여 건) JSON 이 수 MB 라 여유를 둔다.
-MAX_RESULT_IMPORT_SIZE = 20 * 1024 * 1024
+MAX_RESULT_IMPORT_SIZE = PURPOSE_LIMITS["result_import"]  # 스테이징 업로드와 같은 값
 FORMAT_LABEL = {"playwright-json": "Playwright JSON", "junit-xml": "JUnit XML"}
 #: 응답에 싣는 미매칭 제목 상한. 나머지는 건수만 준다.
 MAX_UNMATCHED_LISTED = 200

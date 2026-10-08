@@ -190,3 +190,19 @@ def test_서명_다운로드_주소는_파일명을_붙인다(supa):
     assert url.startswith(f"{base}/storage/v1/object/sign/bkt/attachments/a.png?token=DL&download=")
     assert json.loads(_Fake.calls[-1]["body"]) == {"expiresIn": 60}
     assert "SERVICE-KEY" not in url
+
+
+def test_저장소_오류는_StorageUnavailable_이고_키를_흘리지_않는다(supa):
+    st, _ = supa
+    with pytest.raises(storage_mod.StorageUnavailable) as e:
+        st.read("k/none.bin", 10)  # 가짜 서버는 없는 객체 GET 에 400 을 준다
+    assert "SERVICE-KEY" not in str(e.value)
+
+
+def test_저장소에_닿지_못하면_StorageUnavailable(monkeypatch):
+    monkeypatch.setenv("STORAGE_BACKEND", "supabase")
+    monkeypatch.setenv("SUPABASE_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "SERVICE-KEY")
+    with pytest.raises(storage_mod.StorageUnavailable) as e:
+        storage_mod.get_storage().put("k/x.bin", b"x", None)
+    assert "SERVICE-KEY" not in str(e.value)

@@ -42,7 +42,7 @@ from services.runtime_env import check_serverless_config, env_flag
 
 # ★lifespan 이 아니라 임포트 시점에 검사한다. 서버리스 런타임이 ASGI lifespan 을
 #   부른다는 보장이 없다. 콜드 스타트마다 모듈은 반드시 임포트된다.
-logging.basicConfig()
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 check_serverless_config()
 
 
@@ -96,6 +96,8 @@ app.add_middleware(
 
 # ── Schema guard (serverless) ────────────────────────────────────────────────
 _SCHEMA_EXEMPT = ("/api/config",)
+#: 뒤처짐으로 판정한 뒤 다시 보는 간격(초)
+_SCHEMA_RECHECK_SEC = 30
 
 
 def _check_schema(target_app) -> None:
@@ -111,19 +113,31 @@ def _check_schema(target_app) -> None:
     cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), "alembic.ini"))
     with engine.connect() as conn:
         status = schema_status(conn, ScriptDirectory.from_config(cfg))
-    target_app.state.schema_behind = status in ("empty", "behind")
+    import time
+    target_app.state.schema_behind = status in ("empty", "behind", "legacy")
+    target_app.state.schema_checked_at = time.monotonic()
     if target_app.state.schema_behind:
         logger.error("DB 스키마가 코드보다 옛 버전이다(%s). 배포 마이그레이션을 확인한다.", status)
 
 
 @app.middleware("http")
 async def schema_guard(request: Request, call_next):
-    # lifespan 을 부르지 않는 런타임에서는 첫 요청 때 한 번 판정한다.
-    if not hasattr(request.app.state, "schema_behind"):
-        if env_flag("RUN_MIGRATIONS_ON_STARTUP"):
-            request.app.state.schema_behind = False
-        else:
+    # lifespan 을 부르지 않는 런타임에서는 첫 요청 때 판정한다. 뒤처짐으로 판정했으면
+    # 일정 간격으로 다시 본다. 안 그러면 마이그레이션이 끝난 뒤에도 그 인스턴스는 계속 503 이다.
+    import time
+    state = request.app.state
+    if env_flag("RUN_MIGRATIONS_ON_STARTUP"):
+        if not hasattr(state, "schema_behind"):
+            state.schema_behind = False
+    elif (not hasattr(state, "schema_behind")
+          or (state.schema_behind
+              and time.monotonic() - getattr(state, "schema_checked_at", 0.0) > _SCHEMA_RECHECK_SEC)):
+        try:
             _check_schema(request.app)
+        except Exception:  # noqa: BLE001  판정이 실패하면 500 이 아니라 503 으로 알린다
+            logger.error("DB 스키마 판정 실패", exc_info=True)
+            return JSONResponse(status_code=503,
+                                content={"detail": "DB 에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."})
     if (getattr(request.app.state, "schema_behind", False)
             and request.url.path.startswith("/api/")
             and request.url.path not in _SCHEMA_EXEMPT):
