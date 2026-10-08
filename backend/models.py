@@ -216,6 +216,8 @@ class TestRun(Base):
     __table_args__ = (
         Index("ix_test_runs_project_id", "project_id"),
         Index("ix_test_runs_status", "project_id", "status"),
+        # 다음 회차는 max(round)+1 이다. 프로젝트 잠금이 요청을 줄 세우지만 DB 도 막는다.
+        Index("uq_test_runs_project_name_round", "project_id", "name", "round", unique=True),
     )
 
 
