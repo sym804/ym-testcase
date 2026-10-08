@@ -13,7 +13,7 @@ from schemas import (
 )
 from auth import get_current_user, role_required, check_project_access
 from routes.sheets import _validate_sheet_name
-from services.locks import project_write_lock
+from services.locks import LockNs, advisory_xact_lock, project_write_lock
 from services.tc_id_service import allocate_tc_id, taken_tc_ids
 from services.import_service import (
     HEADER_MAP, SKIP_SHEETS, _resolve_merged, _detect_header_row, _count_tc_rows,
@@ -143,7 +143,6 @@ def bulk_update_testcases(
     payload: TestCaseBulkUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
-    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 
@@ -169,6 +168,8 @@ def bulk_update_testcases(
                 changes[key] = (old_val, value)
             setattr(tc, key, value)
         if moved:
+            # 번호를 건드리는 항목이 있을 때만 잠근다(같은 트랜잭션에서 다시 잡아도 된다).
+            advisory_xact_lock(db, LockNs.PROJECT_WRITE, project_id)
             tc.no = _max_no_in_sheet(project_id, tc.sheet_name, db) + 1
             db.flush()
             touched_sheets.update({old_sheet, tc.sheet_name})
@@ -274,7 +275,6 @@ def update_testcase(
     payload: TestCaseUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
-    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 
@@ -307,6 +307,9 @@ def update_testcase(
         setattr(tc, key, value)
 
     if moved:
+        # 번호를 건드리는 경우만 프로젝트 잠금을 잡는다. 셀 하나 고치는 자동 저장까지
+        # 잠그면 가져오기 같은 긴 작업 동안 모든 저장이 줄을 선다.
+        advisory_xact_lock(db, LockNs.PROJECT_WRITE, project_id)
         # 옮긴 TC 는 도착 시트의 끝으로 보낸다. 번호를 그대로 들고 가면 그 시트에
         # 이미 있는 번호와 겹친다. 그 뒤 양쪽 시트를 1..N 으로 맞춘다.
         tc.no = _max_no_in_sheet(project_id, tc.sheet_name, db) + 1
@@ -605,7 +608,6 @@ def import_testcases(
     sheet_names: Optional[str] = Query(None, description="쉼표 구분 시트명 (미지정 시 전체)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
-    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 
@@ -613,6 +615,8 @@ def import_testcases(
     if _is_csv_file(file.filename):
         # ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온 뒤다.
         content = read_limited_sync(file.file, MAX_IMPORT_SIZE)
+        # 업로드 수신과 파싱 준비는 잠금 밖에서 한다. 번호를 건드리기 직전에 잡는다.
+        advisory_xact_lock(db, LockNs.PROJECT_WRITE, project_id)
         sheet_name = "CSV Import"
         from models import TestCaseSheet
         sheet_exists = db.query(TestCaseSheet).filter(
@@ -644,6 +648,8 @@ def import_testcases(
     if _is_md_file(file.filename):
         # ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온 뒤다.
         content = read_limited_sync(file.file, MAX_IMPORT_SIZE)
+        # 업로드 수신과 파싱 준비는 잠금 밖에서 한다. 번호를 건드리기 직전에 잡는다.
+        advisory_xact_lock(db, LockNs.PROJECT_WRITE, project_id)
         tables = _parse_md_tables(content)
         if not tables:
             return {"created": 0, "updated": 0, "renamed": 0, "imported": 0, "sheets": []}
@@ -691,6 +697,8 @@ def import_testcases(
         return {"created": total_created, "updated": total_updated, "renamed": total_renamed, "imported": total_created + total_updated, "sheets": results}
 
     wb = _load_workbook_from_upload(file)
+    # 워크북 로딩은 잠금 밖에서 한다. 번호를 건드리기 직전에 잡는다.
+    advisory_xact_lock(db, LockNs.PROJECT_WRITE, project_id)
 
     # 대상 시트 결정
     if sheet_names:
