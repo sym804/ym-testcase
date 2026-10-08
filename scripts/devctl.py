@@ -123,9 +123,30 @@ def start_frontend() -> None:
     print(f"  프론트 {FRONTEND_URL} {'기동' if ok else '응답 없음 - ' + log}")
 
 
+def ensure_database() -> None:
+    """로컬 PostgreSQL(docker compose 의 db) 을 띄우고 준비될 때까지 기다린다.
+
+    ★Docker 가 없거나 꺼져 있으면 백엔드를 띄우지 않고 멈춘다. 띄우면 DB 연결 실패로
+      죽은 서버 로그만 남아서 무엇을 켜야 하는지 알 수 없다.
+    """
+    try:
+        r = subprocess.run(["docker", "compose", "up", "-d", "--wait", "db"],
+                           cwd=ROOT, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
+    except FileNotFoundError:
+        print("Docker 가 설치되어 있지 않습니다. Docker Desktop 을 설치하세요.", file=sys.stderr)
+        raise SystemExit(2)
+    if r.returncode != 0:
+        print("PostgreSQL 컨테이너를 띄우지 못했습니다. Docker Desktop 이 실행 중인지 확인하세요.",
+              file=sys.stderr)
+        print(r.stderr or r.stdout, file=sys.stderr)
+        raise SystemExit(2)
+
+
 def cmd_up(args) -> int:
     both = not args.backend and not args.frontend
     if args.backend or both:
+        ensure_database()
         start_backend()
     if args.frontend or both:
         start_frontend()

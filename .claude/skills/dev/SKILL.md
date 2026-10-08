@@ -52,11 +52,13 @@ python scripts/devctl.py down
 된다. 다른 스크립트에서 curl 로 직접 부를 때는 `MSYS_NO_PATHCONV=1` 을 앞에 붙인다.
 쿼리스트링이 붙은 인자는 변환되지 않아, 어떤 호출은 되고 어떤 호출은 안 되는 것처럼 보인다.
 
-**DB 는 `backend/tc_manager.db` 다.** 루트의 `tc_manager.db` 는 4월에 멈춘 껍데기라
-그것을 열면 테이블이 비어 보인다.
+**DB 는 docker compose 의 PostgreSQL(`127.0.0.1:54329`, DB `ymtc`)이다.** `devctl up` 이
+컨테이너를 먼저 띄운다. Docker Desktop 이 꺼져 있으면 up 이 안내하고 멈춘다.
+`backend/.env` 의 `DATABASE_URL` 이 이 주소를 가리켜야 한다(`backend/.env.example` 참고).
+SQLite 파일(`backend/tc_manager.db`)은 v2.0 부터 쓰지 않는다. 옛 데이터는 이관 스크립트로 옮긴다.
 
-**쓰기 전에 백업하고 잠금을 먼저 잡는다.** `BEGIN IMMEDIATE` 로 잠금을 확인한 뒤 쓰고,
-`PRAGMA busy_timeout` 은 30초 이상 준다. 교정 전후 행 수를 대조한다.
+**쓰기 전에 백업하고 트랜잭션 안에서 쓴다.** `docker compose exec db pg_dump -U ymtc ymtc > 백업.sql`
+로 먼저 떠 두고, 교정 전후 행 수를 대조한다. 테스트는 이 DB 를 쓰지 않고 세션마다 임시 DB 를 만든다.
 
 **테스트로 만든 데이터는 그 자리에서 지운다.** 프로젝트를 만들었으면 `DELETE /api/projects/{id}`
 까지 하고, 고아 시트와 고아 TC 가 0건인지 확인한다.
