@@ -21,7 +21,7 @@ from schemas import (
 )
 from auth import get_current_user, role_required, check_project_access, get_project_role
 from routes.attachments import UPLOAD_DIR
-from services.locks import project_write_lock
+from services.locks import LockNs, advisory_xact_lock, project_write_lock
 from services.run_sync_service import sync_run_results
 from services.excel_safe import safe_cell
 from services.sheet_order import leaf_sheet_order, sort_results_for_export
@@ -322,6 +322,10 @@ def submit_results(
 
     if run.status == TestRunStatus.completed:
         raise HTTPException(status_code=400, detail="완료된 테스트 런은 수정할 수 없습니다. 재오픈 후 수정하세요.")
+    # ★결과를 쓰는 세 경로(저장, 파일 가져오기, 누락 행 동기화)가 같은 수행 잠금을 먼저 잡는다.
+    #   잡지 않으면 가져오기가 읽고 판단한 사이 사람이 저장한 값을 덮고, 누락 행을 서로 다른
+    #   순서로 넣다가 교착한다. 같은 수행의 저장은 짧아서 줄을 서도 체감이 작다.
+    advisory_xact_lock(db, LockNs.RUN_RESULTS, run.id)
 
     tc_ids = [r.test_case_id for r in results]
 
@@ -613,6 +617,8 @@ def _record_import(run: TestRun, fmt: str, entries, db: Session, user: User, *,
                    dry_run: bool, keep_executed: bool, label: Optional[str]) -> dict:
     """판정 결과를 런의 행에 적는다. 커밋은 부른 쪽이 한다(dry_run 이면 적지 않는다)."""
     project_id, run_id = run.project_id, run.id
+    # 저장·동기화와 같은 수행 잠금. keep_executed 판단은 잠금을 잡은 뒤의 값으로 한다.
+    advisory_xact_lock(db, LockNs.RUN_RESULTS, run_id)
     # 런 생성 뒤에 추가된 TC 도 행이 있어야 기록된다. 상세 조회와 같은 보정을 먼저 한다.
     sync_run_results(run, db, commit=False)
 

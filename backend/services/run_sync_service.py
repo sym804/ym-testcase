@@ -62,6 +62,11 @@ def sync_run_results(run: TestRun, db: Session, commit: bool = True) -> int:
     if not missing:
         return 0
 
+    # ★넣을 행이 있을 때만 수행 잠금을 잡는다. 누락이 없는 일반 조회는 기다리지 않는다.
+    #   저장·가져오기와 누락 행을 서로 다른 순서로 넣으면 교착하므로 같은 잠금으로 줄 세운다.
+    from services.locks import LockNs, advisory_xact_lock
+    advisory_xact_lock(db, LockNs.RUN_RESULTS, run.id)
+
     # executed_by는 조회자가 아니라 런 소유자로 기록한다
     # (단순 조회 행위가 다른 사람의 실행 이력으로 남지 않도록)
     inserted = insert_results_ignoring_duplicates(db, [
@@ -90,6 +95,8 @@ def sync_project_in_progress_runs(project_id: int, db: Session, commit: bool = T
     runs = (
         db.query(TestRun)
         .filter(TestRun.project_id == project_id, TestRun.status == TestRunStatus.in_progress)
+        # 여러 수행을 잠글 때 순서를 고정한다. 순서가 다르면 두 동기화가 서로를 기다린다.
+        .order_by(TestRun.id)
         .all()
     )
     total = 0
