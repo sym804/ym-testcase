@@ -13,6 +13,7 @@ from schemas import (
 )
 from auth import get_current_user, role_required, check_project_access
 from routes.sheets import _validate_sheet_name
+from services.locks import project_write_lock
 from services.tc_id_service import allocate_tc_id, taken_tc_ids
 from services.import_service import (
     HEADER_MAP, SKIP_SHEETS, _resolve_merged, _detect_header_row, _count_tc_rows,
@@ -109,6 +110,7 @@ def create_testcase(
     payload: TestCaseCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
     _validate_sheet_name(project_id, payload.sheet_name, db, auto_create_default=True)
@@ -141,6 +143,7 @@ def bulk_update_testcases(
     payload: TestCaseBulkUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 
@@ -201,6 +204,7 @@ def reorder_testcases(
     payload: ReorderRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     """TC 순서(no)를 일괄 변경한다.
 
@@ -270,6 +274,7 @@ def update_testcase(
     payload: TestCaseUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 
@@ -327,6 +332,7 @@ def bulk_delete_testcases(
     ids: str = Query(..., description="쉼표 구분 TC ID 목록"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     """여러 TC를 한 번에 소프트 삭제한다."""
     _get_project_or_404(project_id, db)
@@ -353,6 +359,7 @@ def delete_testcase(
     tc_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 
@@ -375,6 +382,7 @@ def restore_testcase(
     tc_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 
@@ -469,6 +477,7 @@ def bulk_clone_testcases(
     body: BulkCloneRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 
@@ -519,6 +528,7 @@ def clone_testcase(
     tc_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 
@@ -595,6 +605,7 @@ def import_testcases(
     sheet_names: Optional[str] = Query(None, description="쉼표 구분 시트명 (미지정 시 전체)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
 ):
     _get_project_or_404(project_id, db)
 
