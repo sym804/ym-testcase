@@ -19,9 +19,13 @@ _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 def admin_url() -> str:
     url = os.getenv("TEST_DATABASE_ADMIN_URL", DEFAULT_ADMIN_URL)
-    host = make_url(url).host
-    if host not in _LOCAL_HOSTS:
-        raise RuntimeError(f"테스트 DB 는 로컬 호스트만 허용한다: {host}")
+    parsed = make_url(url)
+    if parsed.host not in _LOCAL_HOSTS:
+        raise RuntimeError(f"테스트 DB 는 로컬 호스트만 허용한다: {parsed.host}")
+    # ★쿼리 옵션도 막는다. libpq 는 `?host=`, `?hostaddr=`, `?service=` 로 실제 접속
+    #   대상을 바꾼다. 주소의 호스트 부분만 보면 로컬처럼 보이는 원격 주소를 통과시킨다.
+    if parsed.query:
+        raise RuntimeError(f"테스트 DB 관리 주소에 쿼리 옵션을 쓸 수 없다(로컬 판정 우회 방지): {dict(parsed.query)}")
     return url
 
 

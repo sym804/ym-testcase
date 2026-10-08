@@ -44,7 +44,7 @@ def _server_already_running(port: int) -> bool:
 # ★DATABASE_URL 은 conftest 를 임포트하는 시점에 정한다. 픽스처 안은 늦다.
 #   `database.py` 는 임포트 시점에 engine 을 만드는데, 테스트 모듈이 모듈 수준에서
 #   `models` 를 임포트하면(tests_unit/test_tc_id_dedup.py) 수집 단계에서 이미
-#   engine 이 기본값인 개발용 tc_manager.db 에 묶인다. 그러면 lifespan(실행 시점에
+#   engine 이 셸이나 .env 의 주소에 묶인다. 그러면 lifespan(실행 시점에
 #   os.getenv 를 읽는다)은 임시 DB 로 마이그레이션하고 앱 세션은 개발 DB 를 본다
 #   (2026-09-07 실측: CI 223 errors, 로컬 184 errors).
 #   conftest 는 어떤 테스트 모듈보다 먼저 임포트되므로 여기가 유일하게 안전한 자리다.
@@ -92,18 +92,21 @@ def _isolate_database_url():
     from sqlalchemy.engine import make_url
 
     url = testing_db.create_database(prefix="ymtc_test")
+    atexit.register(testing_db.drop_database, url)
     os.environ["DATABASE_URL"] = url
-    os.environ.pop("DATABASE_URL_DIRECT", None)
+    # ★지우지 않고 빈 값으로 박는다. 키가 없으면 하위 프로세스(alembic)와 이후의
+    #   database 임포트에서 dotenv 가 `.env` 의 운영 직결 주소를 다시 채우고, env.py 는
+    #   그 주소를 우선해 운영 DB 에 마이그레이션을 시도한다(2026-10-08 재현). 빈 값은
+    #   load_dotenv(override=False) 가 덮지 않는다.
+    os.environ["DATABASE_URL_DIRECT"] = ""
     r = subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"],
                        cwd=os.path.dirname(os.path.abspath(__file__)),
                        env=dict(os.environ), capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     if r.returncode != 0:
-        testing_db.drop_database(url)
         raise RuntimeError("테스트 DB 마이그레이션 실패: " + r.stderr)
     SESSION_DATABASE_URL = url
     SESSION_DATABASE_NAME = make_url(url).database
-    atexit.register(testing_db.drop_database, url)
 
 
 _isolate_database_url()
@@ -163,7 +166,10 @@ def _server():
             f"Using already-running server at port {port} - tests are NOT isolated (no temp DB)",
             stacklevel=2,
         )
-        _seed_admin(base_url, admin_pw)
+        # ★이미 떠 있는 서버의 DB 는 어디인지 모른다(운영일 수도 있다). 시드도 쓰기라
+        #   일부러 허용(ALLOW_DEV_DB=1)했을 때만 한다.
+        if os.getenv("ALLOW_DEV_DB") == "1":
+            _seed_admin(base_url, admin_pw)
         yield
         return
 
@@ -191,13 +197,17 @@ def _server():
 def pg_engine():
     """테스트 하나 전용 스키마. SQLite 시절 tmp_path 마다 새 DB 파일을 만들던 자리다."""
     base = SESSION_DATABASE_URL or testing_db.create_database(prefix="ymtc_unit")
-    eng = testing_db.schema_engine(base)
+    eng = None
     try:
+        eng = testing_db.schema_engine(base)
         yield eng
     finally:
-        testing_db.dispose_schema_engine(eng)
-        if SESSION_DATABASE_URL is None:
-            testing_db.drop_database(base)
+        try:
+            if eng is not None:
+                testing_db.dispose_schema_engine(eng)
+        finally:
+            if SESSION_DATABASE_URL is None:
+                testing_db.drop_database(base)
 
 
 @pytest.fixture

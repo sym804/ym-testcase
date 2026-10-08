@@ -54,3 +54,52 @@ def test_셸의_원격_DATABASE_URL_은_무시하고_임시_DB_를_쓴다():
     host, db = r.stdout.split()
     assert host in ("127.0.0.1", "localhost"), host
     assert db.startswith("ymtc_test_"), db
+
+
+def test_env_파일의_원격_직결_주소는_테스트_마이그레이션에_쓰이지_않는다(tmp_path):
+    """`.env` 에 운영 직결 주소가 있어도 테스트 세션의 마이그레이션은 임시 DB 로 간다.
+
+    pop 만 하면 하위 프로세스의 dotenv 로딩이 `.env` 값을 다시 채운다(2026-10-08 재현).
+    """
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "DATABASE_URL_DIRECT=postgresql+psycopg2://evil:evil@203.0.113.9:5432/prod?connect_timeout=2\n",
+        encoding="utf-8",
+    )
+    code = "import conftest, os; print(repr(os.environ.get('DATABASE_URL_DIRECT')))"
+    env = dict(os.environ, ENV_FILE=str(env_file), TEST_PORT="18998", TEST_BASE_URL="http://127.0.0.1:18998")
+    env.pop("DATABASE_URL_DIRECT", None)
+    r = subprocess.run([sys.executable, "-c", code], cwd=BACKEND, env=env,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert "203.0.113.9" not in r.stdout + r.stderr
+    assert r.stdout.strip() == "''"
+
+
+def test_이미_떠_있는_서버가_있으면_DATABASE_URL_을_건드리지_않는다():
+    """HTTP 는 그 서버의 DB 로 가는데 in-process engine 만 임시 DB 로 돌리면 한 테스트가
+    두 DB 를 본다. 이 모드에서는 임시 DB 를 만들지 않고 주소를 그대로 둔다."""
+    import http.server
+    import socketserver
+    import threading
+
+    given = "postgresql+psycopg2://ymtc:ymtc@127.0.0.1:54329/ymtc_running"
+    code = (
+        "import conftest, os, dev_db_guard;"
+        "print(os.environ['DATABASE_URL']);"
+        "print(dev_db_guard.SESSION_DATABASE_NAME)"
+    )
+    with socketserver.TCPServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler) as srv:
+        port = srv.server_address[1]
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            env = dict(os.environ, DATABASE_URL=given, TEST_PORT=str(port),
+                       TEST_BASE_URL=f"http://127.0.0.1:{port}")
+            r = subprocess.run([sys.executable, "-c", code], cwd=BACKEND, env=env,
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+        finally:
+            srv.shutdown()
+    assert r.returncode == 0, r.stderr
+    url, name = r.stdout.split()
+    assert url == given
+    assert name == "None"
