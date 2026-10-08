@@ -47,3 +47,10 @@ def test_현재_head_면_통과한다(conn):
     conn.execute(text("CREATE TABLE alembic_version (version_num varchar(32) primary key)"))
     conn.execute(text("INSERT INTO alembic_version VALUES (:h)"), {"h": head})
     assert_known_revision(conn, _script_dir())
+
+
+def test_코드가_모르는_새_리비전은_막지_않는다(conn):
+    """롤백(이전 배포 승격)은 새 스키마 위에서 옛 코드를 띄운다. 그때 기동을 막으면 안 된다."""
+    conn.execute(text("CREATE TABLE alembic_version (version_num varchar(32) primary key)"))
+    conn.execute(text("INSERT INTO alembic_version VALUES ('0099_future')"))
+    assert_known_revision(conn, _script_dir())
