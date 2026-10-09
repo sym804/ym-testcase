@@ -45,6 +45,11 @@ from services.runtime_env import check_serverless_config, env_flag
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 check_serverless_config()
 
+from services.auth_config import load_auth_config  # noqa: E402
+
+# 로그인 정책 환경변수가 잘못되면 여기서 멈춘다(위와 같은 이유로 임포트 시점)
+load_auth_config(os.environ)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

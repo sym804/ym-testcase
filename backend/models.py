@@ -21,6 +21,12 @@ class UserRole(str, enum.Enum):
     admin = "admin"
 
 
+class UserStatus(str, enum.Enum):
+    active = "active"
+    pending = "pending"
+    disabled = "disabled"
+
+
 class ProjectRole(str, enum.Enum):
     tester = "tester"
     admin = "admin"
