@@ -65,6 +65,7 @@ const ERROR_MAP: Record<string, string> = {
   "필터를 찾을 수 없습니다.": "errors.filterNotFound",
   // Uploads, locks, storage
   "업로드를 찾을 수 없습니다.": "errors.uploadNotFound",
+  "Excel 97-2003 형식(.xls)이거나 암호가 걸린 파일은 읽을 수 없습니다. 암호를 풀고 .xlsx 로 다시 저장해 올려 주세요.": "errors.xlsNotSupported",
   "이미 처리한 업로드입니다.": "errors.uploadAlreadyUsed",
   "같은 업로드를 처리하는 중입니다.": "errors.uploadBusy",
   "파일이 아직 올라오지 않았습니다.": "errors.uploadNotReceived",
