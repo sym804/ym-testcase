@@ -13,8 +13,10 @@ const mockUser = {
 const mockLogout = vi.fn();
 const mockToggleTheme = vi.fn();
 
+let mockAuthUser: Record<string, unknown> = mockUser;
+
 vi.mock("../contexts/AuthContext", () => ({
-  useAuth: () => ({ user: mockUser, logout: mockLogout }),
+  useAuth: () => ({ user: mockAuthUser, logout: mockLogout, refreshUser: vi.fn() }),
 }));
 
 vi.mock("../contexts/ThemeContext", () => ({
@@ -33,7 +35,12 @@ vi.mock("../api", () => ({
       { id: 1, project_id: 1, tc_id: "TC-001", depth1: "로그인", depth2: "정상" },
     ]),
   },
-  authApi: { changePassword: vi.fn() },
+  authApi: {
+    changePassword: vi.fn(),
+    config: vi.fn().mockResolvedValue({ google_enabled: true, signup_mode: "email" }),
+    unlinkGoogle: vi.fn(),
+  },
+  googleStartUrl: (mode: string) => `/api/auth/google/start?mode=${mode}`,
 }));
 
 vi.mock("react-hot-toast", () => ({
@@ -56,6 +63,7 @@ function renderHeader(route = "/projects") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockAuthUser = mockUser;
 });
 
 describe("Header", () => {
@@ -163,5 +171,37 @@ describe("Header", () => {
     renderHeader();
     await user.click(screen.getByText("관리"));
     expect(mockNavigate).toHaveBeenCalledWith("/admin");
+  });
+});
+
+describe("Header 계정 연결", () => {
+  it("사용자 메뉴에 계정 연결이 있고 창을 연다", async () => {
+    const user = userEvent.setup();
+    renderHeader();
+    await user.click(screen.getByText("관리자"));
+    await user.click(screen.getByRole("button", { name: "계정 연결" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("비밀번호 없는 계정에는 비밀번호 변경 메뉴가 없다", async () => {
+    const user = userEvent.setup();
+    mockAuthUser = { ...mockUser, has_password: false, google_linked: true };
+    renderHeader();
+    await user.click(screen.getByText("관리자"));
+    expect(screen.getByRole("button", { name: "계정 연결" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "비밀번호 변경" })).not.toBeInTheDocument();
+  });
+
+  it("연결 성공 결과를 한 번 알린다", async () => {
+    const toast = (await import("react-hot-toast")).default;
+    renderHeader("/projects?account=linked");
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Google 계정을 연결했습니다."));
+    expect(mockNavigate).toHaveBeenCalledWith("/projects", { replace: true });
+  });
+
+  it("연결 실패 사유를 알린다", async () => {
+    const toast = (await import("react-hot-toast")).default;
+    renderHeader("/projects?account=already_linked");
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("이 Google 계정은 이미 다른 계정에 연결돼 있습니다."));
   });
 });

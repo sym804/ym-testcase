@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { projectsApi, searchApi, authApi } from "../api";
 import PasswordInput from "./PasswordInput";
 import ApiKeysModal from "./ApiKeysModal";
+import AccountLinkModal from "./AccountLinkModal";
 import type { Project, TestCase } from "../types";
 import { UserRole } from "../types";
 import toast from "react-hot-toast";
@@ -51,6 +52,23 @@ export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showChangePw, setShowChangePw] = useState(false);
   const [showApiKeys, setShowApiKeys] = useState(false);
+  const [showAccountLink, setShowAccountLink] = useState(false);
+
+  // Google 계정 연결의 결과는 ?account=<linked|오류 코드> 로 돌아온다. 한 번 알리고 쿼리를 지운다.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const result = params.get("account");
+    if (!result) return;
+    if (result === "linked") {
+      toast.success(t("googleLinkedToast"));
+    } else {
+      toast.error(i18n.t(`login:googleErrors.${result}`, { defaultValue: i18n.t("login:googleErrors.unknown") }));
+    }
+    params.delete("account");
+    const rest = params.toString();
+    navigate(location.pathname + (rest ? `?${rest}` : ""), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = (q: string) => {
@@ -241,11 +259,19 @@ export default function Header() {
           </button>
           {showUserMenu && (
             <div style={styles.userDropdown}>
+              {user.has_password !== false && (
+                <button
+                  style={styles.userMenuItem}
+                  onClick={() => { setShowUserMenu(false); setShowChangePw(true); }}
+                >
+                  {t("changePassword")}
+                </button>
+              )}
               <button
                 style={styles.userMenuItem}
-                onClick={() => { setShowUserMenu(false); setShowChangePw(true); }}
+                onClick={() => { setShowUserMenu(false); setShowAccountLink(true); }}
               >
-                {t("changePassword")}
+                {t("accountLink")}
               </button>
               <button
                 style={styles.userMenuItem}
@@ -266,6 +292,7 @@ export default function Header() {
           <ChangePasswordInline onClose={() => setShowChangePw(false)} />
         )}
         {showApiKeys && <ApiKeysModal onClose={() => setShowApiKeys(false)} />}
+        {showAccountLink && <AccountLinkModal onClose={() => setShowAccountLink(false)} />}
       </div>
     </header>
   );

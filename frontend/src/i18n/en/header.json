@@ -62,5 +62,17 @@
   "apiKeyEmpty": "No keys yet.",
   "apiKeyLoadFailed": "Could not load keys.",
   "apiKeyCreateFailed": "Could not create the key.",
-  "apiKeyRevokeFailed": "Could not revoke the key."
+  "apiKeyRevokeFailed": "Could not revoke the key.",
+  "accountLink": "Linked accounts",
+  "accountLinkHelp": "Link a Google account to sign in with Google instead of your username and password.",
+  "googleLinked": "A Google account is linked",
+  "googleNotLinked": "No Google account is linked",
+  "linkGoogle": "Link Google account",
+  "unlinkGoogle": "Unlink",
+  "unlinkGoogleConfirm": "Unlink your Google account? You will sign in with your username and password only.",
+  "googleUnlinked": "Google account unlinked.",
+  "googleUnlinkFailed": "Could not unlink.",
+  "noPasswordCannotUnlink": "Accounts without a password cannot unlink.",
+  "googleDisabled": "Google sign-in is turned off.",
+  "googleLinkedToast": "Google account linked."
 }
