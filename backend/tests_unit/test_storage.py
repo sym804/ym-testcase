@@ -65,6 +65,21 @@ def test_모듈_임포트만으로_폴더를_만들지_않는다(tmp_path):
 
 # ── Supabase ─────────────────────────────────────────────────────────────────
 
+# 실제 Supabase Storage(Fastify)는 메서드와 상관없이 content-type 이 JSON 인데 본문이 비면 400 이다.
+# 이 규칙이 없던 가짜 서버가 서명 업로드 주소 발급 결함을 통과시켰다(운영 시험 배포에서 발견).
+def _empty_json(handler, body: bytes) -> bool:
+    return (handler.headers.get("content-type") or "").startswith("application/json") and not body
+
+
+def _reject_empty_json(handler):
+    data = json.dumps({"statusCode": "400", "error": "FastifyError",
+                       "message": "Body cannot be empty when content-type is set to 'application/json'"}).encode()
+    handler.send_response(400)
+    handler.send_header("content-length", str(len(data)))
+    handler.end_headers()
+    handler.wfile.write(data)
+
+
 class _Fake(BaseHTTPRequestHandler):
     calls = []
     objects = {}
@@ -93,6 +108,8 @@ class _Fake(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self._body()
         self._record(body)
+        if _empty_json(self, body):
+            return _reject_empty_json(self)
         if self.path.startswith("/storage/v1/object/upload/sign/"):
             key = self.path[len("/storage/v1/object/upload/sign/"):]
             return self._send(200, {"url": f"/object/upload/sign/{key}?token=TOK"})
@@ -135,7 +152,9 @@ class _Fake(BaseHTTPRequestHandler):
     def do_DELETE(self):
         body = self._body()
         self._record(body)
-        for p in json.loads(body or b"{}").get("prefixes", []):
+        if _empty_json(self, body):
+            return _reject_empty_json(self)
+        for p in json.loads(body).get("prefixes", []):
             _Fake.objects.pop("bkt/" + p, None)
         self._send(200, [])
 
@@ -234,7 +253,10 @@ class _ListFake(BaseHTTPRequestHandler):
 
     def do_POST(self):
         n = int(self.headers.get("content-length") or 0)
-        body = json.loads(self.rfile.read(n) or b"{}")
+        raw = self.rfile.read(n) if n else b""
+        if _empty_json(self, raw):
+            return _reject_empty_json(self)
+        body = json.loads(raw)
         _ListFake.bodies.append((self.path, body))
         items = _ListFake.tree.get(body.get("prefix", ""), [])
         data = json.dumps(items[body.get("offset", 0):body.get("offset", 0) + body.get("limit", 100)]).encode()

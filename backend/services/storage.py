@@ -128,7 +128,9 @@ class SupabaseStorage:
             raise StorageUnavailable(f"storage {method} failed: {type(e).__name__}") from None
 
     def _json(self, method: str, path: str, payload: dict | None = None) -> dict:
-        data = json.dumps(payload).encode() if payload is not None else None
+        # ★본문이 없어도 {} 를 보낸다. Storage(Fastify)는 content-type 이 JSON 인데 본문이 비면
+        #   400 이다. 서명 업로드 주소 발급이 그렇게 막혀 운영 시험 배포의 직접 업로드가 전부 실패했다.
+        data = json.dumps(payload if payload is not None else {}).encode()
         with self._req(method, path, data, {"content-type": "application/json"}) as r:
             return json.loads(r.read() or b"null")
 
