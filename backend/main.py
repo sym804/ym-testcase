@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from services.storage import StorageUnavailable
 
 from routes import auth as auth_routes
+from routes import google_auth as google_auth_routes
 from routes import projects as project_routes
 from routes import testcases as testcase_routes
 from routes import sheets as sheets_routes
@@ -232,6 +233,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(auth_routes.router)
+app.include_router(google_auth_routes.router)
 app.include_router(project_routes.router)
 app.include_router(testcase_routes.router)
 app.include_router(sheets_routes.router)
