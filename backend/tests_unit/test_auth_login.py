@@ -39,10 +39,9 @@ def test_비밀번호_없는_계정은_401_이고_변경은_400(auth_env):
     assert login(auth_env.base, "g@example.com", "anything-at-all").status_code == 401
     uid = make_user(auth_env.Session, username="has-pw")
     h = bearer(login(auth_env.base, "has-pw"))
-    s = auth_env.Session()
-    s.get(User, uid).password_hash = None
-    s.commit()
-    s.close()
+    with auth_env.Session() as s:
+        s.get(User, uid).password_hash = None
+        s.commit()
     r = requests.put(auth_env.base + "/api/auth/change-password", headers=h,
                      json={"current_password": PW, "new_password": "NewPassw0rd!"})
     # 세션 토큰은 비밀번호를 지우기 전에 받았다. 비밀번호가 없으면 400
@@ -55,10 +54,9 @@ def test_중지하면_JWT_와_API_키가_바로_막힌다(auth_env):
     key = requests.post(auth_env.base + "/api/auth/api-keys", headers=h,
                         json={"name": "k", "expires_days": 30}).json()["key"]
     assert requests.get(auth_env.base + "/api/auth/me", headers={"Authorization": "Bearer " + key}).status_code == 200
-    s = auth_env.Session()
-    s.get(User, uid).status = UserStatus.disabled
-    s.commit()
-    s.close()
+    with auth_env.Session() as s:
+        s.get(User, uid).status = UserStatus.disabled
+        s.commit()
     assert requests.get(auth_env.base + "/api/auth/me", headers=h).status_code == 401
     assert requests.get(auth_env.base + "/api/auth/me", headers={"Authorization": "Bearer " + key}).status_code == 401
 

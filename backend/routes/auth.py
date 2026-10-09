@@ -16,7 +16,7 @@ from services.client_ip import client_ip
 from services.locks import LockNs, keyed_xact_lock
 from models import User, UserRole, UserStatus
 from services.account_policy import AccountRejected, initial_status, normalize_email, normalize_identifier
-from services.accounts import email_taken, find_user_by_identifier, lock_accounts
+from services.accounts import active_admin_count, disable, email_taken, find_user_by_identifier, lock_accounts
 from services.auth_config import get_auth_config
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
 from auth import (
@@ -282,6 +282,91 @@ def list_users(
     return db.query(User).order_by(User.id).all()
 
 
+def _locked_target(db: Session, user_id: int) -> User:
+    lock_accounts(db)
+    user = db.query(User).filter(User.id == user_id).with_for_update().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    return user
+
+
+def _saved(db: Session, user: User) -> User:
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/users/{user_id}/approve", response_model=UserResponse)
+def approve_user(user_id: int, db: Session = Depends(get_db),
+                 current_user: User = Depends(role_required("admin"))):
+    user = _locked_target(db, user_id)
+    if user.status != UserStatus.pending:
+        raise HTTPException(status_code=409, detail="승인 대기 중인 계정이 아닙니다.")
+    user.status = UserStatus.active
+    logger.info("User approved: %s by=%s", user.username, current_user.username)
+    return _saved(db, user)
+
+
+@router.post("/users/{user_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
+def reject_user(user_id: int, db: Session = Depends(get_db),
+                current_user: User = Depends(role_required("admin"))):
+    user = _locked_target(db, user_id)
+    if user.status != UserStatus.pending:
+        raise HTTPException(status_code=409, detail="승인 대기 중인 계정만 거절할 수 있습니다.")
+    username = user.username
+    db.delete(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="다른 기록에 연결된 계정이라 거절할 수 없습니다. 사용 중지를 쓰세요.")
+    logger.info("User rejected (deleted): %s by=%s", username, current_user.username)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/users/{user_id}/disable", response_model=UserResponse)
+def disable_user(user_id: int, db: Session = Depends(get_db),
+                 current_user: User = Depends(role_required("admin"))):
+    user = _locked_target(db, user_id)
+    if user.id == current_user.id:
+        raise HTTPException(status_code=409, detail="자기 자신은 사용 중지할 수 없습니다.")
+    if user.status == UserStatus.disabled:
+        raise HTTPException(status_code=409, detail="이미 사용 중지된 계정입니다.")
+    if user.role == UserRole.admin and user.status == UserStatus.active and active_admin_count(db, exclude_id=user.id) == 0:
+        raise HTTPException(status_code=409, detail="마지막 관리자는 사용 중지할 수 없습니다.")
+    disable(db, user)
+    logger.info("User disabled: %s by=%s", user.username, current_user.username)
+    return _saved(db, user)
+
+
+@router.post("/users/{user_id}/enable", response_model=UserResponse)
+def enable_user(user_id: int, db: Session = Depends(get_db),
+                current_user: User = Depends(role_required("admin"))):
+    user = _locked_target(db, user_id)
+    if user.status != UserStatus.disabled:
+        raise HTTPException(status_code=409, detail="사용 중지된 계정이 아닙니다.")
+    user.status = UserStatus.active
+    logger.info("User enabled: %s by=%s", user.username, current_user.username)
+    return _saved(db, user)
+
+
+@router.post("/users/{user_id}/release-email", response_model=UserResponse)
+def release_email(user_id: int, db: Session = Depends(get_db),
+                  current_user: User = Depends(role_required("admin"))):
+    """남의 주소로 먼저 가입해 이메일을 차지한 계정에서 이메일을 뗀다. 진짜 주인이 Google 로 들어올 수 있게."""
+    user = _locked_target(db, user_id)
+    if user.email_verified:
+        raise HTTPException(status_code=409, detail="Google 이 확인한 이메일은 해제할 수 없습니다.")
+    released = user.email or (user.username if "@" in user.username else None)
+    if not released:
+        raise HTTPException(status_code=409, detail="해제할 이메일이 없습니다.")
+    user.email = None
+    if user.username == released:
+        user.username = f"released-{user.id}"
+    logger.info("Email released: user_id=%s by=%s", user.id, current_user.username)
+    return _saved(db, user)
+
+
 @router.put("/users/{user_id}/role", response_model=UserResponse)
 def update_user_role(
     user_id: int,
@@ -296,14 +381,14 @@ def update_user_role(
             detail=f"Invalid role. Must be one of: {valid_roles}",
         )
 
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-
-    user.role = UserRole(payload.role)
-    db.commit()
-    db.refresh(user)
-    return user
+    user = _locked_target(db, user_id)
+    new_role = UserRole(payload.role)
+    # ★마지막 활성 관리자를 강등하면 아무도 관리할 수 없다. 중지 쪽 검사도 이 길로 우회된다.
+    if (user.role == UserRole.admin and new_role != UserRole.admin and user.status == UserStatus.active
+            and active_admin_count(db, exclude_id=user.id) == 0):
+        raise HTTPException(status_code=409, detail="마지막 관리자의 역할은 바꿀 수 없습니다.")
+    user.role = new_role
+    return _saved(db, user)
 
 
 @router.put("/users/{user_id}/reset-password")
@@ -327,6 +412,8 @@ def reset_password(
     # 관리자가 초기화하는 상황은 계정을 되찾는 국면이다. 옛 토큰을 같이 끊는다
     user.token_version = (user.token_version or 0) + 1
     revoke_user_api_keys(user.id, db)
+    # 탈취한 쪽이 자기 Google 계정을 연결해 두었으면 그 길이 남는다. 되찾는 국면이라 끊는다.
+    user.google_sub = None
     db.commit()
     logger.info("Password reset by admin for user: %s", user.username)
     return {"temp_password": temp_pw}
