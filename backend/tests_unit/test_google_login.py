@@ -192,16 +192,16 @@ def test_이미_다른_계정에_연결된_Google_계정(gcfg, monkeypatch):
     assert _callback(gcfg, sess, state).headers["location"] == "/projects?account=already_linked"
 
 
-def test_로그인_안_했으면_연결_시작은_401_중지된_세션도(gcfg):
-    assert requests.get(gcfg.base + "/api/auth/google/start", params={"mode": "link"},
-                        allow_redirects=False).status_code == 401
+def test_로그인_안_했으면_연결_시작은_로그인_화면으로_중지된_세션도(gcfg):
+    r = requests.get(gcfg.base + "/api/auth/google/start", params={"mode": "link"}, allow_redirects=False)
+    assert (r.status_code, r.headers["location"]) == (302, "/login")
     uid = make_user(gcfg.Session, username="soon-disabled")
     sess = _cookie_login(gcfg, "soon-disabled")
     with gcfg.Session() as s:
         s.get(User, uid).status = UserStatus.disabled
         s.commit()
-    assert sess.get(gcfg.base + "/api/auth/google/start", params={"mode": "link"},
-                    allow_redirects=False).status_code == 401
+    r = sess.get(gcfg.base + "/api/auth/google/start", params={"mode": "link"}, allow_redirects=False)
+    assert (r.status_code, r.headers["location"]) == (302, "/login")
 
 
 def test_같은_Google_계정의_동시_첫_로그인은_계정_하나(gcfg, monkeypatch):

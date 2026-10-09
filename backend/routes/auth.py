@@ -4,7 +4,7 @@ import os
 import secrets
 import string
 from datetime import timedelta
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.exc import IntegrityError
@@ -112,11 +112,14 @@ def check_username(username: str, db: Session = Depends(get_db)):
 def _bootstrap_admin(payload: UserCreate, cfg, password_hash: str, db: Session) -> User:
     if cfg.production:
         # ★인터넷에 열린 빈 DB 에서 먼저 들어온 사람이 관리자가 되는 것을 막는다.
-        if not cfg.bootstrap_token or not hmac.compare_digest(payload.bootstrap_token or "", cfg.bootstrap_token):
+        # bytes 로 비교한다. str 끼리는 ASCII 가 아닌 문자가 오면 TypeError(500) 다.
+        given = (payload.bootstrap_token or "").encode("utf-8")
+        if not cfg.bootstrap_token or not hmac.compare_digest(given, cfg.bootstrap_token.encode("utf-8")):
             raise HTTPException(status_code=403, detail="첫 관리자 토큰이 올바르지 않습니다.")
     email = None
     if payload.username and payload.username.strip():
-        username = payload.username.strip()
+        # 로그인은 '@' 가 든 입력을 소문자로 찾는다. 저장도 같은 규칙으로 해야 들어올 수 있다.
+        username = normalize_identifier(payload.username)
     elif payload.email:
         try:
             email = normalize_email(payload.email)
@@ -137,9 +140,13 @@ def _bootstrap_admin(payload: UserCreate, cfg, password_hash: str, db: Session) 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, request: Request, db: Session = Depends(get_db)):
     cfg = get_auth_config()
-    # bcrypt 는 잠금 밖에서 한다. 잠금 구간이 길면 가입 연타에 모든 가입이 줄을 선다.
-    password_hash = hash_password(payload.password)
+    if not payload.display_name.strip():
+        raise HTTPException(status_code=422, detail="표시 이름을 입력해 주세요.")
+    # ★횟수 제한을 bcrypt 보다 먼저 본다. 한도를 넘긴 요청이 bcrypt 비용을 쓰지 않게 한다.
+    #   제한 잠금은 같은 IP 끼리만 줄을 세우므로 그 안에서 bcrypt 를 해도 다른 가입을 막지 않는다.
     _check_register_limit(request, db)
+    # bcrypt 는 계정 잠금 밖에서 한다. 잠금 구간이 길면 가입 연타에 모든 가입이 줄을 선다.
+    password_hash = hash_password(payload.password)
     # ★계정 생성은 전역 잠금으로 줄 세운다. 잠금은 커밋까지 유지되므로 다음 가입은 앞선
     #   가입이 커밋된 뒤에 사용자 수와 이메일 중복을 본다(SYM-136).
     lock_accounts(db)
@@ -263,7 +270,15 @@ def change_password(
     if payload.current_password == payload.new_password:
         raise HTTPException(status_code=400, detail="새 비밀번호가 현재와 동일합니다.")
 
-    current_user.password_hash = hash_password(payload.new_password)
+    new_hash = hash_password(payload.new_password)
+    checked_hash = current_user.password_hash
+    # ★사용 중지·초기화와 같은 계정 잠금으로 줄 세운다. 잠금 없이 API 키부터 바꾸면 사용 중지
+    #   (사용자 행 -> 키 행)와 반대 순서로 행을 잡아 교착된다. bcrypt 는 잠금 밖에서 끝냈다.
+    lock_accounts(db)
+    current_user = _fresh(db, current_user.id)
+    if current_user.password_hash != checked_hash:
+        raise HTTPException(status_code=409, detail="다른 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.")
+    current_user.password_hash = new_hash
     current_user.must_change_password = False
     # 비밀번호를 바꾼 이유가 유출이면, 옛 토큰이 살아 있는 한 바꾼 의미가 없다
     current_user.token_version = (current_user.token_version or 0) + 1
@@ -282,9 +297,23 @@ def list_users(
     return db.query(User).order_by(User.id).all()
 
 
-def _locked_target(db: Session, user_id: int) -> User:
+def _fresh(db: Session, user_id: int) -> Optional[User]:
+    """행을 잠그고 DB 의 최신 값으로 다시 읽는다.
+
+    ★populate_existing 이 없으면 세션에 이미 있는 객체(인증에서 읽은 사용자 등)의 옛 값을 그대로
+      돌려준다. 잠금을 기다리는 사이 다른 요청이 커밋한 변경을 못 보고 덮어쓰게 된다.
+    """
+    return db.query(User).filter(User.id == user_id).with_for_update().populate_existing().first()
+
+
+def _locked_target(db: Session, user_id: int, actor: User) -> User:
+    actor_id = actor.id
     lock_accounts(db)
-    user = db.query(User).filter(User.id == user_id).with_for_update().first()
+    # 잠금을 기다리는 사이 행위자가 강등·중지됐을 수 있다. 잠금 안에서 다시 확인한다.
+    fresh_actor = _fresh(db, actor_id)
+    if fresh_actor is None or fresh_actor.role != UserRole.admin or fresh_actor.status != UserStatus.active:
+        raise HTTPException(status_code=403, detail="Role 'admin' or higher required")
+    user = _fresh(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     return user
@@ -299,7 +328,7 @@ def _saved(db: Session, user: User) -> User:
 @router.post("/users/{user_id}/approve", response_model=UserResponse)
 def approve_user(user_id: int, db: Session = Depends(get_db),
                  current_user: User = Depends(role_required("admin"))):
-    user = _locked_target(db, user_id)
+    user = _locked_target(db, user_id, current_user)
     if user.status != UserStatus.pending:
         raise HTTPException(status_code=409, detail="승인 대기 중인 계정이 아닙니다.")
     user.status = UserStatus.active
@@ -310,7 +339,7 @@ def approve_user(user_id: int, db: Session = Depends(get_db),
 @router.post("/users/{user_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
 def reject_user(user_id: int, db: Session = Depends(get_db),
                 current_user: User = Depends(role_required("admin"))):
-    user = _locked_target(db, user_id)
+    user = _locked_target(db, user_id, current_user)
     if user.status != UserStatus.pending:
         raise HTTPException(status_code=409, detail="승인 대기 중인 계정만 거절할 수 있습니다.")
     username = user.username
@@ -327,7 +356,7 @@ def reject_user(user_id: int, db: Session = Depends(get_db),
 @router.post("/users/{user_id}/disable", response_model=UserResponse)
 def disable_user(user_id: int, db: Session = Depends(get_db),
                  current_user: User = Depends(role_required("admin"))):
-    user = _locked_target(db, user_id)
+    user = _locked_target(db, user_id, current_user)
     if user.id == current_user.id:
         raise HTTPException(status_code=409, detail="자기 자신은 사용 중지할 수 없습니다.")
     if user.status == UserStatus.disabled:
@@ -342,7 +371,7 @@ def disable_user(user_id: int, db: Session = Depends(get_db),
 @router.post("/users/{user_id}/enable", response_model=UserResponse)
 def enable_user(user_id: int, db: Session = Depends(get_db),
                 current_user: User = Depends(role_required("admin"))):
-    user = _locked_target(db, user_id)
+    user = _locked_target(db, user_id, current_user)
     if user.status != UserStatus.disabled:
         raise HTTPException(status_code=409, detail="사용 중지된 계정이 아닙니다.")
     user.status = UserStatus.active
@@ -354,7 +383,7 @@ def enable_user(user_id: int, db: Session = Depends(get_db),
 def release_email(user_id: int, db: Session = Depends(get_db),
                   current_user: User = Depends(role_required("admin"))):
     """남의 주소로 먼저 가입해 이메일을 차지한 계정에서 이메일을 뗀다. 진짜 주인이 Google 로 들어올 수 있게."""
-    user = _locked_target(db, user_id)
+    user = _locked_target(db, user_id, current_user)
     if user.email_verified:
         raise HTTPException(status_code=409, detail="Google 이 확인한 이메일은 해제할 수 없습니다.")
     released = user.email or (user.username if "@" in user.username else None)
@@ -381,7 +410,7 @@ def update_user_role(
             detail=f"Invalid role. Must be one of: {valid_roles}",
         )
 
-    user = _locked_target(db, user_id)
+    user = _locked_target(db, user_id, current_user)
     new_role = UserRole(payload.role)
     # ★마지막 활성 관리자를 강등하면 아무도 관리할 수 없다. 중지 쪽 검사도 이 길로 우회된다.
     if (user.role == UserRole.admin and new_role != UserRole.admin and user.status == UserStatus.active
@@ -400,14 +429,12 @@ def reset_password(
 ):
     # ★임시 비밀번호를 응답으로 돌려준다. 유출된 관리자 키로 남의 계정을 가져갈 수 없게 세션으로만 받는다.
     get_session_user(request, current_user)
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-
     alphabet = string.ascii_letters + string.digits
     temp_pw = "".join(secrets.choice(alphabet) for _ in range(12))
+    temp_hash = hash_password(temp_pw)
+    user = _locked_target(db, user_id, current_user)
 
-    user.password_hash = hash_password(temp_pw)
+    user.password_hash = temp_hash
     user.must_change_password = True
     # 관리자가 초기화하는 상황은 계정을 되찾는 국면이다. 옛 토큰을 같이 끊는다
     user.token_version = (user.token_version or 0) + 1

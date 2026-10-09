@@ -17,9 +17,11 @@ from schemas import UserCreate
 N = 8
 
 
-def _req():
+def _req(i):
+    # ★IP 를 요청마다 다르게 준다. 같은 IP 면 가입 횟수 제한 잠금이 먼저 줄을 세워서
+    #   계정 잠금을 빼도 이 테스트가 통과한다(QA2 지적, 잠금을 빼고 실패하는 것을 확인함).
     return Request({"type": "http", "method": "POST", "path": "/api/auth/register", "headers": [],
-                    "client": ("127.0.0.1", 0), "query_string": b""})
+                    "client": (f"10.0.1.{i}", 0), "query_string": b""})
 
 
 def test_빈_DB_에_동시에_가입해도_관리자는_한_명(pg_engine, monkeypatch):
@@ -32,7 +34,7 @@ def test_빈_DB_에_동시에_가입해도_관리자는_한_명(pg_engine, monke
         s = Session()
         try:
             barrier.wait()
-            register(UserCreate(username=f"user{i}", password="Passw0rd!x", display_name=f"u{i}"), request=_req(), db=s)
+            register(UserCreate(username=f"user{i}", password="Passw0rd!x", display_name=f"u{i}"), request=_req(i), db=s)
             ok.append(i)
         except HTTPException as e:
             rejected.append(e.status_code)

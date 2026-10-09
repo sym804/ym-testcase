@@ -24,7 +24,7 @@ from routes.auth import _check_rate_limit, _clear_failures, _record_failure
 from services import rate_limit
 from services.client_ip import client_ip
 from services.account_policy import normalize_identifier
-from services.accounts import find_user_by_identifier
+from services.accounts import find_user_by_identifier, lock_accounts
 from services.locks import LockNs, keyed_xact_lock
 
 logger = logging.getLogger(__name__)
@@ -234,7 +234,11 @@ def reset_password_with_code(
     _check_rate_limit(request, ident, db)
     fail = HTTPException(status_code=401, detail="코드가 올바르지 않거나 만료되었습니다.")
 
+    # 계정을 바꾸는 다른 경로(사용 중지, 연결, 초기화)와 같은 잠금으로 줄 세운다(교착 방지).
+    lock_accounts(db)
     user = find_user_by_identifier(db, ident)
+    if user is not None:
+        db.refresh(user)
     # 대기·중지 계정은 복구 대상이 아니다. 실패 응답은 다른 실패와 같게 둔다.
     if not user or user.status != UserStatus.active:
         verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화. 위 _DUMMY_HASH 주석 참고

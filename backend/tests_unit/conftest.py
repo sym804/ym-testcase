@@ -30,6 +30,8 @@ def live_app():
     """앱을 빈 포트에 띄운다(lifespan 끔). DB 는 auth_env 가 get_db 를 갈아 끼운다."""
     from main import app
 
+    # schema_guard 가 database.engine(테스트 밖 주소일 수 있다)에 접속하지 않게 한다.
+    app.state.schema_behind = False
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
