@@ -17,7 +17,7 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User, UserRole, Project, ProjectMember, ProjectRole
+from models import User, UserRole, UserStatus, Project, ProjectMember, ProjectRole
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,22 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-def verify_password(plain: str, hashed: str) -> bool:
+_DUMMY_HASH: Optional[str] = None
+
+
+def _dummy_hash() -> str:
+    global _DUMMY_HASH
+    if _DUMMY_HASH is None:
+        _DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
+    return _DUMMY_HASH
+
+
+def verify_password(plain: str, hashed: Optional[str]) -> bool:
+    # ★해시가 없으면(계정 없음, Google 전용 계정) 더미 해시로 한 번 대조하고 거짓을 낸다.
+    #   bcrypt 를 건너뛰면 응답 시간으로 계정 유무가 새고, None.encode() 는 500 이 된다.
+    if not hashed:
+        bcrypt.checkpw(plain.encode("utf-8"), _dummy_hash().encode("utf-8"))
+        return False
     return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
@@ -130,7 +145,8 @@ def _user_from_api_key(raw: str, db: Session) -> User:
     if key.revoked_at is not None or (key.expires_at is not None and key.expires_at <= now):
         raise denied
     user = db.query(User).filter(User.id == key.user_id).first()
-    if user is None:
+    # ★중지·대기 계정의 키도 막는다. 이 경로는 get_current_user 의 상태 검사보다 먼저 반환한다.
+    if user is None or user.status != UserStatus.active:
         raise denied
     if key.last_used_at is None or now - key.last_used_at >= API_KEY_TOUCH_INTERVAL:
         key.last_used_at = now
@@ -183,6 +199,8 @@ def get_current_user(
     #   `ver` 없는 토큰이 통과한다. 마이그레이션상 NULL 은 없어야 하지만, 이 비교가
     #   폐기의 유일한 관문이라 열려 있는 쪽으로 틀리게 두지 않는다.
     if payload.get("ver") != (user.token_version or 0):
+        raise credentials_exception
+    if user.status != UserStatus.active:
         raise credentials_exception
 
     return user

@@ -37,6 +37,10 @@ class UserResponse(BaseModel):
     role: str
     must_change_password: bool = False
     created_at: datetime
+    email: Optional[str] = None
+    status: str = "active"
+    has_password: bool = True
+    google_linked: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

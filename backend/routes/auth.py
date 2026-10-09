@@ -11,7 +11,9 @@ from database import get_db
 from services import rate_limit
 from services.client_ip import client_ip
 from services.locks import LockNs, advisory_xact_lock, keyed_xact_lock
-from models import User, UserRole
+from models import User, UserRole, UserStatus
+from services.account_policy import normalize_identifier
+from services.accounts import find_user_by_identifier
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
 from auth import (
     hash_password, verify_password, create_access_token, get_current_user, role_required,
@@ -105,61 +107,57 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     return user
 
 
-@router.post("/login", response_model=Token)
-def login(payload: UserLogin, request: Request, response: Response, db: Session = Depends(get_db)):
-    _check_rate_limit(request, payload.username, db)
-
-    user = db.query(User).filter(User.username == payload.username).first()
-    if not user or not verify_password(payload.password, user.password_hash):
-        logger.warning("Failed login attempt: user=%s ip=%s", payload.username, client_ip(request))
-        _record_failure(request, payload.username, db)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="아이디 또는 비밀번호가 올바르지 않습니다.",
-        )
-
-    # 성공 시 실패 카운트 초기화
-    _clear_failures(request, payload.username, db)
-    logger.info("User logged in: %s (remember_me=%s)", user.username, payload.remember_me)
-
+def issue_session(response: Response, user: User, remember_me: bool = False) -> str:
+    """로그인 쿠키(access_token, csrf_token)를 심는다. 비밀번호 로그인과 Google 로그인이 같이 쓴다."""
     # remember_me: 30일, 일반: 기본 만료
     # ★예전에는 3650일이었다. JWT 는 발급 후 만료까지 서버가 막을 수 없으므로
     #   그 값은 유출된 토큰을 10년간 되돌릴 수 없다는 뜻이었다. 기간을 줄이고
     #   token_version 으로 폐기 경로를 따로 뒀다.
-    if payload.remember_me:
+    if remember_me:
         expire_delta = timedelta(days=REMEMBER_ME_DAYS)
         cookie_max_age = REMEMBER_ME_DAYS * 24 * 3600
     else:
         expire_delta = timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
         cookie_max_age = COOKIE_MAX_AGE
-
     token = create_access_token(
         data={"sub": str(user.id), "role": user.role.value, "ver": user.token_version or 0},
         expires_delta=expire_delta,
     )
-
-    # httpOnly 쿠키에 JWT 설정
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        max_age=cookie_max_age,
-        path="/",
-    )
+    response.set_cookie(key="access_token", value=token, httponly=True, secure=COOKIE_SECURE,
+                        samesite=COOKIE_SAMESITE, max_age=cookie_max_age, path="/")
     # CSRF 토큰 (JS에서 읽을 수 있도록 httpOnly=False)
-    csrf_token = secrets.token_urlsafe(32)
-    response.set_cookie(
-        key="csrf_token",
-        value=csrf_token,
-        httponly=False,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        max_age=cookie_max_age,
-        path="/",
-    )
+    response.set_cookie(key="csrf_token", value=secrets.token_urlsafe(32), httponly=False, secure=COOKIE_SECURE,
+                        samesite=COOKIE_SAMESITE, max_age=cookie_max_age, path="/")
+    return token
 
+
+@router.post("/login", response_model=Token)
+def login(payload: UserLogin, request: Request, response: Response, db: Session = Depends(get_db)):
+    # ★제한 키를 정규화한 값으로 만든다. 원문을 쓰면 대소문자를 바꿔 한도를 비켜 간다.
+    ident = normalize_identifier(payload.username)
+    _check_rate_limit(request, ident, db)
+
+    user = find_user_by_identifier(db, ident)
+    ok = verify_password(payload.password, user.password_hash if user else None)
+    if not user or not ok:
+        logger.warning("Failed login attempt: user=%s ip=%s", ident, client_ip(request))
+        _record_failure(request, ident, db)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="아이디 또는 비밀번호가 올바르지 않습니다.",
+        )
+
+    _clear_failures(request, ident, db)
+    # ★상태는 비밀번호가 맞은 뒤에만 알려 준다. 틀렸을 때 알려 주면 남의 계정 상태를 떠볼 수 있다.
+    if user.status == UserStatus.pending:
+        raise HTTPException(status_code=403, detail="관리자 승인을 기다리는 중입니다.")
+    if user.status == UserStatus.disabled:
+        raise HTTPException(status_code=403, detail="사용이 중지된 계정입니다.")
+
+    logger.info("User logged in: %s (remember_me=%s)", user.username, payload.remember_me)
+    token = issue_session(response, user, payload.remember_me)
+    # ★횟수 제한 키 잠금을 응답 전에 푼다. get_db 정리는 응답 뒤에 돈다(SYM-145).
+    db.commit()
     return Token(access_token=token, must_change_password=user.must_change_password)
 
 
@@ -192,6 +190,8 @@ def change_password(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_session_user),
 ):
+    if not current_user.password_hash:
+        raise HTTPException(status_code=400, detail="비밀번호가 없는 계정입니다.")
     if not verify_password(payload.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="현재 비밀번호가 올바르지 않습니다.")
 
