@@ -15,7 +15,7 @@ const PROJ_ID = 23; // ymseo_test
 
 async function login(page: Page) {
   await page.goto("/login");
-  await page.getByPlaceholder("아이디를 입력하세요").fill("admin");
+  await page.getByPlaceholder("아이디 또는 이메일을 입력하세요").fill("admin");
   await page.getByPlaceholder("비밀번호를 입력하세요").fill(PASSWORD);
   await page.getByRole("button", { name: "로그인" }).click();
   await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
@@ -70,7 +70,7 @@ test("README + 매뉴얼 스크린샷 (ymseo_test)", async ({ page, request }) =
 
   // 03. 로그인 입력 상태
   await page.goto("/login");
-  await page.getByPlaceholder("아이디를 입력하세요").fill("admin");
+  await page.getByPlaceholder("아이디 또는 이메일을 입력하세요").fill("admin");
   await page.getByPlaceholder("비밀번호를 입력하세요").fill("••••••••");
   await page.screenshot({ path: path.join(MANUAL_DIR, "03_login_filled.png") });
 

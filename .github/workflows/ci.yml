@@ -91,6 +91,12 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: postgresql+psycopg2://ymtc:ymtc@localhost:54329/ymtc
+          # 이메일 가입이 승인 대기가 되는 정책과 Google 버튼(더미 클라이언트)을 E2E 가 본다
+          AUTH_APPROVAL: personal
+          GOOGLE_CLIENT_ID: ci-dummy.apps.googleusercontent.com
+          GOOGLE_CLIENT_SECRET: ci-dummy
+          GOOGLE_REDIRECT_URI: http://localhost:5173/api/auth/google/callback
+          REGISTER_MAX_PER_HOUR: "1000"
         run: |
           python -m uvicorn main:app --port 8008 &
           sleep 5
@@ -128,6 +134,7 @@ jobs:
           e2e/tc-management.spec.ts
           e2e/v060-features.spec.ts
           e2e/uploads.spec.ts
+          e2e/account-approval.spec.ts
           --reporter=list
         timeout-minutes: 15
 
