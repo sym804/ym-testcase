@@ -21,11 +21,29 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v2.2.0.2  (2026-10-10)
+YM TestCase System  v2.2.0.3  (2026-10-10)
 ├── Frontend       v1.13.0.2
 ├── Backend        v2.2.0.1
 └── Database       v1.2.0.0
 ```
+
+---
+
+## System 2.2.0.3 - [fix] 401 리다이렉트 E2E 간헐 실패와 Windows 인코딩 테스트 (2026-10-10)
+
+### 이슈
+
+- SYM-169 사용 중지 E2E 가 reload 도중 401 리다이렉트와 겹쳐 간헐 실패한다 (bug/minor/etc)
+- SYM-171 DB 설정 단위 테스트가 Windows 에서 하위 프로세스 한글 출력이 깨져 실패한다 (bug/trivial/etc)
+
+### 변경
+
+- 로그인 화면으로 튕기는 이동은 응답 도착까지만 대기(`e2e/nav.ts`), 사용 중지 테스트에 재로그인 단언 추가
+- 하위 프로세스에 `PYTHONIOENCODING=utf-8`
+
+### 영향
+
+- 없음(테스트만 변경)
 
 ---
 

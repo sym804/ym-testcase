@@ -3,6 +3,7 @@
  * 체크리스트 192개 TC 중 자동화 가능한 항목 전부 커버
  */
 import { test, expect, type Page } from "@playwright/test";
+import { commit, navigateExpectingRedirect } from "./nav";
 
 const PASSWORD = "test1234";
 
@@ -128,7 +129,7 @@ test.describe("1. 인증", () => {
   });
 
   test("TC-AUTH-010: 미인증 시 리다이렉트", async ({ page }) => {
-    await page.goto("/projects");
+    await navigateExpectingRedirect(page, (p) => p.goto("/projects", commit));
     await expect(page).toHaveURL(/\/login/);
   });
 
