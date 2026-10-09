@@ -62,5 +62,17 @@
   "apiKeyEmpty": "발급한 키가 없습니다.",
   "apiKeyLoadFailed": "키 목록을 불러오지 못했습니다.",
   "apiKeyCreateFailed": "키를 발급하지 못했습니다.",
-  "apiKeyRevokeFailed": "키를 폐기하지 못했습니다."
+  "apiKeyRevokeFailed": "키를 폐기하지 못했습니다.",
+  "accountLink": "계정 연결",
+  "accountLinkHelp": "Google 계정을 연결하면 아이디와 비밀번호 대신 Google 로 로그인할 수 있습니다.",
+  "googleLinked": "Google 계정이 연결돼 있습니다",
+  "googleNotLinked": "Google 계정이 연결돼 있지 않습니다",
+  "linkGoogle": "Google 계정 연결",
+  "unlinkGoogle": "연결 해제",
+  "unlinkGoogleConfirm": "Google 계정 연결을 해제할까요? 그 뒤로는 아이디와 비밀번호로만 로그인합니다.",
+  "googleUnlinked": "Google 계정 연결을 해제했습니다.",
+  "googleUnlinkFailed": "연결을 해제하지 못했습니다.",
+  "noPasswordCannotUnlink": "비밀번호가 없는 계정은 해제할 수 없습니다.",
+  "googleDisabled": "Google 로그인이 꺼져 있습니다.",
+  "googleLinkedToast": "Google 계정을 연결했습니다."
 }
