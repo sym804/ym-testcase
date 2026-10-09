@@ -47,11 +47,11 @@ def victim():
     assert admin.status_code == 200, admin.text
     admin_token = admin.json()["access_token"]
 
-    username = f"__revoke_{secrets.token_hex(4)}__"
+    username = f"__revoke_{secrets.token_hex(4)}__@example.com"
     first_pw = "revoke1234"
     r = requests.post(
         f"{BASE}/api/auth/register",
-        json={"username": username, "password": first_pw, "display_name": "Revoke Target"},
+        json={"email": username, "password": first_pw, "display_name": "Revoke Target"},
     )
     assert r.status_code == 201, r.text
 

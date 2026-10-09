@@ -1,19 +1,23 @@
+import hmac
 import logging
+import os
 import secrets
 import string
 from datetime import timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
 from services import rate_limit
 from services.client_ip import client_ip
-from services.locks import LockNs, advisory_xact_lock, keyed_xact_lock
+from services.locks import LockNs, keyed_xact_lock
 from models import User, UserRole, UserStatus
-from services.account_policy import normalize_identifier
-from services.accounts import find_user_by_identifier
+from services.account_policy import AccountRejected, initial_status, normalize_email, normalize_identifier
+from services.accounts import email_taken, find_user_by_identifier, lock_accounts
+from services.auth_config import get_auth_config
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
 from auth import (
     hash_password, verify_password, create_access_token, get_current_user, role_required,
@@ -68,41 +72,102 @@ def _clear_failures(request: Request, username: str, db: Session):
     rate_limit.clear(BUCKET_LOGIN, _rate_limit_key(request, username), engine=db.get_bind())
 
 
+BUCKET_REGISTER = "register"
+REGISTER_WINDOW_SEC = 3600
+
+
+def _check_register_limit(request: Request, db: Session) -> None:
+    """IP 하나의 가입 시도를 센다(성공·실패 무관). 인터넷에 열린 진입점이라 bcrypt 비용과
+    승인 대기 목록 스팸을 막는다. 비밀번호 찾기 접수 제한과 같은 방식이다."""
+    key = client_ip(request)
+    keyed_xact_lock(db, LockNs.RATE_LIMIT, f"{BUCKET_REGISTER}:{key}")
+    engine = db.get_bind()
+    limit = int(os.getenv("REGISTER_MAX_PER_HOUR", "10"))
+    if rate_limit.count_recent(BUCKET_REGISTER, key, REGISTER_WINDOW_SEC, engine=engine) >= limit:
+        raise HTTPException(status_code=429, detail="가입 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.")
+    rate_limit.record(BUCKET_REGISTER, key, engine=engine)
+
+
+def _has_users(db: Session) -> bool:
+    return db.query(User.id).first() is not None
+
+
+@router.get("/config")
+def auth_config_info(db: Session = Depends(get_db)):
+    """화면이 켜진 로그인 기능을 묻는다. 사용자가 0명이면 첫 관리자 화면을 보여 준다."""
+    cfg = get_auth_config()
+    has_users = _has_users(db)
+    db.rollback()
+    return {"google_enabled": cfg.google_enabled, "signup_mode": "email" if has_users else "bootstrap"}
+
+
 @router.get("/check-username")
 def check_username(username: str, db: Session = Depends(get_db)):
-    exists = db.query(User).filter(User.username == username).first() is not None
-    return {"available": not exists}
+    # 첫 관리자 화면에서만 쓴다. 사용자가 생긴 뒤로는 아이디 존재를 묻는 경로를 닫는다.
+    if _has_users(db):
+        raise HTTPException(status_code=404, detail="Not Found")
+    return {"available": True}
+
+
+def _bootstrap_admin(payload: UserCreate, cfg, password_hash: str, db: Session) -> User:
+    if cfg.production:
+        # ★인터넷에 열린 빈 DB 에서 먼저 들어온 사람이 관리자가 되는 것을 막는다.
+        if not cfg.bootstrap_token or not hmac.compare_digest(payload.bootstrap_token or "", cfg.bootstrap_token):
+            raise HTTPException(status_code=403, detail="첫 관리자 토큰이 올바르지 않습니다.")
+    email = None
+    if payload.username and payload.username.strip():
+        username = payload.username.strip()
+    elif payload.email:
+        try:
+            email = normalize_email(payload.email)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        username = email
+    else:
+        raise HTTPException(status_code=422, detail="아이디를 입력해 주세요.")
+    user = User(username=username, email=email, email_verified=False, password_hash=password_hash,
+                display_name=payload.display_name.strip()[:100], role=UserRole.admin,
+                status=UserStatus.active, must_change_password=False)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: UserCreate, db: Session = Depends(get_db)):
-    # ★가입을 전역 잠금으로 줄 세운다. 잠금은 커밋까지 유지되므로 다음 가입은 앞선
-    #   가입이 커밋된 뒤에 아이디 중복과 사용자 수를 본다. 삽입 뒤 강등하던 방식은
-    #   SQLite 의 쓰기 잠금에 기대고 있어서 PostgreSQL 에서는 서로의 미커밋 행을 못 봤다.
+def register(payload: UserCreate, request: Request, db: Session = Depends(get_db)):
+    cfg = get_auth_config()
     # bcrypt 는 잠금 밖에서 한다. 잠금 구간이 길면 가입 연타에 모든 가입이 줄을 선다.
     password_hash = hash_password(payload.password)
-    advisory_xact_lock(db, LockNs.ACCOUNTS)
-    existing = db.query(User).filter(User.username == payload.username).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이미 등록된 아이디입니다.",
-        )
+    _check_register_limit(request, db)
+    # ★계정 생성은 전역 잠금으로 줄 세운다. 잠금은 커밋까지 유지되므로 다음 가입은 앞선
+    #   가입이 커밋된 뒤에 사용자 수와 이메일 중복을 본다(SYM-136).
+    lock_accounts(db)
+    if not _has_users(db):
+        return _bootstrap_admin(payload, cfg, password_hash, db)
 
-    # First user becomes admin automatically
-    user_count = db.query(User).count()
-    is_first_user = user_count == 0
-    initial_role = UserRole.admin if is_first_user else UserRole.user
+    if not payload.email:
+        raise HTTPException(status_code=400, detail="이메일로 가입해 주세요.")
+    try:
+        email = normalize_email(payload.email)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    try:
+        initial = initial_status(cfg, source="email", email=email)
+    except AccountRejected:
+        raise HTTPException(status_code=403, detail="회사 이메일로만 가입할 수 있습니다.")
+    if email_taken(db, email):
+        raise HTTPException(status_code=400, detail="이미 가입된 이메일입니다.")
 
-    user = User(
-        username=payload.username,
-        password_hash=password_hash,
-        display_name=payload.display_name,
-        role=initial_role,
-        must_change_password=False,
-    )
+    user = User(username=email, email=email, email_verified=False, password_hash=password_hash,
+                display_name=payload.display_name.strip()[:100], role=UserRole.user,
+                status=initial, must_change_password=False)
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="이미 가입된 이메일입니다.")
     db.refresh(user)
     return user
 

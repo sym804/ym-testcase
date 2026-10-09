@@ -112,15 +112,15 @@ def admin_headers():
 def normal_user(admin_headers):
     """일반 사용자 하나를 만들어 둔다. 비밀번호를 변경하는 테스트의 대상이 된다."""
     requests.post(f"{BASE}/api/auth/register", json={
-        "username": "__recover_user__", "password": "origin1234", "display_name": "Recover User",
+        "email": "__recover_user__@example.com", "password": "origin1234", "display_name": "Recover User",
     })
     r = requests.get(f"{BASE}/api/auth/users", headers=admin_headers)
-    uid = next(u["id"] for u in r.json() if u["username"] == "__recover_user__")
-    return {"username": "__recover_user__", "id": uid}
+    uid = next(u["id"] for u in r.json() if u["username"] == "__recover_user__@example.com")
+    return {"username": "__recover_user__@example.com", "id": uid}
 
 
 def test_list_requires_admin(normal_user):
-    h = _login("__recover_user__", "origin1234")
+    h = _login("__recover_user__@example.com", "origin1234")
     r = requests.get(f"{BASE}/api/auth/account-requests", headers=h)
     assert r.status_code == 403, r.text
 
@@ -149,20 +149,20 @@ def test_approve_find_id_returns_username_and_no_code(admin_headers, normal_user
     )
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["username"] == "__recover_user__"
+    assert body["username"] == "__recover_user__@example.com"
     assert body["code"] is None
 
 
 def test_approve_reset_returns_plaintext_code_once(admin_headers, normal_user):
     _submit({
         "request_type": "reset_password",
-        "claimed_username": "__recover_user__",
+        "claimed_username": "__recover_user__@example.com",
         "contact": "메신저 recover",
     })
     r = requests.get(f"{BASE}/api/auth/account-requests", headers=admin_headers)
     req = next(x for x in r.json()
                if x["request_type"] == "reset_password"
-               and x["claimed_username"] == "__recover_user__")
+               and x["claimed_username"] == "__recover_user__@example.com")
 
     r = requests.post(
         f"{BASE}/api/auth/account-requests/{req['id']}/approve",
@@ -217,7 +217,7 @@ def test_approve_requires_admin(normal_user):
         "claimed_display_name": "Forbidden Target",
         "contact": "메신저 forbidden",
     })
-    h = _login("__recover_user__", "origin1234")
+    h = _login("__recover_user__@example.com", "origin1234")
     r = requests.post(
         f"{BASE}/api/auth/account-requests/1/approve",
         json={"user_id": normal_user["id"]}, headers=h,
@@ -393,12 +393,12 @@ def test_expired_code_fails(admin_headers, normal_user):
 def test_wrong_code_is_rate_limited(admin_headers):
     """틀린 코드를 반복하면 429. 다른 테스트의 계정과 키가 겹치지 않도록 전용 계정을 쓴다."""
     requests.post(f"{BASE}/api/auth/register", json={
-        "username": "__rl_target__", "password": "origin1234", "display_name": "RL Target",
+        "email": "__rl_target__@example.com", "password": "origin1234", "display_name": "RL Target",
     })
     saw_429 = False
     for _ in range(12):
         r = requests.post(f"{BASE}/api/auth/reset-password/verify", json={
-            "username": "__rl_target__", "code": "wrongwrongwrong", "new_password": "origin1234",
+            "username": "__rl_target__@example.com", "code": "wrongwrongwrong", "new_password": "origin1234",
         })
         if r.status_code == 429:
             saw_429 = True
@@ -452,7 +452,7 @@ def test_older_approved_code_is_killed_by_newer_redemption(admin_headers, normal
 
 def test_reject_requires_admin(normal_user):
     """반려도 관리자 전용이다. 목록과 승인만 막고 반려를 열어두면 의미가 없다."""
-    h = _login("__recover_user__", "origin1234")
+    h = _login("__recover_user__@example.com", "origin1234")
     r = requests.post(
         f"{BASE}/api/auth/account-requests/1/reject",
         json={"note": "권한 없이 반려"}, headers=h,

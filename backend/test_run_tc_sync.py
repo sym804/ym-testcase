@@ -48,10 +48,10 @@ def project(token):
 def viewer_token():
     """프로젝트 멤버가 아닌 일반 사용자 (공개 프로젝트에서는 viewer 로 취급된다)"""
     requests.post(f"{BASE}/api/auth/register", json={
-        "username": "__sync_viewer__", "password": "viewer1234", "display_name": "Sync Viewer",
+        "email": "__sync_viewer__@example.com", "password": "viewer1234", "display_name": "Sync Viewer",
     })
     r = requests.post(f"{BASE}/api/auth/login",
-                      json={"username": "__sync_viewer__", "password": "viewer1234"})
+                      json={"username": "__sync_viewer__@example.com", "password": "viewer1234"})
     assert r.status_code == 200, f"viewer login failed: {r.status_code} {r.text}"
     return r.json()["access_token"]
 
