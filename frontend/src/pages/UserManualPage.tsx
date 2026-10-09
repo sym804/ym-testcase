@@ -73,6 +73,7 @@ export default function UserManualPage() {
                 <li>{t("overview.li9")}</li>
                 <li>{t("overview.li10")}</li>
                 <li>{t("overview.li11")}</li>
+                <li>{t("overview.li12")}</li>
               </ul>
             </div>
           </section>
@@ -92,6 +93,15 @@ export default function UserManualPage() {
             </ol>
             <div style={s.tipBox} dangerouslySetInnerHTML={{ __html: t("login.tip1") }} />
             <div style={s.infoBox} dangerouslySetInnerHTML={{ __html: t("login.info1") }} />
+
+            <h3 style={s.h3}>{t("login.h3_google")}</h3>
+            <ol style={s.ol}>
+              <li dangerouslySetInnerHTML={{ __html: t("login.google_li1") }} />
+              <li>{t("login.google_li2")}</li>
+              <li>{t("login.google_li3")}</li>
+            </ol>
+            <div style={s.infoBox} dangerouslySetInnerHTML={{ __html: t("login.google_info") }} />
+            <div style={s.tipBox} dangerouslySetInnerHTML={{ __html: t("login.google_warn") }} />
 
             <h3 style={s.h3}>{t("login.h3_register")}</h3>
             <img src="/manual-images/02_register_page.png" alt={t("login.imgAlt_register")} style={s.img} />
@@ -116,9 +126,19 @@ export default function UserManualPage() {
               <br /><br />
               <img src="/manual-images/26_force_password_change.png" alt={t("login.imgAlt_forcePassword")} style={{ width: "100%", borderRadius: 8, border: "1px solid #E2E8F0" }} />
             </div>
+
+            <h3 style={s.h3}>{t("login.h3_link")}</h3>
+            <img src="/manual-images/44_account_link_modal.png" alt={t("login.imgAlt_link")} style={s.img} />
+            <ol style={s.ol}>
+              <li dangerouslySetInnerHTML={{ __html: t("login.link_li1") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("login.link_li2") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("login.link_li3") }} />
+            </ol>
+            <div style={s.infoBox} dangerouslySetInnerHTML={{ __html: t("login.link_info") }} />
+            <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("login.link_warn") }} />
           </section>
 
-          {/* 1-4. 계정 도움 요청 (계정 복구) */}
+          {/* 1-6. 계정 도움 요청 (계정 복구) */}
           <section id="account-recovery" style={s.section}>
             <h2 style={s.h2}>{t("accountRecovery.title")}</h2>
             <p style={s.p}>{t("accountRecovery.p1")}</p>
@@ -984,7 +1004,7 @@ export default function UserManualPage() {
           )}
 
           <div style={s.footer}>
-            <p>{t("footer.text")}</p>
+            <p>{t("common:version")} | {t("footer.text")}</p>
           </div>
         </main>
       </div>

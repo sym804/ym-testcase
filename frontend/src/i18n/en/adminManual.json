@@ -1,6 +1,6 @@
 {
   "title": "YM TestCase Admin Manual",
-  "updatedAt": "Last updated: 2026-09-04 | v1.3.1.0 | Admin-only document",
+  "updatedAt": "Last updated: 2026-10-09 | Admin only",
   "badge": "Admin Manual",
   "backBtn": "Go Back",
   "toc": {
@@ -32,7 +32,8 @@
     "li9": "Frontend: port 5173 (dev)",
     "li10": "CORS configuration required",
     "li11": "File storage: UPLOAD_DIR",
-    "li12": "License: AGPL-3.0"
+    "li12": "License: AGPL-3.0",
+    "li13": "Google sign-in (OpenID Connect, turned on by environment variables)"
   },
   "install": {
     "title": "2. Installation & Running",
@@ -53,7 +54,7 @@
     "envDesc": "Environment mode. Error if SECRET_KEY is not set in production",
     "optional": "Optional",
     "dbDesc": "PostgreSQL URL. Local example: postgresql+psycopg2://ymtc:ymtc@127.0.0.1:54329/ymtc. In deployment, the Supabase transaction pooler",
-    "tokenDesc": "JWT token expiration time (hours)",
+    "tokenDesc": "Session length for a normal login (hours)",
     "corsDesc": "Allowed CORS origins (comma-separated)",
     "uploadDesc": "Attachment storage directory",
     "warn1": "<strong>Warning:</strong> In production, you must set <code>SECRET_KEY</code> to a unique value. The server will fail to start if not set.",
@@ -63,7 +64,22 @@
     "storageDesc": "Storage for attachments and import files. local or supabase (deployment)",
     "supabaseDesc": "Supabase project URL, service key, bucket name. Used when STORAGE_BACKEND=supabase",
     "cronDesc": "Secret for the daily maintenance job (/api/internal/cron/daily)",
-    "proxyDesc": "Proxy header carrying the client IP. Use only a header the platform overwrites"
+    "proxyDesc": "Proxy header that carries the client IP. Use only a header your hosting platform overwrites (Vercel: x-real-ip)",
+    "rememberDesc": "Session length in days when \"Remember me\" is checked",
+    "lockDesc": "Maximum wait for the concurrent edit lock (milliseconds). Beyond it, the request gets a 409 notice",
+    "googleDesc": "OAuth client for Google sign-in. Leave empty to hide the Google button",
+    "googleRedirectDefault": "dev: http://localhost:5173/api/auth/google/callback",
+    "googleRedirectDesc": "Redirect URI registered in the Google console. Required in production (ENV=production)",
+    "companyDomainsDesc": "Company Google Workspace domains (comma separated). An account counts as a company account only by the Workspace domain Google reports",
+    "allowPersonalDesc": "0 accepts company accounts only. AUTH_COMPANY_DOMAINS must be set, and email sign-ups always wait for approval",
+    "approvalDesc": "Who needs administrator approval. none (nobody) / personal (only company Workspace Google accounts skip approval; email sign-ups wait even with a company address) / all (everyone). With AUTH_ALLOW_PERSONAL=0, email sign-ups always wait for approval regardless of this value",
+    "bootstrapDesc": "Value required to create the first administrator on an empty production database (ENV=production)",
+    "registerLimitDesc": "Sign-up requests allowed per IP per hour",
+    "googleSetupTitle": "3-1. Turning on Google sign-in",
+    "googleSetupOl1": "In the Google Cloud console, go to <strong>APIs &amp; Services &gt; Credentials</strong> and create an OAuth client ID (Web application).",
+    "googleSetupOl2": "Add <code>https://&lt;site address&gt;/api/auth/google/callback</code> to <strong>Authorized redirect URIs</strong>. For development, use <code>http://localhost:5173/api/auth/google/callback</code>.",
+    "googleSetupOl3": "Put the issued values in <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code>, put the same redirect URI in <code>GOOGLE_REDIRECT_URI</code>, and restart the server. The login screen then shows <strong>Sign in with Google</strong>.",
+    "googleSetupInfo": "<strong>Company accounts only:</strong> put your Workspace domain in <code>AUTH_COMPANY_DOMAINS</code> and set <code>AUTH_ALLOW_PERSONAL=0</code>. <code>AUTH_APPROVAL</code> decides who waits for approval (in company-only mode, email sign-ups always wait). If a value is invalid, the server stops at startup and tells you why."
   },
   "database": {
     "title": "4. Database",
@@ -108,7 +124,7 @@
     "imgAlt": "Admin page",
     "listTitle": "5-1. User List",
     "li1": "Access the admin page by clicking the <strong>\"Admin\"</strong> button in the header.",
-    "li2": "View all users' ID, username, display name, role, and registration date.",
+    "li2": "For each user you see the username, display name, email, sign-in method (password, Google, and the linked Google address), status, system role, project assignment, and join date.",
     "roleChangeTitle": "5-2. Role Change",
     "ol1": "Change the role dropdown for the target user.",
     "ol2": "The change takes effect immediately.",
@@ -134,12 +150,12 @@
     "accountRequestImgAlt2": "Admin page - Issued code display",
     "accountRequestWarn": "<strong>Warning:</strong> The code is stored on the server only as a hash, and the plaintext is displayed on this screen <strong>only once</strong>. Be sure to copy it with the copy button and deliver it to the user right away. Once you click Close, it cannot be viewed again.",
     "accountStatusTitle": "5-4-1. Sign-up approval and account status",
-    "accountStatusLi1": "Accounts are <strong>Active / Pending approval / Disabled</strong>. <code>AUTH_APPROVAL</code> decides who waits for approval.",
+    "accountStatusLi1": "Accounts are <strong>Active / Pending approval / Disabled</strong>. <code>AUTH_APPROVAL</code> decides who waits for approval. In company-only mode (<code>AUTH_ALLOW_PERSONAL=0</code>), email sign-ups always wait for approval.",
     "accountStatusLi2": "Pending accounts appear above the list as <strong>N pending approval</strong>. <strong>Approve</strong> lets them sign in; <strong>Reject</strong> deletes the account.",
     "accountStatusLi3": "<strong>Disable</strong> blocks sign-in and API keys immediately. Enabling again does not revive old API keys. You cannot disable or demote yourself or the last active administrator.",
     "accountStatusLi4": "<strong>Release email</strong> removes an email from an account that claimed someone else's address. Emails verified by Google cannot be released.",
     "accountStatusLi5": "<strong>Delete</strong> removes only accounts with no activity at all. Use it to clean up accounts created by mistake. Accounts with activity are refused; disable them instead.",
-    "accountStatusLi6": "The linked Google address appears under the sign-in column. <strong>address not recorded</strong> means the account was linked before this feature; it fills in at the next Google sign-in. An empty Google-only account (no password) is removed automatically when its owner links that Google account to another account, even if it is pending or disabled. If that account has activity or a password, linking is refused; <strong>reset</strong> its password to unlink Google, then link again.",
+    "accountStatusLi6": "The linked Google address appears under the sign-in column. <strong>address not recorded</strong> means the account was linked before this feature; it fills in at the next Google sign-in. An empty Google-only account (no password) is removed automatically when its owner links that Google account to another account, even if it is pending or disabled. The last active administrator is never removed this way. If that account has activity or a password, linking is refused; <strong>reset</strong> its password to unlink Google, then link again.",
     "accountStatusWarn": "<strong>Note:</strong> Deleting a Workspace account does not end app sessions (up to 30 days) or API keys. Disable the user to block them immediately."
   },
   "roleSystem": {
@@ -223,13 +239,13 @@
     "pwResetSetting": "Admin page",
     "authToken": "Auth token",
     "authTokenImpl": "JWT (HS256) + httpOnly cookie",
-    "authTokenSetting": "TOKEN_EXPIRE_HOURS (default 2h)",
+    "authTokenSetting": "TOKEN_EXPIRE_HOURS (default 72 hours); Remember me uses REMEMBER_ME_DAYS (default 30 days)",
     "apiKey": "API keys",
     "apiKeyImpl": "Per-user create · revoke, SHA-256 hash stored, Bearer header auth",
     "apiKeySetting": "Expiry 30 · 90 · 180 · 365 days or never, 20 per user, all revoked when the password changes",
     "csrf": "CSRF protection",
     "csrfImpl": "csrf_token cookie + X-CSRF-Token header verification",
-    "csrfSetting": "Auto-applied on state-changing requests",
+    "csrfSetting": "Auto-applied on state-changing requests from cookie sessions (Bearer header auth excluded)",
     "loginLimit": "Login limit",
     "loginLimitImpl": "Rate Limiting",
     "loginLimitSetting": "10 attempts per IP+user in 5 min (locked on exceed)",
@@ -244,21 +260,35 @@
     "xssSetting": "Auto-applied on markdown cell rendering",
     "apiAuth": "API permissions",
     "apiAuthImpl": "Role-based access control",
-    "apiAuthSetting": "Per-endpoint role check"
+    "apiAuthSetting": "Per-endpoint role check",
+    "google": "Google sign-in",
+    "googleImpl": "OpenID Connect authorization code flow + PKCE, state and nonce checks, only emails verified by Google",
+    "googleSetting": "GOOGLE_CLIENT_ID etc., AUTH_COMPANY_DOMAINS, AUTH_ALLOW_PERSONAL",
+    "signup": "Sign-up limits",
+    "signupImpl": "Per-IP sign-up rate limit, administrator approval",
+    "signupSetting": "REGISTER_MAX_PER_HOUR (default 10), AUTH_APPROVAL"
   },
   "apiRef": {
-    "title": "10. API Endpoints (84)",
-    "swaggerInfo": "API documentation (Swagger UI) is available at",
+    "title": "10. Main API Endpoints",
+    "swaggerInfo": "Only frequently used endpoints are listed. For the full list and request formats, see Swagger UI at",
     "swaggerInfoSuffix": ".",
     "descTh": "Description",
     "auth": {
       "title": "Auth",
-      "checkUsername": "Check username availability",
-      "register": "Register (password min 8 chars)",
-      "login": "Login (JWT token issued)",
+      "checkUsername": "Check username availability. First-admin screen only; 404 once any user exists",
+      "config": "Login screen settings (whether the Google button shows, which sign-up screen)",
+      "register": "Sign up with email; may wait for approval. Also creates the first administrator",
+      "login": "Login (issues a session cookie; 30 days by default with remember_me)",
+      "logout": "Logout. Clears the session cookie and ends that account's sessions on other devices too",
       "me": "Current user info",
       "changePassword": "Change password (min 8 chars)",
       "users": "User list (QA Manager+)",
+      "approveUser": "Approve a sign-up (Admin)",
+      "rejectUser": "Reject a sign-up; deletes the pending account (Admin)",
+      "disableUser": "Disable; blocks login and API keys (Admin)",
+      "enableUser": "Enable again (Admin)",
+      "releaseEmail": "Release the email (Admin)",
+      "deleteUser": "Delete an account with no work history; 409 if it has history (Admin)",
       "changeRole": "Change role (Admin)",
       "resetPassword": "Reset password (Admin)",
       "submitAccountRequest": "Submit account recovery request",
@@ -268,7 +298,10 @@
       "resetPasswordWithCode": "Reset password with code",
       "listApiKeys": "List own API keys (signed-in session only)",
       "createApiKey": "Create an API key; the raw key is returned once (signed-in session only)",
-      "revokeApiKey": "Revoke an API key (signed-in session only)"
+      "revokeApiKey": "Revoke an API key (signed-in session only)",
+      "googleStart": "Start Google sign-in (?mode=login|link)",
+      "googleCallback": "Google sign-in callback; the address GOOGLE_REDIRECT_URI points to",
+      "googleUnlink": "Unlink Google (accounts with a password only)"
     },
     "projects": {
       "title": "Projects",
@@ -406,7 +439,16 @@
     "r11f": "Verify Malgun Gothic font is installed",
     "r12s": "\"Another operation is in progress\" when saving",
     "r12c": "Concurrent sheet or test case structure changes in the same project waited too long for a lock",
-    "r12f": "Retry shortly. If it happens often, raise LOCK_WAIT_TIMEOUT_MS (default 10000)"
+    "r12f": "Retry shortly. If it happens often, raise LOCK_WAIT_TIMEOUT_MS (default 10000)",
+    "r13s": "No Google button on the login screen",
+    "r13c": "GOOGLE_CLIENT_ID is empty",
+    "r13f": "Set the GOOGLE_* values as in 3-1 and restart the server",
+    "r14s": "redirect_uri_mismatch error on the Google screen",
+    "r14c": "The redirect URI registered in the Google console differs from GOOGLE_REDIRECT_URI",
+    "r14f": "Make the two values identical, including a trailing / and http vs https",
+    "r15s": "Login fails with \"waiting for administrator approval\"",
+    "r15c": "The account is pending under AUTH_APPROVAL, or it is an email sign-up in company-only mode",
+    "r15f": "Approve the account in User Management (5-4-1)"
   },
   "backup": {
     "title": "12. Backup & Recovery",
@@ -415,5 +457,5 @@
     "restoreTitle": "12-2. Recovery",
     "tip1": "<strong>Deployment:</strong> the Backup workflow in the private repo keeps a daily DB dump (public schema) and the Storage objects as artifacts (14 days). Supabase DB backups do not include Storage objects, so keep both."
   },
-  "footer": "YM TestCase v1.0 | Admin Manual"
+  "footer": "Operations Manual (Admin only)"
 }

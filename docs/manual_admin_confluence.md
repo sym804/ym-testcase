@@ -1,7 +1,7 @@
 # YM TestCase 운영 매뉴얼 (Admin)
 
-> **최종 업데이트**: 2026-03-18
-> **버전**: 0.4.0.0
+> **최종 업데이트**: 2026-10-09
+> **버전**: 2.2.0.1
 > **대상**: Admin 역할 담당자
 > **보안 등급**: 내부 관리용
 
@@ -14,7 +14,7 @@
 | **Backend** | FastAPI (Python 3.10+), SQLAlchemy ORM, Uvicorn ASGI | 포트 8008 |
 | **Frontend** | React 18, TypeScript, Vite, AG Grid, Chart.js | 포트 5173 (개발) / 80 (프로덕션) |
 | **Database** | PostgreSQL 17 | 로컬은 Docker(127.0.0.1:54329), 배포는 Supabase |
-| **인증** | JWT (HS256), bcrypt 해싱 | 토큰 만료 2시간 |
+| **인증** | JWT (HS256, httpOnly 쿠키 + CSRF), bcrypt 해싱, Google 로그인(OpenID Connect, 선택) | 기본 72시간, 로그인 유지 30일 |
 
 ---
 
@@ -58,23 +58,32 @@ npx tsc -b
 | `ENV` | development | 환경 구분. production 시 SECRET_KEY 미설정 에러 | 선택 |
 | `DATABASE_URL` | (필수) | PostgreSQL 주소. 로컬 예: `postgresql+psycopg2://ymtc:ymtc@127.0.0.1:54329/ymtc`, 배포는 Supabase 트랜잭션 풀러 | 필수 |
 | `DATABASE_URL_DIRECT` | - | 마이그레이션 전용 직결(또는 세션 풀러) 주소. 비우면 DATABASE_URL | 선택 |
-| `TOKEN_EXPIRE_HOURS` | 2 | JWT 토큰 만료 시간 (시간) | 선택 |
+| `TOKEN_EXPIRE_HOURS` | 72 | 일반 로그인 유지 시간 (시간) | 선택 |
+| `REMEMBER_ME_DAYS` | 30 | "로그인 유지"를 고른 로그인의 유지 일수 | 선택 |
 | `CORS_ORIGINS` | http://localhost:5173,http://localhost:3000 | CORS 허용 오리진 (콤마 구분) | 선택 |
 | `UPLOAD_DIR` | backend/uploads | 로컬 저장소의 첨부·가져오기 파일 디렉토리 | 선택 |
 | `STORAGE_BACKEND` | local | `local` 또는 `supabase`(배포) | 선택 |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STORAGE_BUCKET` | - | STORAGE_BACKEND=supabase 일 때 Supabase 프로젝트 주소, 서비스 키, 버킷 | 선택 |
 | `CRON_SECRET` | - | 매일 정리 작업(`/api/internal/cron/daily`) 인증 값 | 선택 |
-| `TRUSTED_PROXY_HEADER` | - | 클라이언트 IP 를 담는 프록시 헤더. 플랫폼이 덮어쓰는 헤더만 | 선택 |
+| `TRUSTED_PROXY_HEADER` | - | 클라이언트 IP 를 담는 프록시 헤더. 플랫폼이 덮어쓰는 헤더만(Vercel 은 `x-real-ip`) | 선택 |
 | `LOCK_WAIT_TIMEOUT_MS` | 10000 | 동시 편집 잠금 대기 상한. 넘으면 409 안내 | 선택 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | - | Google 로그인. 비우면 Google 버튼을 숨김 | 선택 |
 | `GOOGLE_REDIRECT_URI` | 개발: `http://localhost:5173/api/auth/google/callback` | Google 콘솔에 등록한 리디렉션 URI. 운영은 필수 | 선택 |
-| `AUTH_COMPANY_DOMAINS` | - | 회사 도메인(쉼표 구분). Google Workspace 도메인으로 판정 | 선택 |
-| `AUTH_ALLOW_PERSONAL` | 1 | 0 이면 회사 계정만 받음 | 선택 |
-| `AUTH_APPROVAL` | none | 관리자 승인 대상. `none` / `personal` / `all` | 선택 |
+| `AUTH_COMPANY_DOMAINS` | - | 회사 도메인(쉼표 구분). Google 이 알려 준 Workspace 도메인으로만 판정 | 선택 |
+| `AUTH_ALLOW_PERSONAL` | 1 | 0 이면 회사 계정만 받음. 이때 `AUTH_COMPANY_DOMAINS` 필수, 이메일 가입은 항상 승인 대기 | 선택 |
+| `AUTH_APPROVAL` | none | 관리자 승인 대상. `none`(모두 바로 사용) / `personal`(회사 Workspace Google 계정만 바로 사용, 나머지는 대기. 이메일 가입은 회사 주소여도 대기) / `all`(모두). 단 `AUTH_ALLOW_PERSONAL=0` 이면 이메일 가입은 이 값과 관계없이 승인 대기 | 선택 |
 | `BOOTSTRAP_TOKEN` | - | 운영(ENV=production) 빈 DB 의 첫 관리자 만들기에 필요한 값 | 선택 |
 | `REGISTER_MAX_PER_HOUR` | 10 | IP 하나의 시간당 가입 요청 수 | 선택 |
 
 ⚠️ **주의**: 프로덕션 환경에서는 반드시 `SECRET_KEY`를 고유한 값으로 설정하세요. 미설정 시 서버 시작이 실패합니다.
+
+### 3-1. Google 로그인 켜기
+
+1. Google Cloud 콘솔의 **API 및 서비스 > 사용자 인증 정보**에서 OAuth 클라이언트 ID(웹 애플리케이션)를 만듭니다.
+2. **승인된 리디렉션 URI**에 `https://<사이트 주소>/api/auth/google/callback` 을 넣습니다. 개발 환경은 `http://localhost:5173/api/auth/google/callback` 입니다.
+3. 발급된 값을 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` 에, 같은 리디렉션 URI 를 `GOOGLE_REDIRECT_URI` 에 넣고 서버를 다시 시작합니다. 로그인 화면에 **Google 로 로그인** 버튼이 나타납니다.
+
+ℹ️ **회사 계정만 받으려면**: `AUTH_COMPANY_DOMAINS` 에 Workspace 도메인을 넣고 `AUTH_ALLOW_PERSONAL=0` 으로 둡니다. 누구를 승인 대기로 둘지는 `AUTH_APPROVAL` 이 정합니다(회사 계정만 받는 설정에서 이메일 가입은 항상 대기). 설정값이 잘못되면 서버가 시작할 때 멈추고 이유를 알려 줍니다.
 
 ---
 
@@ -116,7 +125,7 @@ npx tsc -b
 
 ### 5-2. 사용자 목록
 
-모든 사용자의 ID, 사용자명, 표시명, 역할, 가입일을 확인할 수 있습니다.
+사용자마다 아이디, 표시명, 이메일, 로그인 방식(비밀번호, Google, 연결된 Google 주소), 상태, 시스템 역할, 프로젝트 배정, 가입일을 확인합니다.
 
 ### 5-3. 역할 변경
 
@@ -143,7 +152,7 @@ npx tsc -b
 
 ### 5-5-1. 가입 승인과 계정 상태
 
-계정 상태는 **사용 / 승인 대기 / 사용 중지됨** 셋입니다. 누가 승인 대기가 되는지는 `AUTH_APPROVAL` 이 정합니다(3장).
+계정 상태는 **사용 / 승인 대기 / 사용 중지됨** 셋입니다. 누가 승인 대기가 되는지는 `AUTH_APPROVAL` 이 정합니다(3장). 회사 계정만 받는 설정(`AUTH_ALLOW_PERSONAL=0`)에서는 이메일 가입이 항상 승인 대기입니다.
 
 - 승인 대기 계정이 있으면 사용자 목록 위에 **승인 대기 N명** 이 보입니다. **승인** 하면 바로 로그인할 수 있고, **거절** 하면 그 계정을 지웁니다.
 - **사용 중지** 하면 그 사람의 로그인과 API 키가 바로 막힙니다. **다시 사용** 해도 옛 API 키는 살아나지 않습니다.
@@ -152,7 +161,8 @@ npx tsc -b
 - **이메일 해제**: 남의 주소로 먼저 가입해 이메일을 차지한 계정에서 이메일을 뗍니다. 진짜 주인이 그 뒤에 Google 로 가입할 수 있습니다. Google 이 확인한 이메일은 해제할 수 없습니다.
 - **삭제**: 작업 기록이 하나도 없는 계정만 지웁니다. 실수로 생긴 빈 계정 정리용이고, 기록이 있으면 거절되니 사용 중지를 씁니다.
 - 로그인 방식 칸 아래에 연결된 Google 계정 주소가 보입니다. **주소 미기록** 은 이 기능 전에 연결된 계정이고 다음 Google 로그인 때 채워집니다.
-- 비밀번호 없이 Google 로만 쓰던 빈 계정은, 본인이 다른 계정에 그 Google 계정을 연결하면 자동으로 정리됩니다. 승인 대기나 사용 중지 상태여도 같습니다. 연결한 계정에 이메일이 없으면 그 이메일도 옮겨집니다.
+- 비밀번호 없이 Google 로만 쓰던 빈 계정은, 본인이 다른 계정에 그 Google 계정을 연결하면 자동으로 정리됩니다. 승인 대기나 사용 중지 상태여도 같습니다. 마지막 활성 관리자 계정은 정리하지 않습니다. 연결한 계정에 이메일이 없고 그 이메일을 쓰는 다른 계정이 없으면 그 이메일도 옮겨집니다.
+- 연결하려는 계정에 이미 다른 Google 계정이 연결돼 있거나, 회사 계정만 받는 설정에서 개인 Google 계정을 연결하면 거절됩니다.
 - 그 Google 계정을 쥔 계정에 기록이나 비밀번호가 있으면 연결이 거절됩니다. 그 계정의 **초기화**(비밀번호 초기화)로 Google 연결을 끊은 뒤 다시 연결합니다.
 - 퇴사자는 Workspace 계정을 지워도 앱 로그인(최대 30일)과 API 키가 남습니다. 사용 중지해야 바로 막힙니다.
 - 관리자 초기화나 계정 복구로 비밀번호를 바꾸면 그 계정의 Google 연결도 끊깁니다. 사용자가 다시 연결하면 됩니다.
@@ -241,35 +251,54 @@ npx tsc -b
 | 비밀번호 정책 | 최소 8자, 동일 비밀번호 재사용 불가 | 자동 적용 |
 | 비밀번호 저장 | bcrypt 해싱 | 자동 적용 |
 | 비밀번호 초기화 | Admin이 임시 비밀번호 발급, 강제 변경 플래그 | Admin 페이지 |
-| 인증 토큰 | JWT (HS256) | TOKEN_EXPIRE_HOURS (기본 2시간) |
+| 인증 토큰 | JWT (HS256) + httpOnly 쿠키 | TOKEN_EXPIRE_HOURS (기본 72시간), 로그인 유지는 REMEMBER_ME_DAYS (기본 30일) |
+| CSRF 방어 | csrf_token 쿠키 + X-CSRF-Token 헤더 검증 | 쿠키 로그인의 상태 변경 요청에 자동 적용 (Bearer 헤더 인증은 제외) |
 | API 키 | 사용자별 발급 · 폐기, SHA-256 해시 저장, Bearer 헤더 인증 | 만료 30 · 90 · 180 · 365일 또는 없음, 1인 20개, 비밀번호가 바뀌면 전부 폐기 |
 | 로그인 제한 | Rate Limiting | IP+사용자당 5분간 10회 (초과 시 잠금) |
 | CORS | 오리진 화이트리스트 | CORS_ORIGINS (와일드카드 금지) |
 | 파일 업로드 | 확장자 화이트리스트 + 경로 탐색 방지 | 허용 확장자 고정 |
 | XSS 방지 | DOMPurify (프론트엔드) | 마크다운 셀 렌더링 시 자동 적용 |
 | API 권한 | 역할 기반 접근 제어 | 엔드포인트별 역할 체크 |
+| Google 로그인 | OpenID Connect 인가 코드 흐름 + PKCE, state · nonce 검증, Google 이 확인한 이메일만 받음 | GOOGLE_CLIENT_ID 등, AUTH_COMPANY_DOMAINS, AUTH_ALLOW_PERSONAL |
+| 가입 제한 | IP 당 가입 요청 수 제한, 관리자 승인 | REGISTER_MAX_PER_HOUR (기본 10), AUTH_APPROVAL |
 
 ---
 
-## 10. API 엔드포인트 (57개)
+## 10. 주요 API 엔드포인트
 
-API 문서(Swagger UI): `http://localhost:8008/api/docs`
+자주 쓰는 엔드포인트만 싣습니다. 전체 목록과 요청 형식은 Swagger UI(`http://localhost:8008/api/docs`)에서 확인합니다.
 
 ### 인증 (Auth)
 
 | Method | Endpoint | 설명 |
 |---|---|---|
-| GET | /api/auth/check-username | 사용자명 중복 확인 |
-| POST | /api/auth/register | 회원가입 (비밀번호 최소 8자) |
-| POST | /api/auth/login | 로그인 (JWT 토큰 발급) |
+| GET | /api/auth/config | 로그인 화면 설정 (Google 버튼 표시 여부, 가입 화면 종류) |
+| GET | /api/auth/check-username | 사용자명 중복 확인. 첫 관리자 화면 전용이며 사용자가 생긴 뒤에는 404 |
+| POST | /api/auth/register | 회원가입. 이메일 가입이며 설정에 따라 승인 대기. 첫 관리자 만들기 겸용 |
+| POST | /api/auth/login | 로그인 (세션 쿠키 발급, remember_me 면 기본 30일) |
+| POST | /api/auth/logout | 로그아웃. 세션 쿠키를 지우고 그 계정의 다른 기기 세션도 모두 끊음 |
 | GET | /api/auth/me | 현재 사용자 정보 |
 | PUT | /api/auth/change-password | 비밀번호 변경 (최소 8자) |
 | GET | /api/auth/users | 사용자 목록 (QA Manager 이상) |
+| POST | /api/auth/users/{user_id}/approve | 가입 승인 (Admin) |
+| POST | /api/auth/users/{user_id}/reject | 가입 거절. 승인 대기 계정을 지움 (Admin) |
+| POST | /api/auth/users/{user_id}/disable | 사용 중지. 로그인과 API 키를 막음 (Admin) |
+| POST | /api/auth/users/{user_id}/enable | 다시 사용 (Admin) |
+| POST | /api/auth/users/{user_id}/release-email | 이메일 해제 (Admin) |
+| DELETE | /api/auth/users/{user_id} | 작업 기록이 없는 계정 삭제. 기록이 있으면 409 (Admin) |
 | PUT | /api/auth/users/{user_id}/role | 역할 변경 (Admin) |
 | PUT | /api/auth/users/{user_id}/reset-password | 비밀번호 초기화 (Admin, 로그인 세션만) |
+| POST | /api/auth/account-requests | 계정 복구 요청 접수 |
+| GET | /api/auth/account-requests | 계정 복구 요청 목록 |
+| POST | /api/auth/account-requests/{id}/approve | 계정 복구 요청 승인 |
+| POST | /api/auth/account-requests/{id}/reject | 계정 복구 요청 반려 |
+| POST | /api/auth/reset-password/verify | 코드로 비밀번호 재설정 |
 | GET | /api/auth/api-keys | 본인 API 키 목록 (로그인 세션만) |
 | POST | /api/auth/api-keys | API 키 발급. 원문은 응답에서 1회만 (로그인 세션만) |
 | DELETE | /api/auth/api-keys/{key_id} | API 키 폐기 (로그인 세션만) |
+| GET | /api/auth/google/start | Google 로그인 시작 (?mode=login\|link) |
+| GET | /api/auth/google/callback | Google 로그인 콜백. GOOGLE_REDIRECT_URI 가 가리키는 주소 |
+| POST | /api/auth/google/unlink | Google 연결 해제 (비밀번호가 있는 계정만) |
 
 ### 프로젝트
 
@@ -373,6 +402,9 @@ API 문서(Swagger UI): `http://localhost:8008/api/docs`
 | PDF 한글 깨짐 | 서버에 한글 폰트 미설치 | Malgun Gothic 설치 |
 | 모든 API 가 503 | DB 스키마가 코드보다 옛 버전 | backend 에서 `python -m alembic upgrade head` |
 | 저장 시 "다른 작업이 진행 중입니다" | 같은 프로젝트의 구조 변경이 동시에 몰림 | 잠시 뒤 다시 시도. 잦으면 `LOCK_WAIT_TIMEOUT_MS` 상향 |
+| 로그인 화면에 Google 버튼이 없음 | `GOOGLE_CLIENT_ID` 가 비어 있음 | 3-1 절처럼 `GOOGLE_*` 값을 넣고 서버 재시작 |
+| Google 화면에서 redirect_uri_mismatch | Google 콘솔의 리디렉션 URI 와 `GOOGLE_REDIRECT_URI` 가 다름 | 두 값을 글자까지 같게. 끝의 `/` 와 http/https 도 맞출 것 |
+| "관리자 승인을 기다리는 중입니다" 로 로그인 실패 | `AUTH_APPROVAL` 설정, 또는 회사 계정만 받는 설정의 이메일 가입이라 승인 대기인 계정 | 사용자 관리에서 승인 (5-5-1) |
 
 ---
 
@@ -416,7 +448,11 @@ cp -r backup/uploads_20261009/* backend/uploads/
 | 파일명 | 설명 | 사용 위치 |
 |---|---|---|
 | `01_login_page.png` | 로그인 페이지 | 사용자 매뉴얼 2-1 |
-| `02_register_page.png` | 회원가입 페이지 | 사용자 매뉴얼 2-2 |
+| `02_register_page.png` | 회원가입 페이지 | 사용자 매뉴얼 2-3 |
+| `44_account_link_modal.png` | 계정 연결 창 | 사용자 매뉴얼 2-5 |
+| `36_account_help_find_id.png` | 계정 도움 요청 (아이디 찾기) | 사용자 매뉴얼 2-6 |
+| `37_account_help_reset.png` | 계정 도움 요청 (비밀번호 재설정) | 사용자 매뉴얼 2-6 |
+| `38_reset_password_page.png` | 비밀번호 재설정 페이지 | 사용자 매뉴얼 2-6 |
 | `04_project_list_overview.png` | 프로젝트 목록 전체 현황 | 사용자 매뉴얼 3-1 |
 | `05_project_list_cards.png` | 프로젝트 카드 | 사용자 매뉴얼 3-2 |
 | `06_project_create_modal.png` | 프로젝트 생성 모달 | 사용자 매뉴얼 3-3 |
@@ -438,4 +474,4 @@ cp -r backup/uploads_20261009/* backend/uploads/
 
 ---
 
-*YM TestCase v0.4.0.0 | 운영 매뉴얼 (Admin 전용)*
+*YM TestCase v2.2.0.1 | 운영 매뉴얼 (Admin 전용)*
