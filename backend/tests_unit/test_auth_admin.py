@@ -127,13 +127,14 @@ def test_목록에_새_칸이_있다(auth_env):
 
 def test_관리자_초기화는_Google_연결을_끊는다(auth_env):
     make_user(auth_env.Session, username="boss", role=UserRole.admin)
-    uid = make_user(auth_env.Session, username="u", google_sub="attacker-sub")
+    uid = make_user(auth_env.Session, username="u", google_sub="attacker-sub", google_email="attacker@gmail.com")
     sess = _cookie_session(auth_env, "boss")
     r = sess.put(auth_env.base + f"/api/auth/users/{uid}/reset-password",
                  headers={"X-CSRF-Token": sess.cookies.get("csrf_token")})
     assert r.status_code == 200, r.text
     with auth_env.Session() as s:
-        assert s.get(User, uid).google_sub is None
+        u = s.get(User, uid)
+        assert (u.google_sub, u.google_email) == (None, None)
 
 
 def test_대기_계정의_복구는_승인도_코드도_막힌다(auth_env):

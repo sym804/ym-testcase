@@ -24,7 +24,7 @@ from routes.auth import _check_rate_limit, _clear_failures, _record_failure
 from services import rate_limit
 from services.client_ip import client_ip
 from services.account_policy import normalize_identifier
-from services.accounts import find_user_by_identifier, lock_accounts
+from services.accounts import clear_google, find_user_by_identifier, lock_accounts
 from services.locks import LockNs, keyed_xact_lock
 
 logger = logging.getLogger(__name__)
@@ -293,7 +293,7 @@ def reset_password_with_code(
     # 복구는 계정을 되찾는 국면이다. 옛 토큰이 살아 있으면 되찾은 것이 아니다
     user.token_version = (user.token_version or 0) + 1
     revoke_user_api_keys(user.id, db)
-    user.google_sub = None  # 관리자 초기화와 같은 이유
+    clear_google(user)  # 관리자 초기화와 같은 이유
     # 살아 있는 approved 요청을 전부 닫는다. 중복 억제가 pending 만 보기 때문에 한
     # 사용자가 approved 를 여러 건 들고 있을 수 있고, 쓴 한 건만 닫으면 나머지 코드가
     # 최대 24시간 동안 그대로 유효하다. 이미 메신저로 흘러간 코드가 남는다.

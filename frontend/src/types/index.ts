@@ -31,6 +31,8 @@ export interface User {
   status?: UserStatus;
   has_password?: boolean;
   google_linked?: boolean;
+  /** 연결된 Google 계정의 주소. 이 칸이 생기기 전에 연결된 계정은 다음 Google 로그인까지 비어 있다 */
+  google_email?: string | null;
 }
 
 export type UserStatus = "active" | "pending" | "disabled";

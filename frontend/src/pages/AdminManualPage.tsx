@@ -240,6 +240,8 @@ npx tsc --noEmit`}</pre>
               <li dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusLi2") }} />
               <li dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusLi3") }} />
               <li dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusLi4") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusLi5") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusLi6") }} />
             </ul>
             <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusWarn") }} />
 

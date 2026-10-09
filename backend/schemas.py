@@ -45,6 +45,7 @@ class UserResponse(BaseModel):
     status: str = "active"
     has_password: bool = True
     google_linked: bool = False
+    google_email: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

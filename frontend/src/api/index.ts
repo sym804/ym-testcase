@@ -645,6 +645,9 @@ export const usersApi = {
 
   releaseEmail: async (userId: number) => (await client.post<User>(`/api/auth/users/${userId}/release-email`)).data,
 
+  /** 작업 기록이 없는 계정만 지운다. 기록이 있으면 409 */
+  remove: async (userId: number) => { await client.delete(`/api/auth/users/${userId}`); },
+
   getAllAssignments: async () => {
     const res = await client.get<Record<string, { id: number; project_id: number; project_name: string; role: string }[]>>(
       "/api/projects/all-assignments"

@@ -16,7 +16,9 @@ from services.client_ip import client_ip
 from services.locks import LockNs, keyed_xact_lock
 from models import User, UserRole, UserStatus
 from services.account_policy import AccountRejected, initial_status, normalize_email, normalize_identifier
-from services.accounts import active_admin_count, disable, email_taken, find_user_by_identifier, lock_accounts
+from services.accounts import (
+    active_admin_count, activity_refs, clear_google, disable, email_taken, find_user_by_identifier, lock_accounts,
+)
 from services.auth_config import get_auth_config
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
 from auth import (
@@ -403,6 +405,30 @@ def release_email(user_id: int, db: Session = Depends(get_db),
     return _saved(db, user)
 
 
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, db: Session = Depends(get_db),
+                current_user: User = Depends(role_required("admin"))):
+    """작업 기록이 하나도 없는 계정만 지운다. 실수로 생긴 빈 계정 정리용. 기록이 있으면 사용 중지를 쓴다."""
+    user = _locked_target(db, user_id, current_user)
+    if user.id == current_user.id:
+        raise HTTPException(status_code=409, detail="자기 자신은 삭제할 수 없습니다.")
+    if user.role == UserRole.admin and user.status == UserStatus.active and active_admin_count(db, exclude_id=user.id) == 0:
+        raise HTTPException(status_code=409, detail="마지막 관리자는 삭제할 수 없습니다.")
+    refs = activity_refs(db, user.id)
+    if refs:
+        logger.info("User delete refused: %s refs=%s", user.username, refs)
+        raise HTTPException(status_code=409, detail="작업 기록이 있는 계정은 삭제할 수 없습니다. 사용 중지를 쓰세요.")
+    username = user.username
+    db.delete(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="작업 기록이 있는 계정은 삭제할 수 없습니다. 사용 중지를 쓰세요.")
+    logger.info("User deleted: %s by=%s", username, current_user.username)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.put("/users/{user_id}/role", response_model=UserResponse)
 def update_user_role(
     user_id: int,
@@ -447,7 +473,7 @@ def reset_password(
     user.token_version = (user.token_version or 0) + 1
     revoke_user_api_keys(user.id, db)
     # 탈취한 쪽이 자기 Google 계정을 연결해 두었으면 그 길이 남는다. 되찾는 국면이라 끊는다.
-    user.google_sub = None
+    clear_google(user)
     db.commit()
     logger.info("Password reset by admin for user: %s", user.username)
     return {"temp_password": temp_pw}

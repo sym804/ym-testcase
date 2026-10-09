@@ -73,6 +73,27 @@ test.describe("계정 승인", () => {
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
   });
 
+  test("작업 기록이 없는 계정은 관리 화면에서 삭제된다", async ({ page, request }) => {
+    const email = `e2e_delete_${Date.now()}@example.com`;
+    const reg = await request.post("/api/auth/register", { data: { email, password: PW, display_name: "E2E 삭제" } });
+    expect(reg.status()).toBe(201);
+    const id = (await reg.json()).id as number;
+    const headers = await adminHeaders(request);
+    expect((await request.post(`/api/auth/users/${id}/approve`, { headers })).status()).toBe(200);
+
+    await loginAs(page, "admin", ADMIN_PW);
+    await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
+    await page.goto("/admin");
+    const row = page.locator("tr", { hasText: email });
+    await expect(row).toBeVisible({ timeout: 10000 });
+    page.once("dialog", (d) => d.accept());
+    await row.getByRole("button", { name: "삭제" }).click();
+    await expect(page.getByText("삭제했습니다.")).toBeVisible({ timeout: 10000 });
+    await expect(row).toHaveCount(0);
+    const users = await (await request.get("/api/auth/users", { headers })).json();
+    expect(users.some((u: { id: number }) => u.id === id)).toBe(false);
+  });
+
   test("Google 로그인 버튼이 보이고 시작 주소는 Google 로 보낸다", async ({ page, request }) => {
     await page.goto("/login");
     const link = page.getByRole("link", { name: "Google 로 로그인" });

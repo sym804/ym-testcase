@@ -74,5 +74,6 @@
   "googleUnlinkFailed": "연결을 해제하지 못했습니다.",
   "noPasswordCannotUnlink": "비밀번호가 없는 계정은 해제할 수 없습니다.",
   "googleDisabled": "Google 로그인이 꺼져 있습니다.",
-  "googleLinkedToast": "Google 계정을 연결했습니다."
+  "googleLinkedToast": "Google 계정을 연결했습니다.",
+  "googleMergedToast": "Google 계정을 연결했습니다. 이 Google 계정으로 만들어져 있던 빈 계정은 정리했습니다."
 }

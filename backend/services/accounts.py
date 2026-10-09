@@ -10,6 +10,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from auth import revoke_user_api_keys
+from database import Base
 from models import User, UserRole, UserStatus
 from services.account_policy import normalize_identifier
 from services.locks import LockNs, advisory_xact_lock
@@ -59,3 +60,36 @@ def disable(db: Session, user: User) -> None:
     user.status = UserStatus.disabled
     user.token_version = (user.token_version or 0) + 1
     revoke_user_api_keys(user.id, db)
+
+
+def clear_google(user: User) -> None:
+    """Google 연결을 끊는다. 연결 이메일도 같이 지운다(남으면 끊긴 계정이 연결된 것처럼 보인다)."""
+    user.google_sub = None
+    user.google_email = None
+
+
+def activity_refs(db: Session, user_id: int) -> dict:
+    """이 사용자를 가리키는 행 수를 테이블.칸별로 센다. 0 인 칸은 뺀다.
+
+    ★외래키를 손으로 나열하지 않고 모델 메타데이터에서 찾는다. 테이블이 늘어도 빠지지 않는다.
+    ★호출하는 쪽이 사용자 행을 FOR UPDATE 로 잠근 뒤 부른다. 다른 트랜잭션이 이 사용자를 가리키는
+      행을 넣으려면 같은 행에 KEY SHARE 잠금이 필요해 커밋까지 기다리므로, 센 뒤 지우는 사이에
+      새 기록이 끼어들지 못한다.
+    """
+    refs = {}
+    for table in Base.metadata.sorted_tables:
+        for fk in table.foreign_keys:
+            if fk.column.table.name == "users" and fk.column.name == "id":
+                n = db.query(func.count()).select_from(table).filter(fk.parent == user_id).scalar() or 0
+                if n:
+                    refs[f"{table.name}.{fk.parent.name}"] = n
+    return refs
+
+
+def is_empty_google_account(db: Session, user: User) -> bool:
+    """Google 로만 들어오는(비밀번호 없는) 계정이고 아무 기록도 없으면 참.
+
+    이런 계정에 들어갈 길은 그 Google 계정 하나뿐이다. 그 Google 계정으로 방금 인증한 사람이
+    다른 계정에 연결하려 하면, 이 계정을 정리하고 옮겨도 남의 것을 가져가는 일이 아니다.
+    """
+    return not user.password_hash and not activity_refs(db, user.id)

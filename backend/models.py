@@ -79,6 +79,9 @@ class User(Base):
     email_verified = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     #: Google 이 계정마다 주는 고유 번호. Google 로그인은 이메일이 아니라 이 칸으로 찾는다.
     google_sub = Column(String(255), unique=True, nullable=True, index=True)
+    #: 연결된 Google 계정의 이메일(연결·로그인 때마다 갱신). email 은 다른 계정이 그 주소를
+    #: 쥐고 있으면 비어 있으므로, 관리자가 연결된 계정을 확인하는 칸은 이것이다.
+    google_email = Column(String(100), nullable=True)
     status = Column(SAEnum(UserStatus), nullable=False, default=UserStatus.active, server_default=UserStatus.active.value)
     created_at = Column(DateTime, default=now_kst)
 

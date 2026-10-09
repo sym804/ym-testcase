@@ -33,6 +33,9 @@ const ERROR_MAP: Record<string, string> = {
   "마지막 관리자의 역할은 바꿀 수 없습니다.": "errors.lastAdminRole",
   "비밀번호가 없는 계정은 Google 연결을 해제할 수 없습니다.": "errors.noPasswordUnlink",
   "사용 중인 계정만 처리할 수 있습니다.": "errors.onlyActive",
+  "자기 자신은 삭제할 수 없습니다.": "errors.cannotDeleteSelf",
+  "마지막 관리자는 삭제할 수 없습니다.": "errors.lastAdminDelete",
+  "작업 기록이 있는 계정은 삭제할 수 없습니다. 사용 중지를 쓰세요.": "errors.hasActivity",
   // Sheets
   "시트 이름을 입력해 주세요.": "errors.sheetNameRequired",
   "이미 존재하는 시트 이름입니다.": "errors.sheetNameExists",

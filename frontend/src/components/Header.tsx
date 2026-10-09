@@ -65,6 +65,8 @@ export default function Header() {
     handledAccountRef.current = location.search;
     if (result === "linked") {
       toast.success(t("googleLinkedToast"));
+    } else if (result === "merged") {
+      toast.success(t("googleMergedToast"));
     } else {
       toast.error(googleErrorMessage(result));
     }

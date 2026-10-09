@@ -21,7 +21,9 @@ from routes.auth import issue_session
 from schemas import UserResponse
 from services import google_oauth
 from services.account_policy import EMAIL_MAX, AccountRejected, initial_status, safe_next
-from services.accounts import email_taken, google_username, lock_accounts
+from services.accounts import (
+    active_admin_count, clear_google, email_taken, google_username, is_empty_google_account, lock_accounts,
+)
 from services.auth_config import get_auth_config
 
 logger = logging.getLogger(__name__)
@@ -126,7 +128,7 @@ def _login(db: Session, cfg, flow, ident) -> RedirectResponse:
             return _fail("email_taken")
         user = User(
             username=google_username(db, ident.email), email=ident.email, email_verified=True,
-            google_sub=ident.sub, password_hash=None,
+            google_sub=ident.sub, google_email=ident.email, password_hash=None,
             display_name=(ident.name or ident.email.split("@")[0])[:100],
             role=UserRole.user, status=status_for_new, must_change_password=False,
         )
@@ -142,6 +144,8 @@ def _login(db: Session, cfg, flow, ident) -> RedirectResponse:
         return _fail("pending")
     if user.status == UserStatus.disabled:
         return _fail("disabled")
+    # 연결된 Google 계정의 주소를 최신으로 둔다. 이 칸이 생기기 전에 연결된 계정도 여기서 채워진다.
+    user.google_email = ident.email
     resp = _redirect(flow.next)
     issue_session(resp, user)
     db.commit()
@@ -166,17 +170,46 @@ def _link(request: Request, db: Session, cfg, flow, ident) -> RedirectResponse:
     if user is None or user.status != UserStatus.active or (user.token_version or 0) != version_seen:
         return _fail("google_state", "link")
     if user.google_sub == ident.sub:
+        user.google_email = ident.email
+        db.commit()
         return _redirect("/projects?account=linked")
-    other = db.query(User.id).filter(User.google_sub == ident.sub, User.id != user.id).first()
-    if other or user.google_sub:
+    if user.google_sub:
         return _fail("already_linked", "link")
+    other = (db.query(User).filter(User.google_sub == ident.sub, User.id != user.id)
+             .with_for_update().populate_existing().first())
+    merged_id = None
+    if other is not None:
+        # 실수로 Google 로그인해 생긴 빈 계정이면 정리하고 옮긴다. 그 계정의 유일한 출입구가
+        # 방금 인증한 이 Google 계정이라 남의 계정을 가져가는 일이 아니다. 기록이 있거나
+        # 비밀번호가 있으면 사람의 판단이 필요하므로 지금처럼 거절한다.
+        if not _absorbable(db, other):
+            return _fail("already_linked", "link")
+        merged_id = other.id
+        db.delete(other)
+        db.flush()
     user.google_sub = ident.sub
+    user.google_email = ident.email
     if not user.email and not email_taken(db, ident.email, exclude_id=user.id):
         user.email = ident.email
         user.email_verified = True
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return _fail("already_linked", "link")
+    if merged_id is not None:
+        logger.info("Google account linked after removing empty account: user_id=%s removed=%s", user.id, merged_id)
+        return _redirect("/projects?account=merged")
     logger.info("Google account linked: user_id=%s", user.id)
     return _redirect("/projects?account=linked")
+
+
+def _absorbable(db: Session, other: User) -> bool:
+    if not is_empty_google_account(db, other):
+        return False
+    # 마지막 활성 관리자를 지우면 아무도 관리할 수 없다
+    return not (other.role == UserRole.admin and other.status == UserStatus.active
+                and active_admin_count(db, exclude_id=other.id) == 0)
 
 
 @router.post("/unlink", response_model=UserResponse)
@@ -189,7 +222,7 @@ def google_unlink(db: Session = Depends(get_db), current_user: User = Depends(ge
         raise HTTPException(status_code=401, detail="Could not validate credentials")
     if not user.password_hash:
         raise HTTPException(status_code=400, detail="비밀번호가 없는 계정은 Google 연결을 해제할 수 없습니다.")
-    user.google_sub = None
+    clear_google(user)
     db.commit()
     db.refresh(user)
     logger.info("Google account unlinked: user_id=%s", user.id)

@@ -48,7 +48,12 @@ export default function AccountLinkModal({ onClose }: { onClose: () => void }) {
         <h3 id="account-link-title" style={styles.title}>{t("accountLink")}</h3>
         <p style={styles.help}>{t("accountLinkHelp")}</p>
         <div style={styles.row}>
-          <span style={styles.state}>{linked ? t("googleLinked") : t("googleNotLinked")}</span>
+          <span style={styles.state}>
+            {linked ? t("googleLinked") : t("googleNotLinked")}
+            {linked && user?.google_email && (
+              <span style={styles.linkedEmail}>{user.google_email}</span>
+            )}
+          </span>
           {linked ? (
             hasPassword ? (
               <button type="button" style={styles.dangerBtn} onClick={handleUnlink} disabled={busy}>
@@ -104,6 +109,7 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: "var(--bg-input)",
   },
   state: { fontSize: 14, fontWeight: 600 },
+  linkedEmail: { display: "block", marginTop: 2, fontSize: 12, fontWeight: 400, color: "var(--text-secondary)", wordBreak: "break-all" },
   note: { fontSize: 12, color: "var(--text-secondary)" },
   primaryBtn: {
     padding: "8px 14px",

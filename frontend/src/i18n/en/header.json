@@ -74,5 +74,6 @@
   "googleUnlinkFailed": "Could not unlink.",
   "noPasswordCannotUnlink": "Accounts without a password cannot unlink.",
   "googleDisabled": "Google sign-in is turned off.",
-  "googleLinkedToast": "Google account linked."
+  "googleLinkedToast": "Google account linked.",
+  "googleMergedToast": "Google account linked. The empty account previously created with this Google account was removed."
 }

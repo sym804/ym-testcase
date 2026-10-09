@@ -59,6 +59,12 @@ describe("AccountLinkModal", () => {
     });
   });
 
+  it("연결된 Google 계정 주소를 보여 준다", async () => {
+    mockAuthUser = { ...base, has_password: true, google_linked: true, google_email: "me@gmail.com" };
+    render(<AccountLinkModal onClose={vi.fn()} />);
+    expect(await screen.findByText("me@gmail.com")).toBeInTheDocument();
+  });
+
   it("비밀번호 없는 계정은 해제 버튼 대신 안내", async () => {
     mockAuthUser = { ...base, has_password: false, google_linked: true };
     render(<AccountLinkModal onClose={vi.fn()} />);
