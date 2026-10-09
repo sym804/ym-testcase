@@ -10,7 +10,7 @@ import AccountLinkModal from "./AccountLinkModal";
 import type { Project, TestCase } from "../types";
 import { UserRole } from "../types";
 import toast from "react-hot-toast";
-import { translateError } from "../utils/errorMessage";
+import { googleErrorMessage, translateError } from "../utils/errorMessage";
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -55,14 +55,18 @@ export default function Header() {
   const [showAccountLink, setShowAccountLink] = useState(false);
 
   // Google 계정 연결의 결과는 ?account=<linked|오류 코드> 로 돌아온다. 한 번 알리고 쿼리를 지운다.
+  // ★처리한 주소를 기억한다. StrictMode 는 effect 를 두 번 돌리고, 쿼리를 지우는 이동이 반영되기
+  //   전이라 같은 알림이 두 번 뜬다.
+  const handledAccountRef = useRef<string | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const result = params.get("account");
-    if (!result) return;
+    if (!result || handledAccountRef.current === location.search) return;
+    handledAccountRef.current = location.search;
     if (result === "linked") {
       toast.success(t("googleLinkedToast"));
     } else {
-      toast.error(i18n.t(`login:googleErrors.${result}`, { defaultValue: i18n.t("login:googleErrors.unknown") }));
+      toast.error(googleErrorMessage(result));
     }
     params.delete("account");
     const rest = params.toString();

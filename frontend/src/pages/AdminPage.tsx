@@ -86,7 +86,7 @@ export default function AdminPage() {
       loadUsers();
     } catch (err) {
       console.error(err);
-      toast.error(t("roleChangeFailed"));
+      toast.error(errorText(err, t("roleChangeFailed")));
     }
   };
 
@@ -343,11 +343,11 @@ export default function AdminPage() {
                             {t("enable")}
                           </button>
                         )}
-                        {u.email && !u.email_verified && (
+                        {u.email && !u.email_verified && u.id !== currentUser?.id && (
                           <button
                             style={s.assignBtn}
                             onClick={() => runAccountAction(() => usersApi.releaseEmail(u.id), "emailReleased",
-                              t("releaseEmailConfirm", { name: u.display_name, email: u.email }))}
+                              t("releaseEmailConfirm", { name: u.display_name, email: u.email, newId: `released-${u.id}` }))}
                           >
                             {t("releaseEmail")}
                           </button>

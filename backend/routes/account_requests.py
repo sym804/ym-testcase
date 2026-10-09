@@ -234,34 +234,31 @@ def reset_password_with_code(
     _check_rate_limit(request, ident, db)
     fail = HTTPException(status_code=401, detail="코드가 올바르지 않거나 만료되었습니다.")
 
-    # 계정을 바꾸는 다른 경로(사용 중지, 연결, 초기화)와 같은 잠금으로 줄 세운다(교착 방지).
-    lock_accounts(db)
+    # ★확인과 bcrypt 는 계정 잠금 밖에서 한다. 이 API 는 로그인 없이 부를 수 있어서, 잠금 안에서
+    #   bcrypt 를 돌리면 아이디를 바꿔 가며 보내는 요청이 가입·연결·관리자 조작을 모두 줄 세운다.
+    #   잠금은 성공이 확정된 뒤 반영할 때만 잡고, 그 안에서 상태를 다시 확인한다.
     user = find_user_by_identifier(db, ident)
-    if user is not None:
-        db.refresh(user)
     # 대기·중지 계정은 복구 대상이 아니다. 실패 응답은 다른 실패와 같게 둔다.
     if not user or user.status != UserStatus.active:
         verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화. 위 _DUMMY_HASH 주석 참고
         _record_failure(request, ident, db)
         raise fail
 
-    approved = (
-        db.query(AccountRequest)
-        .filter(
-            AccountRequest.user_id == user.id,
-            AccountRequest.request_type == AccountRequestType.reset_password,
-            AccountRequest.status == AccountRequestStatus.approved,
+    def approved_requests():
+        return (
+            db.query(AccountRequest)
+            .filter(
+                AccountRequest.user_id == user.id,
+                AccountRequest.request_type == AccountRequestType.reset_password,
+                AccountRequest.status == AccountRequestStatus.approved,
+            )
+            # 승인 시각 기준이다. 접수 순서와 승인 순서가 다를 수 있어 created_at 으로
+            # 고르면 관리자가 마지막에 건네준 코드가 401 이 난다.
+            # nulls_last: PostgreSQL 은 DESC 에서 NULL 을 맨 앞에 둔다(SQLite 는 맨 뒤).
+            .order_by(AccountRequest.resolved_at.desc().nulls_last(), AccountRequest.id.desc())
         )
-        # 승인 시각 기준이다. 접수 순서와 승인 순서가 다를 수 있어 created_at 으로
-        # 고르면 관리자가 마지막에 건네준 코드가 401 이 난다.
-        # nulls_last: PostgreSQL 은 DESC 에서 NULL 을 맨 앞에 둔다(SQLite 는 맨 뒤).
-        .order_by(AccountRequest.resolved_at.desc().nulls_last(), AccountRequest.id.desc())
-        # ★행을 잠그고 고른다. 잠그지 않으면 같은 코드로 동시에 온 요청이 모두 통과해
-        #   각자 비밀번호를 바꾼다(PostgreSQL 전환 후 4건 동시 4건 성공 재현). 기다린 쪽은
-        #   앞선 커밋으로 status 가 바뀐 행을 다시 평가해 목록에서 빠진다.
-        .with_for_update()
-        .all()
-    )
+
+    approved = approved_requests().all()
     req = approved[0] if approved else None
     if not req or not req.code_hash:
         verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화
@@ -276,8 +273,22 @@ def reset_password_with_code(
     if not verify_password(payload.code, req.code_hash):
         _record_failure(request, ident, db)
         raise fail
+    checked = (req.id, req.code_hash)
+    new_hash = hash_password(payload.new_password)
 
-    user.password_hash = hash_password(payload.new_password)
+    # 반영: 계정을 바꾸는 다른 경로(사용 중지, 연결, 초기화)와 같은 잠금으로 줄 세운다(교착 방지).
+    lock_accounts(db)
+    user = db.query(User).filter(User.id == user.id).with_for_update().populate_existing().first()
+    # ★요청 행을 잠그고 다시 고른다. 같은 코드로 동시에 온 요청은 여기서 한 줄로 서고, 뒤의 요청은
+    #   앞선 커밋으로 completed 가 된 행을 보고 실패한다(PostgreSQL 전환 후 4건 동시 4건 성공 재현).
+    approved = approved_requests().with_for_update().populate_existing().all()
+    if (user is None or user.status != UserStatus.active
+            or not approved or (approved[0].id, approved[0].code_hash) != checked):
+        _record_failure(request, ident, db)
+        raise fail
+    req = approved[0]
+
+    user.password_hash = new_hash
     user.must_change_password = False
     # 복구는 계정을 되찾는 국면이다. 옛 토큰이 살아 있으면 되찾은 것이 아니다
     user.token_version = (user.token_version or 0) + 1

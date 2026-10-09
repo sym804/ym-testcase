@@ -234,6 +234,15 @@ npx tsc --noEmit`}</pre>
             <h3 style={s.h3}>{t("userMgmt.initialAccountTitle")}</h3>
             <div style={s.infoBox} dangerouslySetInnerHTML={{ __html: t("userMgmt.initialAccountInfo") }} />
 
+            <h3 style={s.h3}>{t("userMgmt.accountStatusTitle")}</h3>
+            <ul style={s.ul}>
+              <li dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusLi1") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusLi2") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusLi3") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusLi4") }} />
+            </ul>
+            <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("userMgmt.accountStatusWarn") }} />
+
             <h3 style={s.h3}>{t("userMgmt.accountRequestTitle")}</h3>
             <p style={s.p}>{t("userMgmt.accountRequestP1")}</p>
             <img src="/manual-images/39_admin_account_requests.png" alt={t("userMgmt.accountRequestImgAlt")} style={s.img} />

@@ -25,26 +25,37 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const usernameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 아이디 확인 요청 번호. 늦게 온 옛 응답이 지금 입력의 결과를 덮지 않게 한다.
+  const checkSeq = useRef(0);
   const bootstrap = mode === "bootstrap";
+
+  const loadConfig = () => authApi.config()
+    .then((c) => setMode(c.signup_mode === "bootstrap" ? "bootstrap" : "email"))
+    .catch(() => setMode("email"));
 
   useEffect(() => {
     let alive = true;
     authApi.config()
       .then((c) => { if (alive) setMode(c.signup_mode === "bootstrap" ? "bootstrap" : "email"); })
       .catch(() => { if (alive) setMode("email"); });
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      checkSeq.current += 1;
+      if (usernameTimer.current) clearTimeout(usernameTimer.current);
+    };
   }, []);
 
   const checkUsername = (username: string) => {
     if (usernameTimer.current) clearTimeout(usernameTimer.current);
+    const seq = ++checkSeq.current;
     if (username.length < 2) { setUsernameStatus("idle"); return; }
     setUsernameStatus("checking");
     usernameTimer.current = setTimeout(async () => {
       try {
         const { available } = await authApi.checkUsername(username);
-        setUsernameStatus(available ? "available" : "taken");
+        if (seq === checkSeq.current) setUsernameStatus(available ? "available" : "taken");
       } catch {
-        setUsernameStatus("idle");
+        if (seq === checkSeq.current) setUsernameStatus("idle");
       }
     }, 400);
   };
@@ -92,6 +103,9 @@ export default function RegisterPage() {
       navigate("/login");
     } catch (err: unknown) {
       setError(errorText(err, t("registerFailed")));
+      // 첫 관리자 화면을 연 사이 다른 사람이 먼저 가입했다. 이메일 가입 화면으로 바꾼다.
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      if (bootstrap && detail === "이메일로 가입해 주세요.") loadConfig();
     } finally {
       setLoading(false);
     }

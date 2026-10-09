@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { StrictMode } from "react";
 import Header from "../components/Header";
 import { UserRole } from "../types";
 
@@ -203,5 +204,21 @@ describe("Header 계정 연결", () => {
     const toast = (await import("react-hot-toast")).default;
     renderHeader("/projects?account=already_linked");
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("이 Google 계정은 이미 다른 계정에 연결돼 있습니다."));
+  });
+});
+
+describe("Header 콜백 알림 한 번", () => {
+  it("StrictMode 에서도 연결 결과를 한 번만 알린다", async () => {
+    const toast = (await import("react-hot-toast")).default;
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={["/projects?account=linked"]}>
+          <Header />
+        </MemoryRouter>
+      </StrictMode>
+    );
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(vi.mocked(toast.success).mock.calls.filter((c) => c[0] === "Google 계정을 연결했습니다.")).toHaveLength(1);
   });
 });

@@ -272,10 +272,15 @@ def change_password(
 
     new_hash = hash_password(payload.new_password)
     checked_hash = current_user.password_hash
+    version_seen = current_user.token_version or 0
     # ★사용 중지·초기화와 같은 계정 잠금으로 줄 세운다. 잠금 없이 API 키부터 바꾸면 사용 중지
     #   (사용자 행 -> 키 행)와 반대 순서로 행을 잡아 교착된다. bcrypt 는 잠금 밖에서 끝냈다.
     lock_accounts(db)
     current_user = _fresh(db, current_user.id)
+    # 잠금을 기다리는 사이 중지·초기화·로그아웃으로 세션이 끊겼으면 진행하지 않는다.
+    if (current_user is None or current_user.status != UserStatus.active
+            or (current_user.token_version or 0) != version_seen):
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
     if current_user.password_hash != checked_hash:
         raise HTTPException(status_code=409, detail="다른 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.")
     current_user.password_hash = new_hash
@@ -384,6 +389,8 @@ def release_email(user_id: int, db: Session = Depends(get_db),
                   current_user: User = Depends(role_required("admin"))):
     """남의 주소로 먼저 가입해 이메일을 차지한 계정에서 이메일을 뗀다. 진짜 주인이 Google 로 들어올 수 있게."""
     user = _locked_target(db, user_id, current_user)
+    if user.id == current_user.id:
+        raise HTTPException(status_code=409, detail="자기 자신의 이메일은 해제할 수 없습니다.")
     if user.email_verified:
         raise HTTPException(status_code=409, detail="Google 이 확인한 이메일은 해제할 수 없습니다.")
     released = user.email or (user.username if "@" in user.username else None)

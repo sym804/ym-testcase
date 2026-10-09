@@ -123,7 +123,7 @@
     "resetPwWarn": "<strong>주의:</strong> 임시 비밀번호는 화면에 1회만 표시됩니다. 반드시 메모하여 전달하세요.",
     "resetApiKeyInfo": "<strong>참고:</strong> 비밀번호를 초기화하면 그 사용자의 API 키도 모두 폐기됩니다. 초기화와 계정 복구 승인은 로그인한 관리자 화면에서만 할 수 있고, API 키로는 할 수 없습니다.",
     "initialAccountTitle": "5-4. 초기 계정",
-    "initialAccountInfo": "시스템 최초 가입 사용자가 자동으로 <strong>Admin</strong> 역할을 부여받습니다. 이후 가입자는 모두 <strong>User</strong>로 시작합니다. 관리자가 필요에 따라 역할을 변경해주어야 합니다.",
+    "initialAccountInfo": "사용자가 한 명도 없으면 가입 화면이 <strong>관리자 계정 만들기</strong>로 바뀌고, 여기서 만든 계정이 <strong>Admin</strong> 입니다. 운영 환경에서는 <code>BOOTSTRAP_TOKEN</code> 값을 함께 넣어야 합니다. 이후 가입자는 이메일로 가입하고 <strong>User</strong> 로 시작합니다.",
     "accountRequestTitle": "5-5. 계정 복구 요청 승인",
     "accountRequestP1": "로그인 화면의 \"계정 도움 요청\"으로 접수된 아이디 찾기 및 비밀번호 재설정 요청을 관리자 페이지에서 처리합니다.",
     "accountRequestImgAlt": "관리자 페이지 - 계정 복구 요청 목록",
@@ -132,7 +132,13 @@
     "accountRequestOl3": "드롭다운에서 대상 계정을 선택하고 <strong>승인</strong> 버튼을 클릭합니다. 본인 확인이 어려우면 <strong>반려</strong> 버튼으로 사유와 함께 거부합니다.",
     "accountRequestOl4": "승인 결과가 화면에 표시됩니다. 아이디 찾기는 아이디가, 비밀번호 재설정은 1회용 코드가 표시됩니다.",
     "accountRequestImgAlt2": "관리자 페이지 - 발급된 코드 표시",
-    "accountRequestWarn": "<strong>주의:</strong> 코드는 서버에 해시로만 저장되며 평문은 이 화면에 <strong>1회만</strong> 표시됩니다. 반드시 그 자리에서 복사 버튼으로 복사해 사용자에게 전달하세요. 닫기 버튼을 누르면 다시 볼 수 없습니다."
+    "accountRequestWarn": "<strong>주의:</strong> 코드는 서버에 해시로만 저장되며 평문은 이 화면에 <strong>1회만</strong> 표시됩니다. 반드시 그 자리에서 복사 버튼으로 복사해 사용자에게 전달하세요. 닫기 버튼을 누르면 다시 볼 수 없습니다.",
+    "accountStatusTitle": "5-4-1. 가입 승인과 계정 상태",
+    "accountStatusLi1": "계정 상태는 <strong>사용 / 승인 대기 / 사용 중지됨</strong> 셋입니다. 누가 승인 대기가 되는지는 <code>AUTH_APPROVAL</code> 이 정합니다.",
+    "accountStatusLi2": "승인 대기 계정이 있으면 목록 위에 <strong>승인 대기 N명</strong> 이 보입니다. <strong>승인</strong> 하면 바로 로그인할 수 있고, <strong>거절</strong> 하면 그 계정을 지웁니다.",
+    "accountStatusLi3": "<strong>사용 중지</strong> 하면 로그인과 API 키가 바로 막힙니다. 다시 사용해도 옛 API 키는 살아나지 않습니다. 자기 자신과 마지막 활성 관리자는 중지·강등할 수 없습니다.",
+    "accountStatusLi4": "<strong>이메일 해제</strong>는 남의 주소로 먼저 가입한 계정에서 이메일을 뗍니다. Google 이 확인한 이메일은 해제할 수 없습니다.",
+    "accountStatusWarn": "<strong>주의:</strong> 퇴사자는 Workspace 계정을 지워도 앱 로그인(최대 30일)과 API 키가 남습니다. 사용 중지해야 바로 막힙니다."
   },
   "roleSystem": {
     "title": "6. 역할/권한 체계",

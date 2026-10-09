@@ -93,11 +93,11 @@
   "releaseEmail": "Release email",
   "rejectConfirm": "Reject the sign-up of {{name}} ({{username}})? The account will be deleted.",
   "disableConfirm": "Disable the account of {{name}} ({{username}})? Sign-in and API keys stop working immediately.",
-  "releaseEmailConfirm": "Remove the email {{email}} from {{name}}'s account? The real owner can then sign up with Google.",
+  "releaseEmailConfirm": "Remove the email {{email}} from {{name}}'s account? Its sign-in username becomes {{newId}}, and the real owner can then sign up with Google.",
   "approved": "Approved.",
   "rejected": "Rejected.",
   "disabled": "Disabled.",
-  "enabled": "Enabled again.",
+  "enabled": "The account can be used again.",
   "emailReleased": "Email released.",
   "actionFailed": "Could not complete the action."
 }
