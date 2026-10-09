@@ -150,3 +150,15 @@ describe("LoginPage Google 로그인", () => {
     expect(await screen.findByText(text)).toBeInTheDocument();
   });
 });
+
+describe("LoginPage 검증 오류", () => {
+  it("서버 검증 오류가 배열로 와도 일반 실패 문구를 보여 준다", async () => {
+    const user = userEvent.setup();
+    vi.mocked(authApi.login).mockRejectedValue({ response: { data: { detail: [{ msg: "too long" }] } } });
+    renderWithProviders(<LoginPage />);
+    await user.type(screen.getByPlaceholderText("아이디 또는 이메일을 입력하세요"), "x");
+    await user.type(screen.getByPlaceholderText("비밀번호를 입력하세요"), "y");
+    await user.click(screen.getByRole("button", { name: "로그인" }));
+    expect(await screen.findByText("로그인에 실패했습니다.")).toBeInTheDocument();
+  });
+});

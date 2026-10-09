@@ -18,6 +18,21 @@ const ERROR_MAP: Record<string, string> = {
   "첫 관리자 토큰이 올바르지 않습니다.": "errors.bootstrapTokenInvalid",
   "비밀번호가 없는 계정입니다.": "errors.noPassword",
   "이메일 형식이 올바르지 않습니다.": "errors.emailInvalid",
+  "표시 이름을 입력해 주세요.": "errors.displayNameRequired",
+  "아이디를 입력해 주세요.": "errors.usernameRequired",
+  "승인 대기 중인 계정이 아닙니다.": "errors.notPending",
+  "승인 대기 중인 계정만 거절할 수 있습니다.": "errors.onlyPendingReject",
+  "다른 기록에 연결된 계정이라 거절할 수 없습니다. 사용 중지를 쓰세요.": "errors.rejectLinked",
+  "자기 자신은 사용 중지할 수 없습니다.": "errors.cannotDisableSelf",
+  "이미 사용 중지된 계정입니다.": "errors.alreadyDisabled",
+  "마지막 관리자는 사용 중지할 수 없습니다.": "errors.lastAdminDisable",
+  "사용 중지된 계정이 아닙니다.": "errors.notDisabled",
+  "Google 이 확인한 이메일은 해제할 수 없습니다.": "errors.verifiedEmailRelease",
+  "해제할 이메일이 없습니다.": "errors.noEmailToRelease",
+  "자기 자신의 이메일은 해제할 수 없습니다.": "errors.cannotReleaseSelf",
+  "마지막 관리자의 역할은 바꿀 수 없습니다.": "errors.lastAdminRole",
+  "비밀번호가 없는 계정은 Google 연결을 해제할 수 없습니다.": "errors.noPasswordUnlink",
+  "사용 중인 계정만 처리할 수 있습니다.": "errors.onlyActive",
   // Sheets
   "시트 이름을 입력해 주세요.": "errors.sheetNameRequired",
   "이미 존재하는 시트 이름입니다.": "errors.sheetNameExists",
@@ -79,10 +94,18 @@ export function translateError(backendDetail: string): string {
 export function errorText(err: unknown, fallback: string): string {
   const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
   if (typeof detail === "string" && detail) return translateError(detail);
-  if (Array.isArray(detail) && detail.length > 0) {
-    const first = detail[0] as { msg?: unknown };
-    if (typeof first?.msg === "string" && first.msg) return first.msg;
-  }
+  // pydantic 검증 오류 배열은 영어 원문이라 그대로 보여 주지 않고 화면 언어의 대체 문구를 쓴다.
+  if (Array.isArray(detail)) return fallback;
   if (err instanceof Error && err.message) return err.message;
   return fallback;
+}
+
+/** Google 콜백이 넘기는 오류 코드. 이 목록 밖의 값은 일반 실패 문구로 바꾼다(번역 키 주입 방지). */
+const GOOGLE_ERROR_CODES = new Set([
+  "google_state", "google_verify", "google_email_unverified", "company_only", "pending", "disabled",
+  "email_taken", "already_linked", "bootstrap_required", "google_disabled",
+]);
+
+export function googleErrorMessage(code: string): string {
+  return i18n.t(`login:googleErrors.${GOOGLE_ERROR_CODES.has(code) ? code : "unknown"}`);
 }

@@ -106,7 +106,7 @@ def test_관리자_둘이_서로를_동시에_중지해도_한_명은_남는다(
         active_admins = s.query(User).filter_by(role=UserRole.admin, status=UserStatus.active).count()
     assert active_admins == 1, results
     # 늦게 잠금을 얻은 쪽은 이미 중지된 관리자라 행위자 재확인에서 403 이다
-    assert results.count("ok") == 1 and len(results) == 2
+    assert sorted(map(str, results)) == ["403", "ok"]
 
 
 def test_이메일_해제는_확인_안_된_이메일만(auth_env):

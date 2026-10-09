@@ -41,9 +41,17 @@ test.describe("계정 승인", () => {
     await loginAs(page, email, PW);
     await expect(page.getByText("관리자 승인을 기다리는 중입니다.")).toBeVisible();
 
-    const headers = await adminHeaders(request);
-    const id = await findUserId(request, headers, email);
-    expect((await request.post(`/api/auth/users/${id}/approve`, { headers })).status()).toBe(200);
+    // 관리자가 화면에서 승인한다(목록 응답과 버튼의 계약을 실제 백엔드로 확인)
+    const admin = await page.context().browser()!.newContext();
+    const adminPage = await admin.newPage();
+    await loginAs(adminPage, "admin", ADMIN_PW);
+    await expect(adminPage).toHaveURL(/\/projects/, { timeout: 10000 });
+    await adminPage.goto("/admin");
+    const row = adminPage.locator("tr", { hasText: email });
+    await expect(row.getByText("승인 대기")).toBeVisible({ timeout: 10000 });
+    await row.getByRole("button", { name: "승인" }).click();
+    await expect(row.getByText("사용 중", { exact: true })).toBeVisible({ timeout: 10000 });
+    await admin.close();
 
     await page.getByRole("button", { name: "로그인" }).click();
     await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
@@ -55,7 +63,7 @@ test.describe("계정 승인", () => {
     expect(reg.status()).toBe(201);
     const headers = await adminHeaders(request);
     const id = (await reg.json()).id as number;
-    await request.post(`/api/auth/users/${id}/approve`, { headers });
+    expect((await request.post(`/api/auth/users/${id}/approve`, { headers })).status()).toBe(200);
 
     await loginAs(page, email, PW);
     await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
@@ -67,8 +75,11 @@ test.describe("계정 승인", () => {
 
   test("Google 로그인 버튼이 보이고 시작 주소는 Google 로 보낸다", async ({ page, request }) => {
     await page.goto("/login");
-    await expect(page.getByRole("link", { name: "Google 로 로그인" })).toBeVisible();
-    const res = await request.get("/api/auth/google/start", { maxRedirects: 0 });
+    const link = page.getByRole("link", { name: "Google 로 로그인" });
+    await expect(link).toBeVisible();
+    // 화면 링크의 실제 주소로 요청한다(VITE_API_URL 이 있으면 백엔드 주소를 가리킨다)
+    const href = await link.getAttribute("href");
+    const res = await request.get(new URL(href!, page.url()).toString(), { maxRedirects: 0 });
     expect(res.status()).toBe(302);
     expect(res.headers()["location"]).toContain("accounts.google.com");
   });

@@ -3,7 +3,7 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import PasswordInput from "../components/PasswordInput";
-import { translateError } from "../utils/errorMessage";
+import { errorText, googleErrorMessage } from "../utils/errorMessage";
 import { authApi, googleStartUrl } from "../api";
 
 export default function LoginPage() {
@@ -19,9 +19,7 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   // Google 콜백이 실패 사유를 ?error=<코드> 로 넘긴다. 모르는 코드는 일반 실패 문구로.
   const callbackError = searchParams.get("error");
-  const callbackMessage = callbackError
-    ? t(`googleErrors.${callbackError}`, { defaultValue: t("googleErrors.unknown") })
-    : "";
+  const callbackMessage = callbackError ? googleErrorMessage(callbackError) : "";
 
   useEffect(() => {
     let alive = true;
@@ -43,8 +41,7 @@ export default function LoginPage() {
       await login({ username, password, remember_me: rememberMe });
       navigate("/projects");
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(detail ? translateError(detail) : t("loginFailed"));
+      setError(errorText(err, t("loginFailed")));
     } finally {
       setLoading(false);
     }

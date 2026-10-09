@@ -123,7 +123,7 @@
     "resetPwWarn": "<strong>Warning:</strong> The temporary password is displayed only once. Make sure to note it down before sharing.",
     "resetApiKeyInfo": "<strong>Note:</strong> Resetting a password also revokes all of that user's API keys. Password resets and account recovery approvals can be done only from a signed-in admin session, not with an API key.",
     "initialAccountTitle": "5-4. Initial Account",
-    "initialAccountInfo": "The first user to register is automatically assigned the <strong>Admin</strong> role. All subsequent users start as <strong>User</strong>. An administrator must change their roles as needed.",
+    "initialAccountInfo": "When there are no users, the sign-up page becomes <strong>Create administrator account</strong> and that account is the <strong>Admin</strong>. In production you must also enter the <code>BOOTSTRAP_TOKEN</code> value. Later users sign up with email and start as <strong>User</strong>.",
     "accountRequestTitle": "5-5. Approving Account Recovery Requests",
     "accountRequestP1": "Requests for finding a username or resetting a password, submitted from the login screen's \"Account Help\" link, are processed on the admin page.",
     "accountRequestImgAlt": "Admin page - Account recovery request queue",
@@ -132,7 +132,13 @@
     "accountRequestOl3": "Select the target account from the dropdown and click <strong>Approve</strong>. If identity cannot be verified, click <strong>Reject</strong> and provide a reason.",
     "accountRequestOl4": "The approval result is displayed on screen. For find-username requests the username is shown; for password resets, a one-time code is shown.",
     "accountRequestImgAlt2": "Admin page - Issued code display",
-    "accountRequestWarn": "<strong>Warning:</strong> The code is stored on the server only as a hash, and the plaintext is displayed on this screen <strong>only once</strong>. Be sure to copy it with the copy button and deliver it to the user right away. Once you click Close, it cannot be viewed again."
+    "accountRequestWarn": "<strong>Warning:</strong> The code is stored on the server only as a hash, and the plaintext is displayed on this screen <strong>only once</strong>. Be sure to copy it with the copy button and deliver it to the user right away. Once you click Close, it cannot be viewed again.",
+    "accountStatusTitle": "5-4-1. Sign-up approval and account status",
+    "accountStatusLi1": "Accounts are <strong>Active / Pending approval / Disabled</strong>. <code>AUTH_APPROVAL</code> decides who waits for approval.",
+    "accountStatusLi2": "Pending accounts appear above the list as <strong>N pending approval</strong>. <strong>Approve</strong> lets them sign in; <strong>Reject</strong> deletes the account.",
+    "accountStatusLi3": "<strong>Disable</strong> blocks sign-in and API keys immediately. Enabling again does not revive old API keys. You cannot disable or demote yourself or the last active administrator.",
+    "accountStatusLi4": "<strong>Release email</strong> removes an email from an account that claimed someone else's address. Emails verified by Google cannot be released.",
+    "accountStatusWarn": "<strong>Note:</strong> Deleting a Workspace account does not end app sessions (up to 30 days) or API keys. Disable the user to block them immediately."
   },
   "roleSystem": {
     "title": "6. Roles & Permissions",

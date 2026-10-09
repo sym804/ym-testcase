@@ -74,13 +74,17 @@ async function violationsOf(container: HTMLElement): Promise<string[]> {
 
 describe("접근성", () => {
   it("로그인 화면에 serious 이상 위반이 없다", async () => {
-    const { container } = renderWithProviders(<LoginPage />);
+    const { container, findByRole } = renderWithProviders(<LoginPage />);
+    // 설정을 받아 Google 링크까지 그려진 뒤에 검사한다
+    await findByRole("link", { name: "Google 로 로그인" });
     const found = await violationsOf(container);
     expect(found, found.join("\n")).toEqual([]);
   });
 
   it("회원가입 화면에 serious 이상 위반이 없다", async () => {
-    const { container } = renderWithProviders(<RegisterPage />);
+    const { container, findByRole } = renderWithProviders(<RegisterPage />);
+    // 설정 응답 전에는 로딩 문구만 있다. 폼이 그려진 뒤에 검사해야 폼이 검사 대상에 든다
+    await findByRole("button", { name: "회원가입" });
     const found = await violationsOf(container);
     expect(found, found.join("\n")).toEqual([]);
   });

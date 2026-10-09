@@ -133,7 +133,7 @@ describe("RegisterPage 이메일 가입", () => {
     await user.type(screen.getByPlaceholderText("비밀번호를 입력하세요"), "password123");
     await user.type(screen.getByPlaceholderText("비밀번호를 다시 입력하세요"), "password123");
     await user.click(screen.getByRole("button", { name: "회원가입" }));
-    expect(await screen.findByText("String should have at least 1 character")).toBeInTheDocument();
+    expect(await screen.findByText("회원가입에 실패했습니다.")).toBeInTheDocument();
   });
 
   it("설정을 못 읽으면 이메일 가입으로 그린다", async () => {
@@ -187,5 +187,41 @@ describe("RegisterPage 첫 관리자", () => {
       });
       expect(mockNavigate).toHaveBeenCalledWith("/login");
     });
+  });
+});
+
+describe("RegisterPage 경쟁과 모드 전환", () => {
+  it("늦게 온 옛 아이디 확인 응답이 지금 입력을 덮지 않는다", async () => {
+    vi.mocked(authApi.config).mockResolvedValue({ google_enabled: false, signup_mode: "bootstrap" });
+    let releaseOld: (v: { available: boolean }) => void = () => {};
+    vi.mocked(authApi.checkUsername)
+      .mockImplementationOnce(() => new Promise((r) => { releaseOld = r; }))
+      .mockResolvedValueOnce({ available: true });
+    const user = userEvent.setup();
+    renderWithProviders(<RegisterPage />);
+    const input = await screen.findByPlaceholderText("아이디를 입력하세요");
+    await user.type(input, "ab");
+    await waitFor(() => expect(authApi.checkUsername).toHaveBeenCalledTimes(1), { timeout: 1000 });
+    await user.type(input, "cd");
+    await waitFor(() => expect(screen.getByText("사용 가능한 아이디입니다.")).toBeInTheDocument(), { timeout: 1000 });
+    releaseOld({ available: false });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText("이미 사용 중인 아이디입니다.")).not.toBeInTheDocument();
+  });
+
+  it("첫 관리자 화면에서 이미 사용자가 생겼다는 응답을 받으면 이메일 가입으로 바꾼다", async () => {
+    vi.mocked(authApi.config)
+      .mockResolvedValueOnce({ google_enabled: false, signup_mode: "bootstrap" })
+      .mockResolvedValue({ google_enabled: false, signup_mode: "email" });
+    vi.mocked(authApi.checkUsername).mockResolvedValue({ available: true });
+    vi.mocked(authApi.register).mockRejectedValue({ response: { data: { detail: "이메일로 가입해 주세요." } } });
+    const user = userEvent.setup();
+    renderWithProviders(<RegisterPage />);
+    await user.type(await screen.findByPlaceholderText("아이디를 입력하세요"), "late");
+    await user.type(screen.getByPlaceholderText("표시될 이름을 입력하세요"), "L");
+    await user.type(screen.getByPlaceholderText("비밀번호를 입력하세요"), "password123");
+    await user.type(screen.getByPlaceholderText("비밀번호를 다시 입력하세요"), "password123");
+    await user.click(screen.getByRole("button", { name: "관리자 계정 만들기" }));
+    expect(await screen.findByPlaceholderText("이메일을 입력하세요")).toBeInTheDocument();
   });
 });

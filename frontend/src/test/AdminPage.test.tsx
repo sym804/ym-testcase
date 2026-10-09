@@ -229,8 +229,8 @@ describe("AdminPage", () => {
 
 describe("AdminPage 계정 상태 관리", () => {
   const people = [
-    { id: 1, username: "admin", display_name: "관리자", role: UserRole.ADMIN, must_change_password: false,
-      created_at: "2026-01-01T00:00:00", status: "active" as const, has_password: true, google_linked: false },
+    { id: 1, username: "admin", email: "admin@x.com", email_verified: false, display_name: "관리자", role: UserRole.ADMIN,
+      must_change_password: false, created_at: "2026-01-01T00:00:00", status: "active" as const, has_password: true, google_linked: false },
     { id: 2, username: "both@x.com", email: "both@x.com", email_verified: true, display_name: "둘다", role: UserRole.USER,
       must_change_password: false, created_at: "2026-01-02T00:00:00", status: "active" as const, has_password: true, google_linked: true },
     { id: 3, username: "p@x.com", email: "p@x.com", email_verified: false, display_name: "대기", role: UserRole.USER,

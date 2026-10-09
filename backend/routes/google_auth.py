@@ -181,8 +181,12 @@ def _link(request: Request, db: Session, cfg, flow, ident) -> RedirectResponse:
 
 @router.post("/unlink", response_model=UserResponse)
 def google_unlink(db: Session = Depends(get_db), current_user: User = Depends(get_session_user)):
+    user_id, version_seen = current_user.id, current_user.token_version or 0
     lock_accounts(db)
-    user = db.query(User).filter(User.id == current_user.id).with_for_update().populate_existing().first()
+    user = db.query(User).filter(User.id == user_id).with_for_update().populate_existing().first()
+    # 잠금을 기다리는 사이 중지·초기화로 세션이 끊겼으면 진행하지 않는다.
+    if user is None or user.status != UserStatus.active or (user.token_version or 0) != version_seen:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
     if not user.password_hash:
         raise HTTPException(status_code=400, detail="비밀번호가 없는 계정은 Google 연결을 해제할 수 없습니다.")
     user.google_sub = None
