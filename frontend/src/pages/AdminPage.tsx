@@ -7,7 +7,7 @@ import { UserRole } from "../types";
 import Header from "../components/Header";
 import AccountRequestSection from "../components/AccountRequestSection";
 import toast from "react-hot-toast";
-import { translateError } from "../utils/errorMessage";
+import { errorText, translateError } from "../utils/errorMessage";
 
 export default function AdminPage() {
   const { user: currentUser } = useAuth();
@@ -100,6 +100,29 @@ export default function AdminPage() {
       toast.error(t("resetPasswordFailed"));
     }
   };
+
+  // 계정 상태 조작. 서버가 409 로 거절하면(마지막 관리자 등) 그 사유를 그대로 보여 준다.
+  const runAccountAction = async (
+    action: () => Promise<unknown>, okKey: string, confirmText?: string,
+  ) => {
+    if (confirmText && !confirm(confirmText)) return;
+    try {
+      await action();
+      toast.success(t(okKey));
+      loadUsers();
+    } catch (err) {
+      toast.error(errorText(err, t("actionFailed")));
+    }
+  };
+
+  const loginMethodLabel = (u: User) => {
+    const pw = u.has_password !== false;
+    if (pw && u.google_linked) return t("loginMethod.both");
+    if (u.google_linked) return t("loginMethod.google");
+    return t("loginMethod.password");
+  };
+
+  const pendingUsers = users.filter((u) => u.status === "pending");
 
   // 프로젝트 배정 모달 열기
   const openAssignModal = async (user: User) => {
@@ -199,6 +222,13 @@ export default function AdminPage() {
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>{t("common:loadingData")}</div>
         ) : (
+          <>
+          {pendingUsers.length > 0 && (
+            <div style={s.pendingBox} role="status">
+              <strong>{t("pendingCount", { count: pendingUsers.length })}</strong>
+              <span style={{ marginLeft: 8, color: "var(--text-secondary)" }}>{t("pendingHint")}</span>
+            </div>
+          )}
           <div style={s.tableWrap}>
             <table style={s.table}>
               <thead>
@@ -206,10 +236,14 @@ export default function AdminPage() {
                   <th style={s.th}>{t("columns.id")}</th>
                   <th style={s.th}>{t("columns.username")}</th>
                   <th style={s.th}>{t("columns.displayName")}</th>
+                  <th style={s.th}>{t("columns.email")}</th>
+                  <th style={s.th}>{t("columns.loginMethod")}</th>
+                  <th style={s.th}>{t("columns.status")}</th>
                   <th style={s.th}>{t("columns.systemRole")}</th>
                   <th style={s.th}>{t("columns.projectAssignment")}</th>
                   <th style={s.th}>{t("columns.joinDate")}</th>
                   <th style={s.th}>{t("columns.password")}</th>
+                  <th style={s.th}>{t("columns.account")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -218,6 +252,13 @@ export default function AdminPage() {
                     <td style={s.td}>{u.id}</td>
                     <td style={s.td}>{u.username}</td>
                     <td style={s.td}>{u.display_name}</td>
+                    <td style={s.td}>{u.email || "-"}</td>
+                    <td style={s.td}>{loginMethodLabel(u)}</td>
+                    <td style={s.td}>
+                      <span style={{ ...s.statusBadge, ...(STATUS_COLORS[u.status || "active"] || {}) }}>
+                        {t(`status.${u.status || "active"}`)}
+                      </span>
+                    </td>
                     <td style={s.td}>
                       <select
                         style={s.select}
@@ -272,11 +313,53 @@ export default function AdminPage() {
                         </button>
                       )}
                     </td>
+                    <td style={s.td}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {u.status === "pending" && (
+                          <>
+                            <button style={s.assignBtn} onClick={() => runAccountAction(() => usersApi.approve(u.id), "approved")}>
+                              {t("approve")}
+                            </button>
+                            <button
+                              style={s.resetBtn}
+                              onClick={() => runAccountAction(() => usersApi.reject(u.id), "rejected",
+                                t("rejectConfirm", { name: u.display_name, username: u.username }))}
+                            >
+                              {t("reject")}
+                            </button>
+                          </>
+                        )}
+                        {u.id !== currentUser?.id && u.status !== "disabled" && (
+                          <button
+                            style={s.resetBtn}
+                            onClick={() => runAccountAction(() => usersApi.disable(u.id), "disabled",
+                              t("disableConfirm", { name: u.display_name, username: u.username }))}
+                          >
+                            {t("disable")}
+                          </button>
+                        )}
+                        {u.status === "disabled" && (
+                          <button style={s.assignBtn} onClick={() => runAccountAction(() => usersApi.enable(u.id), "enabled")}>
+                            {t("enable")}
+                          </button>
+                        )}
+                        {u.email && !u.email_verified && (
+                          <button
+                            style={s.assignBtn}
+                            onClick={() => runAccountAction(() => usersApi.releaseEmail(u.id), "emailReleased",
+                              t("releaseEmailConfirm", { name: u.display_name, email: u.email }))}
+                          >
+                            {t("releaseEmail")}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {/* 비밀번호 초기화 모달 */}
@@ -414,7 +497,30 @@ export default function AdminPage() {
   );
 }
 
+const STATUS_COLORS: Record<string, React.CSSProperties> = {
+  active: { backgroundColor: "var(--bg-badge-gray)", color: "var(--text-badge-gray)" },
+  pending: { backgroundColor: "var(--bg-info-light)", color: "var(--text-info)" },
+  disabled: { backgroundColor: "rgba(220,38,38,0.08)", color: "#DC2626" },
+};
+
 const s: Record<string, React.CSSProperties> = {
+  pendingBox: {
+    marginBottom: 12,
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1px solid var(--border-color)",
+    backgroundColor: "var(--bg-card)",
+    fontSize: 13,
+    color: "var(--text-primary)",
+  },
+  statusBadge: {
+    display: "inline-block",
+    padding: "2px 8px",
+    borderRadius: 10,
+    fontSize: 11,
+    fontWeight: 600,
+    whiteSpace: "nowrap" as const,
+  },
   container: { maxWidth: 900, margin: "0 auto", padding: "24px" },
   title: { fontSize: 20, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 20px" },
   tableWrap: {

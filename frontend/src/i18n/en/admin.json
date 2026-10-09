@@ -9,7 +9,11 @@
     "systemRole": "System Role",
     "projectAssignment": "Project Assignment",
     "joinDate": "Joined",
-    "password": "Password"
+    "password": "Password",
+    "email": "Email",
+    "loginMethod": "Sign-in",
+    "status": "Status",
+    "account": "Account"
   },
   "systemRole": {
     "user": "User",
@@ -69,5 +73,31 @@
     "expiresAt": "Expires",
     "needUser": "Select the target account first.",
     "failed": "The action failed."
-  }
+  },
+  "loginMethod": {
+    "password": "Password",
+    "google": "Google",
+    "both": "Password + Google"
+  },
+  "status": {
+    "active": "Active",
+    "pending": "Pending approval",
+    "disabled": "Disabled"
+  },
+  "pendingCount": "{{count}} pending approval",
+  "pendingHint": "Review sign-up requests and approve or reject them.",
+  "approve": "Approve",
+  "reject": "Reject",
+  "disable": "Disable",
+  "enable": "Enable",
+  "releaseEmail": "Release email",
+  "rejectConfirm": "Reject the sign-up of {{name}} ({{username}})? The account will be deleted.",
+  "disableConfirm": "Disable the account of {{name}} ({{username}})? Sign-in and API keys stop working immediately.",
+  "releaseEmailConfirm": "Remove the email {{email}} from {{name}}'s account? The real owner can then sign up with Google.",
+  "approved": "Approved.",
+  "rejected": "Rejected.",
+  "disabled": "Disabled.",
+  "enabled": "Enabled again.",
+  "emailReleased": "Email released.",
+  "actionFailed": "Could not complete the action."
 }

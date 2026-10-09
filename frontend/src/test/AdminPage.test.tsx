@@ -33,6 +33,11 @@ vi.mock("../api", () => ({
     resetPassword: vi.fn(),
     getAllAssignments: vi.fn(),
     assignToAllProjects: vi.fn(),
+    approve: vi.fn(),
+    reject: vi.fn(),
+    disable: vi.fn(),
+    enable: vi.fn(),
+    releaseEmail: vi.fn(),
   },
   projectsApi: { list: vi.fn() },
   membersApi: {
@@ -219,5 +224,88 @@ describe("AdminPage", () => {
       const manageButtons = screen.getAllByText("관리");
       expect(manageButtons.length).toBeGreaterThan(0);
     });
+  });
+});
+
+describe("AdminPage 계정 상태 관리", () => {
+  const people = [
+    { id: 1, username: "admin", display_name: "관리자", role: UserRole.ADMIN, must_change_password: false,
+      created_at: "2026-01-01T00:00:00", status: "active" as const, has_password: true, google_linked: false },
+    { id: 2, username: "both@x.com", email: "both@x.com", email_verified: true, display_name: "둘다", role: UserRole.USER,
+      must_change_password: false, created_at: "2026-01-02T00:00:00", status: "active" as const, has_password: true, google_linked: true },
+    { id: 3, username: "p@x.com", email: "p@x.com", email_verified: false, display_name: "대기", role: UserRole.USER,
+      must_change_password: false, created_at: "2026-01-03T00:00:00", status: "pending" as const, has_password: true, google_linked: false },
+    { id: 4, username: "off", display_name: "중지", role: UserRole.USER, must_change_password: false,
+      created_at: "2026-01-04T00:00:00", status: "disabled" as const, has_password: true, google_linked: false },
+  ];
+
+  beforeEach(() => {
+    vi.mocked(usersApi.list).mockResolvedValue(people as never);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("이메일, 로그인 방식, 상태를 보여 준다", async () => {
+    renderPage();
+    expect((await screen.findAllByText("both@x.com", { selector: "td" })).length).toBe(2);
+    expect(screen.getByText("이메일")).toBeInTheDocument();
+    expect(screen.getByText("로그인 방식")).toBeInTheDocument();
+    expect(screen.getByText("비밀번호 + Google")).toBeInTheDocument();
+    expect(screen.getAllByText("승인 대기").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("사용 중지됨")).toBeInTheDocument();
+  });
+
+  it("승인 대기 건수와 승인 버튼", async () => {
+    const user = userEvent.setup();
+    vi.mocked(usersApi.approve).mockResolvedValue({} as never);
+    renderPage();
+    expect(await screen.findByText("승인 대기 1명")).toBeInTheDocument();
+    const approve = screen.getAllByRole("button", { name: "승인" });
+    expect(approve).toHaveLength(1);
+    await user.click(approve[0]);
+    await waitFor(() => expect(usersApi.approve).toHaveBeenCalledWith(3));
+    await waitFor(() => expect(vi.mocked(usersApi.list).mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("거절은 확인을 받고 부른다", async () => {
+    const user = userEvent.setup();
+    vi.mocked(usersApi.reject).mockResolvedValue(undefined);
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "거절" }));
+    await waitFor(() => expect(usersApi.reject).toHaveBeenCalledWith(3));
+  });
+
+  it("사용 중지는 본인 행에 없고, 중지된 행에는 다시 사용", async () => {
+    const user = userEvent.setup();
+    vi.mocked(usersApi.disable).mockResolvedValue({} as never);
+    vi.mocked(usersApi.enable).mockResolvedValue({} as never);
+    renderPage();
+    await screen.findAllByText("both@x.com", { selector: "td" });
+    // 사용 중지 대상: 2(사용), 3(대기). 본인(1)과 중지된 4 는 없다
+    const stops = screen.getAllByRole("button", { name: "사용 중지" });
+    expect(stops).toHaveLength(2);
+    await user.click(stops[0]);
+    await waitFor(() => expect(usersApi.disable).toHaveBeenCalledWith(2));
+    await user.click(screen.getByRole("button", { name: "다시 사용" }));
+    await waitFor(() => expect(usersApi.enable).toHaveBeenCalledWith(4));
+  });
+
+  it("이메일 해제는 Google 이 확인하지 않은 이메일에만", async () => {
+    const user = userEvent.setup();
+    vi.mocked(usersApi.releaseEmail).mockResolvedValue({} as never);
+    renderPage();
+    await screen.findAllByText("both@x.com", { selector: "td" });
+    const release = screen.getAllByRole("button", { name: "이메일 해제" });
+    expect(release).toHaveLength(1);
+    await user.click(release[0]);
+    await waitFor(() => expect(usersApi.releaseEmail).toHaveBeenCalledWith(3));
+  });
+
+  it("서버가 거절하면 사유를 보여 준다", async () => {
+    const user = userEvent.setup();
+    const toast = (await import("react-hot-toast")).default;
+    vi.mocked(usersApi.disable).mockRejectedValue({ response: { data: { detail: "마지막 관리자는 사용 중지할 수 없습니다." } } });
+    renderPage();
+    await user.click((await screen.findAllByRole("button", { name: "사용 중지" }))[0]);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("마지막 관리자는 사용 중지할 수 없습니다."));
   });
 });
