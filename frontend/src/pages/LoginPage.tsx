@@ -116,9 +116,8 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-      <div style={{ position: "absolute", bottom: 16, width: "100%", textAlign: "center", fontSize: 11, color: "var(--text-secondary, #94A3B8)" }}>
-        {t("common:version")}
-      </div>
+      {/* 화면 바닥에 고정하면 카드가 길 때(Google 버튼) 낮은 화면에서 카드 문구와 겹친다. 카드 아래에 둔다 */}
+      <div style={styles.version}>{t("common:version")}</div>
     </div>
   );
 }
@@ -144,7 +143,15 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    minHeight: "calc(100vh - 56px)",
+    minHeight: "calc(100vh - 56px - 44px)",
+    padding: "24px 0",
+    boxSizing: "border-box" as const,
+  },
+  version: {
+    height: 44,
+    textAlign: "center" as const,
+    fontSize: 11,
+    color: "var(--text-secondary, #94A3B8)",
   },
   card: {
     backgroundColor: "var(--bg-card)",

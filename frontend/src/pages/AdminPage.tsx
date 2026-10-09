@@ -250,10 +250,10 @@ export default function AdminPage() {
                 {users.map((u) => (
                   <tr key={u.id}>
                     <td style={s.td}>{u.id}</td>
-                    <td style={s.td}>{u.username}</td>
+                    <td style={{ ...s.td, wordBreak: "break-all" }}>{u.username}</td>
                     <td style={s.td}>{u.display_name}</td>
-                    <td style={s.td}>{u.email || "-"}</td>
-                    <td style={s.td}>{loginMethodLabel(u)}</td>
+                    <td style={{ ...s.td, wordBreak: "break-all" }}>{u.email || "-"}</td>
+                    <td style={{ ...s.td, whiteSpace: "nowrap" }}>{loginMethodLabel(u)}</td>
                     <td style={s.td}>
                       <span style={{ ...s.statusBadge, ...(STATUS_COLORS[u.status || "active"] || {}) }}>
                         {t(`status.${u.status || "active"}`)}
@@ -521,7 +521,7 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     whiteSpace: "nowrap" as const,
   },
-  container: { maxWidth: 900, margin: "0 auto", padding: "24px" },
+  container: { maxWidth: 1280, margin: "0 auto", padding: "24px" },
   title: { fontSize: 20, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 20px" },
   tableWrap: {
     backgroundColor: "var(--bg-card)",
@@ -536,6 +536,7 @@ const s: Record<string, React.CSSProperties> = {
     borderBottom: "2px solid var(--border-color)",
     color: "var(--text-secondary)",
     fontWeight: 600,
+    whiteSpace: "nowrap" as const,
   },
   td: {
     padding: "10px 14px",

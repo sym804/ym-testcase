@@ -8,7 +8,7 @@ const PASSWORD = "test1234";
 
 async function login(page: Page, username = "admin") {
   await page.goto("/login");
-  await page.getByPlaceholder("아이디를 입력하세요").fill(username);
+  await page.getByPlaceholder("아이디 또는 이메일을 입력하세요").fill(username);
   await page.getByPlaceholder("비밀번호를 입력하세요").fill(PASSWORD);
   await page.getByRole("button", { name: "로그인" }).click();
   await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
@@ -58,7 +58,7 @@ async function addSheetAndRows(page: Page, sheetName: string, rowCount = 1) {
 test.describe("1. 인증", () => {
   test("TC-AUTH-001: 정상 로그인", async ({ page }) => {
     await page.goto("/login");
-    await page.getByPlaceholder("아이디를 입력하세요").fill("admin");
+    await page.getByPlaceholder("아이디 또는 이메일을 입력하세요").fill("admin");
     await page.getByPlaceholder("비밀번호를 입력하세요").fill(PASSWORD);
     await page.getByRole("button", { name: "로그인" }).click();
     await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
@@ -66,7 +66,7 @@ test.describe("1. 인증", () => {
 
   test("TC-AUTH-002: 잘못된 비밀번호", async ({ page }) => {
     await page.goto("/login");
-    await page.getByPlaceholder("아이디를 입력하세요").fill("admin");
+    await page.getByPlaceholder("아이디 또는 이메일을 입력하세요").fill("admin");
     await page.getByPlaceholder("비밀번호를 입력하세요").fill("wrongpw12345");
     await page.getByRole("button", { name: "로그인" }).click();
     await expect(page.getByText(/올바르지 않습니다/)).toBeVisible({ timeout: 5000 });
@@ -74,7 +74,7 @@ test.describe("1. 인증", () => {
 
   test("TC-AUTH-003: 존재하지 않는 계정", async ({ page }) => {
     await page.goto("/login");
-    await page.getByPlaceholder("아이디를 입력하세요").fill("nonexistent_user_xyz");
+    await page.getByPlaceholder("아이디 또는 이메일을 입력하세요").fill("nonexistent_user_xyz");
     await page.getByPlaceholder("비밀번호를 입력하세요").fill("password1234");
     await page.getByRole("button", { name: "로그인" }).click();
     await expect(page.getByText(/올바르지 않습니다/)).toBeVisible({ timeout: 5000 });
@@ -89,7 +89,7 @@ test.describe("1. 인증", () => {
   test("TC-AUTH-005: 로그인 페이지 UI 확인", async ({ page }) => {
     await page.goto("/login");
     await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible();
-    await expect(page.getByPlaceholder("아이디를 입력하세요")).toBeVisible();
+    await expect(page.getByPlaceholder("아이디 또는 이메일을 입력하세요")).toBeVisible();
     await expect(page.getByPlaceholder("비밀번호를 입력하세요")).toBeVisible();
     await expect(page.getByRole("button", { name: "로그인" })).toBeVisible();
     await expect(page.getByText("회원가입")).toBeVisible();
@@ -99,7 +99,7 @@ test.describe("1. 인증", () => {
     await page.goto("/login");
     await page.getByText("회원가입").click();
     await expect(page.getByRole("heading", { name: "회원가입" })).toBeVisible();
-    await expect(page.getByPlaceholder("아이디")).toBeVisible();
+    await expect(page.getByPlaceholder("이메일을 입력하세요")).toBeVisible();
   });
 
   test("TC-AUTH-008: 회원가입 유효성 검사 (짧은 비밀번호)", async ({ page }) => {

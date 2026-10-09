@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 async function login(page: Page) {
   await page.goto("/login");
-  await page.getByPlaceholder("아이디를 입력하세요").fill("admin");
+  await page.getByPlaceholder("아이디 또는 이메일을 입력하세요").fill("admin");
   await page.getByPlaceholder("비밀번호를 입력하세요").fill("test1234");
   await page.getByRole("button", { name: "로그인" }).click();
   await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
