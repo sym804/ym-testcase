@@ -156,7 +156,10 @@ Supabase 로 옮길 때는 `--target` 에 직결 또는 세션 풀러 주소를 
 | `STORAGE_BACKEND` | `supabase` |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STORAGE_BUCKET` | Supabase 프로젝트 주소, 서비스 키, 버킷 이름 |
 | `CRON_SECRET` | 긴 무작위 문자열. 매일 정리 작업(`/api/internal/cron/daily`) 인증 |
-| `TRUSTED_PROXY_HEADER` | 플랫폼이 덮어쓰는 클라이언트 IP 헤더. 스테이징에서 확인해 정합니다 |
+| `TRUSTED_PROXY_HEADER` | 플랫폼이 덮어쓰는 클라이언트 IP 헤더. 스테이징에서 확인해 정합니다. 비우면 모든 요청이 프록시 IP 하나로 잡혀 가입 횟수 제한이 사이트 전체에 걸립니다 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google 로그인. 아래 4절 |
+| `AUTH_COMPANY_DOMAINS`, `AUTH_ALLOW_PERSONAL`, `AUTH_APPROVAL` | 로그인 정책. 아래 4절 |
+| `BOOTSTRAP_TOKEN` | 빈 DB 로 시작할 때만. 첫 관리자 화면에 넣는 값 |
 
 Preview 는 합성 데이터만 든 별도 Supabase 프로젝트에 연결합니다. 배포 워크플로는 운영 DB 만 마이그레이션하므로, 스키마를 바꾸는 브랜치의 Preview 는 그 DB 에 직접 올린 뒤 확인합니다. 올리기 전에는 API 가 503(스키마가 코드보다 옛 버전)을 냅니다.
 
@@ -171,6 +174,27 @@ DATABASE_URL_DIRECT=<Preview DB 직결 주소> python -m alembic upgrade head
 - 비밀값: `DATABASE_URL_DIRECT`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, 백업용 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STORAGE_BUCKET`.
 - `main` 에 푸시하면 CI(백엔드, 프론트, E2E)가 먼저 돌고, 성공한 커밋만 배포됩니다. 배포는 Vercel 빌드, 운영 DB 마이그레이션, 빌드 산출물 배포 순서입니다(`.github/workflows/deploy.yml`). 빌드가 실패하면 DB 는 그대로입니다. 다시 배포하려면 그 커밋의 CI 를 다시 돌립니다.
 - 매일 DB 덤프(`public` 스키마)와 Storage 객체를 아티팩트로 남깁니다(`backup.yml`, 14일 보관). 스테이징 업로드는 담지 않습니다. 읽지 못한 객체가 있으면 나머지를 담고 실패로 끝나며, 목록은 zip 안의 `_manifest.txt` 에 있습니다.
+
+### 4. 로그인 정책 (Google 로그인, 가입 승인)
+
+들어올 수 있는 사람은 환경변수 셋으로 정합니다. `backend/.env.example` 에 선택지가 모두 적혀 있고 기본값만 켜져 있습니다.
+
+- `AUTH_COMPANY_DOMAINS`: 회사 도메인(쉼표로 여러 개). Google Workspace 도메인(`hd`)으로 회사 계정을 판정합니다. 이메일 끝자리로는 판정하지 않습니다.
+- `AUTH_ALLOW_PERSONAL`: `1` 이면 개인 메일도 받고, `0` 이면 회사 계정만 받습니다.
+- `AUTH_APPROVAL`: `none`(모두 바로 사용, 기본값), `personal`(회사 Google 계정만 바로, 나머지는 관리자 승인 후), `all`(모두 승인 후).
+
+기본값은 누구나 가입해 바로 쓰는 설정입니다. 회사 배포는 `AUTH_APPROVAL=personal` 을 권합니다. 이메일 가입은 주소를 확인하지 않으므로, 회사 계정만 받는 설정(`AUTH_ALLOW_PERSONAL=0`)에서는 승인 설정과 상관없이 항상 승인 대기입니다.
+
+Google 로그인을 켜려면 Google Cloud 콘솔에서 OAuth 클라이언트를 만듭니다.
+
+1. Google 인증 플랫폼에서 대상을 **외부**로 두고 앱 이름과 지원 이메일을 넣습니다. 로고를 올리면 브랜드 심사를 받아야 하므로 비워 둡니다.
+2. 클라이언트를 **웹 애플리케이션**으로 만들고 승인된 리디렉션 URI 에 `https://<도메인>/api/auth/google/callback` 을 넣습니다. 로컬 개발은 `http://localhost:5173/api/auth/google/callback` 입니다. 화면이 여는 시작 주소와 리디렉션 URI 는 같은 호스트여야 합니다. 프론트를 다른 도메인의 백엔드(`VITE_API_URL`)에 붙이면 확인 쿠키가 콜백에 실리지 않아 Google 로그인이 항상 실패합니다.
+3. 클라이언트 ID 와 보안 비밀을 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` 에, 리디렉션 URI 를 `GOOGLE_REDIRECT_URI` 에 넣습니다. 보안 비밀은 만들 때 한 번만 보입니다.
+4. 팀에 열기 전에 게시 상태를 **프로덕션**으로 바꿉니다. 테스트 상태에서는 테스트 사용자로 등록한 계정만 로그인됩니다.
+
+기존 아이디 계정은 그대로 로그인되고, 로그인한 뒤 사용자 메뉴의 **계정 연결**에서 Google 계정을 붙일 수 있습니다. 이메일이 같다고 자동으로 잇지 않습니다.
+
+퇴사자는 Workspace 계정을 지워도 앱의 로그인(최대 30일)과 API 키가 남습니다. 관리 화면에서 **사용 중지**해야 바로 막힙니다.
 
 ## 주요 기능
 

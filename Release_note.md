@@ -21,11 +21,43 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v2.0.0.1  (2026-10-09)
-├── Frontend       v1.11.0.0
-├── Backend        v2.0.0.0
-└── Database       v1.0.0.0
+YM TestCase System  v2.1.0.0  (2026-10-09)
+├── Frontend       v1.12.0.0
+├── Backend        v2.1.0.0
+└── Database       v1.1.0.0
 ```
+
+---
+
+## System 2.1.0.0 - [feat] 조직 계정 인증(Google 로그인, 가입 승인) (2026-10-09)
+
+### 이슈
+
+- SYM-147 회사 계정만 쓰도록 로그인과 가입을 환경변수로 제한하는 기능이 없다 (enhancement/major/security)
+- SYM-148 계정 복구와 Google 연결이 겹치면 공격자가 연결한 Google 계정이 남는다 (bug/major/security)
+- SYM-149 사용 중지와 비밀번호 변경이 겹치면 행 잠금 교착이 날 수 있다 (bug/major/backend)
+- SYM-150 첫 관리자 아이디에 골뱅이와 대문자가 섞이면 로그인할 수 없다 (bug/major/backend)
+- SYM-151 가입 횟수 제한이 bcrypt 계산 뒤에 걸려 비용을 막지 못한다 (bug/minor/security)
+- SYM-152 Google 확인값이나 설치 토큰에 한글이 오면 500 이 난다 (bug/minor/security)
+- SYM-153 Google 이메일이 100자를 넘으면 계정 생성에서 500 이 난다 (bug/minor/backend)
+- SYM-154 첫 관리자 동시 가입 테스트가 같은 IP 라서 계정 잠금 결함을 가린다 (bug/minor/etc)
+- SYM-155 비밀번호 변경과 Google 연결 해제가 잠금을 기다리는 사이 중지된 계정에서도 진행된다 (bug/major/security)
+- SYM-156 비밀번호 찾기 완료 API 가 전역 계정 잠금 안에서 bcrypt 를 돌려 다른 계정 작업을 막는다 (bug/major/backend)
+- SYM-157 영어 화면에서 새 인증 오류 문구가 한국어로 나온다 (bug/minor/frontend)
+
+### 변경
+
+- Google 로그인과 계정 연결, 이메일 가입, 첫 관리자 보호(`BOOTSTRAP_TOKEN`)
+- 정책 환경변수 `AUTH_COMPANY_DOMAINS` / `AUTH_ALLOW_PERSONAL` / `AUTH_APPROVAL`
+- 관리자: 승인, 사용 중지, 이메일 해제. 마이그레이션 0007. QA 2인 통과
+
+### 영향
+
+- 기본값은 지금처럼 누구나 가입. 새 가입은 이메일, 기존 계정은 아이디 그대로
+
+### 조치
+
+- 회사 배포는 `AUTH_APPROVAL=personal` 과 Google 클라이언트 값 설정
 
 ---
 
