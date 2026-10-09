@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YM TestCase API",
     description="Your Method, Your Test Case Manager",
-    version="2.1.0.0",
+    version="2.1.1.0",
     lifespan=lifespan,
     # 배포는 /api/* 만 백엔드로 보낸다(vercel.json). 문서도 그 아래에 둔다.
     docs_url="/api/docs",
@@ -234,6 +234,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(auth_routes.router)
 app.include_router(google_auth_routes.router)
+# ★고정 경로(/api/projects/all-assignments)를 /api/projects/{project_id} 보다 먼저 등록한다.
+#   늦게 등록하면 프로젝트 번호로 읽혀 422 가 난다(관리 화면 배정 칸이 전부 '미배정').
+app.include_router(member_routes.assign_all_router)
 app.include_router(project_routes.router)
 app.include_router(testcase_routes.router)
 app.include_router(sheets_routes.router)
@@ -245,7 +248,6 @@ app.include_router(attachment_routes.router)
 app.include_router(history_routes.router)
 app.include_router(search_routes.router)
 app.include_router(member_routes.router)
-app.include_router(member_routes.assign_all_router)
 app.include_router(custom_fields_routes.router)
 app.include_router(testplan_routes.router)
 app.include_router(run_issue_routes.router)
