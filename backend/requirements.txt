@@ -11,3 +11,5 @@ python-multipart==0.0.32  # 0.0.22 는 multipart 헤더 무제한 DoS(GHSA-pp6c-
 python-dotenv==1.2.3
 openpyxl==3.1.5
 fpdf2==2.8.6
+google-auth==2.61.0  # Google ID 토큰 검증(서명, aud, iss, 만료)
+requests==2.34.2  # google-auth 의 HTTP 전송. 개발 의존성에만 있으면 운영에서 ImportError
