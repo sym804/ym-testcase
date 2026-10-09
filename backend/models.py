@@ -64,7 +64,8 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(100), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
+    # Google 로만 가입한 계정에는 비밀번호가 없다. 비어 있으면 비밀번호 로그인은 항상 실패한다
+    password_hash = Column(String(255), nullable=True)
     display_name = Column(String(100), nullable=False)
     role = Column(SAEnum(UserRole), default=UserRole.user, nullable=False)
     must_change_password = Column(Boolean, default=False, nullable=False)
@@ -72,12 +73,27 @@ class User(Base):
     #: 비밀번호가 변경되면 1 올려서 그 사용자의 옛 토큰을 한 번에 막는다.
     #: JWT 는 발급하면 서버가 손댈 수 없으므로 이 대조가 유일한 폐기 경로다.
     token_version = Column(Integer, default=0, nullable=False, server_default="0")
+    #: 이메일 가입과 Google 계정의 주소. 소문자로 저장한다. 기존 아이디 계정은 비어 있다.
+    email = Column(String(100), unique=True, nullable=True, index=True)
+    #: Google 이 확인해 준 이메일이면 참. 이메일 가입은 거짓(주소 소유를 확인하지 않는다).
+    email_verified = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    #: Google 이 계정마다 주는 고유 번호. Google 로그인은 이메일이 아니라 이 칸으로 찾는다.
+    google_sub = Column(String(255), unique=True, nullable=True, index=True)
+    status = Column(SAEnum(UserStatus), nullable=False, default=UserStatus.active, server_default=UserStatus.active.value)
     created_at = Column(DateTime, default=now_kst)
 
     projects = relationship("Project", back_populates="creator")
     test_cases = relationship("TestCase", back_populates="creator")
     test_runs = relationship("TestRun", back_populates="creator")
     test_results = relationship("TestResult", back_populates="executor")
+
+    @property
+    def has_password(self) -> bool:
+        return bool(self.password_hash)
+
+    @property
+    def google_linked(self) -> bool:
+        return bool(self.google_sub)
 
 
 # ── Project ───────────────────────────────────────────────────────────────────
@@ -476,13 +492,13 @@ class AccountRequest(Base):
     contact = Column(String(200), nullable=False)
     note = Column(Text, nullable=True)
 
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     code_hash = Column(String(255), nullable=True)
     code_expires_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=now_kst)
     resolved_at = Column(DateTime, nullable=True)
-    resolved_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    resolved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     __table_args__ = (
         Index("ix_account_requests_status_created", "status", "created_at"),
