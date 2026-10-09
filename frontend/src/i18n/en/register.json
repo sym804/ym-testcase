@@ -19,5 +19,13 @@
   "checking": "Checking...",
   "usernameAvailable": "This username is available.",
   "hasAccount": "Already have an account?",
-  "login": "Login"
+  "login": "Login",
+  "titleBootstrap": "Create administrator account",
+  "submitBootstrap": "Create administrator account",
+  "bootstrapHelp": "This screen appears only on first setup. The account you create here becomes the administrator.",
+  "email": "Email",
+  "emailPlaceholder": "Enter your email",
+  "bootstrapToken": "Setup token",
+  "bootstrapTokenPlaceholder": "Required only in production",
+  "registerPending": "Your sign-up was received. You can sign in after an administrator approves it."
 }

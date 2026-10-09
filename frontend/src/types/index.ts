@@ -27,6 +27,7 @@ export interface User {
   must_change_password: boolean;
   created_at: string;
   email?: string | null;
+  email_verified?: boolean;
   status?: UserStatus;
   has_password?: boolean;
   google_linked?: boolean;

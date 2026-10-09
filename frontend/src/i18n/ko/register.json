@@ -19,5 +19,13 @@
   "checking": "확인 중...",
   "usernameAvailable": "사용 가능한 아이디입니다.",
   "hasAccount": "이미 계정이 있으신가요?",
-  "login": "로그인"
+  "login": "로그인",
+  "titleBootstrap": "관리자 계정 만들기",
+  "submitBootstrap": "관리자 계정 만들기",
+  "bootstrapHelp": "처음 설치할 때 한 번만 보이는 화면입니다. 여기서 만든 계정이 관리자가 됩니다.",
+  "email": "이메일",
+  "emailPlaceholder": "이메일을 입력하세요",
+  "bootstrapToken": "설치 토큰",
+  "bootstrapTokenPlaceholder": "운영 환경에서만 필요합니다",
+  "registerPending": "가입 신청이 접수됐습니다. 관리자 승인 후 로그인할 수 있습니다."
 }
