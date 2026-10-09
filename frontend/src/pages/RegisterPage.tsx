@@ -1,26 +1,39 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import { authApi } from "../api";
 import toast from "react-hot-toast";
 import PasswordInput from "../components/PasswordInput";
-import { translateError } from "../utils/errorMessage";
+import { errorText } from "../utils/errorMessage";
 
 export default function RegisterPage() {
   const { register } = useAuth();
   const { t } = useTranslation("register");
   const navigate = useNavigate();
+  // 사용자가 0명이면 첫 관리자 모드(아이디 가입), 아니면 이메일 가입이다. 설정을 못 읽으면 이메일로.
+  const [mode, setMode] = useState<"loading" | "bootstrap" | "email">("loading");
   const [form, setForm] = useState({
     username: "",
+    email: "",
     password: "",
     confirm_password: "",
     display_name: "",
+    bootstrap_token: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const usernameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bootstrap = mode === "bootstrap";
+
+  useEffect(() => {
+    let alive = true;
+    authApi.config()
+      .then((c) => { if (alive) setMode(c.signup_mode === "bootstrap" ? "bootstrap" : "email"); })
+      .catch(() => { if (alive) setMode("email"); });
+    return () => { alive = false; };
+  }, []);
 
   const checkUsername = (username: string) => {
     if (usernameTimer.current) clearTimeout(usernameTimer.current);
@@ -39,7 +52,7 @@ export default function RegisterPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setError("");
-    if (e.target.name === "username") {
+    if (bootstrap && e.target.name === "username") {
       checkUsername(e.target.value);
     }
   };
@@ -47,14 +60,16 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!form.username || !form.password || !form.display_name) {
+    const id = bootstrap ? form.username : form.email;
+    if (!id || !form.password || !form.display_name) {
       setError(t("allFieldsRequired"));
       return;
     }
-    if (usernameStatus === "taken") {
+    if (bootstrap && usernameStatus === "taken") {
       setError(t("usernameTaken"));
       return;
     }
+    // 비밀번호 검사가 먼저다. 이메일 형식은 서버가 본다.
     if (form.password.length < 8) {
       setError(t("passwordMinLength"));
       return;
@@ -65,12 +80,18 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      await register(form);
-      toast.success(t("registerSuccess"));
+      const created = await register({
+        username: bootstrap ? form.username : undefined,
+        email: bootstrap ? undefined : form.email,
+        password: form.password,
+        confirm_password: form.confirm_password,
+        display_name: form.display_name,
+        bootstrap_token: bootstrap ? form.bootstrap_token : undefined,
+      });
+      toast.success(created?.status === "pending" ? t("registerPending") : t("registerSuccess"));
       navigate("/login");
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(detail ? translateError(detail) : (err instanceof Error ? err.message : t("registerFailed")));
+      setError(errorText(err, t("registerFailed")));
     } finally {
       setLoading(false);
     }
@@ -83,67 +104,112 @@ export default function RegisterPage() {
       </div>
       <div style={styles.container}>
         <div style={styles.card}>
-          <h2 style={styles.heading}>{t("title")}</h2>
-          <form onSubmit={handleSubmit} style={styles.form}>
-            <label style={styles.label}>{t("username")}</label>
-            <input
-              style={styles.input}
-              name="username"
-              value={form.username}
-              onChange={handleChange}
-              placeholder={t("usernamePlaceholder")}
-              autoFocus
-            />
-            {usernameStatus === "checking" && (
-              <div style={styles.checkingMsg}>{t("checking")}</div>
-            )}
-            {usernameStatus === "available" && (
-              <div style={styles.availableMsg}>{t("usernameAvailable")}</div>
-            )}
-            {usernameStatus === "taken" && (
-              <div style={styles.takenMsg}>{t("usernameTaken")}</div>
-            )}
-            <label style={styles.label}>{t("displayName")}</label>
-            <input
-              style={styles.input}
-              name="display_name"
-              value={form.display_name}
-              onChange={handleChange}
-              placeholder={t("displayNamePlaceholder")}
-            />
-            <label style={styles.label}>{t("password")}</label>
-            <PasswordInput
-              style={styles.input}
-              name="password"
-              value={form.password}
-              onChange={handleChange}
-              placeholder={t("passwordPlaceholder")}
-            />
-            <label style={styles.label}>{t("confirmPassword")}</label>
-            <PasswordInput
-              style={styles.input}
-              name="confirm_password"
-              value={form.confirm_password}
-              onChange={handleChange}
-              placeholder={t("confirmPasswordPlaceholder")}
-            />
-            {form.password && form.password.length < 8 && (
-              <div style={styles.hintMsg}>{t("passwordMinLength")}</div>
-            )}
-            {form.password && form.confirm_password && form.password !== form.confirm_password && (
-              <div style={styles.hintMsg}>{t("passwordMismatch")}</div>
-            )}
-            {error && <div style={styles.errorMsg}>{error}</div>}
-            <button type="submit" style={styles.submitBtn} disabled={loading}>
-              {loading ? t("submitting") : t("submit")}
-            </button>
-          </form>
-          <div style={styles.footer}>
-            {t("hasAccount")}{" "}
-            <Link to="/login" style={styles.link}>
-              {t("login")}
-            </Link>
-          </div>
+          {mode === "loading" ? (
+            <div style={styles.loadingMsg}>{t("common:loadingData")}</div>
+          ) : (
+            <>
+              <h2 style={styles.heading}>{bootstrap ? t("titleBootstrap") : t("title")}</h2>
+              {bootstrap && <p style={styles.bootstrapHelp}>{t("bootstrapHelp")}</p>}
+              <form onSubmit={handleSubmit} style={styles.form}>
+                {bootstrap ? (
+                  <>
+                    <label style={styles.label} htmlFor="register-username">{t("username")}</label>
+                    <input
+                      id="register-username"
+                      style={styles.input}
+                      name="username"
+                      value={form.username}
+                      onChange={handleChange}
+                      placeholder={t("usernamePlaceholder")}
+                      autoFocus
+                    />
+                    {usernameStatus === "checking" && (
+                      <div style={styles.checkingMsg}>{t("checking")}</div>
+                    )}
+                    {usernameStatus === "available" && (
+                      <div style={styles.availableMsg}>{t("usernameAvailable")}</div>
+                    )}
+                    {usernameStatus === "taken" && (
+                      <div style={styles.takenMsg}>{t("usernameTaken")}</div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <label style={styles.label} htmlFor="register-email">{t("email")}</label>
+                    <input
+                      id="register-email"
+                      style={styles.input}
+                      name="email"
+                      type="text"
+                      inputMode="email"
+                      autoComplete="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      placeholder={t("emailPlaceholder")}
+                      autoFocus
+                    />
+                  </>
+                )}
+                <label style={styles.label} htmlFor="register-display-name">{t("displayName")}</label>
+                <input
+                  id="register-display-name"
+                  style={styles.input}
+                  name="display_name"
+                  value={form.display_name}
+                  onChange={handleChange}
+                  placeholder={t("displayNamePlaceholder")}
+                />
+                <label style={styles.label} htmlFor="register-password">{t("password")}</label>
+                <PasswordInput
+                  id="register-password"
+                  style={styles.input}
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  placeholder={t("passwordPlaceholder")}
+                />
+                <label style={styles.label} htmlFor="register-confirm">{t("confirmPassword")}</label>
+                <PasswordInput
+                  id="register-confirm"
+                  style={styles.input}
+                  name="confirm_password"
+                  value={form.confirm_password}
+                  onChange={handleChange}
+                  placeholder={t("confirmPasswordPlaceholder")}
+                />
+                {form.password && form.password.length < 8 && (
+                  <div style={styles.hintMsg}>{t("passwordMinLength")}</div>
+                )}
+                {form.password && form.confirm_password && form.password !== form.confirm_password && (
+                  <div style={styles.hintMsg}>{t("passwordMismatch")}</div>
+                )}
+                {bootstrap && (
+                  <>
+                    <label style={styles.label} htmlFor="register-bootstrap-token">{t("bootstrapToken")}</label>
+                    <input
+                      id="register-bootstrap-token"
+                      style={styles.input}
+                      name="bootstrap_token"
+                      value={form.bootstrap_token}
+                      onChange={handleChange}
+                      placeholder={t("bootstrapTokenPlaceholder")}
+                      autoComplete="off"
+                    />
+                  </>
+                )}
+                {error && <div style={styles.errorMsg} role="alert">{error}</div>}
+                <button type="submit" style={styles.submitBtn} disabled={loading}>
+                  {loading ? t("submitting") : bootstrap ? t("submitBootstrap") : t("submit")}
+                </button>
+              </form>
+              <div style={styles.footer}>
+                {t("hasAccount")}{" "}
+                <Link to="/login" style={styles.link}>
+                  {t("login")}
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -180,6 +246,14 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-primary)",
     textAlign: "center" as const,
   },
+  bootstrapHelp: {
+    margin: "-16px 0 16px",
+    fontSize: 13,
+    color: "var(--text-secondary)",
+    lineHeight: 1.6,
+    textAlign: "center" as const,
+  },
+  loadingMsg: { textAlign: "center" as const, fontSize: 14, color: "var(--text-secondary)" },
   form: { display: "flex", flexDirection: "column" as const, gap: 8 },
   label: { fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", marginTop: 8 },
   input: {

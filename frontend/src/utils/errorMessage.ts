@@ -71,3 +71,18 @@ export function translateError(backendDetail: string): string {
   // If unknown, return as-is
   return backendDetail;
 }
+
+/**
+ * 요청 오류에서 보여 줄 문구를 꺼낸다. FastAPI 의 detail 은 문자열(직접 낸 오류)이거나
+ * 배열(pydantic 검증 오류)이다. 배열을 그대로 렌더하면 React 가 객체를 못 그려 깨진다.
+ */
+export function errorText(err: unknown, fallback: string): string {
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  if (typeof detail === "string" && detail) return translateError(detail);
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] as { msg?: unknown };
+    if (typeof first?.msg === "string" && first.msg) return first.msg;
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
