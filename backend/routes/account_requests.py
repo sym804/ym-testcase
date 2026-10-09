@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import (
-    AccountRequest, AccountRequestStatus, AccountRequestType, User, now_kst,
+    AccountRequest, AccountRequestStatus, AccountRequestType, User, UserStatus, now_kst,
 )
 from schemas import (
     AccountRequestAck, AccountRequestApprove, AccountRequestApproveResult,
@@ -23,6 +23,8 @@ from auth import hash_password, verify_password, role_required, get_session_user
 from routes.auth import _check_rate_limit, _clear_failures, _record_failure
 from services import rate_limit
 from services.client_ip import client_ip
+from services.account_policy import normalize_identifier
+from services.accounts import find_user_by_identifier
 from services.locks import LockNs, keyed_xact_lock
 
 logger = logging.getLogger(__name__)
@@ -157,6 +159,8 @@ def approve_account_request(
     target = db.query(User).filter(User.id == payload.user_id).first()
     if not target:
         raise HTTPException(status_code=404, detail="대상 사용자를 찾을 수 없습니다.")
+    if target.status != UserStatus.active:
+        raise HTTPException(status_code=409, detail="사용 중인 계정만 처리할 수 있습니다.")
 
     req.user_id = target.id
     req.resolved_by_id = current_user.id
@@ -226,13 +230,15 @@ def reset_password_with_code(
     계정 존재 여부와 승인 여부가 새어 나간다. 응답 본문뿐 아니라 응답 시간도
     같아야 하므로 모든 실패 경로가 bcrypt 대조를 한 번씩 지불한다.
     """
-    _check_rate_limit(request, payload.username, db)
+    ident = normalize_identifier(payload.username)
+    _check_rate_limit(request, ident, db)
     fail = HTTPException(status_code=401, detail="코드가 올바르지 않거나 만료되었습니다.")
 
-    user = db.query(User).filter(User.username == payload.username).first()
-    if not user:
+    user = find_user_by_identifier(db, ident)
+    # 대기·중지 계정은 복구 대상이 아니다. 실패 응답은 다른 실패와 같게 둔다.
+    if not user or user.status != UserStatus.active:
         verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화. 위 _DUMMY_HASH 주석 참고
-        _record_failure(request, payload.username, db)
+        _record_failure(request, ident, db)
         raise fail
 
     approved = (
@@ -255,16 +261,16 @@ def reset_password_with_code(
     req = approved[0] if approved else None
     if not req or not req.code_hash:
         verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화
-        _record_failure(request, payload.username, db)
+        _record_failure(request, ident, db)
         raise fail
 
     if req.code_expires_at is None or req.code_expires_at < now_kst():
         verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화
-        _record_failure(request, payload.username, db)
+        _record_failure(request, ident, db)
         raise fail
 
     if not verify_password(payload.code, req.code_hash):
-        _record_failure(request, payload.username, db)
+        _record_failure(request, ident, db)
         raise fail
 
     user.password_hash = hash_password(payload.new_password)
@@ -272,6 +278,7 @@ def reset_password_with_code(
     # 복구는 계정을 되찾는 국면이다. 옛 토큰이 살아 있으면 되찾은 것이 아니다
     user.token_version = (user.token_version or 0) + 1
     revoke_user_api_keys(user.id, db)
+    user.google_sub = None  # 관리자 초기화와 같은 이유
     # 살아 있는 approved 요청을 전부 닫는다. 중복 억제가 pending 만 보기 때문에 한
     # 사용자가 approved 를 여러 건 들고 있을 수 있고, 쓴 한 건만 닫으면 나머지 코드가
     # 최대 24시간 동안 그대로 유효하다. 이미 메신저로 흘러간 코드가 남는다.
@@ -283,7 +290,7 @@ def reset_password_with_code(
     db.commit()
     # 코드를 몇 번 잘못 입력했다가 성공한 사용자가 그 실패 기록 때문에 곧바로
     # 로그인에서 잠기는 것을 막는다. 로그인 성공 경로와 같은 처리다.
-    _clear_failures(request, payload.username, db)
+    _clear_failures(request, ident, db)
     logger.info("Password reset via code: user=%s request=%s retired=%s",
                 user.username, req.id, len(approved))
     return {"message": "비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요."}
