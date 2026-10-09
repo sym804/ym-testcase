@@ -28,7 +28,7 @@
     "goToProjects": "프로젝트 목록으로"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.2.0.1 | AGPL-3.0",
+  "version": "YM TestCase v2.2.0.2 | AGPL-3.0",
   "copy": "복사",
   "copiedToClipboard": "클립보드에 복사되었습니다.",
   "undo": "되돌리기",
@@ -68,6 +68,7 @@
     "filterNotFound": "필터를 찾을 수 없습니다.",
     "tcIdTaken": "이미 쓰이는 TC ID입니다. 다른 값으로 변경해 주세요.",
     "uploadNotFound": "업로드를 찾을 수 없습니다. 파일을 다시 선택해 주세요.",
+    "xlsNotSupported": "Excel 97-2003 형식(.xls)이거나 암호가 걸린 파일은 읽을 수 없습니다. 암호를 풀고 .xlsx 로 다시 저장해 올려 주세요.",
     "uploadAlreadyUsed": "이미 처리한 업로드입니다. 파일을 다시 선택해 주세요.",
     "uploadBusy": "같은 업로드를 처리하는 중입니다. 잠시 후 다시 시도해 주세요.",
     "uploadNotReceived": "파일이 아직 올라오지 않았습니다. 다시 시도해 주세요.",

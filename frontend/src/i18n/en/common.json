@@ -28,7 +28,7 @@
     "goToProjects": "Go to Projects"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.2.0.1 | AGPL-3.0",
+  "version": "YM TestCase v2.2.0.2 | AGPL-3.0",
   "copy": "Copy",
   "copiedToClipboard": "Copied to clipboard.",
   "undo": "Undo",
@@ -68,6 +68,7 @@
     "filterNotFound": "Filter not found.",
     "tcIdTaken": "That TC ID is already in use. Please pick another.",
     "uploadNotFound": "Upload not found. Please select the file again.",
+    "xlsNotSupported": "Excel 97-2003 files (.xls) and password-protected files cannot be read. Remove the password, save the file as .xlsx, and upload it again.",
     "uploadAlreadyUsed": "This upload has already been processed. Please select the file again.",
     "uploadBusy": "This upload is being processed. Please try again shortly.",
     "uploadNotReceived": "The file has not been uploaded yet. Please try again.",

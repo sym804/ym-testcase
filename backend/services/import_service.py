@@ -639,13 +639,23 @@ from services.staged_upload import PURPOSE_LIMITS
 MAX_IMPORT_SIZE = PURPOSE_LIMITS["tc_import"]  # 10MB, 스테이징 업로드와 같은 값
 
 
+XLS_NOT_SUPPORTED = "Excel 97-2003 형식(.xls)이거나 암호가 걸린 파일은 읽을 수 없습니다. 암호를 풀고 .xlsx 로 다시 저장해 올려 주세요."
+#: OLE2 컨테이너의 첫 8바이트. Excel 97-2003 통합 문서와 암호가 걸린 .xlsx(EncryptedPackage)가 이 형식이다
+_OLE2_SIGNATURE = bytes.fromhex("D0CF11E0A1B11AE1")
+
+
 def _load_workbook_from_upload(file: UploadFile):
     """UploadFile을 읽어 openpyxl Workbook으로 반환한다."""
-    if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
+    if not (file.filename or "").lower().endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="Only .xlsx files are supported")
 
     # ★다 읽은 뒤 재면 제한을 넘는 파일도 이미 메모리에 올라온 뒤다.
     file_content = read_limited_sync(file.file, MAX_IMPORT_SIZE)
+
+    # ★openpyxl 은 97-2003 형식을 읽지 못한다. 판정은 이름이 아니라 내용으로 한다.
+    #   이름만 .xls 인 xlsx(다른 시스템의 내보내기에 흔하다)는 그대로 읽힌다.
+    if file_content.startswith(_OLE2_SIGNATURE):
+        raise HTTPException(status_code=400, detail=XLS_NOT_SUPPORTED)
 
     try:
         return load_workbook(filename=io.BytesIO(file_content), data_only=True)

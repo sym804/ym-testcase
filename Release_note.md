@@ -21,11 +21,27 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v2.2.0.1  (2026-10-09)
-├── Frontend       v1.13.0.1
-├── Backend        v2.2.0.0
+YM TestCase System  v2.2.0.2  (2026-10-10)
+├── Frontend       v1.13.0.2
+├── Backend        v2.2.0.1
 └── Database       v1.2.0.0
 ```
+
+---
+
+## System 2.2.0.2 / BE 2.2.0.1 / FE 1.13.0.2 - [fix] Excel 97-2003 파일 가져오기 안내 (2026-10-10)
+
+### 이슈
+
+- SYM-170 Excel 97-2003(.xls) 파일을 가져오면 이유 없이 'Failed to read Excel file' 로 실패한다 (bug/minor/backend)
+
+### 변경
+
+- 내용이 OLE2(97-2003 형식, 암호 걸린 .xlsx)면 '.xlsx 로 다시 저장' 안내로 400. 판정은 이름이 아니라 내용, 확장자 대소문자 무시
+
+### 영향
+
+- 이름만 .xls 인 xlsx 와 TC.XLSX 같은 대문자 확장자는 그대로 가져와짐
 
 ---
 
