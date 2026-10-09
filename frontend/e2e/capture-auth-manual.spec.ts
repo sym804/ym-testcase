@@ -1,5 +1,5 @@
 /**
- * 매뉴얼 스크린샷: 로그인 · 가입 · 계정 연결 · 사용자 관리 · 계정 요청 (System 2.2.0.1)
+ * 매뉴얼 스크린샷: 로그인 · 가입 · 계정 연결 · 사용자 관리 · 비밀번호 초기화 · 계정 요청 (System 2.2.0.4)
  *
  * 실제 DB 를 쓰지 않는다. 빈 DB 를 따로 만들고 격리 포트로 띄운다.
  * 1. 빈 DB 를 만들고 백엔드를 8018 로 띄운다. 환경변수:
@@ -33,6 +33,8 @@ async function shot(page: Page, name: string, fullPage = false) {
 test("인증 화면 매뉴얼 스크린샷", async ({ page, request }) => {
   test.setTimeout(60000);
   await page.setViewportSize({ width: 1280, height: 800 });
+  // 비밀번호 초기화가 confirm() 을 띄운다
+  page.on("dialog", (d) => void d.accept());
 
   // 01. 로그인 (Google 버튼 포함)
   await page.goto("/login");
@@ -50,10 +52,14 @@ test("인증 화면 매뉴얼 스크린샷", async ({ page, request }) => {
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
 
-  // 22, 25. 사용자 관리 (승인 대기 배너, 로그인 방식, 상태, 계정 버튼)
+  // 22. 사용자 관리 (승인 대기 배너, 로그인 방식, 상태, 계정 버튼)
   await page.goto("/admin");
   await expect(page.getByText("Google: admin@example.com")).toBeVisible();
   await shot(page, "22_admin_page.png");
+
+  // 25. 비밀번호 초기화 뒤 임시 비밀번호 창
+  await page.getByRole("row", { name: /kim\.minji@example\.com/ }).getByRole("button", { name: "초기화" }).click();
+  await expect(page.getByRole("heading", { name: "비밀번호 초기화 완료" })).toBeVisible();
   await shot(page, "25_admin_page_with_reset.png");
 
   // 44. 계정 연결 창
@@ -77,7 +83,6 @@ test("인증 화면 매뉴얼 스크린샷", async ({ page, request }) => {
   await expect(resetRow).toBeVisible();
   await shot(page, "39_admin_account_requests.png", true);
 
-  page.on("dialog", (d) => void d.accept());
   await resetRow.getByRole("combobox").selectOption({ label: "kim.minji@example.com (김민지)" });
   await resetRow.getByRole("button", { name: "승인" }).click();
   await expect(page.getByRole("button", { name: "복사" })).toBeVisible();

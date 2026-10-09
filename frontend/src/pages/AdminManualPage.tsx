@@ -60,7 +60,7 @@ export default function AdminManualPage() {
               <div style={s.archCard}>
                 <div style={s.archTitle}>Backend</div>
                 <ul style={s.archList}>
-                  <li>FastAPI (Python 3.12)</li>
+                  <li>FastAPI (Python 3.11 ~ 3.14)</li>
                   <li>SQLAlchemy 2 ORM</li>
                   <li>{t("architecture.li1")}</li>
                   <li>{t("architecture.li2")}</li>
