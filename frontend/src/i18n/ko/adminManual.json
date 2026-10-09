@@ -1,6 +1,6 @@
 {
   "title": "YM TestCase 운영 매뉴얼",
-  "updatedAt": "최종 업데이트: 2026-09-04 | v1.3.1.0 | Admin 전용 문서",
+  "updatedAt": "최종 업데이트: 2026-10-09 | Admin 전용 문서",
   "badge": "운영 매뉴얼 (Admin)",
   "backBtn": "돌아가기",
   "toc": {
@@ -32,7 +32,8 @@
     "li9": "Frontend: 포트 5173 (개발)",
     "li10": "CORS 설정 필요",
     "li11": "파일 저장: UPLOAD_DIR",
-    "li12": "라이선스: AGPL-3.0"
+    "li12": "라이선스: AGPL-3.0",
+    "li13": "Google 로그인 (OpenID Connect, 환경변수로 켬)"
   },
   "install": {
     "title": "2. 설치 및 실행",
@@ -53,7 +54,7 @@
     "envDesc": "환경 구분. production 시 SECRET_KEY 미설정 시 에러",
     "optional": "선택",
     "dbDesc": "PostgreSQL 주소. 로컬 예: postgresql+psycopg2://ymtc:ymtc@127.0.0.1:54329/ymtc. 배포는 Supabase 트랜잭션 풀러",
-    "tokenDesc": "JWT 토큰 만료 시간 (시간)",
+    "tokenDesc": "일반 로그인 유지 시간 (시간)",
     "corsDesc": "허용할 CORS 오리진 (콤마 구분)",
     "uploadDesc": "첨부파일 저장 디렉토리",
     "warn1": "<strong>주의:</strong> 프로덕션 환경에서는 반드시 <code>SECRET_KEY</code>를 고유한 값으로 설정하세요. 미설정 시 서버 시작이 실패합니다.",
@@ -63,7 +64,22 @@
     "storageDesc": "첨부·가져오기 파일 저장소. local 또는 supabase(배포)",
     "supabaseDesc": "Supabase 프로젝트 주소, 서비스 키, 버킷 이름. STORAGE_BACKEND=supabase 일 때",
     "cronDesc": "매일 정리 작업(/api/internal/cron/daily) 인증 값",
-    "proxyDesc": "클라이언트 IP 를 담는 프록시 헤더. 배포 플랫폼이 덮어쓰는 헤더만 쓰세요"
+    "proxyDesc": "클라이언트 IP 를 담는 프록시 헤더. 배포 플랫폼이 덮어쓰는 헤더만 쓰세요(Vercel 은 x-real-ip)",
+    "rememberDesc": "\"로그인 유지\"를 고른 로그인의 유지 일수",
+    "lockDesc": "동시 편집 잠금 대기 상한 (밀리초). 넘으면 409 로 안내합니다",
+    "googleDesc": "Google 로그인용 OAuth 클라이언트. 비우면 Google 버튼을 숨깁니다",
+    "googleRedirectDefault": "개발: http://localhost:5173/api/auth/google/callback",
+    "googleRedirectDesc": "Google 콘솔에 등록한 리디렉션 URI. 운영(ENV=production)에서는 반드시 지정합니다",
+    "companyDomainsDesc": "회사 Google Workspace 도메인 (콤마 구분). Google 이 알려 준 Workspace 도메인으로만 회사 계정을 판정합니다",
+    "allowPersonalDesc": "0 이면 회사 계정만 받습니다. 이때 AUTH_COMPANY_DOMAINS 가 있어야 하고, 이메일 가입은 항상 승인 대기가 됩니다",
+    "approvalDesc": "관리자 승인 대상. none(모두 바로 사용) / personal(회사 Workspace Google 계정만 바로 사용, 나머지는 대기. 이메일 가입은 회사 주소여도 대기) / all(모두). 단 AUTH_ALLOW_PERSONAL=0 이면 이메일 가입은 이 값과 관계없이 승인 대기입니다",
+    "bootstrapDesc": "운영(ENV=production)의 빈 DB 에서 첫 관리자를 만들 때 필요한 값",
+    "registerLimitDesc": "IP 하나의 시간당 가입 요청 수",
+    "googleSetupTitle": "3-1. Google 로그인 켜기",
+    "googleSetupOl1": "Google Cloud 콘솔의 <strong>API 및 서비스 &gt; 사용자 인증 정보</strong>에서 OAuth 클라이언트 ID(웹 애플리케이션)를 만듭니다.",
+    "googleSetupOl2": "<strong>승인된 리디렉션 URI</strong>에 <code>https://&lt;사이트 주소&gt;/api/auth/google/callback</code> 을 넣습니다. 개발 환경은 <code>http://localhost:5173/api/auth/google/callback</code> 입니다.",
+    "googleSetupOl3": "발급된 값을 <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code> 에, 같은 리디렉션 URI 를 <code>GOOGLE_REDIRECT_URI</code> 에 넣고 서버를 다시 시작합니다. 로그인 화면에 <strong>Google 로 로그인</strong> 버튼이 나타납니다.",
+    "googleSetupInfo": "<strong>회사 계정만 받으려면:</strong> <code>AUTH_COMPANY_DOMAINS</code> 에 Workspace 도메인을 넣고 <code>AUTH_ALLOW_PERSONAL=0</code> 으로 둡니다. 누구를 승인 대기로 둘지는 <code>AUTH_APPROVAL</code> 이 정합니다(회사 계정만 받는 설정에서 이메일 가입은 항상 대기). 설정값이 잘못되면 서버가 시작할 때 멈추고 이유를 알려 줍니다."
   },
   "database": {
     "title": "4. 데이터베이스",
@@ -108,7 +124,7 @@
     "imgAlt": "관리자 페이지",
     "listTitle": "5-1. 사용자 목록",
     "li1": "헤더의 <strong>\"관리\"</strong> 버튼 클릭으로 관리자 페이지에 접근합니다.",
-    "li2": "모든 사용자의 ID, 사용자명, 표시명, 역할, 가입일을 확인합니다.",
+    "li2": "사용자마다 아이디, 표시명, 이메일, 로그인 방식(비밀번호, Google, 연결된 Google 주소), 상태, 시스템 역할, 프로젝트 배정, 가입일을 확인합니다.",
     "roleChangeTitle": "5-2. 역할 변경",
     "ol1": "대상 사용자의 역할 드롭다운을 변경합니다.",
     "ol2": "변경 즉시 적용됩니다.",
@@ -134,12 +150,12 @@
     "accountRequestImgAlt2": "관리자 페이지 - 발급된 코드 표시",
     "accountRequestWarn": "<strong>주의:</strong> 코드는 서버에 해시로만 저장되며 평문은 이 화면에 <strong>1회만</strong> 표시됩니다. 반드시 그 자리에서 복사 버튼으로 복사해 사용자에게 전달하세요. 닫기 버튼을 누르면 다시 볼 수 없습니다.",
     "accountStatusTitle": "5-4-1. 가입 승인과 계정 상태",
-    "accountStatusLi1": "계정 상태는 <strong>사용 / 승인 대기 / 사용 중지됨</strong> 셋입니다. 누가 승인 대기가 되는지는 <code>AUTH_APPROVAL</code> 이 정합니다.",
+    "accountStatusLi1": "계정 상태는 <strong>사용 / 승인 대기 / 사용 중지됨</strong> 셋입니다. 누가 승인 대기가 되는지는 <code>AUTH_APPROVAL</code> 이 정합니다. 회사 계정만 받는 설정(<code>AUTH_ALLOW_PERSONAL=0</code>)에서는 이메일 가입이 항상 승인 대기입니다.",
     "accountStatusLi2": "승인 대기 계정이 있으면 목록 위에 <strong>승인 대기 N명</strong> 이 보입니다. <strong>승인</strong> 하면 바로 로그인할 수 있고, <strong>거절</strong> 하면 그 계정을 지웁니다.",
     "accountStatusLi3": "<strong>사용 중지</strong> 하면 로그인과 API 키가 바로 막힙니다. 다시 사용해도 옛 API 키는 살아나지 않습니다. 자기 자신과 마지막 활성 관리자는 중지·강등할 수 없습니다.",
     "accountStatusLi4": "<strong>이메일 해제</strong>는 남의 주소로 먼저 가입한 계정에서 이메일을 뗍니다. Google 이 확인한 이메일은 해제할 수 없습니다.",
     "accountStatusLi5": "<strong>삭제</strong>는 작업 기록이 하나도 없는 계정만 지웁니다. 실수로 생긴 빈 계정을 정리할 때 씁니다. 기록이 있으면 거절되니 사용 중지를 쓰세요.",
-    "accountStatusLi6": "로그인 방식 칸 아래에 연결된 Google 계정 주소가 보입니다. <strong>주소 미기록</strong>은 이 기능 전에 연결된 계정이고, 다음 Google 로그인 때 채워집니다. 비밀번호 없이 Google 로만 쓰던 빈 계정은 본인이 다른 계정에 그 Google 계정을 연결하면 자동으로 정리됩니다(승인 대기, 사용 중지 상태도 같음). 그 계정에 기록이나 비밀번호가 있으면 연결이 거절되니, 그 계정을 <strong>초기화</strong>해 Google 연결을 끊은 뒤 다시 연결합니다.",
+    "accountStatusLi6": "로그인 방식 칸 아래에 연결된 Google 계정 주소가 보입니다. <strong>주소 미기록</strong>은 이 기능 전에 연결된 계정이고, 다음 Google 로그인 때 채워집니다. 비밀번호 없이 Google 로만 쓰던 빈 계정은 본인이 다른 계정에 그 Google 계정을 연결하면 자동으로 정리됩니다(승인 대기, 사용 중지 상태도 같음). 마지막 활성 관리자 계정은 정리하지 않습니다. 그 계정에 기록이나 비밀번호가 있으면 연결이 거절되니, 그 계정을 <strong>초기화</strong>해 Google 연결을 끊은 뒤 다시 연결합니다.",
     "accountStatusWarn": "<strong>주의:</strong> 퇴사자는 Workspace 계정을 지워도 앱 로그인(최대 30일)과 API 키가 남습니다. 사용 중지해야 바로 막힙니다."
   },
   "roleSystem": {
@@ -223,13 +239,13 @@
     "pwResetSetting": "Admin 페이지",
     "authToken": "인증 토큰",
     "authTokenImpl": "JWT (HS256) + httpOnly 쿠키",
-    "authTokenSetting": "TOKEN_EXPIRE_HOURS (기본 2시간)",
+    "authTokenSetting": "TOKEN_EXPIRE_HOURS (기본 72시간), 로그인 유지는 REMEMBER_ME_DAYS (기본 30일)",
     "apiKey": "API 키",
     "apiKeyImpl": "사용자별 발급 · 폐기, SHA-256 해시 저장, Bearer 헤더 인증",
     "apiKeySetting": "만료 30 · 90 · 180 · 365일 또는 없음, 1인 20개, 비밀번호가 바뀌면 전부 폐기",
     "csrf": "CSRF 방어",
     "csrfImpl": "csrf_token 쿠키 + X-CSRF-Token 헤더 검증",
-    "csrfSetting": "상태 변경 요청 시 자동 적용",
+    "csrfSetting": "쿠키 로그인의 상태 변경 요청에 자동 적용 (Bearer 헤더 인증은 제외)",
     "loginLimit": "로그인 제한",
     "loginLimitImpl": "Rate Limiting",
     "loginLimitSetting": "IP+사용자당 5분간 10회 (초과 시 잠금)",
@@ -244,21 +260,35 @@
     "xssSetting": "마크다운 셀 렌더링 시 자동 적용",
     "apiAuth": "API 권한",
     "apiAuthImpl": "역할 기반 접근 제어",
-    "apiAuthSetting": "엔드포인트별 역할 체크"
+    "apiAuthSetting": "엔드포인트별 역할 체크",
+    "google": "Google 로그인",
+    "googleImpl": "OpenID Connect 인가 코드 흐름 + PKCE, state · nonce 검증, Google 이 확인한 이메일만 받음",
+    "googleSetting": "GOOGLE_CLIENT_ID 등, AUTH_COMPANY_DOMAINS, AUTH_ALLOW_PERSONAL",
+    "signup": "가입 제한",
+    "signupImpl": "IP 당 가입 요청 수 제한, 관리자 승인",
+    "signupSetting": "REGISTER_MAX_PER_HOUR (기본 10), AUTH_APPROVAL"
   },
   "apiRef": {
-    "title": "10. API 엔드포인트 (84개)",
-    "swaggerInfo": "API 문서(Swagger UI)는",
+    "title": "10. 주요 API 엔드포인트",
+    "swaggerInfo": "자주 쓰는 엔드포인트만 싣습니다. 전체 목록과 요청 형식은 Swagger UI",
     "swaggerInfoSuffix": "에서 확인할 수 있습니다.",
     "descTh": "설명",
     "auth": {
       "title": "인증 (Auth)",
-      "checkUsername": "사용자명 중복 확인",
-      "register": "회원가입 (비밀번호 최소 8자)",
-      "login": "로그인 (JWT 토큰 발급)",
+      "checkUsername": "사용자명 중복 확인. 첫 관리자 화면 전용이며 사용자가 생긴 뒤에는 404",
+      "config": "로그인 화면 설정 (Google 버튼 표시 여부, 가입 화면 종류)",
+      "register": "회원가입. 이메일 가입이며 설정에 따라 승인 대기. 첫 관리자 만들기 겸용",
+      "login": "로그인 (세션 쿠키 발급, remember_me 면 기본 30일)",
+      "logout": "로그아웃. 세션 쿠키를 지우고 그 계정의 다른 기기 세션도 모두 끊음",
       "me": "현재 사용자 정보",
       "changePassword": "비밀번호 변경 (최소 8자)",
       "users": "사용자 목록 (QA Manager 이상)",
+      "approveUser": "가입 승인 (Admin)",
+      "rejectUser": "가입 거절. 승인 대기 계정을 지움 (Admin)",
+      "disableUser": "사용 중지. 로그인과 API 키를 막음 (Admin)",
+      "enableUser": "다시 사용 (Admin)",
+      "releaseEmail": "이메일 해제 (Admin)",
+      "deleteUser": "작업 기록이 없는 계정 삭제. 기록이 있으면 409 (Admin)",
       "changeRole": "역할 변경 (Admin)",
       "resetPassword": "비밀번호 초기화 (Admin)",
       "submitAccountRequest": "계정 복구 요청 접수",
@@ -268,7 +298,10 @@
       "resetPasswordWithCode": "코드로 비밀번호 재설정",
       "listApiKeys": "본인 API 키 목록 (로그인 세션만)",
       "createApiKey": "API 키 발급. 원문은 응답에서 1회만 (로그인 세션만)",
-      "revokeApiKey": "API 키 폐기 (로그인 세션만)"
+      "revokeApiKey": "API 키 폐기 (로그인 세션만)",
+      "googleStart": "Google 로그인 시작 (?mode=login|link)",
+      "googleCallback": "Google 로그인 콜백. GOOGLE_REDIRECT_URI 가 가리키는 주소",
+      "googleUnlink": "Google 연결 해제 (비밀번호가 있는 계정만)"
     },
     "projects": {
       "title": "프로젝트",
@@ -406,7 +439,16 @@
     "r11f": "Malgun Gothic 폰트 설치 확인",
     "r12s": "저장할 때 \"다른 작업이 진행 중입니다\" 안내",
     "r12c": "같은 프로젝트의 시트·TC 구조 변경이 동시에 몰려 잠금 대기가 길어짐",
-    "r12f": "잠시 뒤 다시 시도하세요. 자주 나면 LOCK_WAIT_TIMEOUT_MS(기본 10000) 를 늘리세요"
+    "r12f": "잠시 뒤 다시 시도하세요. 자주 나면 LOCK_WAIT_TIMEOUT_MS(기본 10000) 를 늘리세요",
+    "r13s": "로그인 화면에 Google 버튼이 없음",
+    "r13c": "GOOGLE_CLIENT_ID 가 비어 있음",
+    "r13f": "3-1 절처럼 GOOGLE_* 값을 넣고 서버를 다시 시작하세요",
+    "r14s": "Google 화면에서 redirect_uri_mismatch 오류",
+    "r14c": "Google 콘솔에 등록한 리디렉션 URI 와 GOOGLE_REDIRECT_URI 가 다름",
+    "r14f": "두 값을 글자까지 같게 맞추세요. 주소 끝의 / 와 http/https 도 다르면 안 됩니다",
+    "r15s": "\"관리자 승인을 기다리는 중입니다\" 로 로그인이 안 됨",
+    "r15c": "AUTH_APPROVAL 설정, 또는 회사 계정만 받는 설정의 이메일 가입이라 승인 대기 상태인 계정",
+    "r15f": "사용자 관리에서 그 계정을 승인하세요(5-4-1)"
   },
   "backup": {
     "title": "12. 백업/복구",
@@ -415,5 +457,5 @@
     "restoreTitle": "12-2. 복구",
     "tip1": "<strong>배포:</strong> 비공개 레포의 Backup 워크플로가 매일 DB 덤프(public 스키마)와 Storage 객체를 아티팩트로 남깁니다(14일 보관). Supabase 의 DB 백업에는 Storage 객체가 들어가지 않으므로 둘을 함께 보관하세요."
   },
-  "footer": "YM TestCase v1.0 | 운영 매뉴얼 (Admin 전용)"
+  "footer": "운영 매뉴얼 (Admin 전용)"
 }
