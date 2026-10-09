@@ -21,11 +21,27 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v2.0.0.0  (2026-10-09)
+YM TestCase System  v2.0.0.1  (2026-10-09)
 ├── Frontend       v1.11.0.0
 ├── Backend        v2.0.0.0
 └── Database       v1.0.0.0
 ```
+
+---
+
+## System 2.0.0.1 - [fix] TC 가져오기 E2E 간헐 실패 대응 (2026-10-09)
+
+### 이슈
+
+- SYM-146 TC 가져오기 E2E 가 CI 에서 간헐로 실패한다 (bug/minor/etc)
+
+### 변경
+
+- 빈 프로젝트 화면이 뜬 뒤에 파일 선택, 실패 시 API 오류와 콘솔 오류를 `api-and-console-problems.txt` 로 보관
+
+### 영향
+
+- 없음(테스트만 변경)
 
 ---
 

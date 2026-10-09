@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
 
 // 스테이징 업로드 흐름: 서버가 발급한 주소에 파일을 직접 올리고(PUT) upload_id 로 처리한다.
@@ -41,17 +42,38 @@ function countStagings(page: Page) {
   return counter;
 }
 
+// 실패한 API 응답과 콘솔 오류. CI 에서만 나는 실패는 화면 캡처만으로 원인을 알 수 없어
+// 실패할 때 첨부로 남긴다(CI 가 test-results 를 아티팩트로 보관한다).
+function recordProblems(page: Page) {
+  const problems: string[] = [];
+  page.on("response", async (res) => {
+    if (!res.url().includes("/api/") || res.status() < 400) return;
+    const body = await res.text().catch(() => "");
+    problems.push(`${res.request().method()} ${new URL(res.url()).pathname} -> ${res.status()} ${body.slice(0, 200)}`);
+  });
+  page.on("requestfailed", (req) => problems.push(`${req.method()} ${req.url()} failed: ${req.failure()?.errorText}`));
+  page.on("console", (msg) => { if (msg.type() === "error") problems.push(`console: ${msg.text().slice(0, 300)}`); });
+  return problems;
+}
+
 test.describe("스테이징 업로드", () => {
   let pid: number;
   let headers: Record<string, string>;
+  let problems: string[];
 
-  test.beforeEach(async ({ request }) => {
+  test.beforeEach(async ({ page, request }) => {
+    problems = recordProblems(page);
     headers = await authHeaders(request);
     const res = await request.post("/api/projects", { data: { name: `E2E_Upload_${Date.now()}` }, headers });
     pid = (await res.json()).id;
   });
 
-  test.afterEach(async ({ request }) => {
+  test.afterEach(async ({ request }, testInfo) => {
+    if (testInfo.status !== testInfo.expectedStatus) {
+      const file = testInfo.outputPath("api-and-console-problems.txt");
+      await writeFile(file, problems.join("\n") || "(none)", "utf-8");
+      await testInfo.attach("api-and-console-problems", { path: file, contentType: "text/plain" });
+    }
     await request.delete(`/api/projects/${pid}`, { headers });
   });
 
@@ -60,6 +82,9 @@ test.describe("스테이징 업로드", () => {
     page.on("dialog", (d) => d.accept()); // 두 번째 가져오기의 덮어쓰기 확인
     await login(page);
     await page.goto(`/projects/${pid}?tab=tc`);
+    // 로딩 중에는 툴바의 파일 입력이 잠깐 있다가 빈 프로젝트 화면의 입력으로 바뀐다.
+    // 화면이 정해진 뒤에 고른다(사용자도 로딩이 끝난 화면에서 고른다).
+    await expect(page.getByText("폴더나 시트를 추가하여 테스트 케이스를 관리하세요.")).toBeVisible();
 
     const input = page.locator('input[type="file"][accept*=".csv"]').first();
     await input.setInputFiles({ name: "tcs.csv", mimeType: "text/csv", buffer: CSV });
