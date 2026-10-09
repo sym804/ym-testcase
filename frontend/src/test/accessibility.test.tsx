@@ -43,7 +43,9 @@ vi.mock("../api", () => ({
     register: vi.fn(),
     changePassword: vi.fn(),
     submitAccountRequest: vi.fn(),
+    config: vi.fn().mockResolvedValue({ google_enabled: true, signup_mode: "email" }),
   },
+  googleStartUrl: (mode: string) => `/api/auth/google/start?mode=${mode}`,
   projectsApi: { list: vi.fn().mockResolvedValue([]) },
 }));
 
@@ -105,7 +107,7 @@ describe("접근성", () => {
     // axe 는 placeholder 를 이름으로 인정해 통과시킨다. 그러나 placeholder 는
     // 입력을 시작하면 사라지므로 라벨의 대체물이 아니다. 라벨로 찾아본다.
     const { getByLabelText } = renderWithProviders(<LoginPage />);
-    expect(getByLabelText("아이디")).toBeTruthy();
+    expect(getByLabelText("아이디 또는 이메일")).toBeTruthy();
     expect(getByLabelText("비밀번호")).toBeTruthy();
   });
 

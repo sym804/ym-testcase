@@ -1,16 +1,31 @@
 {
   "title": "로그인",
-  "username": "아이디",
+  "username": "아이디 또는 이메일",
   "password": "비밀번호",
-  "usernamePlaceholder": "아이디를 입력하세요",
+  "usernamePlaceholder": "아이디 또는 이메일을 입력하세요",
   "passwordPlaceholder": "비밀번호를 입력하세요",
   "rememberMe": "로그인 유지",
   "submit": "로그인",
   "submitting": "로그인 중...",
-  "emptyFields": "아이디와 비밀번호를 입력해 주세요.",
+  "emptyFields": "아이디(또는 이메일)와 비밀번호를 입력해 주세요.",
   "loginFailed": "로그인에 실패했습니다.",
   "noAccount": "계정이 없으신가요?",
   "register": "회원가입",
   "forgotPassword": "아이디나 비밀번호를 잊으셨나요?",
-  "forgotPasswordLink": "계정 도움 요청"
+  "forgotPasswordLink": "계정 도움 요청",
+  "googleLogin": "Google 로 로그인",
+  "or": "또는",
+  "googleErrors": {
+    "google_state": "로그인 확인값이 만료됐습니다. 다시 시도해 주세요.",
+    "google_verify": "Google 로그인 확인에 실패했습니다. 다시 시도해 주세요.",
+    "google_email_unverified": "Google 에서 이메일 확인이 끝나지 않은 계정입니다.",
+    "company_only": "회사 Google 계정으로만 로그인할 수 있습니다.",
+    "pending": "관리자 승인을 기다리는 중입니다.",
+    "disabled": "사용이 중지된 계정입니다.",
+    "email_taken": "이 이메일을 쓰는 계정이 이미 있습니다. 본인 계정이면 그 계정으로 로그인한 뒤 Google 계정을 연결하세요. 아니면 관리자에게 문의하세요.",
+    "already_linked": "이 Google 계정은 이미 다른 계정에 연결돼 있습니다.",
+    "bootstrap_required": "아직 관리자 계정이 없습니다. 가입 화면에서 관리자 계정을 먼저 만드세요.",
+    "google_disabled": "Google 로그인이 꺼져 있습니다.",
+    "unknown": "Google 로그인에 실패했습니다. 다시 시도해 주세요."
+  }
 }

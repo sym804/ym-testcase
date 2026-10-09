@@ -72,7 +72,16 @@
     "uploadBusy": "This upload is being processed. Please try again shortly.",
     "uploadNotReceived": "The file has not been uploaded yet. Please try again.",
     "busy": "Another operation is in progress. Please try again shortly.",
-    "storageUnavailable": "Cannot reach file storage. Please try again shortly."
+    "storageUnavailable": "Cannot reach file storage. Please try again shortly.",
+    "accountPending": "Your account is waiting for administrator approval.",
+    "accountDisabled": "This account has been disabled.",
+    "emailRequired": "Please sign up with an email address.",
+    "emailTaken": "This email is already registered.",
+    "companyEmailOnly": "Only company email addresses can sign up.",
+    "tooManyRegistrations": "Too many sign-up attempts. Please try again later.",
+    "bootstrapTokenInvalid": "The setup token is incorrect.",
+    "noPassword": "This account has no password.",
+    "emailInvalid": "The email address is not valid."
   },
   "selectProject": "Select project",
   "selectRow": "Select this project",

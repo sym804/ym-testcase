@@ -16,7 +16,8 @@ interface AuthContextType {
   loading: boolean;
   mustChangePassword: boolean;
   login: (form: LoginForm) => Promise<void>;
-  register: (form: RegisterForm) => Promise<void>;
+  register: (form: RegisterForm) => Promise<User>;
+  refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
   changePassword: (currentPw: string, newPw: string) => Promise<void>;
 }
@@ -64,11 +65,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (form.password.length < 8) {
       throw new Error(i18n.t("header:passwordMinLength"));
     }
-    await authApi.register({
-      username: form.username,
+    // 비어 있는 칸은 보내지 않는다. 서버는 사용자 0명이면 username, 아니면 email 을 본다.
+    const payload: Omit<RegisterForm, "confirm_password"> = {
       password: form.password,
       display_name: form.display_name,
-    });
+    };
+    if (form.username) payload.username = form.username;
+    if (form.email) payload.email = form.email;
+    if (form.bootstrap_token) payload.bootstrap_token = form.bootstrap_token;
+    return authApi.register(payload);
+  };
+
+  const refreshUser = async () => {
+    const me = await authApi.getMe();
+    setUser(me);
   };
 
   const changePassword = async (currentPw: string, newPw: string) => {
@@ -90,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, mustChangePassword, login, register, logout, changePassword }}>
+    <AuthContext.Provider value={{ user, loading, mustChangePassword, login, register, refreshUser, logout, changePassword }}>
       {children}
     </AuthContext.Provider>
   );

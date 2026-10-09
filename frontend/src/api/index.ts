@@ -1,4 +1,4 @@
-import client from "./client";
+import client, { API_BASE_URL } from "./client";
 import { withStagedUpload } from "./uploads";
 import type {
   User,
@@ -28,10 +28,28 @@ import type {
   ResultImportSummary,
   ApiKeyItem,
   StabilitySummary,
+  AuthConfig,
 } from "../types";
 
 // ─── Auth ────────────────────────────────────────────
+/** Google 로그인 시작 주소. 페이지 이동으로 연다(화면에 Google 스크립트를 넣지 않는다) */
+export function googleStartUrl(mode: "login" | "link", next?: string): string {
+  const q = new URLSearchParams({ mode });
+  if (next) q.set("next", next);
+  return `${API_BASE_URL}/api/auth/google/start?${q.toString()}`;
+}
+
 export const authApi = {
+  config: async () => {
+    const res = await client.get<AuthConfig>("/api/auth/config");
+    return res.data;
+  },
+
+  unlinkGoogle: async () => {
+    const res = await client.post<User>("/api/auth/google/unlink");
+    return res.data;
+  },
+
   login: async (form: LoginForm) => {
     const res = await client.post<{ access_token: string; token_type: string }>(
       "/api/auth/login",
@@ -40,7 +58,7 @@ export const authApi = {
     return res.data;
   },
 
-  register: async (form: Omit<RegisterForm, "confirm_password">) => {
+  register: async (form: Omit<RegisterForm, "confirm_password">): Promise<User> => {
     const res = await client.post<User>("/api/auth/register", form);
     return res.data;
   },
@@ -614,6 +632,18 @@ export const usersApi = {
     const res = await client.put<{ temp_password: string }>(`/api/auth/users/${userId}/reset-password`);
     return res.data;
   },
+
+  approve: async (userId: number) => (await client.post<User>(`/api/auth/users/${userId}/approve`)).data,
+
+  reject: async (userId: number) => {
+    await client.post(`/api/auth/users/${userId}/reject`);
+  },
+
+  disable: async (userId: number) => (await client.post<User>(`/api/auth/users/${userId}/disable`)).data,
+
+  enable: async (userId: number) => (await client.post<User>(`/api/auth/users/${userId}/enable`)).data,
+
+  releaseEmail: async (userId: number) => (await client.post<User>(`/api/auth/users/${userId}/release-email`)).data,
 
   getAllAssignments: async () => {
     const res = await client.get<Record<string, { id: number; project_id: number; project_name: string; role: string }[]>>(

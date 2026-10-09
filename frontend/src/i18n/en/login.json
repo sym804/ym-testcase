@@ -1,16 +1,31 @@
 {
   "title": "Login",
-  "username": "Username",
+  "username": "Username or email",
   "password": "Password",
-  "usernamePlaceholder": "Enter your username",
+  "usernamePlaceholder": "Enter your username or email",
   "passwordPlaceholder": "Enter your password",
   "rememberMe": "Remember me",
   "submit": "Login",
   "submitting": "Logging in...",
-  "emptyFields": "Please enter your username and password.",
+  "emptyFields": "Please enter your username (or email) and password.",
   "loginFailed": "Login failed.",
   "noAccount": "Don't have an account?",
   "register": "Sign up",
   "forgotPassword": "Forgot your username or password?",
-  "forgotPasswordLink": "Get account help"
+  "forgotPasswordLink": "Get account help",
+  "googleLogin": "Sign in with Google",
+  "or": "or",
+  "googleErrors": {
+    "google_state": "The sign-in check expired. Please try again.",
+    "google_verify": "Google sign-in could not be verified. Please try again.",
+    "google_email_unverified": "This Google account has not verified its email.",
+    "company_only": "Only company Google accounts can sign in.",
+    "pending": "Your account is waiting for administrator approval.",
+    "disabled": "This account has been disabled.",
+    "email_taken": "An account with this email already exists. If it is yours, sign in to it and link your Google account. Otherwise contact an administrator.",
+    "already_linked": "This Google account is already linked to another account.",
+    "bootstrap_required": "There is no administrator yet. Create the administrator account on the sign-up page first.",
+    "google_disabled": "Google sign-in is turned off.",
+    "unknown": "Google sign-in failed. Please try again."
+  }
 }

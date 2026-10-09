@@ -13,7 +13,9 @@ vi.mock("../api", () => ({
     checkUsername: vi.fn(),
     register: vi.fn(),
     changePassword: vi.fn(),
+    config: vi.fn().mockResolvedValue({ google_enabled: false, signup_mode: "email" }),
   },
+  googleStartUrl: (mode: string) => `/api/auth/google/start?mode=${mode}`,
   projectsApi: { list: vi.fn().mockResolvedValue([]) },
   overviewApi: {
     get: vi.fn().mockResolvedValue({
@@ -105,7 +107,7 @@ describe("App Routing", () => {
         expect(screen.queryByText("로딩 중...")).not.toBeInTheDocument();
       });
       // 로그인 페이지가 아님을 확인
-      expect(screen.queryByPlaceholderText("아이디를 입력하세요")).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("아이디 또는 이메일을 입력하세요")).not.toBeInTheDocument();
     });
 
     it("must_change_password가 true이면 비밀번호 변경 모달을 표시한다", async () => {
