@@ -2,10 +2,13 @@
 
 라우트 함수를 독립 세션(독립 연결)으로 동시에 부른다. SQLite 에서는 쓰기 잠금이
 줄을 세워 줬지만 PostgreSQL 의 READ COMMITTED 에서는 서로의 미커밋 행을 못 본다.
+첫 계정 뒤로는 아이디 가입이 막히므로(이메일로 가입해 주세요) 한 명만 성공한다.
 """
 import threading
 
+from fastapi import HTTPException
 from sqlalchemy.orm import sessionmaker
+from starlette.requests import Request
 
 from models import User, UserRole
 from routes.auth import register
@@ -14,16 +17,25 @@ from schemas import UserCreate
 N = 8
 
 
-def test_빈_DB_에_동시에_가입해도_관리자는_한_명(pg_engine):
+def _req():
+    return Request({"type": "http", "method": "POST", "path": "/api/auth/register", "headers": [],
+                    "client": ("127.0.0.1", 0), "query_string": b""})
+
+
+def test_빈_DB_에_동시에_가입해도_관리자는_한_명(pg_engine, monkeypatch):
+    monkeypatch.setenv("REGISTER_MAX_PER_HOUR", "1000")
     Session = sessionmaker(bind=pg_engine)
     barrier = threading.Barrier(N)
-    errors = []
+    ok, rejected, errors = [], [], []
 
     def go(i):
         s = Session()
         try:
             barrier.wait()
-            register(UserCreate(username=f"user{i}", password="Passw0rd!x", display_name=f"u{i}"), db=s)
+            register(UserCreate(username=f"user{i}", password="Passw0rd!x", display_name=f"u{i}"), request=_req(), db=s)
+            ok.append(i)
+        except HTTPException as e:
+            rejected.append(e.status_code)
         except Exception as e:  # noqa: BLE001  실패도 결과로 모은다
             errors.append(repr(e))
         finally:
@@ -39,5 +51,5 @@ def test_빈_DB_에_동시에_가입해도_관리자는_한_명(pg_engine):
     roles = [u.role for u in s.query(User).all()]
     s.close()
     assert errors == []
-    assert len(roles) == N
-    assert roles.count(UserRole.admin) == 1, roles
+    assert len(ok) == 1 and rejected == [400] * (N - 1)
+    assert roles == [UserRole.admin]

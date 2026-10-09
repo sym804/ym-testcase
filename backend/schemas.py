@@ -12,9 +12,12 @@ from services.tc_id_service import TC_ID_MAX_LEN  # noqa: E402
 # ── Auth / User ───────────────────────────────────────────────────────────────
 
 class UserCreate(BaseModel):
-    username: str
+    # 사용자가 0명일 때(첫 관리자)만 username 을 받는다. 그 뒤로는 email 이 필수다.
+    username: Optional[str] = Field(None, max_length=100)
+    email: Optional[str] = Field(None, max_length=254)
     password: str = Field(..., min_length=8)
-    display_name: str
+    display_name: str = Field(..., min_length=1, max_length=100)
+    bootstrap_token: Optional[str] = None
 
 
 class UserLogin(BaseModel):

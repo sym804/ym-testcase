@@ -50,16 +50,16 @@ def setup_tokens():
 
     # 테스트용 viewer 생성
     r = requests.post(f"{BASE}/api/auth/register", json={
-        "username": "__sec_viewer__", "password": "viewer1234", "display_name": "Sec Viewer"
+        "email": "__sec_viewer__@example.com", "password": "viewer1234", "display_name": "Sec Viewer"
     })
     if r.status_code == 201:
         store.viewer_uid = r.json()["id"]
     else:
         r2 = requests.get(f"{BASE}/api/auth/users", headers=auth(store.admin))
         store.viewer_uid = next(
-            (u["id"] for u in r2.json() if u["username"] == "__sec_viewer__"), 0
+            (u["id"] for u in r2.json() if u["username"] == "__sec_viewer__@example.com"), 0
         )
-    store.viewer = login("__sec_viewer__", "viewer1234")
+    store.viewer = login("__sec_viewer__@example.com", "viewer1234")
     assert store.viewer, "Viewer login failed"
 
 
@@ -125,7 +125,7 @@ class TestPasswordChange:
         })
         assert r.status_code == 200
         # 변경된 비밀번호로 로그인
-        token = login("__sec_viewer__", "newpass1234")
+        token = login("__sec_viewer__@example.com", "newpass1234")
         assert token
         # 원래 비밀번호로 복원
         r2 = requests.put(f"{BASE}/api/auth/change-password", headers={"Authorization": f"Bearer {token}"}, json={
@@ -133,7 +133,7 @@ class TestPasswordChange:
             "new_password": "viewer1234",
         })
         assert r2.status_code == 200
-        store.viewer = login("__sec_viewer__", "viewer1234")
+        store.viewer = login("__sec_viewer__@example.com", "viewer1234")
 
     def test_change_password_wrong_current(self):
         """현재 비밀번호 틀리면 400"""
@@ -239,14 +239,14 @@ class TestUserManagement:
         temp_pw = r.json()["temp_password"]
         assert len(temp_pw) == 12
         # 임시 비밀번호로 로그인 확인
-        token = login("__sec_viewer__", temp_pw)
+        token = login("__sec_viewer__@example.com", temp_pw)
         assert token
         # viewer 비밀번호 복원
         requests.put(f"{BASE}/api/auth/change-password", headers={"Authorization": f"Bearer {token}"}, json={
             "current_password": temp_pw,
             "new_password": "viewer1234",
         })
-        store.viewer = login("__sec_viewer__", "viewer1234")
+        store.viewer = login("__sec_viewer__@example.com", "viewer1234")
 
     def test_reset_password_as_viewer_forbidden(self):
         """일반 유저는 비밀번호 초기화 불가"""
@@ -256,31 +256,22 @@ class TestUserManagement:
         )
         assert r.status_code == 403
 
-    def test_check_username_exists(self):
-        """존재하는 사용자명 → available: false"""
+    def test_check_username_closed_after_bootstrap(self):
+        """사용자가 생긴 뒤로는 아이디 존재를 묻는 경로가 닫힌다 → 404"""
         r = requests.get(f"{BASE}/api/auth/check-username?username=admin")
-        assert r.status_code == 200
-        assert r.json()["available"] is False
-
-    def test_check_username_available(self):
-        """없는 사용자명 → available: true"""
-        r = requests.get(f"{BASE}/api/auth/check-username?username=__nonexistent_user_12345__")
-        assert r.status_code == 200
-        assert r.json()["available"] is True
+        assert r.status_code == 404
 
     def test_register_duplicate(self):
-        """중복 사용자 등록 → 400"""
-        r = requests.post(f"{BASE}/api/auth/register", json={
-            "username": "admin",
-            "password": "somepassword123",
-            "display_name": "Dup Admin",
-        })
+        """같은 이메일 두 번 → 400"""
+        body = {"email": "__sec_dup__@example.com", "password": "somepassword123", "display_name": "Dup"}
+        requests.post(f"{BASE}/api/auth/register", json=body)
+        r = requests.post(f"{BASE}/api/auth/register", json=body)
         assert r.status_code == 400
 
     def test_register_short_password(self):
         """8자 미만 비밀번호로 등록 → 422"""
         r = requests.post(f"{BASE}/api/auth/register", json={
-            "username": "__sec_short_pw__",
+            "email": "__sec_short_pw__@example.com",
             "password": "short",
             "display_name": "Short PW",
         })
@@ -373,9 +364,9 @@ def outsider_and_private_project():
     h = auth(store.admin)
     uniq = secrets.token_hex(4)
 
-    username = f"__outsider_{uniq}__"
+    username = f"__outsider_{uniq}__@example.com"
     requests.post(f"{BASE}/api/auth/register", json={
-        "username": username, "password": "outsider1234", "display_name": "Outsider",
+        "email": username, "password": "outsider1234", "display_name": "Outsider",
     })
     token = requests.post(f"{BASE}/api/auth/login", json={
         "username": username, "password": "outsider1234",

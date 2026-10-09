@@ -34,8 +34,8 @@ def admin():
 @pytest.fixture(scope="module")
 def other(admin):
     requests.post(f"{BASE}/api/auth/register", json={
-        "username": "__staged_other__", "password": "other12345", "display_name": "Other"})
-    return _login("__staged_other__", "other12345")
+        "email": "__staged_other__@example.com", "password": "other12345", "display_name": "Other"})
+    return _login("__staged_other__@example.com", "other12345")
 
 
 def _stage(h, purpose="tc_import", size=5, filename="tcs.xlsx"):
@@ -83,7 +83,7 @@ def test_다른_사용자의_업로드는_꺼낼_수_없다(admin, other):
     db = _db()
     try:
         with pytest.raises(HTTPException) as e:
-            consume(db, t["upload_id"], _user(db, "__staged_other__"), "tc_import")
+            consume(db, t["upload_id"], _user(db, "__staged_other__@example.com"), "tc_import")
         assert e.value.status_code == 403
     finally:
         db.close()
