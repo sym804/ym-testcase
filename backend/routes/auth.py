@@ -79,7 +79,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     #   SQLite 의 쓰기 잠금에 기대고 있어서 PostgreSQL 에서는 서로의 미커밋 행을 못 봤다.
     # bcrypt 는 잠금 밖에서 한다. 잠금 구간이 길면 가입 연타에 모든 가입이 줄을 선다.
     password_hash = hash_password(payload.password)
-    advisory_xact_lock(db, LockNs.FIRST_ADMIN)
+    advisory_xact_lock(db, LockNs.ACCOUNTS)
     existing = db.query(User).filter(User.username == payload.username).first()
     if existing:
         raise HTTPException(

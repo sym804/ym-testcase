@@ -27,7 +27,8 @@ BUSY_DETAIL = "다른 작업이 진행 중입니다. 잠시 후 다시 시도해
 
 class LockNs(IntEnum):
     PROJECT_WRITE = 1
-    FIRST_ADMIN = 2
+    #: 계정 생성과 신원·상태·역할 변경을 한 줄로 세운다(옛 이름 FIRST_ADMIN, 값은 그대로).
+    ACCOUNTS = 2
     CRON = 3
     RATE_LIMIT = 4
     RUN_RESULTS = 5
