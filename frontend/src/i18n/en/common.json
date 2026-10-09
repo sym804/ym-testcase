@@ -28,7 +28,7 @@
     "goToProjects": "Go to Projects"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.1.1.0 | AGPL-3.0",
+  "version": "YM TestCase v2.2.0.0 | AGPL-3.0",
   "copy": "Copy",
   "copiedToClipboard": "Copied to clipboard.",
   "undo": "Undo",
@@ -96,7 +96,10 @@
     "cannotReleaseSelf": "You cannot release your own email.",
     "lastAdminRole": "The last administrator's role cannot be changed.",
     "noPasswordUnlink": "Accounts without a password cannot unlink Google.",
-    "onlyActive": "Only active accounts can be processed."
+    "onlyActive": "Only active accounts can be processed.",
+    "cannotDeleteSelf": "You cannot delete your own account.",
+    "lastAdminDelete": "The last administrator cannot be deleted.",
+    "hasActivity": "Accounts with activity cannot be deleted. Disable it instead."
   },
   "selectProject": "Select project",
   "selectRow": "Select this project",

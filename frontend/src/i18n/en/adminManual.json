@@ -138,6 +138,8 @@
     "accountStatusLi2": "Pending accounts appear above the list as <strong>N pending approval</strong>. <strong>Approve</strong> lets them sign in; <strong>Reject</strong> deletes the account.",
     "accountStatusLi3": "<strong>Disable</strong> blocks sign-in and API keys immediately. Enabling again does not revive old API keys. You cannot disable or demote yourself or the last active administrator.",
     "accountStatusLi4": "<strong>Release email</strong> removes an email from an account that claimed someone else's address. Emails verified by Google cannot be released.",
+    "accountStatusLi5": "<strong>Delete</strong> removes only accounts with no activity at all. Use it to clean up accounts created by mistake. Accounts with activity are refused; disable them instead.",
+    "accountStatusLi6": "The linked Google address appears under the sign-in column. <strong>address not recorded</strong> means the account was linked before this feature; it fills in at the next Google sign-in. An empty Google-only account (no password) is removed automatically when its owner links that Google account to another account, even if it is pending or disabled. If that account has activity or a password, linking is refused; <strong>reset</strong> its password to unlink Google, then link again.",
     "accountStatusWarn": "<strong>Note:</strong> Deleting a Workspace account does not end app sessions (up to 30 days) or API keys. Disable the user to block them immediately."
   },
   "roleSystem": {

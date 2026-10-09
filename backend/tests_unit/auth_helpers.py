@@ -8,12 +8,13 @@ PW = "Passw0rd!long"
 
 
 def make_user(Session, *, username, email=None, role=UserRole.user, status=UserStatus.active,
-              password=PW, google_sub=None, email_verified=False, display_name=None) -> int:
+              password=PW, google_sub=None, email_verified=False, display_name=None,
+              google_email=None) -> int:
     s = Session()
     try:
         u = User(username=username, email=email, role=role, status=status,
                  password_hash=hash_password(password) if password else None,
-                 google_sub=google_sub, email_verified=email_verified,
+                 google_sub=google_sub, google_email=google_email, email_verified=email_verified,
                  display_name=display_name or username)
         s.add(u)
         s.commit()

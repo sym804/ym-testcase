@@ -95,6 +95,8 @@ export default function AdminPage() {
     try {
       const { temp_password } = await usersApi.resetPassword(user.id);
       setTempPwInfo({ username: user.username, password: temp_password });
+      // 초기화는 Google 연결도 끊는다. 표의 로그인 방식 칸을 바로 맞춘다
+      loadUsers();
     } catch (err) {
       console.error(err);
       toast.error(t("resetPasswordFailed"));
@@ -253,7 +255,16 @@ export default function AdminPage() {
                     <td style={{ ...s.td, wordBreak: "break-all" }}>{u.username}</td>
                     <td style={s.td}>{u.display_name}</td>
                     <td style={{ ...s.td, wordBreak: "break-all" }}>{u.email || "-"}</td>
-                    <td style={{ ...s.td, whiteSpace: "nowrap" }}>{loginMethodLabel(u)}</td>
+                    <td style={{ ...s.td, whiteSpace: "nowrap" }}>
+                      {loginMethodLabel(u)}
+                      {u.google_linked && (
+                        <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>
+                          {u.google_email
+                            ? t("loginMethod.googleAccount", { email: u.google_email })
+                            : t("loginMethod.googleUnknown")}
+                        </div>
+                      )}
+                    </td>
                     <td style={s.td}>
                       <span style={{ ...s.statusBadge, ...(STATUS_COLORS[u.status || "active"] || {}) }}>
                         {t(`status.${u.status || "active"}`)}
@@ -350,6 +361,15 @@ export default function AdminPage() {
                               t("releaseEmailConfirm", { name: u.display_name, email: u.email, newId: `released-${u.id}` }))}
                           >
                             {t("releaseEmail")}
+                          </button>
+                        )}
+                        {u.id !== currentUser?.id && u.status !== "pending" && (
+                          <button
+                            style={s.resetBtn}
+                            onClick={() => runAccountAction(() => usersApi.remove(u.id), "deleted",
+                              t("deleteConfirm", { name: u.display_name, username: u.username }))}
+                          >
+                            {t("delete")}
                           </button>
                         )}
                       </div>

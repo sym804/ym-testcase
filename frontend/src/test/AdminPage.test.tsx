@@ -7,11 +7,18 @@ import { UserRole } from "../types";
 
 let mockRole: UserRole = UserRole.ADMIN;
 
+// ★실제 AuthContext 처럼 같은 사용자 객체를 돌려준다. 렌더마다 새 객체를 주면 [currentUser] 에 걸린
+//   effect 가 매번 목록을 다시 불러와, 목록 갱신을 빠뜨린 결함(초기화 뒤 등)이 테스트에서 가려진다.
+const mockAuthUsers = new Map<string, object>();
+const mockLogout = vi.fn();
 vi.mock("../contexts/AuthContext", () => ({
-  useAuth: () => ({
-    user: { id: 1, username: "admin", display_name: "관리자", role: mockRole, must_change_password: false, created_at: "2026-01-01" },
-    logout: vi.fn(),
-  }),
+  useAuth: () => {
+    if (!mockAuthUsers.has(mockRole)) {
+      mockAuthUsers.set(mockRole, { id: 1, username: "admin", display_name: "관리자", role: mockRole,
+        must_change_password: false, created_at: "2026-01-01" });
+    }
+    return { user: mockAuthUsers.get(mockRole), logout: mockLogout };
+  },
 }));
 
 vi.mock("../contexts/ThemeContext", () => ({
@@ -38,6 +45,7 @@ vi.mock("../api", () => ({
     disable: vi.fn(),
     enable: vi.fn(),
     releaseEmail: vi.fn(),
+    remove: vi.fn(),
   },
   projectsApi: { list: vi.fn() },
   membersApi: {
@@ -307,5 +315,76 @@ describe("AdminPage 계정 상태 관리", () => {
     renderPage();
     await user.click((await screen.findAllByRole("button", { name: "사용 중지" }))[0]);
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("마지막 관리자는 사용 중지할 수 없습니다."));
+  });
+});
+
+describe("AdminPage 연결된 Google 계정과 빈 계정 삭제", () => {
+  const base = { must_change_password: false, created_at: "2026-01-01T00:00:00", status: "active" as const };
+  const people = [
+    { ...base, id: 1, username: "admin", display_name: "관리자", role: UserRole.ADMIN, has_password: true,
+      google_linked: true, email: "boss@gmail.com", email_verified: true, google_email: "boss@gmail.com" },
+    { ...base, id: 2, username: "old", display_name: "옛 연결", role: UserRole.USER, has_password: true,
+      google_linked: true, google_email: null },
+    { ...base, id: 3, username: "p@x.com", email: "p@x.com", display_name: "대기", role: UserRole.USER,
+      has_password: true, google_linked: false, status: "pending" as const },
+    { ...base, id: 4, username: "off", display_name: "중지", role: UserRole.USER, has_password: false,
+      google_linked: true, google_email: "off@gmail.com", status: "disabled" as const },
+  ];
+
+  beforeEach(() => {
+    vi.mocked(usersApi.list).mockResolvedValue(people as never);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("로그인 방식 칸에 연결된 Google 계정 주소를 보여 준다", async () => {
+    renderPage();
+    expect(await screen.findByText("Google: boss@gmail.com")).toBeInTheDocument();
+    expect(screen.getByText("Google: off@gmail.com")).toBeInTheDocument();
+    // 이 기능 전에 연결돼 주소가 없는 계정은 다음 Google 로그인 때 채워진다
+    expect(screen.getByText("Google: 주소 미기록")).toBeInTheDocument();
+  });
+
+  it("삭제는 본인과 승인 대기 행에 없고, 확인을 받고 부른다", async () => {
+    const user = userEvent.setup();
+    vi.mocked(usersApi.remove).mockResolvedValue(undefined);
+    renderPage();
+    await screen.findByText("Google: boss@gmail.com");
+    const deletes = screen.getAllByRole("button", { name: "삭제" });
+    expect(deletes).toHaveLength(2);
+    await user.click(deletes[1]);
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("작업 기록이 없는 계정만"));
+    await waitFor(() => expect(usersApi.remove).toHaveBeenCalledWith(4));
+    await waitFor(() => expect(vi.mocked(usersApi.list).mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("비밀번호 초기화 뒤 목록을 다시 불러와 끊긴 Google 연결을 반영한다", async () => {
+    const user = userEvent.setup();
+    let resetDone = false;
+    vi.mocked(usersApi.list).mockImplementation(async () =>
+      (resetDone
+        ? people.map((p) => (p.id === 4 ? { ...p, google_linked: false, google_email: null } : p))
+        : people) as never);
+    vi.mocked(usersApi.resetPassword).mockImplementation(async () => {
+      resetDone = true;
+      return { temp_password: "Temp1234abcd" };
+    });
+    renderPage();
+    await screen.findByText("Google: off@gmail.com");
+    // 초기화 버튼은 본인(1)을 뺀 2, 3, 4 행에 있다. 마지막이 4(off)
+    const resets = screen.getAllByRole("button", { name: "초기화" });
+    await user.click(resets[resets.length - 1]);
+    await waitFor(() => expect(usersApi.resetPassword).toHaveBeenCalledWith(4));
+    await waitFor(() => expect(screen.queryByText("Google: off@gmail.com")).not.toBeInTheDocument());
+  });
+
+  it("작업 기록이 있어 삭제가 거절되면 사유를 보여 준다", async () => {
+    const user = userEvent.setup();
+    const toast = (await import("react-hot-toast")).default;
+    vi.mocked(usersApi.remove).mockRejectedValue(
+      { response: { data: { detail: "작업 기록이 있는 계정은 삭제할 수 없습니다. 사용 중지를 쓰세요." } } });
+    renderPage();
+    await user.click((await screen.findAllByRole("button", { name: "삭제" }))[0]);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      "작업 기록이 있는 계정은 삭제할 수 없습니다. 사용 중지를 쓰세요."));
   });
 });

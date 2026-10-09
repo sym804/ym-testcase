@@ -201,13 +201,15 @@ def _approved_code(Session, uid, code="the-code-123"):
 
 
 def test_비밀번호_찾기_완료는_Google_연결을_끊는다(auth_env):
-    uid = make_user(auth_env.Session, username="u@example.com", email="u@example.com", google_sub="attacker-sub")
+    uid = make_user(auth_env.Session, username="u@example.com", email="u@example.com", google_sub="attacker-sub",
+                    google_email="attacker@gmail.com")
     code = _approved_code(auth_env.Session, uid)
     r = requests.post(auth_env.base + "/api/auth/reset-password/verify",
                       json={"username": "U@example.com", "code": code, "new_password": "NewPassw0rd!"})
     assert r.status_code == 200, r.text
     with auth_env.Session() as s:
-        assert s.get(User, uid).google_sub is None
+        u = s.get(User, uid)
+        assert (u.google_sub, u.google_email) == (None, None)
 
 
 @pytest.mark.parametrize("st", [UserStatus.pending, UserStatus.disabled])

@@ -138,6 +138,8 @@
     "accountStatusLi2": "승인 대기 계정이 있으면 목록 위에 <strong>승인 대기 N명</strong> 이 보입니다. <strong>승인</strong> 하면 바로 로그인할 수 있고, <strong>거절</strong> 하면 그 계정을 지웁니다.",
     "accountStatusLi3": "<strong>사용 중지</strong> 하면 로그인과 API 키가 바로 막힙니다. 다시 사용해도 옛 API 키는 살아나지 않습니다. 자기 자신과 마지막 활성 관리자는 중지·강등할 수 없습니다.",
     "accountStatusLi4": "<strong>이메일 해제</strong>는 남의 주소로 먼저 가입한 계정에서 이메일을 뗍니다. Google 이 확인한 이메일은 해제할 수 없습니다.",
+    "accountStatusLi5": "<strong>삭제</strong>는 작업 기록이 하나도 없는 계정만 지웁니다. 실수로 생긴 빈 계정을 정리할 때 씁니다. 기록이 있으면 거절되니 사용 중지를 쓰세요.",
+    "accountStatusLi6": "로그인 방식 칸 아래에 연결된 Google 계정 주소가 보입니다. <strong>주소 미기록</strong>은 이 기능 전에 연결된 계정이고, 다음 Google 로그인 때 채워집니다. 비밀번호 없이 Google 로만 쓰던 빈 계정은 본인이 다른 계정에 그 Google 계정을 연결하면 자동으로 정리됩니다(승인 대기, 사용 중지 상태도 같음). 그 계정에 기록이나 비밀번호가 있으면 연결이 거절되니, 그 계정을 <strong>초기화</strong>해 Google 연결을 끊은 뒤 다시 연결합니다.",
     "accountStatusWarn": "<strong>주의:</strong> 퇴사자는 Workspace 계정을 지워도 앱 로그인(최대 30일)과 API 키가 남습니다. 사용 중지해야 바로 막힙니다."
   },
   "roleSystem": {

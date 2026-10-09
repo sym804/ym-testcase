@@ -77,7 +77,9 @@
   "loginMethod": {
     "password": "Password",
     "google": "Google",
-    "both": "Password + Google"
+    "both": "Password + Google",
+    "googleAccount": "Google: {{email}}",
+    "googleUnknown": "Google: address not recorded"
   },
   "status": {
     "active": "Active",
@@ -99,5 +101,8 @@
   "disabled": "Disabled.",
   "enabled": "The account can be used again.",
   "emailReleased": "Email released.",
+  "delete": "Delete",
+  "deleteConfirm": "Delete the account of {{name}} ({{username}})? Only accounts with no activity are deleted. If it has activity, disable it instead.",
+  "deleted": "Account deleted.",
   "actionFailed": "Could not complete the action."
 }

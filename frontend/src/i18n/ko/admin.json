@@ -77,7 +77,9 @@
   "loginMethod": {
     "password": "비밀번호",
     "google": "Google",
-    "both": "비밀번호 + Google"
+    "both": "비밀번호 + Google",
+    "googleAccount": "Google: {{email}}",
+    "googleUnknown": "Google: 주소 미기록"
   },
   "status": {
     "active": "사용 중",
@@ -99,5 +101,8 @@
   "disabled": "사용 중지했습니다.",
   "enabled": "다시 사용할 수 있게 했습니다.",
   "emailReleased": "이메일을 뗐습니다.",
+  "delete": "삭제",
+  "deleteConfirm": "{{name}} ({{username}}) 계정을 삭제할까요? 작업 기록이 없는 계정만 지워집니다. 기록이 있으면 사용 중지를 쓰세요.",
+  "deleted": "삭제했습니다.",
   "actionFailed": "처리하지 못했습니다."
 }

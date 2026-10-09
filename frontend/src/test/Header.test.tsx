@@ -200,6 +200,13 @@ describe("Header 계정 연결", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/projects", { replace: true });
   });
 
+  it("빈 계정을 정리하고 연결한 결과를 알린다", async () => {
+    const toast = (await import("react-hot-toast")).default;
+    renderHeader("/projects?account=merged");
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
+      "Google 계정을 연결했습니다. 이 Google 계정으로 만들어져 있던 빈 계정은 정리했습니다."));
+  });
+
   it("연결 실패 사유를 알린다", async () => {
     const toast = (await import("react-hot-toast")).default;
     renderHeader("/projects?account=already_linked");
