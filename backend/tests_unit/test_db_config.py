@@ -10,6 +10,8 @@ def _import_database(env_overrides: dict) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
     env.update(env_overrides)
     env["ENV_FILE"] = os.path.join(BACKEND, "does-not-exist.env")
+    # 아래에서 UTF-8 로 읽는다. 자식도 UTF-8 로 쓰게 한다(Windows 기본은 cp949 라 한글 오류가 깨진다)
+    env["PYTHONIOENCODING"] = "utf-8"
     return subprocess.run(
         [sys.executable, "-c", "import database"],
         cwd=BACKEND, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -42,6 +44,8 @@ def _alembic(env_overrides: dict) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items() if k not in ("DATABASE_URL", "DATABASE_URL_DIRECT")}
     env.update(env_overrides)
     env["ENV_FILE"] = os.path.join(BACKEND, "does-not-exist.env")
+    # 아래에서 UTF-8 로 읽는다. 자식도 UTF-8 로 쓰게 한다(Windows 기본은 cp949 라 한글 오류가 깨진다)
+    env["PYTHONIOENCODING"] = "utf-8"
     return subprocess.run(
         [sys.executable, "-m", "alembic", "current"],
         cwd=BACKEND, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { commit, navigateExpectingRedirect } from "./nav";
 
 test.describe("인증 플로우", () => {
   test("로그인 페이지 렌더링", async ({ page }) => {
@@ -32,7 +33,7 @@ test.describe("인증 플로우", () => {
   });
 
   test("비인증 상태에서 /projects 접근 시 /login 리다이렉트", async ({ page }) => {
-    await page.goto("/projects");
+    await navigateExpectingRedirect(page, (p) => p.goto("/projects", commit));
     await expect(page).toHaveURL(/\/login/);
   });
 

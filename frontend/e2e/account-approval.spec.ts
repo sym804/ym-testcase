@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
+import { commit, navigateExpectingRedirect } from "./nav";
 
 // 계정 승인 흐름. CI 의 E2E 백엔드는 AUTH_APPROVAL=personal 이라 이메일 가입은 승인 대기가 된다.
 // Google 은 더미 클라이언트 ID 로 켜 두므로 버튼과 시작 주소까지만 본다(실제 Google 로그인은 하지 않는다).
@@ -69,8 +70,11 @@ test.describe("계정 승인", () => {
     await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
 
     expect((await request.post(`/api/auth/users/${id}/disable`, { headers })).status()).toBe(200);
-    await page.reload();
+    await navigateExpectingRedirect(page, (p) => p.reload(commit));
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
+    // 다른 이유(서버 오류 등)로 /login 에 온 것이 아니라 사용 중지 때문임을 확인한다
+    await loginAs(page, email, PW);
+    await expect(page.getByText("사용이 중지된 계정입니다.")).toBeVisible();
   });
 
   test("작업 기록이 없는 계정은 관리 화면에서 삭제된다", async ({ page, request }) => {
