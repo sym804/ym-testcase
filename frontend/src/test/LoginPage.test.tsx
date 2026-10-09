@@ -12,7 +12,9 @@ vi.mock("../api", () => ({
     checkUsername: vi.fn(),
     register: vi.fn(),
     changePassword: vi.fn(),
+    config: vi.fn(),
   },
+  googleStartUrl: (mode: string) => `/api/auth/google/start?mode=${mode}`,
 }));
 
 vi.mock("react-hot-toast", () => ({
@@ -33,13 +35,14 @@ vi.mock("react-router-dom", async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(authApi.config).mockResolvedValue({ google_enabled: false, signup_mode: "email" });
 });
 
 describe("LoginPage", () => {
   it("로그인 폼이 렌더링된다", () => {
     renderWithProviders(<LoginPage />);
     expect(screen.getByRole("heading", { name: "로그인" })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("아이디를 입력하세요")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("아이디 또는 이메일을 입력하세요")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("비밀번호를 입력하세요")).toBeInTheDocument();
   });
 
@@ -49,7 +52,7 @@ describe("LoginPage", () => {
 
     await user.click(screen.getByRole("button", { name: "로그인" }));
 
-    expect(screen.getByText("아이디와 비밀번호를 입력해 주세요.")).toBeInTheDocument();
+    expect(screen.getByText("아이디(또는 이메일)와 비밀번호를 입력해 주세요.")).toBeInTheDocument();
     expect(authApi.login).not.toHaveBeenCalled();
   });
 
@@ -71,7 +74,7 @@ describe("LoginPage", () => {
 
     renderWithProviders(<LoginPage />);
 
-    await user.type(screen.getByPlaceholderText("아이디를 입력하세요"), "tester");
+    await user.type(screen.getByPlaceholderText("아이디 또는 이메일을 입력하세요"), "tester");
     await user.type(screen.getByPlaceholderText("비밀번호를 입력하세요"), "pass1234");
     await user.click(screen.getByRole("button", { name: "로그인" }));
 
@@ -88,7 +91,7 @@ describe("LoginPage", () => {
 
     renderWithProviders(<LoginPage />);
 
-    await user.type(screen.getByPlaceholderText("아이디를 입력하세요"), "wrong");
+    await user.type(screen.getByPlaceholderText("아이디 또는 이메일을 입력하세요"), "wrong");
     await user.type(screen.getByPlaceholderText("비밀번호를 입력하세요"), "wrong");
     await user.click(screen.getByRole("button", { name: "로그인" }));
 
@@ -108,7 +111,7 @@ describe("LoginPage", () => {
 
     renderWithProviders(<LoginPage />);
 
-    await user.type(screen.getByPlaceholderText("아이디를 입력하세요"), "tester");
+    await user.type(screen.getByPlaceholderText("아이디 또는 이메일을 입력하세요"), "tester");
     await user.type(screen.getByPlaceholderText("비밀번호를 입력하세요"), "pass1234");
     await user.click(screen.getByRole("button", { name: "로그인" }));
 
@@ -120,5 +123,30 @@ describe("LoginPage", () => {
     const link = screen.getByText("회원가입");
     expect(link).toBeInTheDocument();
     expect(link.closest("a")).toHaveAttribute("href", "/register");
+  });
+});
+
+describe("LoginPage Google 로그인", () => {
+  it("Google 이 켜져 있으면 Google 로그인 링크가 보인다", async () => {
+    vi.mocked(authApi.config).mockResolvedValue({ google_enabled: true, signup_mode: "email" });
+    renderWithProviders(<LoginPage />);
+    const link = await screen.findByRole("link", { name: "Google 로 로그인" });
+    expect(link.getAttribute("href")).toContain("/api/auth/google/start");
+  });
+
+  it("Google 이 꺼져 있으면 링크가 없다", async () => {
+    renderWithProviders(<LoginPage />);
+    await waitFor(() => expect(authApi.config).toHaveBeenCalled());
+    expect(screen.queryByRole("link", { name: "Google 로 로그인" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["pending", "관리자 승인을 기다리는 중입니다."],
+    ["company_only", "회사 Google 계정으로만 로그인할 수 있습니다."],
+    ["disabled", "사용이 중지된 계정입니다."],
+    ["something_new", "Google 로그인에 실패했습니다. 다시 시도해 주세요."],
+  ])("콜백 오류 %s 를 안내한다", async (code, text) => {
+    renderWithProviders(<LoginPage />, { route: `/login?error=${code}` });
+    expect(await screen.findByText(text)).toBeInTheDocument();
   });
 });

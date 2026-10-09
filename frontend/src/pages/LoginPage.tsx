@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import PasswordInput from "../components/PasswordInput";
 import { translateError } from "../utils/errorMessage";
+import { authApi, googleStartUrl } from "../api";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -14,6 +15,21 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [searchParams] = useSearchParams();
+  // Google 콜백이 실패 사유를 ?error=<코드> 로 넘긴다. 모르는 코드는 일반 실패 문구로.
+  const callbackError = searchParams.get("error");
+  const callbackMessage = callbackError
+    ? t(`googleErrors.${callbackError}`, { defaultValue: t("googleErrors.unknown") })
+    : "";
+
+  useEffect(() => {
+    let alive = true;
+    authApi.config()
+      .then((c) => { if (alive) setGoogleEnabled(c.google_enabled); })
+      .catch(() => { if (alive) setGoogleEnabled(false); });
+    return () => { alive = false; };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +85,7 @@ export default function LoginPage() {
               />
               {t("rememberMe")}
             </label>
-            {error && <div style={styles.errorMsg}>{error}</div>}
+            {(error || callbackMessage) && <div style={styles.errorMsg} role="alert">{error || callbackMessage}</div>}
             <button
               type="submit"
               style={styles.submitBtn}
@@ -78,6 +94,14 @@ export default function LoginPage() {
               {loading ? t("submitting") : t("submit")}
             </button>
           </form>
+          {googleEnabled && (
+            <>
+              <div style={styles.divider}>{t("or")}</div>
+              <a href={googleStartUrl("login")} style={styles.googleBtn}>
+                {t("googleLogin")}
+              </a>
+            </>
+          )}
           <div style={styles.footer}>
             {t("noAccount")}{" "}
             <Link to="/register" style={styles.link}>
@@ -194,6 +218,25 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-secondary)",
     marginTop: 8,
     cursor: "pointer",
+  },
+  divider: {
+    marginTop: 16,
+    textAlign: "center" as const,
+    fontSize: 12,
+    color: "var(--text-secondary)",
+  },
+  googleBtn: {
+    display: "block",
+    marginTop: 8,
+    padding: "11px 0",
+    borderRadius: 8,
+    border: "1px solid var(--border-input)",
+    backgroundColor: "var(--bg-input)",
+    color: "var(--text-primary)",
+    fontSize: 15,
+    fontWeight: 600,
+    textAlign: "center" as const,
+    textDecoration: "none",
   },
   hint: {
     marginTop: 8,

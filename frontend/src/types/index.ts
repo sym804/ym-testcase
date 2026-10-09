@@ -26,6 +26,18 @@ export interface User {
   role: UserRole;
   must_change_password: boolean;
   created_at: string;
+  email?: string | null;
+  status?: UserStatus;
+  has_password?: boolean;
+  google_linked?: boolean;
+}
+
+export type UserStatus = "active" | "pending" | "disabled";
+
+/** 화면이 켜진 로그인 기능을 묻는다. 사용자가 0명이면 signup_mode 가 bootstrap 이다 */
+export interface AuthConfig {
+  google_enabled: boolean;
+  signup_mode: "bootstrap" | "email";
 }
 
 export type IssueTracker = "jira" | "linear";
@@ -331,10 +343,14 @@ export interface LoginForm {
 }
 
 export interface RegisterForm {
-  username: string;
+  /** 첫 관리자(사용자 0명)일 때만 쓴다 */
+  username?: string;
+  email?: string;
   password: string;
   confirm_password: string;
   display_name: string;
+  /** 운영 환경의 첫 관리자 토큰 */
+  bootstrap_token?: string;
 }
 
 // Report

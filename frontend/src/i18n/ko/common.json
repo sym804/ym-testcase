@@ -72,7 +72,16 @@
     "uploadBusy": "같은 업로드를 처리하는 중입니다. 잠시 후 다시 시도해 주세요.",
     "uploadNotReceived": "파일이 아직 올라오지 않았습니다. 다시 시도해 주세요.",
     "busy": "다른 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.",
-    "storageUnavailable": "파일 저장소에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
+    "storageUnavailable": "파일 저장소에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    "accountPending": "관리자 승인을 기다리는 중입니다.",
+    "accountDisabled": "사용이 중지된 계정입니다.",
+    "emailRequired": "이메일로 가입해 주세요.",
+    "emailTaken": "이미 가입된 이메일입니다.",
+    "companyEmailOnly": "회사 이메일로만 가입할 수 있습니다.",
+    "tooManyRegistrations": "가입 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+    "bootstrapTokenInvalid": "첫 관리자 토큰이 올바르지 않습니다.",
+    "noPassword": "비밀번호가 없는 계정입니다.",
+    "emailInvalid": "이메일 형식이 올바르지 않습니다."
   },
   "selectProject": "프로젝트 선택",
   "selectRow": "이 프로젝트 선택",

@@ -213,6 +213,39 @@ describe("AuthContext", () => {
         display_name: "New",
       });
     });
+
+    it("이메일 가입은 이메일을 넘기고 서버가 준 상태를 돌려준다", async () => {
+      vi.mocked(authApi.register).mockResolvedValue({
+        id: 3,
+        username: "ym@example.com",
+        email: "ym@example.com",
+        status: "pending",
+        display_name: "Ym",
+        role: UserRole.USER as never,
+        must_change_password: false,
+        created_at: "2026-01-01",
+      });
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let created: { status?: string } | undefined;
+      await act(async () => {
+        created = await result.current.register({
+          email: "ym@example.com",
+          password: "password123",
+          confirm_password: "password123",
+          display_name: "Ym",
+          bootstrap_token: "",
+        });
+      });
+
+      expect(authApi.register).toHaveBeenCalledWith({
+        email: "ym@example.com",
+        password: "password123",
+        display_name: "Ym",
+      });
+      expect(created?.status).toBe("pending");
+    });
   });
 
   describe("logout", () => {
