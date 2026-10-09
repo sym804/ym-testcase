@@ -20,7 +20,7 @@ from models import User, UserRole, UserStatus
 from routes.auth import issue_session
 from schemas import UserResponse
 from services import google_oauth
-from services.account_policy import AccountRejected, initial_status, safe_next
+from services.account_policy import EMAIL_MAX, AccountRejected, initial_status, safe_next
 from services.accounts import email_taken, google_username, lock_accounts
 from services.auth_config import get_auth_config
 
@@ -62,7 +62,8 @@ def google_start(request: Request, mode: str = "login", next: str = "/projects",
         user = _session_user(request, db)
         db.rollback()
         if user is None:
-            raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+            # 페이지 이동으로 여는 주소라 JSON 401 대신 로그인 화면으로 보낸다.
+            return _redirect("/login")
         uid = user.id
     flow = google_oauth.new_flow(mode, safe_next(next), uid)
     resp = RedirectResponse(google_oauth.authorize_url(cfg, flow), status_code=302)
@@ -86,7 +87,8 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
         return _redirect("/projects" if mode == "link" else "/login")
     if not cfg.google_enabled:
         return _fail("google_disabled", mode)
-    if flow is None or not state or not hmac.compare_digest(state, flow.state):
+    # bytes 로 비교한다. str 끼리는 ASCII 가 아닌 문자가 오면 TypeError(500) 다.
+    if flow is None or not state or not hmac.compare_digest(state.encode("utf-8"), flow.state.encode("utf-8")):
         return _fail("google_state", mode)
     try:
         ident = google_oauth.exchange_and_verify(cfg, code, flow.verifier, flow.nonce)
@@ -95,6 +97,10 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
         return _fail("google_verify", mode)
     if not ident.email_verified:
         return _fail("google_email_unverified", mode)
+    if not ident.email or len(ident.email) > EMAIL_MAX:
+        # users.email 이 100자다. 넘는 주소는 저장하다 500 이 나므로 검증 실패로 돌려보낸다.
+        logger.warning("Google login rejected: email length %s", len(ident.email or ""))
+        return _fail("google_verify", mode)
 
     try:
         if mode == "link":
@@ -114,7 +120,7 @@ def _login(db: Session, cfg, flow, ident) -> RedirectResponse:
     except AccountRejected as e:
         return _fail(e.code)
 
-    user = db.query(User).filter(User.google_sub == ident.sub).with_for_update().first()
+    user = db.query(User).filter(User.google_sub == ident.sub).with_for_update().populate_existing().first()
     if user is None:
         if email_taken(db, ident.email):
             return _fail("email_taken")
@@ -153,8 +159,12 @@ def _link(request: Request, db: Session, cfg, flow, ident) -> RedirectResponse:
     except AccountRejected as e:
         return _fail(e.code, "link")
 
+    version_seen = current.token_version or 0
     lock_accounts(db)
-    user = db.query(User).filter(User.id == flow.uid).with_for_update().first()
+    user = db.query(User).filter(User.id == flow.uid).with_for_update().populate_existing().first()
+    # ★잠금을 기다리는 사이 비밀번호 초기화·복구·중지가 끝났을 수 있다. 세션을 다시 확인한다.
+    if user is None or user.status != UserStatus.active or (user.token_version or 0) != version_seen:
+        return _fail("google_state", "link")
     if user.google_sub == ident.sub:
         return _redirect("/projects?account=linked")
     other = db.query(User.id).filter(User.google_sub == ident.sub, User.id != user.id).first()
@@ -172,7 +182,7 @@ def _link(request: Request, db: Session, cfg, flow, ident) -> RedirectResponse:
 @router.post("/unlink", response_model=UserResponse)
 def google_unlink(db: Session = Depends(get_db), current_user: User = Depends(get_session_user)):
     lock_accounts(db)
-    user = db.query(User).filter(User.id == current_user.id).with_for_update().first()
+    user = db.query(User).filter(User.id == current_user.id).with_for_update().populate_existing().first()
     if not user.password_hash:
         raise HTTPException(status_code=400, detail="비밀번호가 없는 계정은 Google 연결을 해제할 수 없습니다.")
     user.google_sub = None

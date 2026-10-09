@@ -41,6 +41,7 @@ class UserResponse(BaseModel):
     must_change_password: bool = False
     created_at: datetime
     email: Optional[str] = None
+    email_verified: bool = False
     status: str = "active"
     has_password: bool = True
     google_linked: bool = False
