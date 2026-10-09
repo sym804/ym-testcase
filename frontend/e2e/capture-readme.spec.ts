@@ -61,12 +61,6 @@ test("README + 매뉴얼 스크린샷 (ymseo_test)", async ({ page, request }) =
   await page.goto("/login");
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(SAVE_DIR, "login.png") });
-  await page.screenshot({ path: path.join(MANUAL_DIR, "01_login_page.png") });
-
-  // 02. 회원가입
-  await page.getByText("회원가입").click();
-  await page.waitForTimeout(500);
-  await page.screenshot({ path: path.join(MANUAL_DIR, "02_register_page.png") });
 
   // 03. 로그인 입력 상태
   await page.goto("/login");
@@ -221,9 +215,6 @@ test("README + 매뉴얼 스크린샷 (ymseo_test)", async ({ page, request }) =
   await themeBtn.click();
   await page.waitForTimeout(500);
 
-  // 22, 25. Admin 페이지
-  await page.goto("/admin");
-  await page.waitForTimeout(2000);
-  await page.screenshot({ path: path.join(MANUAL_DIR, "22_admin_page.png") });
-  await page.screenshot({ path: path.join(MANUAL_DIR, "25_admin_page_with_reset.png") });
+  // 01, 02, 22, 25(로그인 · 가입 · 사용자 관리 · 초기화)는 capture-auth-manual.spec.ts 가 찍는다.
+  // Google 버튼과 계정 상태가 보이는 환경이 따로 필요하고, 25 는 초기화 창을 띄운 뒤 찍어야 한다(SYM-168).
 });

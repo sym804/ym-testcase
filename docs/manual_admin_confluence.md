@@ -1,7 +1,7 @@
 # YM TestCase 운영 매뉴얼 (Admin)
 
-> **최종 업데이트**: 2026-10-09
-> **버전**: 2.2.0.1
+> **최종 업데이트**: 2026-10-10
+> **버전**: 2.2.0.4
 > **대상**: Admin 역할 담당자
 > **보안 등급**: 내부 관리용
 
@@ -11,8 +11,8 @@
 
 | 구성 요소 | 기술 스택 | 비고 |
 |---|---|---|
-| **Backend** | FastAPI (Python 3.10+), SQLAlchemy ORM, Uvicorn ASGI | 포트 8008 |
-| **Frontend** | React 18, TypeScript, Vite, AG Grid, Chart.js | 포트 5173 (개발) / 80 (프로덕션) |
+| **Backend** | FastAPI (Python 3.11 ~ 3.14, 배포·CI 3.12), SQLAlchemy ORM, Alembic, Uvicorn ASGI | 포트 8008 |
+| **Frontend** | React 19, TypeScript, Vite, AG Grid, Chart.js | 포트 5173 (개발). 배포는 Vercel |
 | **Database** | PostgreSQL 17 | 로컬은 Docker(127.0.0.1:54329), 배포는 Supabase |
 | **인증** | JWT (HS256, httpOnly 쿠키 + CSRF), bcrypt 해싱, Google 로그인(OpenID Connect, 선택) | 기본 72시간, 로그인 유지 30일 |
 
@@ -137,7 +137,9 @@ npx tsc -b
 
 ### 5-4. 비밀번호 초기화
 
-1. 대상 사용자 행에서 **비밀번호 초기화** 버튼을 클릭합니다.
+> 📎 `25_admin_page_with_reset.png`
+
+1. 대상 사용자 행의 비밀번호 칸에서 **초기화** 버튼을 클릭합니다.
 2. 12자리 임시 비밀번호가 생성되어 표시됩니다.
 3. 해당 임시 비밀번호를 사용자에게 전달합니다.
 4. 사용자는 다음 로그인 시 **비밀번호 강제 변경** 화면이 표시됩니다.
@@ -166,6 +168,20 @@ npx tsc -b
 - 그 Google 계정을 쥔 계정에 기록이나 비밀번호가 있으면 연결이 거절됩니다. 그 계정의 **초기화**(비밀번호 초기화)로 Google 연결을 끊은 뒤 다시 연결합니다.
 - 퇴사자는 Workspace 계정을 지워도 앱 로그인(최대 30일)과 API 키가 남습니다. 사용 중지해야 바로 막힙니다.
 - 관리자 초기화나 계정 복구로 비밀번호를 바꾸면 그 계정의 Google 연결도 끊깁니다. 사용자가 다시 연결하면 됩니다.
+
+### 5-5-2. 계정 복구 요청 승인
+
+로그인 화면의 "계정 도움 요청"으로 접수된 아이디 찾기와 비밀번호 재설정 요청을 관리자 페이지 하단 **계정 요청**에서 처리합니다.
+
+> 📎 `39_admin_account_requests.png`
+
+1. 대기 중인 요청의 연락처와 메모로 요청자 본인을 확인합니다.
+2. 드롭다운에서 대상 계정을 고르고 **승인**합니다. 본인 확인이 어려우면 **반려**합니다.
+3. 아이디 찾기는 아이디가, 비밀번호 재설정은 1회용 코드가 화면에 표시됩니다. 요청자의 연락처로 전달합니다.
+
+> 📎 `40_admin_code_issued.png`
+
+⚠️ **주의**: 코드는 서버에 해시로만 저장되고 평문은 이 화면에 **한 번만** 보입니다. 닫기 전에 복사해 전달하세요. 코드는 발급 후 24시간 안에 한 번만 쓸 수 있습니다.
 
 ### 5-6. 역할 변경 가이드라인
 
@@ -399,7 +415,7 @@ npx tsc -b
 | 파일 업로드 실패 | 50MB 초과 또는 비허용 확장자 | 파일 확인 |
 | 한글 깨짐 | 소스 파일 인코딩 문제 | UTF-8로 재저장 후 빌드 |
 | Excel Import 실패 | 헤더 매핑 실패 | 지원 헤더 형식 확인 |
-| PDF 한글 깨짐 | 서버에 한글 폰트 미설치 | Malgun Gothic 설치 |
+| PDF 한글 깨짐 | 쓸 수 있는 한글 폰트가 없음(`backend/fonts` 의 Pretendard 가 배포에서 빠졌고 서버에 맑은 고딕·나눔고딕도 없음) | `backend/fonts/Pretendard-*.ttf` 를 배포에 포함. 서버 로그 "한글 폰트를 찾을 수 없습니다" 로 확인 |
 | 모든 API 가 503 | DB 스키마가 코드보다 옛 버전 | backend 에서 `python -m alembic upgrade head` |
 | 저장 시 "다른 작업이 진행 중입니다" | 같은 프로젝트의 구조 변경이 동시에 몰림 | 잠시 뒤 다시 시도. 잦으면 `LOCK_WAIT_TIMEOUT_MS` 상향 |
 | 로그인 화면에 Google 버튼이 없음 | `GOOGLE_CLIENT_ID` 가 비어 있음 | 3-1 절처럼 `GOOGLE_*` 값을 넣고 서버 재시작 |
@@ -470,8 +486,11 @@ cp -r backup/uploads_20261009/* backend/uploads/
 | `20_dark_mode_project.png` | 다크모드 프로젝트 | 사용자 매뉴얼 12 |
 | `21_dark_mode_dashboard.png` | 다크모드 대시보드 | 사용자 매뉴얼 12 |
 | `22_admin_page.png` | 관리자 페이지 | 운영 매뉴얼 5 |
+| `25_admin_page_with_reset.png` | 비밀번호 초기화 뒤 임시 비밀번호 | 운영 매뉴얼 5-4 |
+| `39_admin_account_requests.png` | 계정 복구 요청 목록 | 운영 매뉴얼 5-5-2 |
+| `40_admin_code_issued.png` | 재설정 코드 발급 | 운영 매뉴얼 5-5-2 |
 | `23_tc_toolbar.png` | TC 관리 툴바 | 사용자 매뉴얼 6-1 |
 
 ---
 
-*YM TestCase v2.2.0.1 | 운영 매뉴얼 (Admin 전용)*
+*YM TestCase v2.2.0.4 | 운영 매뉴얼 (Admin 전용)*

@@ -21,11 +21,29 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v2.2.0.3  (2026-10-10)
-├── Frontend       v1.13.0.2
+YM TestCase System  v2.2.0.4  (2026-10-10)
+├── Frontend       v1.13.0.3
 ├── Backend        v2.2.0.1
 └── Database       v1.2.0.0
 ```
+
+---
+
+## System 2.2.0.4 / FE 1.13.0.3 - [docs] 초기화 그림 재촬영과 사내 업무 가이드 갱신 (2026-10-10)
+
+### 이슈
+
+- SYM-168 운영 매뉴얼의 비밀번호 초기화 그림(25)이 사용자 관리 그림(22)과 같은 화면이다 (enhancement/trivial/frontend)
+- SYM-167 사내 업무 가이드 초안(docs/confluence_draft.md)이 인증 기능 전 내용으로 남아 있다 (enhancement/trivial/etc)
+
+### 변경
+
+- 그림 25 를 초기화 완료 창으로 재촬영, 다른 캡처 스크립트의 01/02/22/25 저장 제거. md 운영 매뉴얼에 계정 복구 요청 승인 절
+- 사내 업무 가이드, 운영 매뉴얼: 인증·PostgreSQL·백업·가져오기 형식·PDF 폰트 서술을 코드 기준으로 수정
+
+### 영향
+
+- 매뉴얼 화면과 docs 문서만 변경
 
 ---
 
