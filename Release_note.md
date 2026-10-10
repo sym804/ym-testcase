@@ -21,11 +21,28 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v2.2.5.0  (2026-10-10)
+YM TestCase System  v2.2.5.1  (2026-10-10)
 ├── Frontend       v1.13.3.0
 ├── Backend        v2.2.3.0
 └── Database       v1.2.0.0
 ```
+
+---
+
+## System 2.2.5.1 - [docs] 공개 배포와 회사 배포 가이드 추가 (2026-10-10)
+
+### 이슈
+
+- SYM-196 배포 절차가 README 한 절에 몰려 있어 공개 배포와 회사 배포를 따라 하기 어렵다 (enhancement/minor/etc)
+
+### 변경
+
+- `docs/deploy_public.md`(fork, Vercel Git 연동, PC 마이그레이션), `docs/deploy_company.md`(비공개 레포, Actions 배포, Google 내부 OAuth) 추가. README 배포 절은 두 가이드로 안내
+- `.gitignore` 에 `.vercel/`
+
+### 영향
+
+- 문서만 변경
 
 ---
 

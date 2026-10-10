@@ -131,51 +131,19 @@ Supabase 로 옮길 때는 `--target` 에 직결 또는 세션 풀러 주소를 
 
 ## 배포 (Vercel + Supabase)
 
-팀이 인터넷에서 쓰도록 올릴 때의 구성입니다. 화면과 API 가 한 Vercel 프로젝트, 한 도메인에서 돌고(`vercel.json` 의 Services), 데이터는 Supabase 의 PostgreSQL 과 Storage 에 둡니다.
+팀이 인터넷에서 쓰도록 올릴 때의 구성입니다. 화면과 API 가 한 Vercel 프로젝트, 한 도메인에서 돌고(`vercel.json` 의 Services), 데이터는 Supabase 의 PostgreSQL 과 Storage 에 둡니다. 절차는 용도에 따라 두 가이드로 나눴습니다.
 
-배포 자격증명은 이 공개 레포에 두지 않습니다. 이 레포를 `upstream` 으로 따르는 비공개 레포를 하나 만들고, 그 레포에 Vercel 과 Supabase 를 연결합니다. 코드 파일은 고치지 않고 `git pull upstream main` 으로 따라갑니다.
+- [공개 배포 가이드](docs/deploy_public.md): 이 레포를 fork 해 개인이나 소규모 팀이 자기 계정에 올립니다. Vercel Git 연동으로 배포하고 마이그레이션은 PC 에서 돌립니다
+- [회사 배포 가이드](docs/deploy_company.md): 이 레포를 `upstream` 으로 따르는 회사 비공개 레포에서 GitHub Actions 로 배포합니다. CI 통과, 운영 DB 마이그레이션, 배포가 자동으로 이어지고 매일 백업이 남습니다. Google Workspace 계정과 가입 승인을 씁니다
 
-### 1. Supabase
-
-- 프로젝트를 만듭니다. 리전은 사용자와 가까운 곳(한국이면 서울)으로 고릅니다.
-- Storage 에 비공개 버킷을 만들고 파일 크기 상한을 50MB 로 둡니다. 서명 업로드 주소는 크기를 강제하지 않으므로 버킷 상한이 마지막 방어선입니다.
-- 접속 주소 두 개를 확인합니다. 앱은 트랜잭션 풀러 주소, 마이그레이션은 직결(또는 세션 풀러) 주소를 씁니다.
-
-### 2. Vercel
-
-- 비공개 레포로 프로젝트를 만듭니다. 설정은 레포의 `vercel.json` 을 그대로 씁니다.
-- 회사 업무에 쓰면 Vercel 약관상 Hobby 가 아니라 Pro 요금제 대상입니다.
-- 운영(Production)의 Git 자동 배포를 끕니다. 배포는 GitHub Actions 가 마이그레이션 뒤에 합니다.
-- 환경변수(Production, Preview 둘 다):
-
-| 이름 | 값 |
-|---|---|
-| `DATABASE_URL` | Supabase 트랜잭션 풀러 주소 (`postgresql+psycopg2://...:6543/postgres`) |
-| `SECRET_KEY` | 긴 무작위 문자열 |
-| `ENV` | `production` |
-| `STORAGE_BACKEND` | `supabase` |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STORAGE_BUCKET` | Supabase 프로젝트 주소, 서비스 키, 버킷 이름 |
-| `CRON_SECRET` | 긴 무작위 문자열. 매일 정리 작업(`/api/internal/cron/daily`) 인증 |
-| `TRUSTED_PROXY_HEADER` | 플랫폼이 덮어쓰는 클라이언트 IP 헤더. 스테이징에서 확인해 정합니다. 비우면 모든 요청이 프록시 IP 하나로 잡혀 가입 횟수 제한이 사이트 전체에 걸립니다 |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google 로그인. 아래 4절 |
-| `AUTH_COMPANY_DOMAINS`, `AUTH_ALLOW_PERSONAL`, `AUTH_APPROVAL` | 로그인 정책. 아래 4절 |
-| `BOOTSTRAP_TOKEN` | 빈 DB 로 시작할 때만. 첫 관리자 화면에 넣는 값 |
-
-Preview 는 합성 데이터만 든 별도 Supabase 프로젝트에 연결합니다. 배포 워크플로는 운영 DB 만 마이그레이션하므로, 스키마를 바꾸는 브랜치의 Preview 는 그 DB 에 직접 올린 뒤 확인합니다. 올리기 전에는 API 가 503(스키마가 코드보다 옛 버전)을 냅니다.
+Vercel Git 연동에서 Preview 배포를 쓰려면 합성 데이터만 든 별도 Supabase 프로젝트를 Preview 환경변수에 연결합니다. 스키마를 바꾸는 브랜치의 Preview 는 그 DB 에 직접 마이그레이션한 뒤 확인합니다. 올리기 전에는 API 가 503(스키마가 코드보다 옛 버전)을 냅니다. 회사 배포 가이드처럼 Git 에 연결하지 않으면 Preview 배포는 생기지 않습니다.
 
 ```bash
 cd backend
-DATABASE_URL_DIRECT=<Preview DB 직결 주소> python -m alembic upgrade head
+DATABASE_URL=<Preview DB 세션 풀러 주소> DATABASE_URL_DIRECT=<같은 주소> python -m alembic upgrade head
 ```
 
-### 3. GitHub Actions (비공개 레포)
-
-- 저장소 변수 `DEPLOY_ENABLED` 를 `true` 로 둡니다. 공개 레포에서는 배포·백업 워크플로가 돌지 않습니다.
-- 비밀값: `DATABASE_URL_DIRECT`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, 백업용 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STORAGE_BUCKET`.
-- `main` 에 푸시하면 CI(백엔드, 프론트, E2E)가 먼저 돌고, 성공한 커밋만 배포됩니다. 배포는 Vercel 빌드, 운영 DB 마이그레이션, 빌드 산출물 배포 순서입니다(`.github/workflows/deploy.yml`). 빌드가 실패하면 DB 는 그대로입니다. 다시 배포하려면 그 커밋의 CI 를 다시 돌립니다.
-- 매일 DB 덤프(`public` 스키마)와 Storage 객체를 아티팩트로 남깁니다(`backup.yml`, 14일 보관). 스테이징 업로드는 담지 않습니다. 읽지 못한 객체가 있으면 나머지를 담고 실패로 끝나며, 목록은 zip 안의 `_manifest.txt` 에 있습니다.
-
-### 4. 로그인 정책 (Google 로그인, 가입 승인)
+### 로그인 정책 (Google 로그인, 가입 승인)
 
 들어올 수 있는 사람은 환경변수 셋으로 정합니다. `backend/.env.example` 에 선택지가 모두 적혀 있고 기본값만 켜져 있습니다.
 
@@ -187,7 +155,7 @@ DATABASE_URL_DIRECT=<Preview DB 직결 주소> python -m alembic upgrade head
 
 Google 로그인을 켜려면 Google Cloud 콘솔에서 OAuth 클라이언트를 만듭니다.
 
-1. Google 인증 플랫폼에서 대상을 **외부**로 두고 앱 이름과 지원 이메일을 넣습니다. 로고를 올리면 브랜드 심사를 받아야 하므로 비워 둡니다.
+1. Google 인증 플랫폼에서 대상을 **외부**로 두고 앱 이름과 지원 이메일을 넣습니다. 로고를 올리면 브랜드 심사를 받아야 하므로 비워 둡니다. 회사 Workspace 의 Cloud 프로젝트에서 사내 계정만 받으려면 **내부**로 둡니다(회사 배포 가이드 4절).
 2. 클라이언트를 **웹 애플리케이션**으로 만들고 승인된 리디렉션 URI 에 `https://<도메인>/api/auth/google/callback` 을 넣습니다. 로컬 개발은 `http://localhost:5173/api/auth/google/callback` 입니다. 화면이 여는 시작 주소와 리디렉션 URI 는 같은 호스트여야 합니다. 프론트를 다른 도메인의 백엔드(`VITE_API_URL`)에 붙이면 확인 쿠키가 콜백에 실리지 않아 Google 로그인이 항상 실패합니다.
 3. 클라이언트 ID 와 보안 비밀을 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` 에, 리디렉션 URI 를 `GOOGLE_REDIRECT_URI` 에 넣습니다. 보안 비밀은 만들 때 한 번만 보입니다.
 4. 팀에 열기 전에 게시 상태를 **프로덕션**으로 바꿉니다. 테스트 상태에서는 테스트 사용자로 등록한 계정만 로그인됩니다.
