@@ -7,6 +7,18 @@ vi.mock("react-hot-toast", () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 
+// ★같은 객체를 돌려준다(렌더마다 새 객체면 [currentUser] effect 가 반복된다, SYM-165 와 같은 이유)
+const mockAuth = vi.hoisted(() => ({ role: "user", users: new Map<string, object>() }));
+vi.mock("../contexts/AuthContext", () => ({
+  useAuth: () => {
+    if (!mockAuth.users.has(mockAuth.role)) {
+      mockAuth.users.set(mockAuth.role, { id: 99, username: "me", display_name: "나", role: mockAuth.role,
+        must_change_password: false, created_at: "2026-01-01" });
+    }
+    return { user: mockAuth.users.get(mockAuth.role) };
+  },
+}));
+
 vi.mock("../api", () => ({
   membersApi: {
     list: vi.fn(),
@@ -34,6 +46,7 @@ const mockUsers = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockAuth.role = "user";
   vi.mocked(membersApi.list).mockResolvedValue(mockMembers);
   vi.mocked(membersApi.add).mockResolvedValue({} as any);
   vi.mocked(membersApi.updateRole).mockResolvedValue({} as any);
@@ -95,7 +108,7 @@ describe("ProjectMembers", () => {
     });
   });
 
-  it("생성자는 제거할 수 없다 (X 버튼 없음)", async () => {
+  it("시스템 관리자가 아니면 생성자 X 버튼이 없다", async () => {
     render(<ProjectMembers projectId={1} createdBy={10} myRole="admin" />);
     await waitFor(() => {
       expect(screen.getByText("creator")).toBeInTheDocument();
@@ -110,3 +123,24 @@ describe("ProjectMembers", () => {
     expect(screen.getByText("불러오는 중...")).toBeInTheDocument();
   });
 });
+
+describe("ProjectMembers 생성자 행", () => {
+  const creatorRow = async () => (await screen.findByText("creator")).closest("tr")!;
+
+  it("프로젝트 admin 이라도 시스템 역할이 user 면 생성자의 역할 변경과 제거가 없다", async () => {
+    mockAuth.role = "user";
+    render(<ProjectMembers projectId={1} createdBy={10} myRole="admin" />);
+    const row = await creatorRow();
+    expect(row.querySelector("select")).toBeNull();
+    expect(row.querySelector("button")).toBeNull();
+  });
+
+  it("시스템 관리자는 생성자의 역할을 바꾸고 뺄 수 있다(강등된 생성자 권한 회수)", async () => {
+    mockAuth.role = "admin";
+    render(<ProjectMembers projectId={1} createdBy={10} myRole="admin" />);
+    const row = await creatorRow();
+    expect(row.querySelector("select")).not.toBeNull();
+    expect(row.querySelector("button")).not.toBeNull();
+  });
+});
+

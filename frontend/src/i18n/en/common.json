@@ -28,7 +28,7 @@
     "goToProjects": "Go to Projects"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.2.4.0 | AGPL-3.0",
+  "version": "YM TestCase v2.2.5.0 | AGPL-3.0",
   "copy": "Copy",
   "copiedToClipboard": "Copied to clipboard.",
   "undo": "Undo",
@@ -111,7 +111,10 @@
     "passwordTooLong": "Passwords must be 72 bytes or less (72 English letters or 24 Korean characters).",
     "inputTooLong": "A value is too long or in the wrong format. Shorten it and try again.",
     "dateFormat": "Dates must be in YYYY-MM-DD format.",
-    "importTooLong": "Nothing was imported because some cells are too long. Shorten them and upload again:"
+    "importTooLong": "Nothing was imported because some cells are too long. Shorten them and upload again:",
+    "mustChangePassword": "Please change your password first.",
+    "creatorRemove": "Only system administrators can remove the project creator.",
+    "creatorRoleChange": "Only system administrators can change the project creator's role."
   },
   "selectProject": "Select project",
   "selectRow": "Select this project",

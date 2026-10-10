@@ -229,8 +229,19 @@ def get_current_user(
         raise credentials_exception
     if user.status != UserStatus.active:
         raise credentials_exception
+    # ★임시 비밀번호(관리자 초기화) 상태면 변경 창이 쓰는 경로만 연다. 화면만 막으면 임시
+    #   비밀번호를 본 사람이 API 로 바로 쓸 수 있다. API 키는 초기화 때 모두 폐기되고, 새 키는
+    #   세션으로만 만들므로 이 경로(세션)만 보면 된다.
+    route_path = getattr(request.scope.get("route"), "path", None) or request.url.path
+    if user.must_change_password and route_path not in _PASSWORD_CHANGE_PATHS:
+        raise HTTPException(status_code=403, detail=MUST_CHANGE_PASSWORD_DETAIL)
 
     return user
+
+
+#: 임시 비밀번호 상태에서도 열어 두는 경로. 변경 창은 사용자 확인, 변경, 로그아웃만 쓴다.
+_PASSWORD_CHANGE_PATHS = frozenset({"/api/auth/me", "/api/auth/change-password", "/api/auth/logout"})
+MUST_CHANGE_PASSWORD_DETAIL = "비밀번호를 먼저 변경해 주세요."
 
 
 def revoke_user_api_keys(user_id: int, db: Session) -> int:
@@ -301,10 +312,10 @@ def get_project_role(
     if user_role in ("admin", "qa_manager"):
         return "admin"
 
-    # 프로젝트 생성자도 admin
+    # ★생성자라는 이유로 admin 을 주지 않는다. 생성자는 만들 때 admin 멤버로 등록되므로 멤버 표가
+    #   정본이다. 따로 보면 강등된 뒤 관리자가 멤버 역할을 낮추거나 빼도 계속 admin 이었다.
+    #   목록(projects.py), 개요(overview.py), 검색(search.py)도 같은 규칙이다.
     project = db.query(Project).filter(Project.id == project_id).first()
-    if project and project.created_by == user.id:
-        return "admin"
 
     # 멤버 테이블 조회
     member = db.query(ProjectMember).filter(

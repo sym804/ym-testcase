@@ -4,6 +4,8 @@ import { membersApi } from "../api";
 import type { ProjectMember, User } from "../types";
 import toast from "react-hot-toast";
 import { translateError } from "../utils/errorMessage";
+import { useAuth } from "../contexts/AuthContext";
+import { UserRole } from "../types";
 
 interface Props {
   projectId: number;
@@ -26,6 +28,10 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
   const [addRole, setAddRole] = useState("tester");
 
   const isAdmin = myRole === "admin";
+  // 생성자의 역할 변경과 제거는 시스템 관리자만 한다(서버 규칙과 같다). 강등된 생성자의 권한을
+  // 거둘 길이 이것이다.
+  const { user: me } = useAuth();
+  const canManageCreator = me?.role === UserRole.ADMIN || me?.role === UserRole.QA_MANAGER;
 
   const load = async () => {
     try {
@@ -152,7 +158,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
                 </td>
                 <td style={s.td}>{m.username || "-"}</td>
                 <td style={s.td}>
-                  {isAdmin && !isCreator ? (
+                  {isAdmin && (!isCreator || canManageCreator) ? (
                     <select
                       style={s.roleSelect}
                       value={m.role}
@@ -173,7 +179,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
                 </td>
                 {isAdmin && (
                   <td style={s.td}>
-                    {!isCreator && (
+                    {(!isCreator || canManageCreator) && (
                       <button
                         style={s.removeBtn}
                         onClick={() => handleRemove(m.id)}

@@ -533,7 +533,7 @@
     "h3_projectInfo": "13-1. Project Information",
     "pi_li1": "You can edit the project name and description.",
     "pi_li2": "<strong>Issue tracker URL:</strong> Enter the address of your issue tracker such as Jira or Linear (e.g., <code>https://your-domain.atlassian.net</code> (Jira), <code>https://linear.app/your-workspace</code> (Linear)). Issue keys (e.g., PROJ-123) link to <code>URL/browse/PROJ-123</code> for Jira and <code>URL/issue/PROJ-123</code> for Linear. For other tools, put <code>{key}</code> in the URL where the issue key should go.",
-    "pi_li3": "<strong>Public/Private:</strong> Public projects are viewable by all logged-in users (edits require membership). Private projects are accessible only to project members and the creator. Default is <strong>Public</strong>.",
+    "pi_li3": "<strong>Public/Private:</strong> Public projects are viewable by all logged-in users (edits require membership). Private projects are accessible only to project members (the creator is added as an admin member on creation) and system administrators. Default is <strong>Public</strong>.",
     "h3_defaultFields": "13-2. Default Field Settings",
     "df_p1": "You can <strong>rename display names</strong> and <strong>hide</strong> default TC fields (TC ID, Type, Category, etc.) for the project.",
     "df_li1": "<strong>Display name:</strong> Change default English headers to localized or team-specific terms (e.g., Category → Module, Depth 1 → Major Category).",
@@ -572,7 +572,7 @@
     "imgAlt_members": "Member management",
     "mem_li1": "Add users to the project and assign project roles.",
     "mem_li2": "Project roles: <strong>Project Admin</strong> (project management), <strong>Project Tester</strong> (test execution)",
-    "mem_li3": "Role changes and member removal are available (project creator cannot be removed).",
+    "mem_li3": "Role changes and member removal are available. Only system administrators (Admin, QA Manager) can change the project creator's role or remove the creator.",
     "pi_li2b": "<strong>Issue tracker:</strong> Choose Jira or Linear. It decides how issue keys are turned into links and puts the tool name in the report's issue section title. \"Not set\" guesses from the URL shape."
   },
   "roles": {
@@ -600,7 +600,7 @@
     "access_public": "Public Project",
     "access_public_desc": "All authenticated users can view (editing depends on role)",
     "access_private": "Private Project",
-    "access_private_desc": "Only project members or creators can access",
+    "access_private_desc": "Only project members and system administrators can access",
     "access_admin_desc": "System Admin / QA Manager can access all projects",
     "h3_dualRoles": "14-3. Relationship Between System Roles and Project Roles",
     "info1": "<strong>Dual role structure:</strong> System roles (Admin/QA Manager/User) determine global permissions, while project roles (Project Admin/Project Tester) determine permissions within that project.",

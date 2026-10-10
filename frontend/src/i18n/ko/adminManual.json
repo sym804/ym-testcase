@@ -175,7 +175,7 @@
     "projTh2": "설명",
     "projAdminDesc": "프로젝트 관리, TC CRUD, 런 관리, 멤버 관리, 설정 변경",
     "projTesterDesc": "테스트 수행, 결과 기록, 첨부파일 업로드",
-    "projLi1": "비공개 프로젝트는 멤버 또는 생성자만 접근 가능합니다.",
+    "projLi1": "비공개 프로젝트는 멤버와 시스템 관리자만 접근 가능합니다. 프로젝트 권한은 멤버 표의 역할만 따릅니다(생성자도 멤버 역할대로). 강등된 생성자의 권한은 멤버 역할을 낮추거나 멤버에서 빼서 거둡니다.",
     "projLi2": "공개 프로젝트는 인증된 사용자 모두 조회 가능하지만, 수정은 프로젝트 역할에 따릅니다.",
     "projLi3": "System Admin / QA Manager는 모든 프로젝트에 접근 가능합니다.",
     "passwordTitle": "6-3. 비밀번호 정책",
@@ -266,7 +266,7 @@
     "googleSetting": "GOOGLE_CLIENT_ID 등, AUTH_COMPANY_DOMAINS, AUTH_ALLOW_PERSONAL",
     "signup": "가입 제한",
     "signupImpl": "IP 당 가입 요청 수 제한, 관리자 승인",
-    "signupSetting": "REGISTER_MAX_PER_HOUR (기본 10), AUTH_APPROVAL"
+    "signupSetting": "REGISTER_MAX_PER_HOUR (기본 30), AUTH_APPROVAL"
   },
   "apiRef": {
     "title": "10. 주요 API 엔드포인트",

@@ -29,6 +29,11 @@ def _commit_assignment(db: Session, user_id: int, project_id: int | None = None)
         raise HTTPException(status_code=409, detail="다른 요청과 겹쳤습니다. 다시 시도해 주세요.")
 
 
+def _is_system_manager(user: User) -> bool:
+    role = user.role.value if isinstance(user.role, UserRole) else user.role
+    return role in ("admin", "qa_manager")
+
+
 router = APIRouter(
     prefix="/api/projects/{project_id}/members",
     tags=["project-members"],
@@ -154,6 +159,10 @@ def update_member_role(
     valid_roles = [r.value for r in ProjectRole]
     if payload.role not in valid_roles:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {valid_roles}")
+    # 제거와 같은 규칙. 프로젝트 admin 끼리는 생성자의 역할을 바꿀 수 없다.
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if project and member.user_id == project.created_by and not _is_system_manager(current_user):
+        raise HTTPException(status_code=400, detail="Cannot change the project creator's role")
 
     member.role = ProjectRole(payload.role)
     db.commit()
@@ -186,9 +195,10 @@ def remove_member(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    # 프로젝트 생성자는 제거 불가
+    # 프로젝트 생성자는 프로젝트 admin 끼리는 뺄 수 없다. 시스템 관리자(admin, qa_manager)는
+    # 뺄 수 있다. 역할 판정이 멤버 표만 보므로, 강등된 생성자의 접근을 끊는 길이 이것뿐이다.
     project = db.query(Project).filter(Project.id == project_id).first()
-    if project and member.user_id == project.created_by:
+    if project and member.user_id == project.created_by and not _is_system_manager(current_user):
         raise HTTPException(status_code=400, detail="Cannot remove the project creator")
 
     logger.info(

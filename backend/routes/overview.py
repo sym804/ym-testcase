@@ -33,7 +33,6 @@ def global_overview(
             p for p in all_projects
             if not p.is_private
             or p.id in member_project_ids
-            or p.created_by == current_user.id
         ]
 
     project_ids = [p.id for p in projects]

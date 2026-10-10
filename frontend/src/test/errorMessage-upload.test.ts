@@ -21,6 +21,9 @@ const SERVER_DETAILS = [
   "다른 요청과 겹쳤습니다. 다시 시도해 주세요.",
   "이 작업을 수행할 권한이 없습니다.",
   "이 프로젝트에 접근 권한이 없습니다.",
+  "비밀번호를 먼저 변경해 주세요.",
+  "Cannot remove the project creator",
+  "Cannot change the project creator's role",
 ];
 
 describe("translateError: 업로드·잠금 문구", () => {

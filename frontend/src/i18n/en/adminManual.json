@@ -175,7 +175,7 @@
     "projTh2": "Description",
     "projAdminDesc": "Project management, TC CRUD, run management, member management, settings",
     "projTesterDesc": "Test execution, result recording, attachment upload",
-    "projLi1": "Private projects are accessible only to members or the creator.",
+    "projLi1": "Private projects are accessible only to members and system administrators. Project permissions follow only the member role (the creator too). To revoke a demoted creator, lower their member role or remove them.",
     "projLi2": "Public projects are viewable by all authenticated users, but editing depends on project role.",
     "projLi3": "System Admin / QA Manager can access all projects.",
     "passwordTitle": "6-3. Password Policy",
@@ -266,7 +266,7 @@
     "googleSetting": "GOOGLE_CLIENT_ID etc., AUTH_COMPANY_DOMAINS, AUTH_ALLOW_PERSONAL",
     "signup": "Sign-up limits",
     "signupImpl": "Per-IP sign-up rate limit, administrator approval",
-    "signupSetting": "REGISTER_MAX_PER_HOUR (default 10), AUTH_APPROVAL"
+    "signupSetting": "REGISTER_MAX_PER_HOUR (default 30), AUTH_APPROVAL"
   },
   "apiRef": {
     "title": "10. Main API Endpoints",
