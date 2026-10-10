@@ -24,6 +24,7 @@ import {
   authApi,
   projectsApi,
   testCasesApi,
+  TC_LIST_PAGE,
   testRunsApi,
   dashboardApi,
   reportsApi,
@@ -152,9 +153,30 @@ describe("testCasesApi", () => {
     mockGet.mockResolvedValueOnce({ data: tcs });
     const result = await testCasesApi.list(1, { sheet_name: "Sheet1" });
     expect(mockGet).toHaveBeenCalledWith("/api/projects/1/testcases", {
-      params: { sheet_name: "Sheet1" },
+      params: { sheet_name: "Sheet1", limit: String(TC_LIST_PAGE), offset: "0" },
     });
     expect(result).toEqual(tcs);
+  });
+
+  it("list 는 서버 상한에서 잘리지 않게 끝까지 나눠 받는다", async () => {
+    const page = (start: number, n: number) => Array.from({ length: n }, (_, i) => ({ id: start + i }));
+    mockGet
+      .mockResolvedValueOnce({ data: page(0, TC_LIST_PAGE) })
+      .mockResolvedValueOnce({ data: page(TC_LIST_PAGE, TC_LIST_PAGE) })
+      .mockResolvedValueOnce({ data: page(2 * TC_LIST_PAGE, 7) });
+    const result = await testCasesApi.list(1);
+    expect(result).toHaveLength(2 * TC_LIST_PAGE + 7);
+    expect(mockGet).toHaveBeenCalledTimes(3);
+    expect(mockGet.mock.calls[2][1]).toEqual({ params: { limit: String(TC_LIST_PAGE), offset: String(2 * TC_LIST_PAGE) } });
+  });
+
+  it("list 는 구간 경계가 밀려 두 번 온 행을 한 번만 담는다", async () => {
+    const page = (start: number, n: number) => Array.from({ length: n }, (_, i) => ({ id: start + i }));
+    mockGet
+      .mockResolvedValueOnce({ data: page(0, TC_LIST_PAGE) })
+      .mockResolvedValueOnce({ data: page(TC_LIST_PAGE - 1, 3) });
+    const result = await testCasesApi.list(1);
+    expect(result).toHaveLength(TC_LIST_PAGE + 2);
   });
 
   it("create sends POST with test case data", async () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import ProjectPage from "../pages/ProjectPage";
 import { UserRole } from "../types";
 
@@ -55,9 +55,16 @@ const mockProject = {
 };
 
 // Mock heavy components
-vi.mock("../components/TestCaseGrid", () => ({
-  default: () => <div data-testid="tc-grid">TestCaseGrid</div>,
-}));
+// 마운트될 때마다 번호를 새로 받는다. 프로젝트를 바꿨는데 같은 번호면 시트 선택 같은 내부 상태가 남는다.
+const gridMounts = vi.hoisted(() => ({ n: 0 }));
+vi.mock("../components/TestCaseGrid", async () => {
+  const { useState } = await import("react");
+  function MockGrid({ projectId }: { projectId: number }) {
+    const [inst] = useState(() => ++gridMounts.n);
+    return <div data-testid="tc-grid" data-inst={inst} data-project={projectId}>TestCaseGrid</div>;
+  }
+  return { default: MockGrid };
+});
 vi.mock("../components/TestRunManager", () => ({
   default: () => <div data-testid="run-manager">TestRunManager</div>,
 }));
@@ -178,5 +185,52 @@ describe("ProjectPage", () => {
     });
     // description이 빈 문자열이므로 "설명" 텍스트가 없어야 함
     expect(screen.queryByText("설명")).not.toBeInTheDocument();
+  });
+});
+
+describe("ProjectPage 프로젝트 전환", () => {
+  function GoTo2() {
+    const nav = useNavigate();
+    return <button onClick={() => nav("/projects/2")}>go2</button>;
+  }
+
+  function renderSwitchable() {
+    return render(
+      <MemoryRouter initialEntries={["/projects/1"]}>
+        <GoTo2 />
+        <Routes>
+          <Route path="/projects/:id" element={<ProjectPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  it("다른 프로젝트로 가면 TC 그리드를 새로 띄워 이전 프로젝트의 시트 선택이 남지 않는다", async () => {
+    const second = { ...mockProject, id: 2, name: "SecondProject" };
+    vi.mocked(projectsApi.getOne).mockImplementation(async (id: number) => (id === 2 ? second : mockProject) as any);
+    renderSwitchable();
+    const first = await screen.findByTestId("tc-grid");
+    const firstInst = first.getAttribute("data-inst");
+
+    await userEvent.click(screen.getByText("go2"));
+
+    await waitFor(() => expect(screen.getByText("SecondProject")).toBeInTheDocument());
+    const grid = screen.getByTestId("tc-grid");
+    expect(grid.getAttribute("data-project")).toBe("2");
+    expect(grid.getAttribute("data-inst")).not.toBe(firstInst);
+  });
+
+  it("새 프로젝트를 못 불러오면 이전 프로젝트 이름 아래 새 데이터를 보이지 않는다", async () => {
+    vi.mocked(projectsApi.getOne).mockImplementation(async (id: number) => {
+      if (id === 2) throw new Error("500");
+      return mockProject as any;
+    });
+    renderSwitchable();
+    await screen.findByText("TestProject");
+
+    await userEvent.click(screen.getByText("go2"));
+
+    await waitFor(() => expect(screen.queryByText("TestProject")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("tc-grid")).not.toBeInTheDocument();
   });
 });

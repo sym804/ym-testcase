@@ -87,3 +87,19 @@ describe("새 행의 기본값", () => {
     expect(created.priority).not.toBe("Normal");
   });
 });
+
+describe("새 행의 TC ID (프로젝트 전체 기준)", () => {
+  it("다른 시트가 쓴 번호를 피해 프로젝트 최대 번호 다음을 쓴다", async () => {
+    const row = (id: number, tc: string, sheet: string, no: number) =>
+      ({ id, tc_id: tc, sheet_name: sheet, no }) as any;
+    const mine = [row(1, "TC-001", "기본", 1), row(2, "TC-002", "기본", 2)];
+    const others = [row(3, "TC-003", "다른 시트", 1), row(4, "TC-010", "다른 시트", 2)];
+    vi.mocked(testCasesApi.list).mockImplementation(async (_pid: number, params?: Record<string, string>) =>
+      (params?.sheet_name ? mine : [...mine, ...others]) as any);
+
+    const created = await addOneRow("+ 행 추가");
+
+    expect(created.tc_id).toBe("TC-011");
+    expect(created.no).toBe(3);
+  });
+});

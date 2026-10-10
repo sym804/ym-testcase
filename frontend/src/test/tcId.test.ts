@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planTcIdFill, resolveTcIdSeed, dominantTcIdPrefix, findTcIdCollisions } from "../utils/tcId";
+import { planTcIdFill, resolveTcIdSeed, dominantTcIdPrefix, findTcIdCollisions, nextNewTcIds } from "../utils/tcId";
 
 const idsOf = (all: (string | null)[], plan: { index: number; tcId: string }[]) => {
   const out = [...all];
@@ -148,5 +148,26 @@ describe("findTcIdCollisions", () => {
     const assigned = [{ key: "id:1", tcId: "SFW-004" }];
     const all = [{ key: "id:1", tcId: "SFW-004" }, { key: "id:2", tcId: "SFW-005" }];
     expect(findTcIdCollisions(assigned, all)).toEqual([]);
+  });
+});
+
+describe("nextNewTcIds (새 행 TC ID, 프로젝트 전체 기준)", () => {
+  it("접두사는 지금 시트에서, 번호는 프로젝트 전체에서 이어 간다", () => {
+    const sheet = ["TC-001", "TC-002", "TC-030"];
+    const project = [...sheet, "TC-031", "TC-060"];
+    expect(nextNewTcIds(sheet, project, 2)).toEqual(["TC-061", "TC-062"]);
+  });
+
+  it("빈 시트는 프로젝트에서 가장 많이 쓴 접두사를 따른다", () => {
+    expect(nextNewTcIds([], ["TC-001", "TC-002", "LG-9"], 1)).toEqual(["TC-003"]);
+  });
+
+  it("프로젝트에 아무 TC 도 없으면 TC-001 부터", () => {
+    expect(nextNewTcIds([], [], 3)).toEqual(["TC-001", "TC-002", "TC-003"]);
+  });
+
+  it("번호 꼴이 아닌 값은 최대 번호 계산에 섞지 않는다", () => {
+    expect(nextNewTcIds(["LG-009"], ["LG-009", "LG-010x", "LG-010"], 2)).toEqual(["LG-011", "LG-012"]);
+    expect(nextNewTcIds(["A-1"], ["A-1", "A-2"], 1)).toEqual(["A-3"]);
   });
 });

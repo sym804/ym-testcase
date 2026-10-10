@@ -135,13 +135,28 @@ export const projectsApi = {
 };
 
 // ─── Test Cases ──────────────────────────────────────
+// TC 목록을 나눠 받는 크기. 서버는 한 번에 최대 5,000건까지 주고 그 뒤는 말없이 자른다.
+// 끝까지 이어 받는다. 한 응답을 작게 두는 것은 Vercel 함수 응답 한도(4.5MB) 때문이다.
+export const TC_LIST_PAGE = 1000;
+
 export const testCasesApi = {
   list: async (projectId: number, params?: Record<string, string>) => {
-    const res = await client.get<TestCase[]>(
-      `/api/projects/${projectId}/testcases`,
-      { params }
-    );
-    return res.data;
+    // 호출자가 범위를 정했으면 그대로 한 번만 부른다
+    if (params?.limit || params?.offset) {
+      const res = await client.get<TestCase[]>(`/api/projects/${projectId}/testcases`, { params });
+      return res.data;
+    }
+    // 받는 사이 다른 사람이 TC 를 만들거나 번호를 다시 매기면 구간 경계가 밀려 같은 행이
+    // 두 번 올 수 있다. id 로 한 번만 담는다.
+    const byId = new Map<number, TestCase>();
+    for (let offset = 0; ; offset += TC_LIST_PAGE) {
+      const res = await client.get<TestCase[]>(
+        `/api/projects/${projectId}/testcases`,
+        { params: { ...params, limit: String(TC_LIST_PAGE), offset: String(offset) } }
+      );
+      for (const tc of res.data) if (!byId.has(tc.id)) byId.set(tc.id, tc);
+      if (res.data.length < TC_LIST_PAGE) return [...byId.values()];
+    }
   },
 
   create: async (projectId: number, data: Partial<TestCase>) => {

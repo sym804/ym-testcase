@@ -116,3 +116,27 @@ export function findTcIdCollisions(
   );
   return assigned.map((a) => a.tcId).filter((id) => outside.has(id));
 }
+
+/**
+ * 새 행에 붙일 TC ID 를 count 개 만든다.
+ * ★TC ID 는 프로젝트 안에서 유일하다(uq_test_cases_project_tc_id). 지금 시트의 행만 보고 번호를
+ *   이으면 다른 시트가 이미 쓴 번호와 부딪혀 행 추가가 409 로 실패한다. 빈 시트는 매번 TC-001 이
+ *   나와서 늘 실패했다. 접두사와 자릿수는 지금 시트(없으면 프로젝트)에서, 번호는 프로젝트 전체에서 정한다.
+ */
+export function nextNewTcIds(
+  sheetIds: (string | null | undefined)[],
+  projectIds: (string | null | undefined)[],
+  count: number
+): string[] {
+  const seed = dominantTcIdPrefix(sheetIds) ?? dominantTcIdPrefix(projectIds);
+  const prefix = seed?.prefix ?? "TC-";
+  const numWidth = seed?.numWidth ?? 3;
+  // 같은 접두사의 최대 번호 다음부터 잇는다. 그 접두사로 쓰인 값은 모두 최대 번호 이하라
+  // 따로 '이미 쓴 값' 을 대조할 필요가 없다.
+  let maxNum = 0;
+  for (const id of [...sheetIds, ...projectIds]) {
+    const m = id?.match(TC_ID_PATTERN);
+    if (m && m[1] === prefix) maxNum = Math.max(maxNum, parseInt(m[2], 10));
+  }
+  return Array.from({ length: count }, (_, i) => prefix + String(maxNum + i + 1).padStart(numWidth, "0"));
+}

@@ -15,7 +15,15 @@ const ProjectSettings = lazy(() => import("../components/ProjectSettings"));
 
 const TAB_KEYS = ["tc", "run", "compare", "dashboard", "report", "settings"];
 
+// ★프로젝트가 바뀌면 화면 전체를 새로 띄운다. 같은 라우트라 그대로 두면 TestCaseGrid 의 시트 선택,
+//   필터, 펼친 폴더가 이전 프로젝트 값으로 남아 새 프로젝트를 엉뚱한 시트로 조회하고(빈 표),
+//   새 프로젝트를 불러오는 동안이나 실패했을 때 이전 프로젝트 이름과 권한으로 그려진다.
 export default function ProjectPage() {
+  const { id } = useParams<{ id: string }>();
+  return <ProjectPageContent key={id} />;
+}
+
+function ProjectPageContent() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation("project");
   const [searchParams, setSearchParams] = useSearchParams();
