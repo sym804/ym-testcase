@@ -28,7 +28,7 @@ from sqlalchemy.orm import sessionmaker
 from auth import hash_password
 from database import get_db
 from main import app
-from models import ApiKey, Project, User, UserRole, now_kst
+from models import ApiKey, Project, User, UserRole, UserStatus, now_kst
 
 PW = "Passw0rd!long"
 
@@ -193,6 +193,30 @@ def test_관리자_키로는_비밀번호_초기화와_복구_승인을_못_한�
     # 요청 행이 없어도 403 이 먼저 나야 한다. 세션 검사가 조회보다 앞이다
     r = client.post("/api/auth/account-requests/1/approve", json={"user_id": 2}, headers=_bearer(raw))
     assert r.status_code == 403
+
+
+@pytest.mark.parametrize("method,path,body", [
+    ("post", "/api/auth/users/2/approve", None),
+    ("post", "/api/auth/users/2/reject", None),
+    ("post", "/api/auth/users/2/disable", None),
+    ("post", "/api/auth/users/2/enable", None),
+    ("post", "/api/auth/users/2/release-email", None),
+    ("delete", "/api/auth/users/2", None),
+    ("put", "/api/auth/users/2/role", {"role": "admin"}),
+    ("post", "/api/auth/account-requests/1/reject", {"reason": "x"}),
+])
+def test_관리자_키로는_계정을_관리하지_못한다(env, method, path, body):
+    """유출된 관리자 키로 자기 계정을 승인하고 관리자로 올리면 키를 폐기해도 관리자가 남는다."""
+    client, db = env
+    raw = _new_key(client, _session(client, "boss"))["key"]
+    kw = {"headers": _bearer(raw)}
+    if body is not None:
+        kw["json"] = body
+    r = getattr(client, method)(path, **kw)
+    assert r.status_code == 403, r.text
+    db.expire_all()
+    ym = db.query(User).filter_by(username="ym").one()
+    assert ym.role == UserRole.user and ym.status == UserStatus.active
 
 
 def test_비밀번호를_바꾸면_키가_모두_폐기된다(env):

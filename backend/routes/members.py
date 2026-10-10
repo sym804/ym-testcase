@@ -2,6 +2,7 @@ import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
@@ -10,6 +11,23 @@ from schemas import ProjectMemberCreate, ProjectMemberUpdate, ProjectMemberRespo
 from auth import get_current_user, check_project_access, role_required
 
 logger = logging.getLogger(__name__)
+
+def _commit_assignment(db: Session, user_id: int, project_id: int | None = None) -> None:
+    """배정을 커밋한다. 존재 확인을 통과한 뒤 다른 요청이 계정을 지우거나 같은 배정을
+    먼저 넣으면 제약에 걸린다(SYM-164). 전역 핸들러의 모호한 409 대신 무엇이 바뀌었는지 알려 준다.
+    """
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if db.query(User.id).filter(User.id == user_id).first() is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        if project_id is not None:
+            if db.query(Project.id).filter(Project.id == project_id).first() is None:
+                raise HTTPException(status_code=404, detail="Project not found")
+            raise HTTPException(status_code=400, detail="User is already a member")
+        raise HTTPException(status_code=409, detail="다른 요청과 겹쳤습니다. 다시 시도해 주세요.")
+
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/members",
@@ -98,7 +116,7 @@ def add_member(
         role=ProjectRole(payload.role),
     )
     db.add(member)
-    db.commit()
+    _commit_assignment(db, payload.user_id, project_id)
     db.refresh(member)
 
     logger.info(
@@ -242,7 +260,7 @@ def assign_to_all_projects(
                 role=ProjectRole(payload.role),
             ))
             assigned += 1
-    db.commit()
+    _commit_assignment(db, payload.user_id)
     logger.info(
         "Bulk assign: user=%s role=%s projects=%d by=%s",
         user.username, payload.role, assigned, current_user.username,
