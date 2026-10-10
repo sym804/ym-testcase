@@ -84,7 +84,8 @@ def _check_register_limit(request: Request, db: Session) -> None:
     key = client_ip(request)
     keyed_xact_lock(db, LockNs.RATE_LIMIT, f"{BUCKET_REGISTER}:{key}")
     engine = db.get_bind()
-    limit = int(os.getenv("REGISTER_MAX_PER_HOUR", "10"))
+    # 기본 30. 사무실 하나(NAT 하나)에서 팀이 한꺼번에 이메일로 가입하면 10건으로는 막혔다.
+    limit = int(os.getenv("REGISTER_MAX_PER_HOUR", "30"))
     if rate_limit.count_recent(BUCKET_REGISTER, key, REGISTER_WINDOW_SEC, engine=engine) >= limit:
         raise HTTPException(status_code=429, detail="가입 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.")
     rate_limit.record(BUCKET_REGISTER, key, engine=engine)

@@ -556,7 +556,10 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     lastSavedRef.current = next;
   }, [rowData]);
 
-  const restoreRow = useCallback((rowKey: string) => {
+  // sent 를 주면 거부된 요청이 보낸 칸만 되돌린다. ★행 전체를 되돌리면 그 요청이 오가는 사이
+  // 사용자가 고친 다른 칸까지 지워지고, 줄 서 있던 다음 저장은 바뀐 칸이 없다며 조용히 끝났다.
+  // 거부된 뒤 다시 고친 칸(값이 보낸 값과 다른 칸)도 그대로 둔다.
+  const restoreRow = useCallback((rowKey: string, sent?: Record<string, unknown>) => {
     const saved = lastSavedRef.current[rowKey];
     const gridApi = gridApiRef.current;
     if (!saved || !gridApi) return;
@@ -564,7 +567,28 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     if (!node?.data) return;
     // 같은 객체를 그대로 채운다. rowData 배열이 이 객체를 참조하므로
     // 새 객체로 갈아끼우면 state 와 그리드가 갈라진다.
-    Object.assign(node.data, cloneRow(saved));
+    if (!sent) {
+      Object.assign(node.data, cloneRow(saved));
+    } else {
+      const snap = cloneRow(saved) as unknown as Record<string, unknown>;
+      const cur = node.data as unknown as Record<string, unknown>;
+      for (const [k, v] of Object.entries(sent)) {
+        if (k === "custom_fields" && v && typeof v === "object") {
+          // 커스텀 칸도 하나씩 본다. 같은 객체 안에서 다른 칸을 그 사이 고쳤을 수 있다.
+          const curCf = (cur.custom_fields ?? {}) as Record<string, unknown>;
+          const snapCf = (snap.custom_fields ?? {}) as Record<string, unknown>;
+          for (const [ck, cv] of Object.entries(v as Record<string, unknown>)) {
+            if (JSON.stringify(curCf[ck] ?? null) === JSON.stringify(cv ?? null)) {
+              if (ck in snapCf) curCf[ck] = snapCf[ck];
+              else delete curCf[ck];
+            }
+          }
+          cur.custom_fields = curCf;
+          continue;
+        }
+        if (JSON.stringify(cur[k] ?? null) === JSON.stringify(v ?? null)) cur[k] = snap[k];
+      }
+    }
     gridApi.refreshCells({ rowNodes: [node], force: true });
   }, []);
 
@@ -596,7 +620,11 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           for (const [k, v] of Object.entries(saveData)) {
             if (k === "_originalNo") continue;
             const before = k === "no" && "_originalNo" in base ? base._originalNo : base[k];
-            if (JSON.stringify(v ?? null) !== JSON.stringify(before ?? null)) payload[k] = v;
+            // custom_fields 는 편집기가 제자리에서 고치는 객체라 복사해서 싣는다. 그대로 실으면
+            // 요청이 오가는 사이의 편집이 '보낸 값' 에 섞여 거부 때 되돌릴 칸을 잘못 고른다.
+            if (JSON.stringify(v ?? null) !== JSON.stringify(before ?? null)) {
+              payload[k] = k === "custom_fields" && v ? { ...(v as Record<string, unknown>) } : v;
+            }
           }
           if (Object.keys(payload).length === 0) return;
         }
@@ -609,8 +637,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
           const detail = (err as { response?: { data?: { detail?: string } } })
             ?.response?.data?.detail;
           toast.error(detail ? translateError(detail) : t("autoSaveFailed"));
-          // 저장되지 않은 값을 화면에 남기지 않는다
-          restoreRow(key);
+          // 저장되지 않은 값을 화면에 남기지 않는다(보낸 칸만)
+          restoreRow(key, payload);
         }
       };
       const chain = (saveChainRef.current[key] ?? Promise.resolve()).then(run);

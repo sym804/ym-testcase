@@ -54,7 +54,7 @@ beforeEach(() => {
   vi.mocked(testCasesApi.listSheets).mockResolvedValue([
     { id: 1, name: "기본", parent_id: null, sort_order: 0, is_folder: false, tc_count: 1, children: [] },
   ] as any);
-  vi.mocked(testCasesApi.list).mockResolvedValue([{ ...tcRow }] as any);
+  vi.mocked(testCasesApi.list).mockResolvedValue([{ ...tcRow, custom_fields: {} }] as any);
 });
 
 async function loaded() {
@@ -122,6 +122,56 @@ describe("TC 자동저장", () => {
 
     await waitFor(() => expect(testCasesApi.update).toHaveBeenCalledTimes(1), { timeout: 5000 });
     expect(vi.mocked(testCasesApi.update).mock.calls[0][2]).toEqual({ remarks: "편집" });
+  });
+
+  it("앞 저장이 거부되면 그 칸만 되돌리고, 그 사이 고친 다른 칸은 남겨 저장한다", { timeout: 20000 }, async () => {
+    let reject!: (e: unknown) => void;
+    vi.mocked(testCasesApi.update)
+      .mockImplementationOnce(() => new Promise((_, rj) => { reject = rj; }))
+      .mockResolvedValue({} as any);
+    const data = await loaded();
+    // 저장 거부 때 행을 되돌리는 경로가 그리드 API 로 행을 찾는다
+    act(() => gridProps.onGridReady({ api: {
+      getRowNode: (id: string) => (id === String(data.id) ? { data } : undefined),
+      refreshCells: () => {}, forEachNode: () => {},
+    } }));
+
+    edit(data, "priority", "높음");
+    await waitFor(() => expect(testCasesApi.update).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    edit(data, "remarks", "메모");
+    await new Promise((r) => setTimeout(r, 400));   // 두 번째 저장이 앞 요청 뒤에 줄을 선다
+    reject({ response: { data: { detail: "거부" } } });
+
+    await waitFor(() => expect(testCasesApi.update).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    expect(vi.mocked(testCasesApi.update).mock.calls[1][2]).toEqual({ remarks: "메모" });
+    expect(data.priority).toBe("보통");
+    expect(data.remarks).toBe("메모");
+  });
+
+  it("커스텀 칸 A 저장이 거부돼도 그 사이 고친 커스텀 칸 B 는 남겨 저장한다", { timeout: 20000 }, async () => {
+    let reject!: (e: unknown) => void;
+    vi.mocked(testCasesApi.update)
+      .mockImplementationOnce(() => new Promise((_, rj) => { reject = rj; }))
+      .mockResolvedValue({} as any);
+    const data = await loaded();
+    act(() => gridProps.onGridReady({ api: {
+      getRowNode: (id: string) => (id === String(data.id) ? { data } : undefined),
+      refreshCells: () => {}, forEachNode: () => {},
+    } }));
+    const editCf = (k: string, v: string) => {
+      data.custom_fields[k] = v;
+      act(() => gridProps.onCellValueChanged({ data, oldValue: "", newValue: v, colDef: { field: `cf_${k}` }, column: { getColId: () => `cf_${k}` } }));
+    };
+
+    editCf("a", "A1");
+    await waitFor(() => expect(testCasesApi.update).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    editCf("b", "B1");
+    await new Promise((r) => setTimeout(r, 400));
+    reject({ response: { data: { detail: "거부" } } });
+
+    await waitFor(() => expect(testCasesApi.update).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    expect(data.custom_fields).toEqual({ b: "B1" });
+    expect(vi.mocked(testCasesApi.update).mock.calls[1][2]).toEqual({ custom_fields: { b: "B1" } });
   });
 });
 

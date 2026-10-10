@@ -73,7 +73,7 @@ npx tsc -b
 | `AUTH_ALLOW_PERSONAL` | 1 | 0 이면 회사 계정만 받음. 이때 `AUTH_COMPANY_DOMAINS` 필수, 이메일 가입은 항상 승인 대기 | 선택 |
 | `AUTH_APPROVAL` | none | 관리자 승인 대상. `none`(모두 바로 사용) / `personal`(회사 Workspace Google 계정만 바로 사용, 나머지는 대기. 이메일 가입은 회사 주소여도 대기) / `all`(모두). 단 `AUTH_ALLOW_PERSONAL=0` 이면 이메일 가입은 이 값과 관계없이 승인 대기 | 선택 |
 | `BOOTSTRAP_TOKEN` | - | 운영(ENV=production) 빈 DB 의 첫 관리자 만들기에 필요한 값 | 선택 |
-| `REGISTER_MAX_PER_HOUR` | 10 | IP 하나의 시간당 가입 요청 수 | 선택 |
+| `REGISTER_MAX_PER_HOUR` | 30 | IP 하나의 시간당 가입 요청 수 | 선택 |
 
 ⚠️ **주의**: 프로덕션 환경에서는 반드시 `SECRET_KEY`를 고유한 값으로 설정하세요. 미설정 시 서버 시작이 실패합니다.
 
@@ -211,7 +211,7 @@ npx tsc -b
 | **Project Admin** | 프로젝트 관리, TC CRUD, 런 관리, 멤버 관리, 설정 변경 |
 | **Project Tester** | 테스트 수행, 결과 기록, 첨부파일 업로드 |
 
-- 비공개 프로젝트는 멤버 또는 생성자만 접근 가능
+- 비공개 프로젝트는 멤버와 시스템 관리자만 접근 가능. 프로젝트 권한은 멤버 표의 역할만 따른다(생성자도 멤버 역할대로)
 - 공개 프로젝트는 인증된 사용자 모두 조회 가능 (수정은 프로젝트 역할에 따름)
 - System Admin / QA Manager는 모든 프로젝트에 접근 가능
 
@@ -276,7 +276,7 @@ npx tsc -b
 | XSS 방지 | DOMPurify (프론트엔드) | 마크다운 셀 렌더링 시 자동 적용 |
 | API 권한 | 역할 기반 접근 제어 | 엔드포인트별 역할 체크 |
 | Google 로그인 | OpenID Connect 인가 코드 흐름 + PKCE, state · nonce 검증, Google 이 확인한 이메일만 받음 | GOOGLE_CLIENT_ID 등, AUTH_COMPANY_DOMAINS, AUTH_ALLOW_PERSONAL |
-| 가입 제한 | IP 당 가입 요청 수 제한, 관리자 승인 | REGISTER_MAX_PER_HOUR (기본 10), AUTH_APPROVAL |
+| 가입 제한 | IP 당 가입 요청 수 제한, 관리자 승인 | REGISTER_MAX_PER_HOUR (기본 30), AUTH_APPROVAL |
 
 ---
 

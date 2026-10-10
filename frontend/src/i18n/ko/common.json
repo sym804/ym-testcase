@@ -28,7 +28,7 @@
     "goToProjects": "프로젝트 목록으로"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.2.4.0 | AGPL-3.0",
+  "version": "YM TestCase v2.2.5.0 | AGPL-3.0",
   "copy": "복사",
   "copiedToClipboard": "클립보드에 복사되었습니다.",
   "undo": "되돌리기",
@@ -111,7 +111,10 @@
     "passwordTooLong": "비밀번호는 72바이트 이하로 입력해 주세요(영문 72자, 한글 24자까지).",
     "inputTooLong": "입력값이 허용 길이나 형식을 벗어났습니다. 긴 값을 줄여 다시 시도해 주세요.",
     "dateFormat": "날짜는 YYYY-MM-DD 형식으로 보내 주세요.",
-    "importTooLong": "허용 길이를 넘는 칸이 있어 가져오지 않았습니다. 값을 줄여 다시 올려 주세요:"
+    "importTooLong": "허용 길이를 넘는 칸이 있어 가져오지 않았습니다. 값을 줄여 다시 올려 주세요:",
+    "mustChangePassword": "비밀번호를 먼저 변경해 주세요.",
+    "creatorRemove": "프로젝트 생성자는 시스템 관리자만 뺄 수 있습니다.",
+    "creatorRoleChange": "프로젝트 생성자의 역할은 시스템 관리자만 바꿀 수 있습니다."
   },
   "selectProject": "프로젝트 선택",
   "selectRow": "이 프로젝트 선택",

@@ -8,6 +8,11 @@ vi.mock("react-hot-toast", () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 
+// ProjectMembers 가 생성자 관리 권한을 보려고 로그인 사용자를 읽는다. 같은 객체를 돌려준다.
+const mockMe = vi.hoisted(() => ({ id: 1, username: "admin", display_name: "관리자", role: "admin",
+  must_change_password: false, created_at: "2026-01-01" }));
+vi.mock("../contexts/AuthContext", () => ({ useAuth: () => ({ user: mockMe }) }));
+
 vi.mock("../api", () => ({
   projectsApi: {
     update: vi.fn().mockResolvedValue({ id: 1, name: "TestProject", is_private: true }),

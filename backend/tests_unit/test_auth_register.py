@@ -75,6 +75,14 @@ def test_가입_횟수_제한(auth_env, monkeypatch):
     assert codes == [201, 201, 201, 429]
 
 
+def test_가입_횟수_기본_상한은_IP_당_시간당_30건(auth_env):
+    """사무실 하나(NAT 하나)에서 팀이 한꺼번에 이메일로 가입해도 막히지 않게 10건에서 30건으로 올렸다."""
+    make_user(auth_env.Session, username="boss", role=UserRole.admin)
+    codes = [_reg(auth_env.base, email=f"d{i}@example.com").status_code for i in range(31)]
+    assert codes[:30] == [201] * 30
+    assert codes[30] == 429
+
+
 def test_구글_설정이_있으면_config_가_알린다(auth_env, monkeypatch):
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "cid")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "s")

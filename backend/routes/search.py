@@ -18,7 +18,7 @@ def _accessible_project_ids(user: User, db: Session) -> list[int]:
     Rules (consistent with get_project_role):
     - System admin: all projects
     - Public projects: all authenticated users
-    - Private projects: members, or project creator
+    - Private projects: members only (the creator is an admin member from creation)
     """
     all_projects = db.query(Project).all()
 
@@ -37,7 +37,6 @@ def _accessible_project_ids(user: User, db: Session) -> list[int]:
         p.id for p in all_projects
         if not p.is_private  # 공개 프로젝트는 모든 인증 사용자 접근 가능
         or p.id in member_ids
-        or p.created_by == user.id
     ]
 
 

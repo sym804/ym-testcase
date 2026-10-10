@@ -442,14 +442,9 @@ class TestMembers:
         r5 = requests.delete(f"{BASE}/api/projects/{pub_id}/members/{mid}", headers=h)
         assert r5.status_code == 204
 
-    def test_creator_cannot_be_removed(self, project_pair):
-        pub_id, _ = project_pair
-        h = auth(store.admin)
-        r = requests.get(f"{BASE}/api/projects/{pub_id}/members", headers=h)
-        creator = next((m for m in r.json() if m.get("username") == "admin"), None)
-        if creator:
-            r2 = requests.delete(f"{BASE}/api/projects/{pub_id}/members/{creator['id']}", headers=h)
-            assert r2.status_code == 400
+    # 생성자 보호는 프로젝트 admin 끼리만 적용한다. 시스템 관리자는 생성자를 뺄 수 있다
+    # (강등된 생성자의 권한 회수, SYM 이슈 참고). 규칙은 tests_unit/test_creator_role.py 가 본다.
+    # 여기서 시스템 관리자로 생성자를 빼면 모듈이 함께 쓰는 프로젝트의 멤버가 바뀌므로 하지 않는다.
 
 
 # ── 5. 파일 업로드 보안 ──────────────────────────────────────
@@ -688,14 +683,16 @@ class TestCodeSecurity:
         assert "_accessible_project_ids" in code
         assert "project_id.in_" in code
         assert "UserRole.admin" in code
-        assert "created_by" in code
+        # 접근은 멤버 표로만 정한다. 생성자 우회 판정을 두지 않는다
+        assert "ProjectMember" in code
+        assert "created_by" not in code
 
     def test_overview_filters_private_projects(self):
         code = self._read("routes/overview.py")
         assert "is_private" in code
         assert "ProjectMember" in code
         assert "UserRole.admin" in code
-        assert "created_by" in code
+        assert "created_by" not in code
 
 
 class TestBrokenAccessControl:

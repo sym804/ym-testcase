@@ -28,7 +28,7 @@ from sqlalchemy.orm import sessionmaker
 from auth import hash_password
 from database import get_db
 from main import app
-from models import ApiKey, Project, User, UserRole, UserStatus, now_kst
+from models import ApiKey, Project, ProjectMember, ProjectRole, User, UserRole, UserStatus, now_kst
 
 PW = "Passw0rd!long"
 
@@ -83,7 +83,11 @@ def env(pg_engine, tmp_path, server):
     user = User(username="ym", password_hash=hash_password(PW), display_name="Y", role=UserRole.user)
     db.add_all([admin, user])
     db.flush()
-    db.add(Project(name="P", created_by=user.id, is_private=True))
+    p = Project(name="P", created_by=user.id, is_private=True)
+    db.add(p)
+    db.flush()
+    # 실제 생성 경로처럼 생성자를 admin 멤버로 둔다(역할은 멤버 표로만 판정한다)
+    db.add(ProjectMember(project_id=p.id, user_id=user.id, role=ProjectRole.admin))
     db.commit()
 
     def _db():

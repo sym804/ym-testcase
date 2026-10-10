@@ -40,6 +40,9 @@ const ERROR_MAP: Record<string, string> = {
   "이 프로젝트에 접근 권한이 없습니다.": "errors.noProjectAccess",
   "API 키로는 할 수 없는 작업입니다. 로그인해서 진행해 주세요.": "errors.sessionOnly",
   "다른 요청과 겹쳤습니다. 다시 시도해 주세요.": "errors.concurrentRequest",
+  "비밀번호를 먼저 변경해 주세요.": "errors.mustChangePassword",
+  "Cannot remove the project creator": "errors.creatorRemove",
+  "Cannot change the project creator's role": "errors.creatorRoleChange",
   // Sheets
   "시트 이름을 입력해 주세요.": "errors.sheetNameRequired",
   "이미 존재하는 시트 이름입니다.": "errors.sheetNameExists",

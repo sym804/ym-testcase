@@ -78,8 +78,6 @@ def list_projects(
         # 역할 결정 (get_project_role 로직 인라인)
         if user_role in ("admin", "qa_manager"):
             proj_role = "admin"
-        elif p.created_by == current_user.id:
-            proj_role = "admin"
         elif p.id in memberships:
             proj_role = memberships[p.id]
         elif not p.is_private:
