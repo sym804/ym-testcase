@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import PasswordInput from "../components/PasswordInput";
 import { errorText, googleErrorMessage } from "../utils/errorMessage";
 import { authApi, googleStartUrl } from "../api";
+import { safeNextPath } from "../utils/nextPath";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -19,6 +20,7 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   // Google 콜백이 실패 사유를 ?error=<코드> 로 넘긴다. 모르는 코드는 일반 실패 문구로.
   const callbackError = searchParams.get("error");
+  const nextPath = safeNextPath(searchParams.get("next"));
   const callbackMessage = callbackError ? googleErrorMessage(callbackError) : "";
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login({ username, password, remember_me: rememberMe });
-      navigate("/projects");
+      navigate(nextPath, { replace: true });
     } catch (err: unknown) {
       setError(errorText(err, t("loginFailed")));
     } finally {
@@ -94,7 +96,7 @@ export default function LoginPage() {
           {googleEnabled && (
             <>
               <div style={styles.divider}>{t("or")}</div>
-              <a href={googleStartUrl("login")} style={styles.googleBtn}>
+              <a href={googleStartUrl("login", nextPath)} style={styles.googleBtn}>
                 {t("googleLogin")}
               </a>
             </>

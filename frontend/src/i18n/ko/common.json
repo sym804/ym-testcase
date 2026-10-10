@@ -28,7 +28,7 @@
     "goToProjects": "프로젝트 목록으로"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.2.3.0 | AGPL-3.0",
+  "version": "YM TestCase v2.2.4.0 | AGPL-3.0",
   "copy": "복사",
   "copiedToClipboard": "클립보드에 복사되었습니다.",
   "undo": "되돌리기",
@@ -100,7 +100,18 @@
     "onlyActive": "사용 중인 계정만 처리할 수 있습니다.",
     "cannotDeleteSelf": "자기 자신은 삭제할 수 없습니다.",
     "lastAdminDelete": "마지막 관리자는 삭제할 수 없습니다.",
-    "hasActivity": "작업 기록이 있는 계정은 삭제할 수 없습니다. 사용 중지를 쓰세요."
+    "hasActivity": "작업 기록이 있는 계정은 삭제할 수 없습니다. 사용 중지를 쓰세요.",
+    "noPermission": "이 작업을 수행할 권한이 없습니다.",
+    "noProjectAccess": "이 프로젝트에 접근 권한이 없습니다.",
+    "sessionOnly": "API 키로는 할 수 없는 작업입니다. 로그인해서 진행해 주세요.",
+    "concurrentRequest": "다른 요청과 겹쳤습니다. 다시 시도해 주세요.",
+    "uploadAlreadyReceived": "이미 올린 업로드입니다.",
+    "uploadInProgress": "이미 올리는 중인 업로드입니다.",
+    "uploadDirectOnly": "이 배포에서는 저장소에 직접 올립니다.",
+    "passwordTooLong": "비밀번호는 72바이트 이하로 입력해 주세요(영문 72자, 한글 24자까지).",
+    "inputTooLong": "입력값이 허용 길이나 형식을 벗어났습니다. 긴 값을 줄여 다시 시도해 주세요.",
+    "dateFormat": "날짜는 YYYY-MM-DD 형식으로 보내 주세요.",
+    "importTooLong": "허용 길이를 넘는 칸이 있어 가져오지 않았습니다. 값을 줄여 다시 올려 주세요:"
   },
   "selectProject": "프로젝트 선택",
   "selectRow": "이 프로젝트 선택",

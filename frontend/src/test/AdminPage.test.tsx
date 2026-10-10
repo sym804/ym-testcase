@@ -69,6 +69,7 @@ vi.mock("../api", () => ({
 }));
 
 import { usersApi, projectsApi, membersApi, searchApi, accountRequestsApi } from "../api";
+import toast from "react-hot-toast";
 
 const mockUsers = [
   { id: 1, username: "admin", display_name: "관리자", role: UserRole.ADMIN, must_change_password: false, created_at: "2026-01-01T00:00:00" },
@@ -386,5 +387,42 @@ describe("AdminPage 연결된 Google 계정과 빈 계정 삭제", () => {
     await user.click((await screen.findAllByRole("button", { name: "삭제" }))[0]);
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       "작업 기록이 있는 계정은 삭제할 수 없습니다. 사용 중지를 쓰세요."));
+  });
+});
+
+describe("AdminPage 조회 실패 표시 (SYM-160)", () => {
+  it("배정 조회가 실패하면 '미배정' 대신 조회 실패를 보이고 알린다", async () => {
+    vi.mocked(usersApi.getAllAssignments).mockRejectedValue(new Error("422"));
+    renderPage();
+    expect(await screen.findByText("조회 실패")).toBeInTheDocument();
+    expect(screen.queryByText("미배정")).not.toBeInTheDocument();
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith("프로젝트 배정을 불러오지 못했습니다.", expect.anything());
+  });
+
+  it("프로젝트 목록 조회가 실패하면 알린다", async () => {
+    vi.mocked(projectsApi.list).mockRejectedValue(new Error("500"));
+    renderPage();
+    await waitFor(() =>
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith("프로젝트 목록을 불러오지 못했습니다.", expect.anything()));
+  });
+
+  it("배정 모달은 프로젝트마다 멤버를 부르지 않고 전체 배정 조회로 채운다", async () => {
+    vi.mocked(usersApi.getAllAssignments).mockResolvedValue({
+      "2": [{ id: 11, project_id: 1, project_name: "프로젝트A", role: "tester" }],
+    });
+    renderPage();
+    await userEvent.click((await screen.findAllByText("관리")).find((el) => el.tagName === "BUTTON")!);
+    expect(await screen.findByText("테스터1 프로젝트 배정")).toBeInTheDocument();
+    expect(await screen.findByText("제거")).toBeInTheDocument();
+    expect(membersApi.list).not.toHaveBeenCalled();
+  });
+
+  it("배정 모달 조회가 실패하면 '배정된 프로젝트가 없습니다' 대신 실패를 보인다", async () => {
+    renderPage();
+    const btn = (await screen.findAllByText("관리")).find((el) => el.tagName === "BUTTON")!;
+    vi.mocked(usersApi.getAllAssignments).mockRejectedValue(new Error("500"));
+    await userEvent.click(btn);
+    expect(await screen.findByText("배정 정보를 불러오지 못했습니다. 창을 닫고 다시 열어 주세요.")).toBeInTheDocument();
+    expect(screen.queryByText("배정된 프로젝트가 없습니다.")).not.toBeInTheDocument();
   });
 });

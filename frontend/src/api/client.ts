@@ -1,4 +1,5 @@
 import axios from "axios";
+import { loginPathFor } from "../utils/nextPath";
 
 // 끝 슬래시를 뗀다. 업로드 PUT 과 미리보기 img 는 axios 를 거치지 않고 문자열로 이어 붙인다.
 export const API_BASE_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
@@ -41,7 +42,9 @@ client.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       if (!PUBLIC_PATHS.includes(window.location.pathname)) {
-        window.location.href = "/login";
+        // 원래 주소를 실어 보낸다. 로그인 뒤 같은 화면으로 돌아온다.
+        const { pathname, search, hash } = window.location;
+        window.location.href = loginPathFor(pathname, search, hash);
       }
     }
     return Promise.reject(error);

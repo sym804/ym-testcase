@@ -36,6 +36,10 @@ const ERROR_MAP: Record<string, string> = {
   "자기 자신은 삭제할 수 없습니다.": "errors.cannotDeleteSelf",
   "마지막 관리자는 삭제할 수 없습니다.": "errors.lastAdminDelete",
   "작업 기록이 있는 계정은 삭제할 수 없습니다. 사용 중지를 쓰세요.": "errors.hasActivity",
+  "이 작업을 수행할 권한이 없습니다.": "errors.noPermission",
+  "이 프로젝트에 접근 권한이 없습니다.": "errors.noProjectAccess",
+  "API 키로는 할 수 없는 작업입니다. 로그인해서 진행해 주세요.": "errors.sessionOnly",
+  "다른 요청과 겹쳤습니다. 다시 시도해 주세요.": "errors.concurrentRequest",
   // Sheets
   "시트 이름을 입력해 주세요.": "errors.sheetNameRequired",
   "이미 존재하는 시트 이름입니다.": "errors.sheetNameExists",
@@ -71,9 +75,32 @@ const ERROR_MAP: Record<string, string> = {
   "파일이 아직 올라오지 않았습니다.": "errors.uploadNotReceived",
   "다른 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.": "errors.busy",
   "파일 저장소에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.": "errors.storageUnavailable",
+  "이미 올린 업로드입니다.": "errors.uploadAlreadyReceived",
+  "이미 올리는 중인 업로드입니다.": "errors.uploadInProgress",
+  "이 배포에서는 저장소에 직접 올립니다.": "errors.uploadDirectOnly",
+  // Input limits
+  "비밀번호는 72바이트 이하로 입력해 주세요(영문 72자, 한글 24자까지).": "errors.passwordTooLong",
+  "입력값이 허용 길이나 형식을 벗어났습니다. 긴 값을 줄여 다시 시도해 주세요.": "errors.inputTooLong",
+  "날짜는 YYYY-MM-DD 형식으로 보내 주세요.": "errors.dateFormat",
 };
 
-export function translateError(backendDetail: string): string {
+// 뒤에 행 목록이 붙는 문구. 앞부분만 번역하고 행 목록(시트 이름, 칸 이름, 숫자)은 그대로 잇는다.
+const PREFIX_MAP: Record<string, string> = {
+  "허용 길이를 넘는 칸이 있어 가져오지 않았습니다. 값을 줄여 다시 올려 주세요: ": "errors.importTooLong",
+};
+
+export function translateError(backendDetail: unknown): string {
+  // ★pydantic 검증 오류(422)의 detail 은 배열이다. 그대로 돌려주면 토스트가 객체를 그리다
+  //   React 오류로 화면 전체가 오류 화면으로 바뀐다. 문자열이 아니면 일반 입력 오류 문구로 바꾼다.
+  if (typeof backendDetail !== "string") {
+    return i18n.t("common:errors.inputTooLong");
+  }
+  for (const [prefix, k] of Object.entries(PREFIX_MAP)) {
+    if (backendDetail.startsWith(prefix)) {
+      return `${i18n.t(`common:${k}`)} ${backendDetail.slice(prefix.length)}`;
+    }
+  }
+
   // Check exact match
   const key = ERROR_MAP[backendDetail];
   if (key) {

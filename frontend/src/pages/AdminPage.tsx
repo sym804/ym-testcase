@@ -9,6 +9,8 @@ import AccountRequestSection from "../components/AccountRequestSection";
 import toast from "react-hot-toast";
 import { errorText, translateError } from "../utils/errorMessage";
 
+type Assignment = { id: number; project_id: number; project_name: string; role: string };
+
 export default function AdminPage() {
   const { user: currentUser } = useAuth();
   const { t, i18n } = useTranslation("admin");
@@ -36,7 +38,10 @@ export default function AdminPage() {
   const [assignLoading, setAssignLoading] = useState(false);
 
   // 전체 유저별 프로젝트 배정 정보 (한 눈에 보기용)
-  const [allAssignments, setAllAssignments] = useState<Record<number, { id: number; project_id: number; project_name: string; role: string }[]>>({});
+  const [allAssignments, setAllAssignments] = useState<Record<number, Assignment[]>>({});
+  // 조회 실패를 빈 값과 구분한다. 삼키면 배정 칸이 전부 '미배정' 으로 보인다(SYM-160).
+  const [assignmentsFailed, setAssignmentsFailed] = useState(false);
+  const [assignedFailed, setAssignedFailed] = useState(false);
 
   const loadUsers = async () => {
     try {
@@ -54,19 +59,30 @@ export default function AdminPage() {
     try {
       const data = await projectsApi.list();
       setProjects(data);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      toast.error(t("projectsLoadFailed"), { id: "projects-load-failed" });
+    }
   };
 
-  const loadAllAssignments = async () => {
+  // 전체 배정을 다시 읽어 표에 반영하고 돌려준다. 실패하면 null.
+  const loadAllAssignments = async (): Promise<Record<number, Assignment[]> | null> => {
     try {
       const data = await usersApi.getAllAssignments();
       // API returns string keys, convert to number keys
-      const mapped: Record<number, { id: number; project_id: number; project_name: string; role: string }[]> = {};
+      const mapped: Record<number, Assignment[]> = {};
       for (const [key, val] of Object.entries(data)) {
         mapped[Number(key)] = val;
       }
       setAllAssignments(mapped);
-    } catch (err) { console.error(err); }
+      setAssignmentsFailed(false);
+      return mapped;
+    } catch (err) {
+      console.error(err);
+      setAssignmentsFailed(true);
+      toast.error(t("assignmentsLoadFailed"), { id: "assignments-load-failed" });
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -132,16 +148,16 @@ export default function AdminPage() {
     setAssignProjectId("");
     setAssignRole("tester");
     setAssignedProjects([]);
-    // 모든 프로젝트의 멤버를 순회해서 이 사용자가 속한 프로젝트 추출
-    try {
-      const allMembers: ProjectMember[] = [];
-      for (const p of projects) {
-        const members = await membersApi.list(p.id);
-        const found = members.find((m) => m.user_id === user.id);
-        if (found) allMembers.push(found);
-      }
-      setAssignedProjects(allMembers);
-    } catch (err) { console.error(err); }
+    setAssignedFailed(false);
+    // 프로젝트마다 멤버를 부르지 않고 전체 배정 조회 한 번으로 채운다. 표도 같이 갱신된다.
+    const all = await loadAllAssignments();
+    if (all === null) {
+      setAssignedFailed(true);
+      return;
+    }
+    setAssignedProjects((all[user.id] || []).map((a) => ({
+      id: a.id, project_id: a.project_id, user_id: user.id, role: a.role, added_at: "",
+    })));
   };
 
   const handleAddProject = async () => {
@@ -151,7 +167,6 @@ export default function AdminPage() {
       await membersApi.add(Number(assignProjectId), assignTarget.id, assignRole);
       toast.success(t("assignSuccess"));
       await openAssignModal(assignTarget);
-      loadAllAssignments();
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       toast.error(detail ? translateError(detail) : t("assignFailed"));
@@ -168,7 +183,6 @@ export default function AdminPage() {
       const result = await usersApi.assignToAllProjects(assignTarget.id, assignRole);
       toast.success(t("assignAllSuccess", { count: result.assigned }));
       await openAssignModal(assignTarget);
-      loadAllAssignments();
     } catch (err) {
       console.error(err);
       toast.error(t("assignAllFailed"));
@@ -183,7 +197,6 @@ export default function AdminPage() {
       await membersApi.remove(member.project_id, member.id);
       toast.success(t("removeSuccess"));
       await openAssignModal(assignTarget);
-      loadAllAssignments();
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       toast.error(detail ? translateError(detail) : t("removeFailed"));
@@ -195,7 +208,7 @@ export default function AdminPage() {
       await membersApi.updateRole(member.project_id, member.id, newRole);
       toast.success(t("projectRoleChanged"));
       if (assignTarget) await openAssignModal(assignTarget);
-      loadAllAssignments();
+      else loadAllAssignments();
     } catch (err) {
       console.error(err);
       toast.error(t("projectRoleChangeFailed"));
@@ -286,7 +299,9 @@ export default function AdminPage() {
                       {u.role === "user" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                            {(allAssignments[u.id] || []).length > 0 ? (
+                            {assignmentsFailed ? (
+                              <span style={{ fontSize: 11, color: "var(--text-danger)" }}>{t("assignmentsFailedTag")}</span>
+                            ) : (allAssignments[u.id] || []).length > 0 ? (
                               (allAssignments[u.id] || []).map((a) => (
                                 <span
                                   key={a.id}
@@ -425,7 +440,11 @@ export default function AdminPage() {
               </h3>
 
               {/* 현재 배정된 프로젝트 */}
-              {assignedProjects.length > 0 ? (
+              {assignedFailed ? (
+                <div role="alert" style={{ padding: "12px 0", fontSize: 13, color: "var(--text-danger)" }}>
+                  {t("assignedLoadFailed")}
+                </div>
+              ) : assignedProjects.length > 0 ? (
                 <table style={{ ...s.table, marginBottom: 16 }}>
                   <thead>
                     <tr>

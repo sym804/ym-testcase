@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { daysAgo } from "../utils/localDate";
 import { useTranslation } from "react-i18next";
 import { Doughnut, Bar, Line } from "react-chartjs-2";
@@ -62,7 +62,11 @@ export default function Dashboard({ projectId }: Props) {
   // 버전 묶음. 비우면 전체. 수행 목록 트리와 같은 묶음 규칙이라 v1.5 와 1.5 는 하나다(09-30).
   const [selectedVersion, setSelectedVersion] = useState<string>("");
 
+  // ★늦게 온 응답이 지금 고른 수행·기간의 집계를 덮지 않게 세대 번호로 거른다.
+  const loadSeqRef = useRef(0);
+
   const loadData = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
       // 위에서 수행을 고르면 그 수행의 회차 추이를 본다
@@ -76,6 +80,7 @@ export default function Dashboard({ projectId }: Props) {
         dashboardApi.heatmap(projectId, selectedRunId, dateFrom || undefined, dateTo || undefined, ver),
         testRunsApi.list(projectId),
       ]);
+      if (seq !== loadSeqRef.current) return;
       setSummary(s);
       setPriority(p);
       setCategory(c);
@@ -83,10 +88,11 @@ export default function Dashboard({ projectId }: Props) {
       setHeatmap(h);
       setRuns(runList);
     } catch (err) {
+      if (seq !== loadSeqRef.current) return;
       console.error(err);
       toast.error(t("loadFailed"));
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
     // runs 는 목록을 받은 뒤 갱신되므로 의존성에 넣지 않는다(넣으면 다시 불러오기를 되풀이한다)
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -79,7 +79,45 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: "로그인" }));
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/projects");
+      expect(mockNavigate).toHaveBeenCalledWith("/projects", { replace: true });
+    });
+  });
+
+  it("next 가 있으면 로그인 뒤 그 화면으로 돌아간다", async () => {
+    const user = userEvent.setup();
+    vi.mocked(authApi.login).mockResolvedValue({ access_token: "token", token_type: "bearer" });
+    vi.mocked(authApi.getMe).mockResolvedValue({
+      id: 1, username: "tester", display_name: "테스터", role: UserRole.USER,
+      must_change_password: false, created_at: "2026-01-01",
+    });
+
+    renderWithProviders(<LoginPage />, { route: "/login?next=%2Fprojects%2F3%3Ftab%3Drun" });
+
+    await user.type(screen.getByPlaceholderText("아이디 또는 이메일을 입력하세요"), "tester");
+    await user.type(screen.getByPlaceholderText("비밀번호를 입력하세요"), "pass1234");
+    await user.click(screen.getByRole("button", { name: "로그인" }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/projects/3?tab=run", { replace: true });
+    });
+  });
+
+  it("사이트 밖 next 는 따르지 않는다", async () => {
+    const user = userEvent.setup();
+    vi.mocked(authApi.login).mockResolvedValue({ access_token: "token", token_type: "bearer" });
+    vi.mocked(authApi.getMe).mockResolvedValue({
+      id: 1, username: "tester", display_name: "테스터", role: UserRole.USER,
+      must_change_password: false, created_at: "2026-01-01",
+    });
+
+    renderWithProviders(<LoginPage />, { route: "/login?next=%2F%2Fevil.example" });
+
+    await user.type(screen.getByPlaceholderText("아이디 또는 이메일을 입력하세요"), "tester");
+    await user.type(screen.getByPlaceholderText("비밀번호를 입력하세요"), "pass1234");
+    await user.click(screen.getByRole("button", { name: "로그인" }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/projects", { replace: true });
     });
   });
 

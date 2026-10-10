@@ -273,7 +273,7 @@
 | 🖱️ 마우스 | 결과 셀 클릭 → 드롭다운에서 PASS/FAIL/BLOCK/N/A/NS 선택 |
 | ⌨️ 단축키 | 셀 선택 후 P(Pass), F(Fail), B(Block), N(NS) 키로 빠른 입력 |
 | 📋 범위 채우기 | Ctrl+D로 현재 값을 아래로 복사, Shift+Click으로 범위 선택 |
-| ↩️ Undo/Redo | Ctrl+Z로 실행 취소, Ctrl+Shift+Z로 재실행 (최대 200단계) |
+| ↩️ Undo | Ctrl+Z로 마지막 조작 한 번을 되돌림. 여러 행을 함께 바꾼 조작은 한 번에 되돌아감(최대 50번). 재실행 없음. 완료된 런과 보기 권한에서는 결과를 바꿀 수 없음 |
 
 Issue Link 칸에 주소(http/https)나 이슈 키를 적으면 옆에 ↗ 가 붙는다. 이슈 키는 설정 탭에 이슈 관리 도구 주소를 넣은 경우에만 붙는다. ↗ 는 해당 이슈를 새 탭으로 열고, 글자를 더블클릭하면 편집된다.
 
@@ -439,7 +439,7 @@ YMTC_API_KEY=ymtc_... node scripts/ymtc-upload.mjs \
 | `B` | BLOCK 입력 | 테스트 수행 그리드 |
 | `N` | NS (미실행) 입력 | 테스트 수행 그리드 |
 | `Ctrl + Z` | 실행 취소 (Undo) | TC 관리 / 테스트 수행 |
-| `Ctrl + Shift + Z` | 재실행 (Redo) | TC 관리 / 테스트 수행 |
+| `Ctrl + Shift + Z` | 재실행 (Redo) | TC 관리 |
 | `Ctrl + D` | 아래로 값 채우기 | 테스트 수행 그리드 |
 | `Shift + Click` | 범위 선택 | 테스트 수행 그리드 |
 | `Ctrl + C / V` | 복사 / 붙여넣기 | TC 관리 그리드 |

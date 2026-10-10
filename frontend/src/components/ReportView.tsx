@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { reportsApi, testRunsApi } from "../api";
 import type { Project, ReportBreakdownRow, ReportData, TestRun } from "../types";
@@ -60,17 +60,24 @@ export default function ReportView({ projectId, project }: Props) {
       .catch(() => toast.error(t("runLoadFailed")));
   }, [projectId]);
 
+  // ★늦게 온 응답이 지금 고른 수행의 리포트를 덮지 않게 세대 번호로 거른다. 수행을 빠르게 바꾸면
+  //   선택 상자는 B 인데 화면은 A 의 리포트가 남았다(CompareView 와 같은 방식).
+  const reportSeqRef = useRef(0);
+
   const loadReport = useCallback(async () => {
     if (!selectedRunId) return;
+    const seq = ++reportSeqRef.current;
     setLoading(true);
     try {
       const data = await reportsApi.getData(projectId, selectedRunId);
+      if (seq !== reportSeqRef.current) return;
       setReport(data);
     } catch (err) {
+      if (seq !== reportSeqRef.current) return;
       console.error(err);
       toast.error(t("loadFailed"));
     } finally {
-      setLoading(false);
+      if (seq === reportSeqRef.current) setLoading(false);
     }
   }, [projectId, selectedRunId]);
 
@@ -79,12 +86,25 @@ export default function ReportView({ projectId, project }: Props) {
   }, [loadReport]);
 
   // 이슈를 고친 뒤 다시 읽는다. loadReport 는 로딩 화면으로 변경해 스크롤이 튀므로 조용히 변경한다.
+  // ★조용한 갱신은 세대 번호를 올리지 않는다. 올리면 진행 중인 loadReport 의 응답과 로딩 해제가
+  //   버려진다. 대신 응답 시점에 세대와 선택이 그대로인지 본다. 이전 수행에서 시작된 비교 대상
+  //   변경이 늦게 끝나 이 함수를 불러도, 이미 다른 수행을 고른 뒤라면 아무것도 하지 않는다.
+  const selectedRunIdRef = useRef(selectedRunId);
+  selectedRunIdRef.current = selectedRunId;
+  // 같은 수행의 갱신이 연달아 나가면 늦게 온 옛 응답이 새 응답을 덮지 않게 갱신끼리도 순번을 둔다.
+  const refreshSeqRef = useRef(0);
   const refreshReport = useCallback(async () => {
-    if (!selectedRunId) return;
+    const runId = selectedRunId;
+    if (!runId || runId !== selectedRunIdRef.current) return;
+    const seq = reportSeqRef.current;
+    const mine = ++refreshSeqRef.current;
+    const current = () =>
+      seq === reportSeqRef.current && runId === selectedRunIdRef.current && mine === refreshSeqRef.current;
     try {
-      setReport(await reportsApi.getData(projectId, selectedRunId));
+      const data = await reportsApi.getData(projectId, runId);
+      if (current()) setReport(data);
     } catch {
-      toast.error(t("loadFailed"));
+      if (current()) toast.error(t("loadFailed"));
     }
   }, [projectId, selectedRunId]);
 

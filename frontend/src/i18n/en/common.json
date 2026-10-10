@@ -28,7 +28,7 @@
     "goToProjects": "Go to Projects"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.2.3.0 | AGPL-3.0",
+  "version": "YM TestCase v2.2.4.0 | AGPL-3.0",
   "copy": "Copy",
   "copiedToClipboard": "Copied to clipboard.",
   "undo": "Undo",
@@ -100,7 +100,18 @@
     "onlyActive": "Only active accounts can be processed.",
     "cannotDeleteSelf": "You cannot delete your own account.",
     "lastAdminDelete": "The last administrator cannot be deleted.",
-    "hasActivity": "Accounts with activity cannot be deleted. Disable it instead."
+    "hasActivity": "Accounts with activity cannot be deleted. Disable it instead.",
+    "noPermission": "You don't have permission to do this.",
+    "noProjectAccess": "You don't have access to this project.",
+    "sessionOnly": "This can't be done with an API key. Please sign in.",
+    "concurrentRequest": "Another request got there first. Please try again.",
+    "uploadAlreadyReceived": "This upload has already been received.",
+    "uploadInProgress": "This upload is already in progress.",
+    "uploadDirectOnly": "This deployment uploads directly to storage.",
+    "passwordTooLong": "Passwords must be 72 bytes or less (72 English letters or 24 Korean characters).",
+    "inputTooLong": "A value is too long or in the wrong format. Shorten it and try again.",
+    "dateFormat": "Dates must be in YYYY-MM-DD format.",
+    "importTooLong": "Nothing was imported because some cells are too long. Shorten them and upload again:"
   },
   "selectProject": "Select project",
   "selectRow": "Select this project",

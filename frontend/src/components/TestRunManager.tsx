@@ -31,6 +31,7 @@ import { useTestTimer } from "../hooks/useTestTimer";
 import { useAttachments } from "../hooks/useAttachments";
 import { useResultFilters } from "../hooks/useResultFilters";
 import { LARGE_TEXT_EDITOR_PARAMS } from "../utils/gridEditors";
+import { translateError } from "../utils/errorMessage";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -115,14 +116,32 @@ export default function TestRunManager({ projectId, project }: Props) {
   }, [selectableSheets, selectedRun]);
 
   // ── Undo 스택 ──
-  const undoStackRef = useRef<{ rowId: number; field: string; oldValue: string }[]>([]);
+  // ★한 번의 조작(단축키, 드롭다운, 일괄 입력, Shift+클릭 채우기, Ctrl+D, 셀 편집)을 한 묶음으로
+  //   기록한다. 단축키와 셀 편집만 기록하던 때는 드롭다운으로 바꾼 직후 Ctrl+Z 를 누르면
+  //   그 행이 아니라 한참 전에 단축키로 입력한 다른 행의 결과가 지워진 채 저장됐다.
+  type UndoEntry = { rowId: number; field: string; oldValue: string };
+  const undoStackRef = useRef<UndoEntry[][]>([]);
+  const recordUndo = (entries: UndoEntry[]) => {
+    if (entries.length === 0) return;
+    undoStackRef.current.push(entries);
+    if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+  };
+
+  // ★보기 전용: viewer 이거나 완료된 수행. 버튼만 숨기고 결과 드롭다운, 셀 편집, 단축키,
+  //   일괄 입력, 첨부, 타이머를 열어 두면 바꾼 뒤 서버가 거절하고 화면이 다시 읽힌다.
+  //   완료된 수행을 타이머가 켜진 채 열면 행을 옮길 때마다 오류가 났다.
+  const readOnly = !canManageRun || selectedRun?.status === TestRunStatus.COMPLETED;
+  const readOnlyRef = useRef(readOnly);
+  readOnlyRef.current = readOnly;
 
   // ── 커스텀 훅 ──
   // ★타이머가 잰 시간은 stopTimer 시점에만 확정되므로 그 자리에서 저장까지 해야
   //   한다. 저장 함수는 아래에서 정의되어 여기서는 아직 없으므로 ref 로 잇는다.
-  const saveOneResultRef = useRef<((row: TestResult) => void) | null>(null);
+  const saveOneResultRef = useRef<((row: TestResult) => Promise<void>) | null>(null);
+  // 타이머 시간 저장이 끝났는지. 완료 요청은 이것을 기다린다(먼저 완료되면 늦은 저장이 거절된다).
+  const timerSaveRef = useRef<Promise<void> | null>(null);
   const handleTimerElapsed = useCallback((row: { id: number; duration_sec: number }) => {
-    saveOneResultRef.current?.(row as unknown as TestResult);
+    timerSaveRef.current = saveOneResultRef.current?.(row as unknown as TestResult) ?? null;
   }, []);
 
   const {
@@ -156,7 +175,10 @@ export default function TestRunManager({ projectId, project }: Props) {
   // 이유를 그대로 띄우고 서버 값으로 되돌린다.
   const handleSaveError = useCallback((err: unknown) => {
     const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-    toast.error(detail || t("saveFailed"));
+    toast.error(detail ? translateError(detail) : t("saveFailed"));
+    // 서버 값으로 다시 읽으므로 되돌리기 기록은 더 이상 화면과 맞지 않는다. 남기면 Ctrl+Z 가
+    // 실패한 조작 이전 값을 새 토큰으로 저장해, 그 사이 다른 사람이 저장한 값을 덮는다.
+    undoStackRef.current = [];
     const run = selectedRunRef.current;
     if (run) loadRunDetailRef.current?.(run);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,6 +209,7 @@ export default function TestRunManager({ projectId, project }: Props) {
   const onCellClicked = useCallback((event: CellClickedEvent) => {
     const field = event.column?.getColId();
     if (!field || field !== "result") return;
+    if (readOnlyRef.current) return;
 
     const browserEvent = event.event as MouseEvent;
     const api = gridApiRef.current;
@@ -213,15 +236,18 @@ export default function TestRunManager({ projectId, project }: Props) {
       const startIdx = Math.min(anchor.rowIndex, event.rowIndex);
       const endIdx = Math.max(anchor.rowIndex, event.rowIndex);
       const changed: TestResult[] = [];
+      const undo: UndoEntry[] = [];
 
       api.forEachNodeAfterFilterAndSort((node) => {
         if (node.rowIndex != null && node.rowIndex >= startIdx && node.rowIndex <= endIdx && node.data) {
+          undo.push({ rowId: node.data.id, field, oldValue: node.data[field] ?? "" });
           node.data[field] = anchor.value;
           changed.push(node.data);
         }
       });
 
       if (changed.length > 0) {
+        recordUndo(undo);
         api.refreshCells({ force: true });
         setCountTick((t) => t + 1);
         toast.success(t("fillResult", { count: changed.length, value: anchor.value }));
@@ -297,6 +323,8 @@ export default function TestRunManager({ projectId, project }: Props) {
       setSelectedRun(run);
       setLoadingResults(true);
       if (!sameRun) resetAttachments(); // 다른 런으로 옮길 때만 첨부 캐시를 비운다
+      // 되돌리기 기록은 그 수행의 행을 가리킨다. 다른 수행으로 옮기면 비운다.
+      if (!sameRun) undoStackRef.current = [];
       try {
         const detail = await testRunsApi.getOne(projectId, run.id);
         if (isStale()) return;
@@ -383,7 +411,7 @@ export default function TestRunManager({ projectId, project }: Props) {
   const onRowFocused = useCallback((rowId: number | null) => {
     if (!rowId) return;
     loadAttachmentFor(rowId);
-    if (!timerEnabled || rowId === timerRowId) return;
+    if (readOnlyRef.current || !timerEnabled || rowId === timerRowId) return;
     startTimer(rowId);
   }, [timerEnabled, timerRowId, startTimer, loadAttachmentFor]);
 
@@ -394,6 +422,8 @@ export default function TestRunManager({ projectId, project }: Props) {
   //   붙여넣기 뒤 Enter 로 다음 행에 바로 넘어가는 조작에서 물린다.
   //   TC 관리 그리드(TestCaseGrid)는 처음부터 행별 키였고 이쪽만 전역이었다.
   const saveResultRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // 대기 중인 저장을 지금 보내는 함수. 화면을 떠날 때 버리지 않고 보낸다.
+  const pendingSaveRef = useRef<Record<string, () => void>>({});
   // 행마다 마지막으로 읽거나 저장한 executed_at. 저장 때 같이 보내 다른 사용자의 저장을 덮지
   // 않게 한다(낙관적 잠금). 그리드 행 데이터를 건드리지 않으려고 ref 에 둔다.
   const resultTokenRef = useRef<Record<number, string | null>>({});
@@ -426,12 +456,15 @@ export default function TestRunManager({ projectId, project }: Props) {
     saveOneResultRef.current = saveOneResult;
   }, [saveOneResult]);
 
-  // ★언마운트되면 대기 중인 저장 타이머를 거둔다. 남겨 두면 화면을 떠난 뒤에
-  //   발화해 파괴된 그리드 API 를 만지거나 토스트를 띄운다.
+  // ★언마운트되면 대기 중인 저장 타이머를 거두고 그 저장은 바로 보낸다. 타이머를 남겨 두면
+  //   화면을 떠난 뒤 발화해 파괴된 그리드 API 를 만진다. 그렇다고 버리면 셀을 고치고 0.3초 안에
+  //   다른 탭으로 옮긴 편집이 알림 없이 사라진다(저장 요청 자체가 나가지 않는다).
   useEffect(() => {
     const timers = saveResultRef.current;
+    const pending = pendingSaveRef.current;
     return () => {
       Object.values(timers).forEach((t) => clearTimeout(t));
+      Object.values(pending).forEach((flush) => flush());
     };
   }, []);
 
@@ -448,6 +481,8 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
     if (!e) return;
     const api = gridApiRef.current;
     if (!api) return;
+    // 보기 전용이면 결과를 바꾸는 단축키를 받지 않는다(이동 키는 그리드가 처리한다)
+    if (readOnlyRef.current) return;
 
     // P/F/B/N 단축키 (편집 중이 아닐 때, Ctrl/Alt 미사용)
     const key = e.key.toLowerCase();
@@ -466,7 +501,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
       if (focusedCell) {
         const node = api.getDisplayedRowAtIndex(focusedCell.rowIndex);
         if (node?.data) {
-          undoStackRef.current.push({ rowId: node.data.id, field: "result", oldValue: node.data.result ?? "" });
+          recordUndo([{ rowId: node.data.id, field: "result", oldValue: node.data.result ?? "" }]);
           node.data.result = value;
           api.refreshCells({ rowNodes: [node], force: true });
           setCountTick((t) => t + 1);
@@ -501,13 +536,16 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
       if (selectedNodes.length === 0) return;
 
       const changed: TestResult[] = [];
+      const undo: UndoEntry[] = [];
       selectedNodes.forEach((node) => {
         if (node.data && node !== event.node) {
+          undo.push({ rowId: node.data.id, field, oldValue: node.data[field] ?? "" });
           node.data[field] = sourceValue;
           changed.push(node.data);
         }
       });
       if (changed.length > 0) {
+        recordUndo(undo);
         api.refreshCells({ force: true });
         setCountTick((t) => t + 1);
         toast.success(t("fillResult", { count: changed.length, value: sourceValue }));
@@ -517,17 +555,26 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
 
     // Ctrl+Z: Undo
     if (e.key === "z" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      // 셀 편집기 안의 Ctrl+Z 는 입력 중인 글자를 되돌리는 것이다. 가로채지 않는다.
+      if (api.getEditingCells().length > 0) return;
       e.preventDefault();
-      const entry = undoStackRef.current.pop();
-      if (!entry) { toast(t("undoEmpty")); return; }
+      const group = undoStackRef.current.pop();
+      if (!group) { toast(t("undoEmpty")); return; }
+      const byId = new Map<number, UndoEntry[]>();
+      for (const u of group) byId.set(u.rowId, [...(byId.get(u.rowId) || []), u]);
+      const restored: TestResult[] = [];
       api.forEachNode((node) => {
-        if (node.data?.id === entry.rowId) {
-          node.data[entry.field] = entry.oldValue;
-          api.refreshCells({ rowNodes: [node], force: true });
-          setCountTick((t) => t + 1);
-          saveOneResult(node.data);
-        }
+        const entries = node.data ? byId.get(node.data.id) : undefined;
+        if (!entries) return;
+        // 같은 행이 여러 번 들어 있으면 가장 먼저 기록한 값이 조작 전 값이다
+        for (const u of [...entries].reverse()) node.data[u.field] = u.oldValue;
+        restored.push(node.data);
       });
+      if (restored.length === 0) { toast(t("undoEmpty")); return; }
+      api.refreshCells({ force: true });
+      setCountTick((t) => t + 1);
+      if (restored.length === 1) saveOneResult(restored[0]);
+      else saveManyResults(restored);
       toast.success(t("undoDone"));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -543,12 +590,15 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
       return;
     }
     const changed: TestResult[] = [];
+    const undo: UndoEntry[] = [];
     selectedNodes.forEach((node) => {
       if (node.data) {
+        undo.push({ rowId: node.data.id, field: "result", oldValue: node.data.result ?? "" });
         node.data.result = value;
         changed.push(node.data);
       }
     });
+    recordUndo(undo);
     api.refreshCells({ force: true });
     setCountTick((t) => t + 1);
     toast.success(t("bulkResultApplied", { count: selectedNodes.length, value: value || t("bulkResultEmpty") }));
@@ -761,8 +811,10 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
           return (
             <select
               value={row.result || ""}
+              disabled={readOnly}
               onChange={(e) => {
                 const newVal = e.target.value;
+                recordUndo([{ rowId: row.id, field: "result", oldValue: row.result ?? "" }]);
                 row.result = newVal;
                 gridApiRef.current?.refreshCells({ rowNodes: [gridApiRef.current.getRowNode(String(row.id))!], columns: ["result"], force: true });
                 saveOneResult(row);
@@ -782,7 +834,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                 color: "inherit",
                 fontSize: 12,
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: readOnly ? "default" : "pointer",
                 textAlign: "center",
                 outline: "none",
               }}
@@ -800,7 +852,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
         width: 200,
         wrapText: true,
         autoHeight: true,
-        editable: true,
+        editable: !readOnly,
         cellEditor: "agLargeTextCellEditor",
         cellEditorParams: LARGE_TEXT_EDITOR_PARAMS,
         cellEditorPopup: true,
@@ -811,7 +863,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
         field: "issue_link",
         headerName: "Issue Link",
         width: 140,
-        editable: true,
+        editable: !readOnly,
         // 이슈 키나 주소면 옆에 ↗ 를 붙여 이슈 관리 도구로 연다(SYM-123)
         cellRenderer: IssueLinkCell,
       },
@@ -861,32 +913,36 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                   >
                     {att.filename}
                   </span>
-                  <span
-                    style={{ fontSize: 11, color: "var(--color-fail)", cursor: "pointer", fontWeight: 700 }}
-                    title={t("common:delete")}
-                    onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(att.id, row.id); }}
-                  >×</span>
+                  {!readOnly && (
+                    <span
+                      style={{ fontSize: 11, color: "var(--color-fail)", cursor: "pointer", fontWeight: 700 }}
+                      title={t("common:delete")}
+                      onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(att.id, row.id); }}
+                    >×</span>
+                  )}
                 </span>
               ))}
-              <button
-                style={{
-                  fontSize: 14,
-                  border: "1px solid var(--border-input)",
-                  borderRadius: 4,
-                  backgroundColor: "var(--bg-input)",
-                  color: "#64748B",
-                  cursor: "pointer",
-                  padding: "0 5px",
-                  lineHeight: "20px",
-                }}
-                title={t("imageAttach")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  triggerUpload(row.id);
-                }}
-              >
-                +
-              </button>
+              {!readOnly && (
+                <button
+                  style={{
+                    fontSize: 14,
+                    border: "1px solid var(--border-input)",
+                    borderRadius: 4,
+                    backgroundColor: "var(--bg-input)",
+                    color: "#64748B",
+                    cursor: "pointer",
+                    padding: "0 5px",
+                    lineHeight: "20px",
+                  }}
+                  title={t("imageAttach")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerUpload(row.id);
+                  }}
+                >
+                  +
+                </button>
+              )}
             </div>
           );
         },
@@ -896,7 +952,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
         headerName: "Remarks",
         minWidth: 200,
         flex: 1,
-        editable: true,
+        editable: !readOnly,
         wrapText: true,
         autoHeight: true,
         // ★큰 편집기를 지정하지 않으면 기본 agTextCellEditor(<input type="text">)가
@@ -921,7 +977,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
     // ★t 를 넣는다. 빼 두면 언어를 변경해도 헤더가 옛 언어로 남는다. 첨부 맵이
     //   변경될 때(다른 런을 열 때) 우연히 갱신되는 것에 기대고 있었다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [attachmentsMap, timerEnabled, t, fieldDisplay, priorityDisplay]
+    [attachmentsMap, timerEnabled, t, fieldDisplay, priorityDisplay, readOnly]
   );
 
   const defaultColDef = useMemo<ColDef>(
@@ -933,22 +989,20 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
     if (!event.data) return;
     // Undo 스택에 기록
     if (event.column && event.oldValue !== event.newValue) {
-      undoStackRef.current.push({
-        rowId: event.data.id,
-        field: event.column.getColId(),
-        oldValue: event.oldValue ?? "",
-      });
-      if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+      recordUndo([{ rowId: event.data.id, field: event.column.getColId(), oldValue: event.oldValue ?? "" }]);
     }
     // 카운트 뱃지 갱신
     setCountTick((t) => t + 1);
     // debounce로 즉시 저장. 키는 행(TC)이다.
     const saveKey = String(event.data?.test_case_id ?? event.data?.id ?? "");
     if (saveResultRef.current[saveKey]) clearTimeout(saveResultRef.current[saveKey]);
-    saveResultRef.current[saveKey] = setTimeout(() => {
+    const flush = () => {
       delete saveResultRef.current[saveKey];
+      delete pendingSaveRef.current[saveKey];
       saveOneResult(event.data);
-    }, 300);
+    };
+    pendingSaveRef.current[saveKey] = flush;
+    saveResultRef.current[saveKey] = setTimeout(flush, 300);
   }, [saveOneResult]);
 
   const handleDelete = async () => {
@@ -998,6 +1052,11 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
 
   const handleComplete = async () => {
     if (!selectedRun) return;
+    // 완료하면 보기 전용이 되어 타이머 배지가 숨는다. 재는 중이던 시간은 지금 저장하고 멈춘다.
+    // 그대로 두면 숨은 채 계속 돌다가 "다시 수행" 뒤 완료 기간까지 더해 저장된다.
+    timerSaveRef.current = null;
+    stopTimer();
+    if (timerSaveRef.current) await timerSaveRef.current;
     // 전체 결과 조회 (모든 시트 포함 - 현재 화면은 시트 필터링된 상태일 수 있음)
     try {
       const fullDetail = await testRunsApi.getOne(projectId, selectedRun.id);
@@ -1206,6 +1265,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
             {/* Toolbar: bulk result + progress + counts */}
             <div style={styles.toolbar}>
               <div style={styles.toolbarLeft}>
+                {!readOnly && (<>
                 <div style={{ position: "relative" }} ref={bulkMenuRef}>
                   <button
                     style={styles.btnGhost}
@@ -1248,6 +1308,7 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
                     <button style={styles.timerStopBtn} onClick={stopTimer} title={t("timerStop")}>■</button>
                   </span>
                 )}
+                </>)}
               </div>
               <div style={styles.toolbarRight}>
                 <div style={styles.countBadges}>
@@ -1350,6 +1411,8 @@ const SHORTCUT_MAP: Record<string, string> = { p: "PASS", f: "FAIL", b: "BLOCK",
               onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
               onDrop={(e) => {
                 e.preventDefault();
+                // 보기 전용이면 끌어 놓은 이미지도 올리지 않는다(+ 버튼만 숨기면 이 길이 남는다)
+                if (readOnlyRef.current) return;
                 const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
                 if (files.length === 0) { toast.error(t("imageDropOnly")); return; }
                 const focused = gridApiRef.current?.getFocusedCell();

@@ -167,3 +167,23 @@ describe("수행 결과 저장 디바운스", () => {
     expect(saved[2][0]).toMatchObject({ test_case_id: 1, result: "FAIL" });
   });
 });
+
+describe("화면을 떠날 때 대기 중인 저장", () => {
+  it("편집 직후 화면을 떠나도 그 편집은 저장된다", async () => {
+    // ★디바운스 타이머를 취소만 하면 0.3초 안에 다른 탭으로 옮긴 편집이 사라졌다.
+    const user = userEvent.setup();
+    const { unmount } = render(<TestRunManager projectId={1} project={adminProject as any} />);
+    await user.click(await screen.findByText("결제 회귀"));
+    await waitFor(() => expect(gridProps?.onCellValueChanged).toBeTypeOf("function"));
+
+    gridProps.onCellValueChanged({
+      data: { ...resultRow(71, 1), actual_result: "메모" },
+      column: { getColId: () => "actual_result" },
+      oldValue: "",
+    });
+    unmount();
+
+    expect(testRunsApi.submitResults).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(testRunsApi.submitResults).mock.calls[0][2][0]).toMatchObject({ test_case_id: 1, actual_result: "메모" });
+  });
+});
