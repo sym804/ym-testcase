@@ -787,3 +787,53 @@ describe("ReportView 이슈 묶음과 판정", () => {
     });
   });
 });
+
+describe("ReportView 수행 전환 경합", () => {
+  it("늦게 도착한 이전 수행의 리포트가 지금 고른 수행을 덮지 않는다", async () => {
+    const r2 = { ...mockRuns[0], id: 2, name: "R2 수행" };
+    vi.mocked(testRunsApi.list).mockResolvedValue([mockRuns[0], r2] as any);
+    let releaseFirst!: () => void;
+    vi.mocked(reportsApi.getData).mockImplementation(async (_pid: number, runId: number) => {
+      if (runId === 1) {
+        await new Promise<void>((r) => { releaseFirst = r; });
+        return mockReport;
+      }
+      return { ...mockReport, test_run: { ...mockReport.test_run, id: 2, name: "R2 수행" } };
+    });
+    render(<ReportView projectId={1} />);
+    await waitFor(() => expect(reportsApi.getData).toHaveBeenCalledWith(1, 1));
+
+    await userEvent.selectOptions(screen.getByRole("combobox"), "2");
+    await waitFor(() => expect(reportsApi.getData).toHaveBeenCalledWith(1, 2));
+    await screen.findAllByText(/R2 수행/);
+    releaseFirst();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(screen.queryAllByText(/R1 수행/).filter((el) => el.tagName !== "OPTION")).toHaveLength(0);
+  });
+});
+
+describe("ReportView 이전 수행에서 시작된 갱신", () => {
+  it("비교 대상 저장이 늦게 끝나도 이미 고른 다른 수행의 리포트를 덮지 않는다", async () => {
+    const user = userEvent.setup();
+    const r2 = { ...mockRuns[0], id: 2, name: "R2 수행" };
+    vi.mocked(testRunsApi.list).mockResolvedValue([mockRuns[0], r2] as any);
+    let releaseUpdate!: () => void;
+    vi.mocked(testRunsApi.update).mockImplementation(
+      () => new Promise((r) => { releaseUpdate = () => r({ ...mockRuns[0], compare_run_id: 2 } as any); }));
+    vi.mocked(reportsApi.getData).mockImplementation(async (_pid: number, runId: number) =>
+      runId === 2 ? { ...mockReport, test_run: { ...mockReport.test_run, id: 2, name: "R2 수행" } } : mockReport);
+    render(<ReportView projectId={1} project={{ ...editorProject }} />);
+    await user.selectOptions(await screen.findByTestId("compare-target"), "2");   // R1 의 비교 대상 변경 시작
+
+    await user.selectOptions(screen.getAllByRole("combobox")[0], "2");            // R2 로 옮김
+    await screen.findAllByText(/R2 수행/);
+    const before = vi.mocked(reportsApi.getData).mock.calls.length;
+    releaseUpdate();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(vi.mocked(reportsApi.getData).mock.calls.slice(before).filter((c) => c[1] === 1)).toHaveLength(0);
+    expect(screen.queryAllByText(/R1 수행/).filter((el) => el.tagName !== "OPTION")).toHaveLength(0);
+  });
+});
+

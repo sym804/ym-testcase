@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { loginPathFor } from "./utils/nextPath";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "./contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
@@ -17,6 +18,7 @@ const UserManualPage = lazy(() => import("./pages/UserManualPage"));
 const AdminManualPage = lazy(() => import("./pages/AdminManualPage"));
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const { user, loading, mustChangePassword } = useAuth();
   const { t } = useTranslation("common");
 
@@ -38,7 +40,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={loginPathFor(location.pathname, location.search, location.hash)} replace />;
   }
 
   if (mustChangePassword) {
