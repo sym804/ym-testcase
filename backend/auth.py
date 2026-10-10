@@ -49,6 +49,26 @@ SYSTEM_ROLE_HIERARCHY: List[str] = ["user", "qa_manager", "admin"]
 PROJECT_ROLE_HIERARCHY: List[str] = ["viewer", "tester", "admin"]
 
 
+#: bcrypt 가 받는 비밀번호 최대 바이트. bcrypt 5.0 부터 넘으면 hashpw · checkpw 가 ValueError 를 낸다.
+BCRYPT_MAX_BYTES = 72
+PASSWORD_TOO_LONG_DETAIL = "비밀번호는 72바이트 이하로 입력해 주세요(영문 72자, 한글 24자까지)."
+
+
+def password_too_long(password: str) -> bool:
+    return len(password.encode("utf-8")) > BCRYPT_MAX_BYTES
+
+
+def ensure_password_fits(password: str) -> None:
+    """새 비밀번호(가입 · 변경 · 초기화)가 bcrypt 상한을 넘으면 400.
+
+    ★글자 수가 아니라 바이트로 잰다. 한글은 한 글자가 3바이트라 25자면 넘는다. 예전에는
+      hashpw 의 ValueError 가 그대로 500 이 됐다. 잘라서 해시하지 않는다. 자르면 73바이트째
+      부터는 무엇을 쳐도 같은 비밀번호가 되어, 사용자가 정한 것보다 약해진다.
+    """
+    if password_too_long(password):
+        raise HTTPException(status_code=400, detail=PASSWORD_TOO_LONG_DETAIL)
+
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
@@ -66,10 +86,17 @@ def _dummy_hash() -> str:
 def verify_password(plain: str, hashed: Optional[str]) -> bool:
     # ★해시가 없으면(계정 없음, Google 전용 계정) 더미 해시로 한 번 대조하고 거짓을 낸다.
     #   bcrypt 를 건너뛰면 응답 시간으로 계정 유무가 새고, None.encode() 는 500 이 된다.
-    if not hashed:
-        bcrypt.checkpw(plain.encode("utf-8"), _dummy_hash().encode("utf-8"))
+    # ★72바이트를 넘는 입력은 어떤 해시와도 맞을 수 없다(넘는 값은 저장되지 않는다). 틀린
+    #   비밀번호와 같게 거짓을 내고, 응답 시간도 같게 더미 대조를 한 번 지불한다. 예전에는
+    #   checkpw 의 ValueError 로 500 이 났고 실패 횟수도 세지 않았다.
+    pw = plain.encode("utf-8")
+    if len(pw) > BCRYPT_MAX_BYTES:
+        bcrypt.checkpw(pw[:BCRYPT_MAX_BYTES], _dummy_hash().encode("utf-8"))
         return False
-    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    if not hashed:
+        bcrypt.checkpw(pw, _dummy_hash().encode("utf-8"))
+        return False
+    return bcrypt.checkpw(pw, hashed.encode("utf-8"))
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -250,6 +277,18 @@ def role_required(minimum_role: str):
         return current_user
 
     return _check
+
+
+def admin_session_required(
+    request: Request,
+    current_user: User = Depends(role_required("admin")),
+) -> User:
+    """계정 관리(승인, 역할, 중지, 삭제 등)는 관리자 로그인 세션으로만 한다.
+
+    API 키는 사용자 권한을 통째로 갖는다. 관리자 키가 새면 자기 계정을 승인하고 관리자로 올려,
+    키를 폐기해도 관리자 계정이 남는다. 그래서 계정을 바꾸는 작업은 키로 받지 않는다.
+    """
+    return get_session_user(request, current_user)
 
 
 def get_project_role(

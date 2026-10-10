@@ -44,6 +44,9 @@ def _too_large(max_bytes: int) -> HTTPException:
 
 
 class LocalStorage:
+    # 클라이언트가 저장소에 직접 올리는가. 아니면 백엔드 PUT 라우트가 받는다.
+    direct_upload = False
+
     def __init__(self, root: str):
         self.root = os.path.abspath(root)
 
@@ -109,6 +112,8 @@ class LocalStorage:
 
 
 class SupabaseStorage:
+    direct_upload = True
+
     def __init__(self, base_url: str, service_key: str, bucket: str):
         self.base = base_url.rstrip("/") + "/storage/v1"
         self.key = service_key

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, case
 
@@ -27,6 +27,32 @@ def _version_filter(version: str):
     return func.ltrim(func.lower(func.trim(func.coalesce(TestRun.version, ""))), "v") == version_key(version)
 
 
+def _date_bounds(date_from: Optional[str], date_to: Optional[str]):
+    """기간 필터의 (시작, 끝) 시각. 없는 쪽은 None. 끝은 그날 23:59:59 까지다.
+
+    ★형식이 틀리면 400 이다. fromisoformat 의 ValueError 가 전역 핸들러까지 올라가 500 이
+      됐다. date_to 에 시각까지 보내면("2026-10-01T00:00") 뒤에 붙이는
+      T23:59:59 와 겹쳐 역시 깨지므로 날짜만 받는다.
+    """
+    try:
+        start = datetime.fromisoformat(date_from) if date_from else None
+        end = datetime.fromisoformat(date_to + "T23:59:59") if date_to else None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="날짜는 YYYY-MM-DD 형식으로 보내 주세요.")
+    return start, end
+
+
+def _created_at_filters(date_from: Optional[str], date_to: Optional[str]) -> list:
+    """수행 생성 시각으로 거르는 조건 목록."""
+    start, end = _date_bounds(date_from, date_to)
+    out = []
+    if start is not None:
+        out.append(TestRun.created_at >= start)
+    if end is not None:
+        out.append(TestRun.created_at <= end)
+    return out
+
+
 def _latest_run_subquery(project_id: int, db: Session, date_from: str = None, date_to: str = None,
                          version: str = None):
     """TC별로 마지막으로 판정된 런의 test_run_id를 구하는 서브쿼리.
@@ -37,11 +63,8 @@ def _latest_run_subquery(project_id: int, db: Session, date_from: str = None, da
     NS 는 판정이 아니라서 뺀다(SYM-131). 넣으면 새 수행을 만들기만 해도 그 수행이 담은 TC 가
     전부 최신 NS 가 되어 앞 수행의 PASS/FAIL 이 미수행으로 바뀐다(실측 stockradar: PASS 519 -> 0).
     """
-    run_filter = [TestRun.project_id == project_id, TestResult.result != TestResultValue.NS]
-    if date_from:
-        run_filter.append(TestRun.created_at >= datetime.fromisoformat(date_from))
-    if date_to:
-        run_filter.append(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+    run_filter = [TestRun.project_id == project_id, TestResult.result != TestResultValue.NS,
+                  *_created_at_filters(date_from, date_to)]
     if version:
         run_filter.append(_version_filter(version))
 
@@ -188,6 +211,8 @@ def priority_distribution(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
+    # 집계할 TC 가 없어 일찍 돌아가도 형식이 틀린 날짜는 같은 400 으로 알린다.
+    _date_bounds(date_from, date_to)
     # TC priority별 총 건수
     priority_totals_q = (
         db.query(TestCase.priority, func.count(TestCase.id))
@@ -279,6 +304,8 @@ def category_breakdown(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
+    # 집계할 TC 가 없어 일찍 돌아가도 형식이 틀린 날짜는 같은 400 으로 알린다.
+    _date_bounds(date_from, date_to)
     category_totals_q = (
         db.query(TestCase.category, func.count(TestCase.id))
         .filter(
@@ -379,11 +406,8 @@ def round_comparison(
       다시 계산하던 것을 없앴다. 실행이 0건이면 0% 가 아니라 null 이다. 진행 중인
       회차가 0% 로 찍혀 폭락처럼 보였다.
     """
-    run_q = db.query(TestRun).filter(TestRun.project_id == project_id)
-    if date_from:
-        run_q = run_q.filter(TestRun.created_at >= datetime.fromisoformat(date_from))
-    if date_to:
-        run_q = run_q.filter(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+    run_q = db.query(TestRun).filter(TestRun.project_id == project_id,
+                                     *_created_at_filters(date_from, date_to))
     if version:
         run_q = run_q.filter(_version_filter(version))
 
@@ -570,11 +594,7 @@ def tc_stability(
     매번 실패한 TC 는 따로 센다. test.fail 로 고정한 결함 재현이 여기에 든다.
     재시도는 한 수행 안의 일이라 여기서 보이지 않는다. 회차 사이의 변동만 본다.
     """
-    run_filter = [TestRun.project_id == project_id]
-    if date_from:
-        run_filter.append(TestRun.created_at >= datetime.fromisoformat(date_from))
-    if date_to:
-        run_filter.append(TestRun.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+    run_filter = [TestRun.project_id == project_id, *_created_at_filters(date_from, date_to)]
     if version:
         run_filter.append(_version_filter(version))
 

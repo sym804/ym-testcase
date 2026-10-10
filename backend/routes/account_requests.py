@@ -19,7 +19,7 @@ from schemas import (
     AccountRequestCreate, AccountRequestListItem, AccountRequestReject,
     ResetPasswordWithCode,
 )
-from auth import hash_password, verify_password, role_required, get_session_user, revoke_user_api_keys
+from auth import hash_password, verify_password, ensure_password_fits, role_required, get_session_user, revoke_user_api_keys, admin_session_required
 from routes.auth import _check_rate_limit, _clear_failures, _record_failure
 from services import rate_limit
 from services.client_ip import client_ip
@@ -194,7 +194,7 @@ def reject_account_request(
     request_id: int,
     payload: AccountRequestReject,
     db: Session = Depends(get_db),
-    current_user: User = Depends(role_required("admin")),
+    current_user: User = Depends(admin_session_required),
 ):
     # ★행을 잠그고 상태를 본다. 잠그지 않으면 두 승인이 둘 다 pending 을 보거나, 코드 소비로
     #   completed 가 된 행을 늦게 끝난 승인이 다시 approved 로 되살린다.
@@ -230,6 +230,9 @@ def reset_password_with_code(
     계정 존재 여부와 승인 여부가 새어 나간다. 응답 본문뿐 아니라 응답 시간도
     같아야 하므로 모든 실패 경로가 bcrypt 대조를 한 번씩 지불한다.
     """
+    # 새 비밀번호의 bcrypt 72바이트 상한은 계정과 무관한 입력 오류라 먼저 400 으로 알린다.
+    # 코드가 맞은 뒤에 거절하면 코드를 이미 쓴 것처럼 보인다.
+    ensure_password_fits(payload.new_password)
     ident = normalize_identifier(payload.username)
     _check_rate_limit(request, ident, db)
     fail = HTTPException(status_code=401, detail="코드가 올바르지 않거나 만료되었습니다.")

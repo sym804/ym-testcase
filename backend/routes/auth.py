@@ -22,8 +22,8 @@ from services.accounts import (
 from services.auth_config import get_auth_config
 from schemas import UserCreate, UserLogin, UserResponse, UserRoleUpdate, Token, PasswordChange
 from auth import (
-    hash_password, verify_password, create_access_token, get_current_user, role_required,
-    get_session_user, revoke_user_api_keys,
+    hash_password, verify_password, ensure_password_fits, create_access_token, get_current_user, role_required,
+    get_session_user, revoke_user_api_keys, admin_session_required,
     COOKIE_SECURE, COOKIE_SAMESITE, COOKIE_MAX_AGE, ACCESS_TOKEN_EXPIRE_HOURS,
     REMEMBER_ME_DAYS,
 )
@@ -144,6 +144,7 @@ def register(payload: UserCreate, request: Request, db: Session = Depends(get_db
     cfg = get_auth_config()
     if not payload.display_name.strip():
         raise HTTPException(status_code=422, detail="표시 이름을 입력해 주세요.")
+    ensure_password_fits(payload.password)  # bcrypt 72바이트 상한. 넘으면 400
     # ★횟수 제한을 bcrypt 보다 먼저 본다. 한도를 넘긴 요청이 bcrypt 비용을 쓰지 않게 한다.
     #   제한 잠금은 같은 IP 끼리만 줄을 세우므로 그 안에서 bcrypt 를 해도 다른 가입을 막지 않는다.
     _check_register_limit(request, db)
@@ -266,6 +267,7 @@ def change_password(
 ):
     if not current_user.password_hash:
         raise HTTPException(status_code=400, detail="비밀번호가 없는 계정입니다.")
+    ensure_password_fits(payload.new_password)  # bcrypt 72바이트 상한. 넘으면 400
     if not verify_password(payload.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="현재 비밀번호가 올바르지 않습니다.")
 
@@ -334,7 +336,7 @@ def _saved(db: Session, user: User) -> User:
 
 @router.post("/users/{user_id}/approve", response_model=UserResponse)
 def approve_user(user_id: int, db: Session = Depends(get_db),
-                 current_user: User = Depends(role_required("admin"))):
+                 current_user: User = Depends(admin_session_required)):
     user = _locked_target(db, user_id, current_user)
     if user.status != UserStatus.pending:
         raise HTTPException(status_code=409, detail="승인 대기 중인 계정이 아닙니다.")
@@ -345,7 +347,7 @@ def approve_user(user_id: int, db: Session = Depends(get_db),
 
 @router.post("/users/{user_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
 def reject_user(user_id: int, db: Session = Depends(get_db),
-                current_user: User = Depends(role_required("admin"))):
+                current_user: User = Depends(admin_session_required)):
     user = _locked_target(db, user_id, current_user)
     if user.status != UserStatus.pending:
         raise HTTPException(status_code=409, detail="승인 대기 중인 계정만 거절할 수 있습니다.")
@@ -362,7 +364,7 @@ def reject_user(user_id: int, db: Session = Depends(get_db),
 
 @router.post("/users/{user_id}/disable", response_model=UserResponse)
 def disable_user(user_id: int, db: Session = Depends(get_db),
-                 current_user: User = Depends(role_required("admin"))):
+                 current_user: User = Depends(admin_session_required)):
     user = _locked_target(db, user_id, current_user)
     if user.id == current_user.id:
         raise HTTPException(status_code=409, detail="자기 자신은 사용 중지할 수 없습니다.")
@@ -377,7 +379,7 @@ def disable_user(user_id: int, db: Session = Depends(get_db),
 
 @router.post("/users/{user_id}/enable", response_model=UserResponse)
 def enable_user(user_id: int, db: Session = Depends(get_db),
-                current_user: User = Depends(role_required("admin"))):
+                current_user: User = Depends(admin_session_required)):
     user = _locked_target(db, user_id, current_user)
     if user.status != UserStatus.disabled:
         raise HTTPException(status_code=409, detail="사용 중지된 계정이 아닙니다.")
@@ -388,7 +390,7 @@ def enable_user(user_id: int, db: Session = Depends(get_db),
 
 @router.post("/users/{user_id}/release-email", response_model=UserResponse)
 def release_email(user_id: int, db: Session = Depends(get_db),
-                  current_user: User = Depends(role_required("admin"))):
+                  current_user: User = Depends(admin_session_required)):
     """남의 주소로 먼저 가입해 이메일을 차지한 계정에서 이메일을 뗀다. 진짜 주인이 Google 로 들어올 수 있게."""
     user = _locked_target(db, user_id, current_user)
     if user.id == current_user.id:
@@ -407,7 +409,7 @@ def release_email(user_id: int, db: Session = Depends(get_db),
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: int, db: Session = Depends(get_db),
-                current_user: User = Depends(role_required("admin"))):
+                current_user: User = Depends(admin_session_required)):
     """작업 기록이 하나도 없는 계정만 지운다. 실수로 생긴 빈 계정 정리용. 기록이 있으면 사용 중지를 쓴다."""
     user = _locked_target(db, user_id, current_user)
     if user.id == current_user.id:
@@ -434,7 +436,7 @@ def update_user_role(
     user_id: int,
     payload: UserRoleUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(role_required("admin")),
+    current_user: User = Depends(admin_session_required),
 ):
     valid_roles = [r.value for r in UserRole]
     if payload.role not in valid_roles:
