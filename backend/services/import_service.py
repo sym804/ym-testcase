@@ -97,6 +97,57 @@ HEADER_MAP = {
 }
 
 
+#: 가져오기가 채우는 길이 제한 칸과 사용자에게 보일 이름(TC 내보내기 머리글과 같다).
+#: 상한은 models.TestCase 의 String(n) 에서 읽는다. 여기에 숫자를 두 벌 두지 않는다.
+_LIMITED_FIELD_LABELS = {
+    "tc_id": "TC ID",
+    "type": "Type", "category": "Category", "depth1": "Depth1", "depth2": "Depth2",
+    "priority": "Priority", "test_type": "Platform", "r1": "R1", "r2": "R2", "r3": "R3",
+}
+_FIELD_MAX_LEN = {f: TestCase.__table__.columns[f].type.length for f in _LIMITED_FIELD_LABELS}
+SHEET_NAME_MAX_LEN = TestCase.__table__.columns["sheet_name"].type.length
+#: 오류 문구에 늘어놓는 문제 칸 상한. 나머지는 건수만 알린다.
+MAX_OVERLONG_LISTED = 20
+
+
+def overlong_fields(fields: dict) -> list[str]:
+    """길이 상한을 넘는 칸을 `이름(글자 수/상한자)` 로 돌려준다. 없으면 빈 목록.
+
+    ★잘라 넣지 않는다. R1 · 우선순위 같은 칸은 코드 값이라 앞부분만 남기면 다른 값이 되고
+      ("Not Applicable" -> "Not Applic"), 설명 칸을 자르면 내용이 소리 없이 사라진다.
+      PostgreSQL 은 넘는 값을 DataError 로 거절해, 이 검사가 없으면 가져오기 전체가 500 으로
+      롤백되고 어느 행이 문제인지 알 수 없었다.
+    """
+    bad = []
+    for field, limit in _FIELD_MAX_LEN.items():
+        val = fields.get(field)
+        if val is None:
+            continue
+        n = len(str(val))
+        if n > limit:
+            bad.append(f"{_LIMITED_FIELD_LABELS[field]}({n}/{limit}자)")
+    return bad
+
+
+def raise_if_overlong(problems: list[str], db=None) -> None:
+    """가져오기 전체에서 모은 길이 초과 행을 400 으로 알린다. 하나라도 있으면 아무것도 넣지 않는다.
+
+    ★일부만 넣지 않는다. 엑셀을 고쳐 다시 올리는 흐름이라, 반쯤 들어간 상태에서 재가져오기를
+      하면 어느 행이 이번에 들어간 것인지 사용자가 가려낼 수 없다.
+    """
+    if not problems:
+        return
+    if db is not None:
+        # 잡아 둔 프로젝트 쓰기 잠금을 응답 전에 푼다(get_db 정리는 응답 뒤에 돈다)
+        db.rollback()
+    shown = "; ".join(problems[:MAX_OVERLONG_LISTED])
+    more = f" 외 {len(problems) - MAX_OVERLONG_LISTED}건" if len(problems) > MAX_OVERLONG_LISTED else ""
+    raise HTTPException(
+        status_code=400,
+        detail=f"허용 길이를 넘는 칸이 있어 가져오지 않았습니다. 값을 줄여 다시 올려 주세요: {shown}{more}",
+    )
+
+
 def _resolve_merged(ws, row: int, col: int):
     """Return effective value for a cell that may be part of a merged range."""
     cell = ws.cell(row=row, column=col)
@@ -116,13 +167,14 @@ def _detect_header_row(ws) -> Optional[int]:
     for row_idx in range(1, min(ws.max_row + 1, 20)):
         for col_idx in range(1, ws.max_column + 1):
             val = ws.cell(row=row_idx, column=col_idx).value
-            if val and str(val).strip() == "TC ID":
+            # "tc id", "TC  ID" 처럼 대소문자 · 공백만 다른 것도 같은 머리글로 본다.
+            if val and _norm_header(val) == "tc id":
                 return row_idx
     # Fallback: look for any known header
     for row_idx in range(1, min(ws.max_row + 1, 20)):
         for col_idx in range(1, ws.max_column + 1):
             val = ws.cell(row=row_idx, column=col_idx).value
-            if val and str(val).strip() in HEADER_MAP:
+            if val and map_header(val) is not None:
                 return row_idx
     return None
 
@@ -135,9 +187,8 @@ def _count_tc_rows(ws, header_row: int) -> int:
     tc_id_col: Optional[int] = None
     no_col: Optional[int] = None
     for col_idx in range(1, ws.max_column + 1):
-        val = ws.cell(row=header_row, column=col_idx).value
-        if val and str(val).strip() in HEADER_MAP:
-            mapped = HEADER_MAP[str(val).strip()]
+        mapped = map_header(ws.cell(row=header_row, column=col_idx).value)
+        if mapped is not None:
             if mapped == "_skip":
                 continue
             all_cols[col_idx] = mapped
@@ -276,10 +327,12 @@ def dedupe_in_file(base: str, used: set) -> tuple[str, bool]:
         return base, False
 
     # 빈 자리를 찾는다. 접미사 모양을 allocate_tc_id 와 맞춘다. 두 번째가 -2 다.
+    # ★길이도 채번과 같게 맞춘다(fit_tc_id). 50자 ID 가 두 번 나오면 `-2` 를 그대로 붙여
+    #   52자가 되고, 길이 검사가 가져오기 전체를 거절했다.
     n = 2
-    while f"{base}-{n}" in used:
+    while fit_tc_id(base, f"-{n}") in used:
         n += 1
-    out = f"{base}-{n}"
+    out = fit_tc_id(base, f"-{n}")
     used.add(out)
     return out, True
 
@@ -310,9 +363,8 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
 
     col_map: dict[int, str] = {}
     for col_idx in range(1, ws.max_column + 1):
-        val = ws.cell(row=header_row, column=col_idx).value
-        if val and str(val).strip() in HEADER_MAP:
-            mapped = HEADER_MAP[str(val).strip()]
+        mapped = map_header(ws.cell(row=header_row, column=col_idx).value)
+        if mapped is not None:
             if mapped == "_skip":
                 continue
             col_map[col_idx] = mapped
@@ -321,6 +373,8 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
     updated_count = 0
     renamed_count = 0
     empty_streak = 0
+    #: 길이 상한을 넘는 행. 넣지 않고 모아서 호출부가 400 으로 알린다(raise_if_overlong).
+    too_long: list[str] = []
 
     # 기존 TC 맵 (같은 프로젝트+시트+tc_id → TC 객체)
     existing_tcs = (
@@ -421,6 +475,10 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
             r3=row_data.get("r3"),
             remarks=row_data.get("remarks"),
         )
+        bad = overlong_fields({**fields, "tc_id": tc_id_val})
+        if bad:
+            too_long.append(f"{sheet_name} 시트 {row_idx}행 {', '.join(bad)}")
+            continue
 
         existing = existing_map.get(tc_id_val)
         if existing is None:
@@ -452,7 +510,7 @@ def _parse_sheet(ws, project_id: int, user_id: int, db: Session, no_offset: int 
             db.add(tc)
             created_count += 1
 
-    return {"created": created_count, "updated": updated_count, "renamed": renamed_count}
+    return {"created": created_count, "updated": updated_count, "renamed": renamed_count, "too_long": too_long}
 
 
 # ── Jira/Xray/Zephyr CSV 헤더 매핑 ───────────────────────────────────────────
@@ -501,6 +559,35 @@ JIRA_HEADER_MAP = {
 }
 
 
+def _norm_header(h) -> str:
+    """머리글 비교용 키. 대소문자를 접고 앞뒤 공백을 떼며, 줄바꿈을 포함한 겹친 공백을 하나로 줄인다."""
+    return " ".join(str(h).split()).casefold()
+
+
+#: CSV · 마크다운은 Jira/Xray/Zephyr 머리글까지 본다. 같은 이름이면 Jira 쪽이 이긴다(예전과 같다).
+_COMBINED_HEADER_MAP = {**HEADER_MAP, **JIRA_HEADER_MAP}
+_HEADER_MAP_NORM = {_norm_header(k): v for k, v in HEADER_MAP.items()}
+_COMBINED_HEADER_MAP_NORM = {_norm_header(k): v for k, v in _COMBINED_HEADER_MAP.items()}
+
+
+def map_header(h, combined: bool = False) -> Optional[str]:
+    """머리글 칸 값을 필드 이름으로 바꾼다. 모르는 머리글이면 None.
+
+    ★정확히 같은 머리글을 먼저 본다. 그 매핑은 예전과 한 글자도 달라지지 않는다.
+      맞는 것이 없을 때만 대소문자 · 공백을 무시하고 다시 찾는다. 예전에는 "Expected result",
+      "Test steps" 처럼 대소문자만 다른 머리글이 매핑되지 않아 그 칸이 소리 없이 빠졌다.
+    """
+    if h is None:
+        return None
+    raw = str(h).strip()
+    if not raw:
+        return None
+    exact = _COMBINED_HEADER_MAP if combined else HEADER_MAP
+    if raw in exact:
+        return exact[raw]
+    return (_COMBINED_HEADER_MAP_NORM if combined else _HEADER_MAP_NORM).get(_norm_header(raw))
+
+
 def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, sheet_name: str = "CSV Import") -> dict:
     """CSV 파일을 파싱하여 TC를 DB에 추가/업데이트한다."""
     # 인코딩 감지
@@ -520,14 +607,11 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
 
 
     # 컬럼 매핑 (HEADER_MAP + JIRA_HEADER_MAP 모두 사용)
-    combined_map = {**HEADER_MAP, **JIRA_HEADER_MAP}
     col_map = {}
     for header in reader.fieldnames:
-        h = header.strip()
-        if h in combined_map:
-            mapped = combined_map[h]
-            if mapped != "_skip":
-                col_map[header] = mapped
+        mapped = map_header(header, combined=True)
+        if mapped is not None and mapped != "_skip":
+            col_map[header] = mapped
 
     if not col_map:
         return {"created": 0, "updated": 0}
@@ -559,11 +643,14 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
     created_count = 0
     updated_count = 0
     renamed_count = 0
+    too_long: list[str] = []
 
     for row_num, row in enumerate(csv.DictReader(io.StringIO(text)), start=1):
         row_data = {}
         for csv_header, field in col_map.items():
-            val = row.get(csv_header, "").strip()
+            # ★열이 머리글보다 적은 행은 DictReader 가 모자란 칸을 None 으로 채운다(get 의 기본값은
+            #   키가 있어 쓰이지 않는다). 빈 칸으로 읽는다. 예전에는 .strip() 에서 500 이 났다.
+            val = (row.get(csv_header) or "").strip()
             if val and field not in row_data:
                 row_data[field] = val
 
@@ -600,6 +687,11 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
             "test_type", "precondition", "test_steps", "expected_result",
             "r1", "r2", "r3", "remarks",
         ] if row_data.get(k) is not None}
+        bad = overlong_fields({**fields, "tc_id": tc_id_val})
+        if bad:
+            # 셀 안 줄바꿈이 있으면 파일 줄 번호와 어긋나므로 데이터 행 차례로 알린다.
+            too_long.append(f"CSV {row_num}번째 데이터 행 {', '.join(bad)}")
+            continue
 
         existing = existing_map.get(tc_id_val)
         if existing is None:
@@ -630,7 +722,7 @@ def _parse_csv(file_content: bytes, project_id: int, user_id: int, db: Session, 
             db.add(tc)
             created_count += 1
 
-    return {"created": created_count, "updated": updated_count, "renamed": renamed_count}
+    return {"created": created_count, "updated": updated_count, "renamed": renamed_count, "too_long": too_long}
 
 
 from services.upload_guard import read_limited_sync
@@ -796,16 +888,12 @@ def _preview_md(file_content: bytes, project_id: int, db: Session) -> list:
 
 def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, sheet_name: str) -> dict:
     """파싱된 Markdown 테이블 하나를 TC로 DB에 추가/업데이트한다."""
-    combined_map = {**HEADER_MAP, **JIRA_HEADER_MAP}
-
     # 헤더 → 필드 매핑 (인덱스 기반)
     col_map = {}
     for idx, h in enumerate(table["headers"]):
-        h_stripped = h.strip()
-        if h_stripped in combined_map:
-            mapped = combined_map[h_stripped]
-            if mapped != "_skip":
-                col_map[idx] = mapped
+        mapped = map_header(h, combined=True)
+        if mapped is not None and mapped != "_skip":
+            col_map[idx] = mapped
 
     if not col_map:
         return {"created": 0, "updated": 0}
@@ -833,6 +921,7 @@ def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, she
     created_count = 0
     updated_count = 0
     renamed_count = 0
+    too_long: list[str] = []
 
     for row_num, cells in enumerate(table["rows"], start=1):
         row_data = {}
@@ -875,6 +964,10 @@ def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, she
             "test_type", "precondition", "test_steps", "expected_result",
             "r1", "r2", "r3", "remarks",
         ] if row_data.get(k) is not None}
+        bad = overlong_fields({**fields, "tc_id": tc_id_val})
+        if bad:
+            too_long.append(f"{sheet_name} 표 {row_num}번째 데이터 행 {', '.join(bad)}")
+            continue
 
         existing = existing_map.get(tc_id_val)
         if existing is None:
@@ -905,7 +998,7 @@ def _parse_md_table(table: dict, project_id: int, user_id: int, db: Session, she
             db.add(tc)
             created_count += 1
 
-    return {"created": created_count, "updated": updated_count, "renamed": renamed_count}
+    return {"created": created_count, "updated": updated_count, "renamed": renamed_count, "too_long": too_long}
 
 
 def _preview_csv(file_content: bytes, project_id: int, db: Session) -> list:

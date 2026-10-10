@@ -54,12 +54,18 @@ def leaf_sheet_order(project_id: int, db: Session) -> dict:
 
 
 def sort_results_for_export(results, order: dict):
-    """결과 행을 화면과 같은 차례로 세운다. 시트 순서가 먼저고 그 안에서 no 순이다."""
+    """결과 행을 화면과 같은 차례로 세운다. 시트 순서가 먼저고 그 안에서 no 순이다.
+
+    ★마지막 키는 TC id 다. 지운 시트의 TC 는 모두 맨 뒤 같은 자리이고 no 는 시트마다 1 부터라
+      겹친다. 동점이면 들어온 차례(조회 순서)를 따르는데 그 차례는 보장되지 않아, 같은 수행을
+      내보낼 때마다 순서와 No 가 바뀔 수 있었다.
+    """
     last = len(order)
     return sorted(
         results,
         key=lambda r: (
             order.get(r.test_case.sheet_name, last) if r.test_case else last,
             r.test_case.no if r.test_case else 0,
+            r.test_case_id,
         ),
     )

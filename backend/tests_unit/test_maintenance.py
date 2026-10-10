@@ -26,8 +26,9 @@ def test_삭제에_실패한_객체는_기록해_두고_다음_정리에서_지�
     monkeypatch.setattr(attachments, "get_storage", lambda: st)
     monkeypatch.setattr(maintenance, "get_storage", lambda: st)
     s = sessionmaker(bind=pg_engine)()
-    attachments.delete_attachment_objects(["a/1.png", "a/2.png"], s)
+    pending = attachments.schedule_object_deletions(["a/1.png", "a/2.png"], s)
     s.commit()
+    attachments.run_object_deletions(pending, s)  # 저장소가 죽어 있어 예약이 남는다
     assert sorted(k for (k,) in s.query(StorageDeletion.storage_key)) == ["a/1.png", "a/2.png"]
 
     st.fail = False

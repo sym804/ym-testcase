@@ -20,6 +20,7 @@ from services.import_service import (
     _parse_sheet, _parse_csv, _load_workbook_from_upload, _is_csv_file,
     _is_md_file, _decode_text, _preview_md, _parse_md_tables,
     _parse_md_table, _preview_csv, MAX_IMPORT_SIZE,
+    SHEET_NAME_MAX_LEN, raise_if_overlong,
 )
 from services.export_service import export_testcases_excel
 from services.sheet_order import leaf_sheet_order
@@ -92,7 +93,10 @@ def list_testcases(
             | (TestCase.expected_result.ilike(like))
         )
 
-    q = q.order_by(TestCase.no)
+    # ★no 는 시트마다 1 부터라 시트를 가리지 않으면 겹친다. id 로 동점을 깨지 않으면
+    #   LIMIT/OFFSET 으로 나눠 받을 때 PostgreSQL 이 동점 사이 차례를 매번 달리 줘서
+    #   같은 TC 를 두 번 받거나 빠뜨린다.
+    q = q.order_by(TestCase.no, TestCase.id)
     if offset is not None:
         q = q.offset(offset)
     if limit is not None:
@@ -150,8 +154,11 @@ def bulk_update_testcases(
     updated: list[TestCase] = []
     touched_sheets: set[str] = set()
     for item in payload.items:
+        # ★지운 TC 는 고치지 않는다. 단건 수정과 같은 이유다(화면에 없는 행의 TC ID 가
+        #   바뀌면 복원했을 때 다른 것이 된다). 없는 id 처럼 건너뛴다.
         tc = db.query(TestCase).filter(
-            TestCase.id == item.id, TestCase.project_id == project_id
+            TestCase.id == item.id, TestCase.project_id == project_id,
+            TestCase.deleted_at.is_(None),
         ).first()
         if not tc:
             continue
@@ -182,6 +189,11 @@ def bulk_update_testcases(
         renumber_sheet(project_id, sheet, db)
 
     db.commit()
+    if touched_sheets:
+        # ★시트를 옮기면 그 시트를 범위로 둔 진행 중 수행에 새로 들어가야 한다. 생성 · 복제 ·
+        #   복원 · 가져오기와 같이 여기서 맞춘다. 안 하면 수행 상세를 열기 전까지 대시보드와
+        #   리포트가 그 TC 를 빼고 센다.
+        sync_project_in_progress_runs(project_id, db)
     for tc in updated:
         db.refresh(tc)
     return updated
@@ -324,6 +336,9 @@ def update_testcase(
         renumber_sheet(project_id, tc.sheet_name, db)
 
     db.commit()
+    if moved:
+        # 도착 시트를 범위로 둔 진행 중 수행에 넣는다(일괄 수정과 같다).
+        sync_project_in_progress_runs(project_id, db)
     db.refresh(tc)
     return tc
 
@@ -634,6 +649,7 @@ def import_testcases(
         #   막는데 임포트만 그 검증을 거치지 않았다. 폴더에 들어간 TC 는 시트
         #   순서에서 빠지고 수행 범위로도 고를 수 없어 담을 방법이 없어진다.
         if sheet_exists is not None and sheet_exists.is_folder:
+            db.rollback()  # 프로젝트 쓰기 잠금을 응답 전에 푼다
             raise HTTPException(status_code=400, detail="폴더에는 TC 를 직접 추가할 수 없습니다.")
         if not sheet_exists:
             max_order = db.query(TestCaseSheet.sort_order).filter(
@@ -646,6 +662,8 @@ def import_testcases(
         park_sheet_numbers(project_id, sheet_name, db)
         db.flush()
         r = _parse_csv(content, project_id, current_user.id, db, sheet_name=sheet_name)
+        # 커밋 전에 거절한다. 세션은 get_db 가 닫으며 되돌린다.
+        raise_if_overlong(r.get("too_long", []), db)
         db.flush()
         renumber_sheet(project_id, sheet_name, db)
         db.commit()
@@ -671,9 +689,15 @@ def import_testcases(
         total_created = 0
         total_updated = 0
         total_renamed = 0
+        too_long: list[str] = []
         results = []
         for table in tables:
             if table["name"] not in target_names:
+                continue
+            # ★마크다운은 제목(#)이 시트 이름이 된다. 엑셀 시트 이름(31자)과 달리 길이 제한이
+            #   없어, 넘으면 시트 행을 넣다가 DataError 로 가져오기 전체가 500 이 됐다.
+            if len(table["name"]) > SHEET_NAME_MAX_LEN:
+                too_long.append(f"시트 이름 '{table['name'][:20]}...'({len(table['name'])}/{SHEET_NAME_MAX_LEN}자)")
                 continue
             # 시트 레코드 자동 생성
             sheet_exists = db.query(TestCaseSheet).filter(
@@ -683,6 +707,7 @@ def import_testcases(
             #   막는데 임포트만 그 검증을 거치지 않았다. 폴더에 들어간 TC 는 시트
             #   순서에서 빠지고 수행 범위로도 고를 수 없어 담을 방법이 없어진다.
             if sheet_exists is not None and sheet_exists.is_folder:
+                db.rollback()  # 프로젝트 쓰기 잠금을 응답 전에 푼다
                 raise HTTPException(status_code=400, detail="폴더에는 TC 를 직접 추가할 수 없습니다.")
             if not sheet_exists:
                 max_order = db.query(TestCaseSheet.sort_order).filter(
@@ -693,6 +718,7 @@ def import_testcases(
             park_sheet_numbers(project_id, table["name"], db)
             db.flush()
             r = _parse_md_table(table, project_id, current_user.id, db, sheet_name=table["name"])
+            too_long.extend(r.get("too_long", []))
             results.append({"sheet": table["name"], "created": r["created"], "updated": r["updated"], "renamed": r.get("renamed", 0)})
             total_created += r["created"]
             total_updated += r["updated"]
@@ -700,6 +726,7 @@ def import_testcases(
             db.flush()
             renumber_sheet(project_id, table["name"], db)
 
+        raise_if_overlong(too_long, db)
         db.commit()
         sync_project_in_progress_runs(project_id, db)
         return {"created": total_created, "updated": total_updated, "renamed": total_renamed, "imported": total_created + total_updated, "sheets": results}
@@ -727,6 +754,7 @@ def import_testcases(
     total_created = 0
     total_updated = 0
     total_renamed = 0
+    too_long: list[str] = []
     results = []
     for name in target_names:
         if name not in wb.sheetnames:
@@ -741,6 +769,7 @@ def import_testcases(
         #   막는데 임포트만 그 검증을 거치지 않았다. 폴더에 들어간 TC 는 시트
         #   순서에서 빠지고 수행 범위로도 고를 수 없어 담을 방법이 없어진다.
         if sheet_exists is not None and sheet_exists.is_folder:
+            db.rollback()  # 프로젝트 쓰기 잠금을 응답 전에 푼다
             raise HTTPException(status_code=400, detail="폴더에는 TC 를 직접 추가할 수 없습니다.")
         if not sheet_exists:
             max_order = db.query(TestCaseSheet.sort_order).filter(
@@ -752,6 +781,7 @@ def import_testcases(
         park_sheet_numbers(project_id, name, db)
         db.flush()
         r = _parse_sheet(ws, project_id, current_user.id, db, no_offset=0, sheet_name=name)
+        too_long.extend(r.get("too_long", []))
         results.append({"sheet": name, "created": r["created"], "updated": r["updated"], "renamed": r.get("renamed", 0)})
         total_created += r["created"]
         total_updated += r["updated"]
@@ -759,6 +789,8 @@ def import_testcases(
         db.flush()
         renumber_sheet(project_id, name, db)
 
+    # 모든 시트를 다 본 뒤 한 번에 알린다. 시트마다 끊으면 고쳐 올릴 때마다 다음 시트가 걸린다.
+    raise_if_overlong(too_long, db)
     db.commit()
     sync_project_in_progress_runs(project_id, db)
     return {"created": total_created, "updated": total_updated, "renamed": total_renamed, "imported": total_created + total_updated, "sheets": results}

@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -133,7 +133,8 @@ def list_sheets(
 
 
 class _SheetCreate(BaseModel):
-    name: str
+    # TestCaseSheet.name 과 TestCase.sheet_name 이 String(100)
+    name: str = Field(..., max_length=100)
     parent_id: Optional[int] = None
     is_folder: bool = False
 
@@ -186,7 +187,7 @@ def create_sheet(
 
 
 class _SheetRename(BaseModel):
-    new_name: str
+    new_name: str = Field(..., max_length=100)
 
 
 @router.put("/sheets/{sheet_id}/rename")

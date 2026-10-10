@@ -66,6 +66,13 @@ def sync_run_results(run: TestRun, db: Session, commit: bool = True) -> int:
     #   저장·가져오기와 누락 행을 서로 다른 순서로 넣으면 교착하므로 같은 잠금으로 줄 세운다.
     from services.locks import LockNs, advisory_xact_lock
     advisory_xact_lock(db, LockNs.RUN_RESULTS, run.id)
+    # ★잠금을 기다리는 사이 완료됐을 수 있다. 위에서 본 '진행 중' 은 잠금 전 값이라 다시 읽는다.
+    #   (refresh 를 쓰지 않는다. 호출자가 run 에 걸어 둔 미반영 변경을 지우면 안 된다.)
+    status = db.query(TestRun.status).filter(TestRun.id == run.id).scalar()
+    if status != TestRunStatus.in_progress:
+        if commit:
+            db.commit()  # 잡은 잠금을 응답 전에 푼다
+        return 0
 
     # executed_by는 조회자가 아니라 런 소유자로 기록한다
     # (단순 조회 행위가 다른 사람의 실행 이력으로 남지 않도록)
@@ -102,6 +109,8 @@ def sync_project_in_progress_runs(project_id: int, db: Session, commit: bool = T
     total = 0
     for run in runs:
         total += sync_run_results(run, db, commit=False)
-    if total and commit:
+    # ★넣은 행이 0건이어도 커밋한다. 다른 요청이 먼저 넣어 충돌로 0건이 됐어도 잠금은 잡았다.
+    #   커밋하지 않으면 get_db 정리(응답 뒤)까지 수행 잠금이 남아 뒤따르는 저장·완료가 기다린다.
+    if commit:
         db.commit()
     return total
