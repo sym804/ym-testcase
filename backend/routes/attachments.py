@@ -57,20 +57,46 @@ def _validate_extension(filename: str) -> str:
     return ext
 
 
-def delete_attachment_objects(keys: list, db: Session) -> None:
-    """첨부 객체를 저장소에서 지운다. 실패해도 DB 삭제는 막지 않는다.
+def schedule_object_deletions(keys: list, db: Session) -> list[tuple[int, str]]:
+    """커밋 전에 부른다. 지울 저장소 키를 같은 트랜잭션에 storage_deletions 로 적어 둔다.
 
-    ★실패한 키는 storage_deletions 에 남긴다. 첨부 기록이 지워지면 객체를 다시 찾을 수
-      없으므로, 일일 정리(services/maintenance.py)가 이 기록으로 다시 지운다.
+    ★저장소는 DB 커밋이 끝난 뒤에 지운다(run_object_deletions). 먼저 지우면 커밋이 실패하거나
+      시간 초과로 끊겼을 때 기록은 남고 파일만 사라진다. 되돌릴 수 없는 쪽을 뒤에 둔다.
+    ★예약을 같은 트랜잭션에 적는 이유: 커밋 뒤 저장소를 지우기 전에 프로세스가 죽어도(서버리스
+      시간 초과) 일일 정리(services/maintenance.py)가 이 기록으로 지운다. 커밋이 실패하면 예약도
+      같이 사라져 아직 쓰는 파일을 지우지 않는다.
+
+    :return: (예약 id, 키) 목록. 커밋 뒤 run_object_deletions 에 넘긴다.
     """
-    keys = [k for k in keys if k]
-    if not keys:
+    rows = [StorageDeletion(storage_key=k) for k in keys if k]
+    if not rows:
+        return []
+    db.add_all(rows)
+    db.flush()
+    return [(r.id, r.storage_key) for r in rows]
+
+
+def run_object_deletions(pending: list[tuple[int, str]], db: Session) -> None:
+    """커밋이 끝난 뒤 부른다. 저장소에서 지우고 예약을 걷는다. 실패해도 예외를 내지 않는다.
+
+    DB 삭제는 이미 끝났으므로 응답은 성공이다. 저장소가 실패하면 예약이 남아 일일 정리가
+    다시 지운다. 예약을 걷다 실패하면 정리가 없는 객체를 한 번 더 지우는데, 그건 무해하다.
+    """
+    if not pending:
         return
     try:
-        get_storage().delete(keys)
-    except Exception:  # noqa: BLE001  저장소 장애로 프로젝트·수행 삭제가 막히면 안 된다
-        logger.warning("Failed to delete attachment objects, queued for retry: %d", len(keys), exc_info=True)
-        db.add_all([StorageDeletion(storage_key=k) for k in keys])
+        get_storage().delete([k for _, k in pending])
+    except Exception:  # noqa: BLE001  저장소 장애로 이미 끝난 삭제를 실패로 돌리지 않는다
+        logger.warning("Failed to delete attachment objects, left for daily retry: %d", len(pending), exc_info=True)
+        return
+    try:
+        db.query(StorageDeletion).filter(
+            StorageDeletion.id.in_([i for i, _ in pending])
+        ).delete(synchronize_session=False)
+        db.commit()
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logger.warning("Failed to clear storage deletion queue: %d", len(pending), exc_info=True)
 
 
 def _get_project_id_from_test_result(test_result_id: int, db: Session) -> Optional[int]:
@@ -287,7 +313,8 @@ def delete_attachment(
         raise HTTPException(status_code=404, detail="Project not found")
     _check_attachment_access(project_id, current_user, db, "tester")
 
-    delete_attachment_objects([att.filepath], db)
-
+    # 저장소는 커밋 뒤에 지운다(schedule_object_deletions 참고)
+    pending = schedule_object_deletions([att.filepath], db)
     db.delete(att)
     db.commit()
+    run_object_deletions(pending, db)

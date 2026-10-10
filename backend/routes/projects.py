@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from routes.attachments import delete_attachment_objects
+from routes.attachments import run_object_deletions, schedule_object_deletions
 from models import User, Project, ProjectMember, ProjectRole, TestRun, TestResult, Attachment
 from schemas import ProjectCreate, ProjectUpdate, ProjectResponse
 from auth import get_current_user, role_required, get_project_role, check_project_access
@@ -180,13 +180,16 @@ def delete_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # 프로젝트에 속한 첨부파일 실파일 삭제
+    # 프로젝트에 속한 첨부파일 실파일 삭제. 키는 지금 모으고 저장소는 커밋 뒤에 지운다
+    # (schedule_object_deletions 참고).
+    pending = []
     run_ids = [r.id for r in db.query(TestRun.id).filter(TestRun.project_id == project_id).all()]
     if run_ids:
         result_ids = [r.id for r in db.query(TestResult.id).filter(TestResult.test_run_id.in_(run_ids)).all()]
         if result_ids:
             attachments = db.query(Attachment).filter(Attachment.test_result_id.in_(result_ids)).all()
-            delete_attachment_objects([att.filepath for att in attachments], db)
+            pending = schedule_object_deletions([att.filepath for att in attachments], db)
 
     db.delete(project)
     db.commit()
+    run_object_deletions(pending, db)

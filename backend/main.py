@@ -9,9 +9,10 @@ logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 
 from services.storage import StorageUnavailable
 
@@ -83,7 +84,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YM TestCase API",
     description="Your Method, Your Test Case Manager",
-    version="2.2.1.0",
+    version="2.2.2.0",
     lifespan=lifespan,
     # 배포는 /api/* 만 백엔드로 보낸다(vercel.json). 문서도 그 아래에 둔다.
     docs_url="/api/docs",
@@ -103,6 +104,10 @@ app.add_middleware(
     # 서버가 정한 파일 이름을 읽으려면 열어 둬야 한다.
     expose_headers=["Content-Disposition"],
 )
+
+# ★응답을 압축한다. Vercel 함수 응답은 4.5MB 가 상한이라 TC 본문을 싣는 수행 상세가 TC
+#   수천 건이면 넘는다(실데이터 643건짜리 수행이 저장 크기로 약 1MB). JSON 은 크게 줄어든다.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # ── Schema guard (serverless) ────────────────────────────────────────────────
 _SCHEMA_EXEMPT = ("/api/config",)
@@ -213,6 +218,19 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
         )
     logger.error("Integrity error on %s %s: %s", request.method, request.url.path, detail)
     return JSONResponse(status_code=409, content={"detail": "데이터 제약 조건에 걸렸습니다."})
+
+
+# ★PostgreSQL 은 VARCHAR(n) 을 넘는 값을 DataError 로 거절한다(SQLite 는 길이를 보지 않았다).
+#   스키마 max_length 와 가져오기 검사가 먼저 막지만, 빠진 경로가 있으면 500 으로 떨어져
+#   사용자는 이유를 모른다. 입력을 고치면 되는 일이라 400 과 안내 문구로 돌려준다.
+#   숫자 범위 초과나 형식 오류(invalid input syntax)도 같은 DataError 라 함께 받는다.
+@app.exception_handler(DataError)
+async def data_error_handler(request: Request, exc: DataError):
+    logger.warning("Data error on %s %s: %s", request.method, request.url.path, getattr(exc, "orig", exc))
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "입력값이 허용 길이나 형식을 벗어났습니다. 긴 값을 줄여 다시 시도해 주세요."},
+    )
 
 
 @app.exception_handler(StorageUnavailable)

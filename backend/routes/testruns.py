@@ -19,7 +19,7 @@ from schemas import (
     TestResultCreate, TestResultResponse,
 )
 from auth import get_current_user, role_required, check_project_access, get_project_role
-from routes.attachments import delete_attachment_objects
+from routes.attachments import run_object_deletions, schedule_object_deletions
 from services.staged_upload import PURPOSE_LIMITS, resolve_file
 from services.locks import LockNs, advisory_xact_lock, project_write_lock
 from services.run_sync_service import sync_run_results
@@ -240,7 +240,8 @@ def get_testrun(
     # 세션에서 분리한 뒤 정렬해 ORM 컬렉션 변경으로 잡히지 않게 한다.
     if loaded:
         db.expunge(loaded)
-        loaded.results.sort(key=lambda r: r.test_case.no if r.test_case else 0)
+        # 시트가 여럿이면 no 가 겹친다. TC id 로 동점을 깨 조회마다 같은 차례가 되게 한다.
+        loaded.results.sort(key=lambda r: (r.test_case.no if r.test_case else 0, r.test_case_id))
     return loaded
 
 
@@ -280,6 +281,22 @@ def update_testrun(
     db.commit()
     db.refresh(run)
     return run
+
+
+COMPLETED_RUN_DETAIL = "완료된 테스트 런은 수정할 수 없습니다. 재오픈 후 수정하세요."
+
+
+def _reject_if_completed_after_lock(run: TestRun, db: Session) -> None:
+    """수행 잠금(RUN_RESULTS)을 잡은 뒤 상태를 다시 읽어 완료됐으면 거절한다.
+
+    ★잠금 전에 본 "진행 중" 은 낡았을 수 있다. 잠금을 기다리는 사이 완료가 먼저 커밋되면
+      예전에는 그 값을 믿고 완료된 수행에 결과를 썼다. 완료 · 재오픈도 같은 잠금을 잡으므로
+      잠금을 얻은 뒤 읽은 상태가 확정 값이다.
+    """
+    db.refresh(run, attribute_names=["status"])
+    if run.status == TestRunStatus.completed:
+        db.rollback()  # 잡은 수행 잠금을 응답 전에 푼다
+        raise HTTPException(status_code=400, detail=COMPLETED_RUN_DETAIL)
 
 
 def _stale_rows(results, existing_map: dict, db: Session) -> list[str]:
@@ -326,6 +343,7 @@ def submit_results(
     #   잡지 않으면 가져오기가 읽고 판단한 사이 사람이 저장한 값을 덮고, 누락 행을 서로 다른
     #   순서로 넣다가 교착한다. 같은 수행의 저장은 짧아서 줄을 서도 체감이 작다.
     advisory_xact_lock(db, LockNs.RUN_RESULTS, run.id)
+    _reject_if_completed_after_lock(run, db)
 
     tc_ids = [r.test_case_id for r in results]
 
@@ -626,6 +644,7 @@ def _record_import(run: TestRun, fmt: str, entries, db: Session, user: User, *,
     project_id, run_id = run.project_id, run.id
     # 저장·동기화와 같은 수행 잠금. keep_executed 판단은 잠금을 잡은 뒤의 값으로 한다.
     advisory_xact_lock(db, LockNs.RUN_RESULTS, run_id)
+    _reject_if_completed_after_lock(run, db)
     # 런 생성 뒤에 추가된 TC 도 행이 있어야 기록된다. 상세 조회와 같은 보정을 먼저 한다.
     sync_run_results(run, db, commit=False)
 
@@ -707,8 +726,16 @@ def complete_testrun(
     #   빠뜨린 것처럼 보이지만, 완료는 "여기서 끝" 이라는 선언이다. 그 순간에 새 TC 를
     #   끌어들이면 수행하지 않은 행이 NS 로 들어가 합격률과 총계가 변경된다.
     #   reopen 이 부르는 것은 반대로 "다시 연다" 라서 그 사이 늘어난 TC 를 담아야 하기
-    #   때문이다. TC 생성·복제·복원·임포트가 이미 진행 중 수행을 맞추므로
+    #   때문이다. TC 생성·복제·복원·임포트·시트 이동이 이미 진행 중 수행을 맞추므로
     #   (sync_project_in_progress_runs) 완료 직전에 누락이 남는 경로는 사실상 없다.
+    # ★결과 저장 · 가져오기와 같은 수행 잠금을 잡는다. 안 잡으면 저장이 상태를 확인한 뒤
+    #   쓰기 전에 완료가 끼어들어, 완료된 수행에 결과가 들어간다.
+    advisory_xact_lock(db, LockNs.RUN_RESULTS, run.id)
+    db.refresh(run)
+    if run.status == TestRunStatus.completed:
+        # 이미 완료된 수행이다. 두 번 눌러도 처음 완료한 시각을 덮지 않는다.
+        db.rollback()
+        return run
     run.status = TestRunStatus.completed
     run.completed_at = now_kst()
 
@@ -733,6 +760,11 @@ def reopen_testrun(
     if not run:
         raise HTTPException(status_code=404, detail="Test run not found")
 
+    # 완료와 같은 수행 잠금. 완료 · 재오픈 · 저장이 한 줄로 선다.
+    advisory_xact_lock(db, LockNs.RUN_RESULTS, run.id)
+    # ★잠금 전에 읽은 객체가 이미 '진행 중' 이면 같은 값 대입은 변경으로 잡히지 않는다. 기다리는
+    #   사이 완료가 커밋됐다면 그대로 완료로 남고 200 이 나간다. 잠금 뒤 최신 값으로 다시 읽는다.
+    db.refresh(run)
     run.status = TestRunStatus.in_progress
     run.completed_at = None
     db.commit()
@@ -760,15 +792,18 @@ def delete_testrun(
     if not run:
         raise HTTPException(status_code=404, detail="Test run not found")
 
+    # 첨부 키는 지금 모으고 저장소는 커밋 뒤에 지운다(schedule_object_deletions 참고).
+    pending = []
     result_ids = [r.id for r in db.query(TestResult.id).filter(TestResult.test_run_id == run_id).all()]
     if result_ids:
         attachments = db.query(Attachment).filter(Attachment.test_result_id.in_(result_ids)).all()
-        delete_attachment_objects([att.filepath for att in attachments], db)
+        pending = schedule_object_deletions([att.filepath for att in attachments], db)
         # bulk delete로 처리 (개별 db.delete()는 cascade와 충돌하여 경고 발생)
         db.query(Attachment).filter(Attachment.test_result_id.in_(result_ids)).delete(synchronize_session=False)
     db.query(TestResult).filter(TestResult.test_run_id == run_id).delete(synchronize_session=False)
     db.delete(run)
     db.commit()
+    run_object_deletions(pending, db)
 
 
 @router.post("/{run_id}/clone", response_model=TestRunListResponse, status_code=status.HTTP_201_CREATED)
@@ -831,12 +866,23 @@ def _clone_run(source: TestRun, user: User, db: Session, *, next_round: bool) ->
     db.flush()
 
     if source.results:
+        # ★원본 런은 한 번 담은 행을 빼지 않으므로, 그 뒤 지운 TC 와 범위 밖 시트로 옮긴 TC 의
+        #   행이 남아 있다. 그대로 베끼면 새 회차에 NS 로 다시 들어간다. _new_run 과 같은
+        #   조건(지우지 않았고, 범위가 있으면 그 시트 안)을 통과한 TC 만 넘긴다.
+        alive_q = db.query(TestCase.id).filter(
+            TestCase.project_id == source.project_id,
+            TestCase.id.in_({r.test_case_id for r in source.results}),
+            TestCase.deleted_at.is_(None),
+        )
+        if source.sheet_names is not None:
+            alive_q = alive_q.filter(TestCase.sheet_name.in_(source.sheet_names))
+        alive = {row[0] for row in alive_q.all()}
         # ★원본 런에 같은 TC 결과가 둘 이상이면 그대로 복사돼 새 런에도 중복이 생긴다.
         #   유니크 제약이 생긴 뒤로는 아예 실패한다. TC 기준으로 한 번만 넣는다.
         seen = set()
         rows = []
         for r in source.results:
-            if r.test_case_id in seen:
+            if r.test_case_id in seen or r.test_case_id not in alive:
                 continue
             seen.add(r.test_case_id)
             rows.append({
@@ -845,7 +891,8 @@ def _clone_run(source: TestRun, user: User, db: Session, *, next_round: bool) ->
                 "result": TestResultValue.NS,
                 "executed_by": user.id,
             })
-        db.bulk_insert_mappings(TestResult, rows)
+        if rows:
+            db.bulk_insert_mappings(TestResult, rows)
     return new_run
 
 

@@ -14,7 +14,7 @@ from services.tc_id_service import TC_ID_MAX_LEN  # noqa: E402
 class UserCreate(BaseModel):
     # 사용자가 0명일 때(첫 관리자)만 username 을 받는다. 그 뒤로는 email 이 필수다.
     username: Optional[str] = Field(None, max_length=100)
-    email: Optional[str] = Field(None, max_length=254)
+    email: Optional[str] = Field(None, max_length=100)
     password: str = Field(..., min_length=8)
     display_name: str = Field(..., min_length=1, max_length=100)
     bootstrap_token: Optional[str] = None
@@ -141,10 +141,10 @@ def _normalize_tracker(v):
 
 
 class ProjectCreate(BaseModel):
-    name: str = Field(..., min_length=1)
+    name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
-    jira_base_url: Optional[str] = None
-    issue_tracker: Optional[str] = None
+    jira_base_url: Optional[str] = Field(None, max_length=500)
+    issue_tracker: Optional[str] = Field(None, max_length=20)
     is_private: bool = False
 
     @field_validator("issue_tracker", mode="before")
@@ -154,10 +154,10 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=200)
     description: Optional[str] = None
-    jira_base_url: Optional[str] = None
-    issue_tracker: Optional[str] = None
+    jira_base_url: Optional[str] = Field(None, max_length=500)
+    issue_tracker: Optional[str] = Field(None, max_length=20)
     is_private: Optional[bool] = None
     field_config: Optional[dict] = None
 
@@ -214,40 +214,40 @@ class TestCaseCreate(BaseModel):
     #: 들어오거나 구멍이 생겨 규약이 다시 깨진다.
     no: Optional[int] = None
     tc_id: str = Field(..., min_length=1, max_length=TC_ID_MAX_LEN)
-    type: Optional[str] = None
-    category: Optional[str] = None
-    depth1: Optional[str] = None
-    depth2: Optional[str] = None
-    priority: Optional[str] = None
-    test_type: Optional[str] = None
+    type: Optional[str] = Field(None, max_length=50)
+    category: Optional[str] = Field(None, max_length=200)
+    depth1: Optional[str] = Field(None, max_length=200)
+    depth2: Optional[str] = Field(None, max_length=200)
+    priority: Optional[str] = Field(None, max_length=20)
+    test_type: Optional[str] = Field(None, max_length=50)
     precondition: Optional[str] = None
     test_steps: Optional[str] = None
     expected_result: Optional[str] = None
-    r1: Optional[str] = None
-    r2: Optional[str] = None
-    r3: Optional[str] = None
+    r1: Optional[str] = Field(None, max_length=10)
+    r2: Optional[str] = Field(None, max_length=10)
+    r3: Optional[str] = Field(None, max_length=10)
     remarks: Optional[str] = None
-    sheet_name: Optional[str] = "기본"
+    sheet_name: Optional[str] = Field("기본", max_length=100)
     custom_fields: Optional[dict[str, Any]] = None
 
 
 class TestCaseUpdate(BaseModel):
     no: Optional[int] = None
     tc_id: Optional[str] = Field(None, min_length=1, max_length=TC_ID_MAX_LEN)
-    type: Optional[str] = None
-    category: Optional[str] = None
-    depth1: Optional[str] = None
-    depth2: Optional[str] = None
-    priority: Optional[str] = None
-    test_type: Optional[str] = None
+    type: Optional[str] = Field(None, max_length=50)
+    category: Optional[str] = Field(None, max_length=200)
+    depth1: Optional[str] = Field(None, max_length=200)
+    depth2: Optional[str] = Field(None, max_length=200)
+    priority: Optional[str] = Field(None, max_length=20)
+    test_type: Optional[str] = Field(None, max_length=50)
     precondition: Optional[str] = None
     test_steps: Optional[str] = None
     expected_result: Optional[str] = None
-    r1: Optional[str] = None
-    r2: Optional[str] = None
-    r3: Optional[str] = None
+    r1: Optional[str] = Field(None, max_length=10)
+    r2: Optional[str] = Field(None, max_length=10)
+    r3: Optional[str] = Field(None, max_length=10)
     remarks: Optional[str] = None
-    sheet_name: Optional[str] = None
+    sheet_name: Optional[str] = Field(None, max_length=100)
     custom_fields: Optional[dict[str, Any]] = None
 
 
@@ -281,21 +281,22 @@ class TestCaseResponse(BaseModel):
 class TestCaseBulkItem(BaseModel):
     id: int
     no: Optional[int] = None
-    tc_id: Optional[str] = None
-    type: Optional[str] = None
-    category: Optional[str] = None
-    depth1: Optional[str] = None
-    depth2: Optional[str] = None
-    priority: Optional[str] = None
-    test_type: Optional[str] = None
+    # 단건 수정(TestCaseUpdate)과 같은 규칙. 빈 TC ID 는 사전조건 참조와 채번을 깨뜨린다.
+    tc_id: Optional[str] = Field(None, min_length=1, max_length=TC_ID_MAX_LEN)
+    type: Optional[str] = Field(None, max_length=50)
+    category: Optional[str] = Field(None, max_length=200)
+    depth1: Optional[str] = Field(None, max_length=200)
+    depth2: Optional[str] = Field(None, max_length=200)
+    priority: Optional[str] = Field(None, max_length=20)
+    test_type: Optional[str] = Field(None, max_length=50)
     precondition: Optional[str] = None
     test_steps: Optional[str] = None
     expected_result: Optional[str] = None
-    r1: Optional[str] = None
-    r2: Optional[str] = None
-    r3: Optional[str] = None
+    r1: Optional[str] = Field(None, max_length=10)
+    r2: Optional[str] = Field(None, max_length=10)
+    r3: Optional[str] = Field(None, max_length=10)
     remarks: Optional[str] = None
-    sheet_name: Optional[str] = None
+    sheet_name: Optional[str] = Field(None, max_length=100)
     custom_fields: Optional[dict[str, Any]] = None
 
 
@@ -306,9 +307,9 @@ class TestCaseBulkUpdate(BaseModel):
 # ── TestRun ───────────────────────────────────────────────────────────────────
 
 class TestRunCreate(BaseModel):
-    name: str
-    version: Optional[str] = None
-    environment: Optional[str] = None
+    name: str = Field(..., max_length=200)
+    version: Optional[str] = Field(None, max_length=50)
+    environment: Optional[str] = Field(None, max_length=100)
     round: int = 1
     test_plan_id: Optional[int] = None
     #: 이 런에 담을 시트. 생략하거나 None 이면 프로젝트 전체를 담는다.
@@ -316,9 +317,9 @@ class TestRunCreate(BaseModel):
 
 
 class TestRunUpdate(BaseModel):
-    name: Optional[str] = None
-    version: Optional[str] = None
-    environment: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=200)
+    version: Optional[str] = Field(None, max_length=50)
+    environment: Optional[str] = Field(None, max_length=100)
     round: Optional[int] = None
     #: 리포트의 비교 대상 수행. null 이면 자동(같은 이름의 이전 회차)으로 되돌린다.
     compare_run_id: Optional[int] = None
@@ -328,7 +329,7 @@ class TestResultCreate(BaseModel):
     test_case_id: int
     result: str  # PASS/FAIL/BLOCK/NA/NS
     actual_result: Optional[str] = None
-    issue_link: Optional[str] = None
+    issue_link: Optional[str] = Field(None, max_length=500)
     remarks: Optional[str] = None
     started_at: Optional[str] = None
     finished_at: Optional[str] = None
@@ -341,7 +342,7 @@ class TestResultCreate(BaseModel):
 class TestResultUpdate(BaseModel):
     result: Optional[str] = None
     actual_result: Optional[str] = None
-    issue_link: Optional[str] = None
+    issue_link: Optional[str] = Field(None, max_length=500)
     remarks: Optional[str] = None
 
 
@@ -469,15 +470,15 @@ class TestRunListResponse(BaseModel):
 # ── Custom Field ─────────────────────────────────────────────────────────────
 
 class CustomFieldDefCreate(BaseModel):
-    field_name: str
-    field_type: str = "text"  # text, number, select, multiselect, checkbox, date
+    field_name: str = Field(..., max_length=100)
+    field_type: str = Field("text", max_length=20)  # text, number, select, multiselect, checkbox, date
     options: Optional[List[str]] = None
     is_required: bool = False
 
 
 class CustomFieldDefUpdate(BaseModel):
-    field_name: Optional[str] = None
-    field_type: Optional[str] = None
+    field_name: Optional[str] = Field(None, max_length=100)
+    field_type: Optional[str] = Field(None, max_length=20)
     options: Optional[List[str]] = None
     is_required: Optional[bool] = None
     sort_order: Optional[int] = None
@@ -499,16 +500,16 @@ class CustomFieldDefResponse(BaseModel):
 # ── Test Plan ────────────────────────────────────────────────────────────────
 
 class TestPlanCreate(BaseModel):
-    name: str
-    milestone: Optional[str] = None
+    name: str = Field(..., max_length=200)
+    milestone: Optional[str] = Field(None, max_length=200)
     description: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
 
 
 class TestPlanUpdate(BaseModel):
-    name: Optional[str] = None
-    milestone: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=200)
+    milestone: Optional[str] = Field(None, max_length=200)
     description: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
@@ -540,15 +541,15 @@ class FilterCondition(BaseModel):
 
 
 class SavedFilterCreate(BaseModel):
-    name: str
+    name: str = Field(..., max_length=200)
     conditions: List[FilterCondition]
-    logic: str = "AND"  # AND / OR
+    logic: str = Field("AND", max_length=3)  # AND / OR
 
 
 class SavedFilterUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=200)
     conditions: Optional[List[FilterCondition]] = None
-    logic: Optional[str] = None
+    logic: Optional[str] = Field(None, max_length=3)
 
 
 class SavedFilterResponse(BaseModel):

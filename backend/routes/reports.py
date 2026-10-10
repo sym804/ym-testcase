@@ -1151,7 +1151,7 @@ def report_excel(
         .filter(TestResult.test_run_id == run.id)
         # 런에 나중에 편입된 TC가 뒤에 붙지 않도록 TC 번호 순으로 고정한다
         .join(TestCase, TestResult.test_case_id == TestCase.id)
-        .order_by(TestCase.no)
+        .order_by(TestCase.no, TestCase.id)
         .all()
     )
     # ★수행 엑셀과 같은 차례로 세운다. 같은 수행을 두 파일로 뽑을 수 있어서,
