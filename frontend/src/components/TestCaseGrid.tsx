@@ -19,7 +19,7 @@ import toast from "react-hot-toast";
 import { translateError } from "../utils/errorMessage";
 import { LARGE_TEXT_EDITOR_PARAMS } from "../utils/gridEditors";
 import { readRowField, writeRowField } from "../utils/rowFields";
-import { planTcIdFill, dominantTcIdPrefix, findTcIdCollisions } from "../utils/tcId";
+import { planTcIdFill, findTcIdCollisions, nextNewTcIds } from "../utils/tcId";
 import MarkdownCell from "./MarkdownCell";
 import PreconditionCell from "./PreconditionCell";
 import HighlightCell from "./HighlightCell";
@@ -41,12 +41,24 @@ const TYPE_OPTIONS = ["Func.", "UI/UX", "Perf.", "Security", "API", "Data"];
 // 우선순위 값과 색은 utils/priority 에 있다. 테스트 수행 그리드와 같이 쓴다.
 const PLATFORM_OPTIONS = ["Web", "Mobile Web", "Mobile App", "iOS", "Android", "PC", "API", "공통"];
 
+/** 행 복사. custom_fields 는 편집기가 객체를 직접 고치므로 따로 복사해야 스냅샷과 갈라진다. */
+function cloneRow(row: TestCase): TestCase {
+  return { ...row, custom_fields: row.custom_fields ? { ...row.custom_fields } : row.custom_fields };
+}
+
 export default function TestCaseGrid({ projectId, project, highlightTcId }: Props) {
   const { t, i18n } = useTranslation("testcase");
   const gridLocale = i18n.language === "ko" ? AG_GRID_LOCALE_KO : AG_GRID_LOCALE_EN;
   const canEditTC = project.my_role === "admin";
   const gridRef = useRef<AgGridReact>(null);
   const [rowData, setRowData] = useState<TestCase[]>([]);
+  // 자동저장의 기준(마지막으로 서버가 확정한 행). 자세한 규칙은 아래 스냅샷 effect 주석.
+  const lastSavedRef = useRef<Record<string, TestCase>>({});
+  const resetSnapshots = (rows: TestCase[]) => {
+    const next: Record<string, TestCase> = {};
+    for (const row of rows) if (row.id) next[String(row.id)] = cloneRow(row);
+    lastSavedRef.current = next;
+  };
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
   const [selectedCount, setSelectedCount] = useState(0);
@@ -56,6 +68,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
 
   // ── 시트 탭 (트리 구조) ──
   const [sheets, setSheets] = useState<SheetNode[]>([]);
+  // 시트 조회 실패를 '시트 없음' 과 구분한다. 삼키면 TC 가 수백 건 있어도 빈 프로젝트 화면이 뜬다.
+  const [sheetsFailed, setSheetsFailed] = useState(false);
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
   const [expandedSheets, setExpandedSheets] = useState<Set<number>>(new Set());
 
@@ -70,6 +84,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const [filterLogic, setFilterLogic] = useState<"AND" | "OR">("AND");
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [activeFilterName, setActiveFilterName] = useState<string | null>(null);
+  // 표가 고급 필터 결과인지. 필터 결과는 시트 일부라 드래그 정렬을 켜면 번호가 어긋난다.
+  const [filterApplied, setFilterApplied] = useState(false);
 
   // 트리를 flat 리스트로 펼치기 (시트 순서, tc_count 합산 등에 사용)
   const flatSheets = useMemo(() => {
@@ -225,6 +241,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     try {
       const s = await testCasesApi.listSheets(projectId);
       setSheets(s);
+      setSheetsFailed(false);
       // 최초 로딩 시에만 첫 시트 자동 선택
       const flatAll: SheetNode[] = [];
       const collectFlat = (nodes: SheetNode[]) => { for (const n of nodes) { flatAll.push(n); collectFlat(n.children); } };
@@ -237,10 +254,12 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       // 같은 규칙이다(지운 시트가 활성이었으면 null 이 된다).
       const leaves = flatAll.filter((n) => !n.is_folder);
       if (leaves.length === 1) setActiveSheet((prev) => prev ?? leaves[0].name);
-    } catch {
-      // 시트 API 실패 시 무시 (기존 호환)
+    } catch (err) {
+      console.error(err);
+      setSheetsFailed(true);
+      toast.error(t("sheetsLoadFailed"), { id: "sheets-load-failed" });
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   const loadCustomFields = useCallback(async () => {
     try {
@@ -286,10 +305,13 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         }
         let seq = 1;
         const withSeq = sorted.map((tc) => ({ ...tc, _originalNo: tc.no, no: seq++ }));
+        resetSnapshots(withSeq);
         setRowData(withSeq);
       } else {
+        resetSnapshots(data);
         setRowData(data);
       }
+      setFilterApplied(false);
       undoStackRef.current = [];
       redoStackRef.current = [];
       setUndoCount(0);
@@ -357,7 +379,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         //   숨은 행이 빠진다. 그대로 저장하면 시트 안 번호 규약이 무너진다.
         //   서버도 같은 조건으로 거절하지만(400), 끌어 놓고 나서 실패를 보는 것보다
         //   못 끌게 하는 편이 낫다.
-        { _key: "no", field: "no", headerName: "No", width: 70, rowDrag: canEditTC && !!activeSheet && !searchText, editable: false, type: "numericColumn", wrapText: false, autoHeight: false },
+        { _key: "no", field: "no", headerName: "No", width: 70, rowDrag: canEditTC && !!activeSheet && !searchText && !filterApplied, editable: false, type: "numericColumn", wrapText: false, autoHeight: false },
         { _key: "tc_id", field: "tc_id", headerName: fieldDisplay("tc_id", "TC ID").name, width: 110, editable: canEditTC, cellRenderer: HighlightCell },
         {
           _key: "type", field: "type",
@@ -448,7 +470,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     ];
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canEditTC, activeSheet, searchText, customFields, project.field_config, priorityRefData, platformRefData]
+    [canEditTC, activeSheet, searchText, filterApplied, customFields, project.field_config, priorityRefData, platformRefData]
   );
 
   const defaultColDef = useMemo<ColDef>(
@@ -478,40 +500,58 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
     gridApiRef.current = params.api;
-    if (highlightTcId) {
-      setTimeout(() => {
-        params.api.forEachNode((node) => {
-          if (node.data?.tc_id === highlightTcId) {
-            node.setSelected(true);
-            params.api.ensureNodeVisible(node, "middle");
-          }
-        });
-      }, 300);
-    }
-  }, [highlightTcId]);
+  }, []);
+
+  // 검색에서 고른 TC 를 강조한다. ★onGridReady 에서만 하면 같은 프로젝트 안에서 다시 검색했을 때
+  //   그리드가 다시 준비되지 않아 아무 일도 없다. 지금 시트에 없으면 전체 보기로 넓혀 한 번 더 찾는다.
+  const highlightDoneRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlightTcId || loading || highlightDoneRef.current === highlightTcId) return;
+    const timer = setTimeout(() => {
+      const api = gridApiRef.current;
+      if (!api) return;
+      let found = false;
+      api.forEachNode((node) => {
+        if (!found && node.data?.tc_id === highlightTcId) {
+          found = true;
+          api.deselectAll();
+          node.setSelected(true);
+          api.ensureNodeVisible(node, "middle");
+        }
+      });
+      if (!found && activeSheet !== null && flatSheets.length > 1) {
+        setActiveSheet(null);
+        return;
+      }
+      highlightDoneRef.current = highlightTcId;
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [highlightTcId, rowData, loading, activeSheet, flatSheets.length]);
 
   // ── 자동 저장 (디바운스) ──
   const autoSaveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  // 저장이 거부되면 되돌리려고, 행마다 서버가 확정한 마지막 상태를 들고 있는다.
-  // 거부된 값을 화면에 남기면 자동저장이 행 전체를 보내므로 같은 행의 다음 편집도
-  // 계속 같은 이유로 실패한다. 사용자는 토스트를 놓치면 저장된 줄 안다.
+  // 행마다 서버가 확정한 마지막 상태를 들고 있는다. 두 가지에 쓴다.
+  // 하나, 자동저장은 이 상태와 다른 칸만 보낸다. 둘, 저장이 거부되면 이 상태로 되돌린다.
+  // 거부된 값을 화면에 남기면 그 칸이 계속 '바뀐 칸' 으로 잡혀 같은 행의 다음 편집도
+  // 같은 이유로 실패한다. 사용자는 토스트를 놓치면 저장된 줄 안다.
   //
   // 편집 지점마다 기록하지 않고 여기 한 곳에 두는 이유가 있다. 이 파일에서
   // autoSaveRow 를 부르는 경로는 여섯이고(셀 편집, 찾기/바꾸기, 일괄 변경,
   // TC ID 자동채우기, Ctrl+D 채우기, undo/redo) 그중 다섯은 node.data 를 직접
   // 대입해 onCellValueChanged 를 타지 않는다. 편집 쪽에 기록을 붙이면 그 다섯이
   // 빠진다(2026-09-07 실측: 모두 바꾸기가 409 로 거부돼도 값이 화면에 남았다).
-  const lastSavedRef = useRef<Record<string, TestCase>>({});
-
-  // 서버에서 온 행으로 스냅샷을 새로 잡는다. rowData 는 셀 편집으로는 변경되지
-  // 않고(그 경로는 node.data 를 직접 고친다) 로드·추가·복제·삭제에서만 바뀌므로,
-  // 여기서 통째로 다시 잡아도 편집 중인 값을 스냅샷으로 굳히지 않는다.
-  // 사라진 행의 스냅샷은 같이 버려져 시트나 프로젝트를 옮겨도 남지 않는다.
+  // 스냅샷을 잡는다. ★이미 스냅샷이 있는 행은 덮지 않는다. rowData 의 행 객체는 그리드의
+  //   node.data 와 같은 객체라 셀 편집이 그대로 들어 있다. 행 추가·복제·삭제로 배열만 바뀔
+  //   때 통째로 다시 잡으면 저장 전 편집이 '저장된 값' 으로 굳어 부분 저장이 그 칸을 빼먹는다.
+  //   서버에서 새로 읽을 때(loadData, 필터 적용)는 setRowData 와 같은 자리에서 resetSnapshots 로
+  //   바로 잡는다. effect 로 미루면 화면이 그려진 뒤 effect 가 돌기 전에 들어온 편집이 스냅샷에 섞인다.
+  //   사라진 행의 스냅샷은 같이 버려져 시트나 프로젝트를 옮겨도 남지 않는다.
   useEffect(() => {
+    const prev = lastSavedRef.current;
     const next: Record<string, TestCase> = {};
     for (const row of rowData) {
-      if (row.id) next[String(row.id)] = { ...row };
+      if (row.id) next[String(row.id)] = prev[String(row.id)] ?? cloneRow(row);
     }
     lastSavedRef.current = next;
   }, [rowData]);
@@ -524,36 +564,60 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     if (!node?.data) return;
     // 같은 객체를 그대로 채운다. rowData 배열이 이 객체를 참조하므로
     // 새 객체로 갈아끼우면 state 와 그리드가 갈라진다.
-    Object.assign(node.data, saved);
+    Object.assign(node.data, cloneRow(saved));
     gridApi.refreshCells({ rowNodes: [node], force: true });
   }, []);
+
+  // 행마다 저장을 한 줄로 세운다. 앞 요청이 끝나기 전에 다음 요청이 나가면 서버에서 순서가
+  // 뒤바뀌어 옛 값이 남을 수 있다(서버리스 콜드 스타트처럼 응답이 늦을 때).
+  const saveChainRef = useRef<Record<string, Promise<void>>>({});
 
   const autoSaveRow = useCallback(async (data: TestCase) => {
     if (!data.id || data.id === 0) return; // 미저장 행은 무시
     const key = String(data.id);
     if (autoSaveTimerRef.current[key]) clearTimeout(autoSaveTimerRef.current[key]);
-    autoSaveTimerRef.current[key] = setTimeout(async () => {
-      // 보낸 시점의 상태. 성공하면 이것이 서버가 확정한 상태가 된다.
-      const sent = { ...data } as TestCase;
-      try {
-        // 전체 보기에서 화면용 연속 번호가 DB에 저장되지 않도록 원본 no 복원
-        const saveData = { ...data };
-        if ("_originalNo" in saveData) {
-          saveData.no = (saveData as Record<string, unknown>)._originalNo as number;
-          delete (saveData as Record<string, unknown>)._originalNo;
-        }
-        await testCasesApi.update(projectId, data.id, saveData);
-        lastSavedRef.current[key] = sent;
-      } catch (err) {
-        // TC ID 중복 같은 409 는 이유를 그대로 보여 준다.
-        // "저장 실패"만 뜨면 무엇을 고쳐야 하는지 알 수 없다.
-        const detail = (err as { response?: { data?: { detail?: string } } })
-          ?.response?.data?.detail;
-        toast.error(detail ? translateError(detail) : t("autoSaveFailed"));
-        // 저장되지 않은 값을 화면에 남기지 않는다
-        restoreRow(key);
-      }
+    autoSaveTimerRef.current[key] = setTimeout(() => {
       delete autoSaveTimerRef.current[key];
+      const run = async () => {
+        // 보낸 시점의 상태. 성공하면 이것이 서버가 확정한 상태가 된다.
+        const sent = cloneRow(data);
+        // 전체 보기에서 화면용 연속 번호가 DB에 저장되지 않도록 원본 no 복원
+        const saveData = { ...data } as Record<string, unknown>;
+        if ("_originalNo" in saveData) {
+          saveData.no = saveData._originalNo as number;
+          delete saveData._originalNo;
+        }
+        // ★바뀐 칸만 보낸다. 행 전체를 보내면 그 사이 다른 사람이 같은 TC 의 다른 칸을 고친 것을
+        //   이 화면이 들고 있던 옛 값으로 알림 없이 되돌린다. 서버는 보낸 칸만 고친다(exclude_unset).
+        const base = lastSavedRef.current[key] as unknown as Record<string, unknown> | undefined;
+        let payload: Record<string, unknown> = saveData;
+        if (base) {
+          payload = {};
+          for (const [k, v] of Object.entries(saveData)) {
+            if (k === "_originalNo") continue;
+            const before = k === "no" && "_originalNo" in base ? base._originalNo : base[k];
+            if (JSON.stringify(v ?? null) !== JSON.stringify(before ?? null)) payload[k] = v;
+          }
+          if (Object.keys(payload).length === 0) return;
+        }
+        try {
+          await testCasesApi.update(projectId, data.id, payload as Partial<TestCase>);
+          lastSavedRef.current[key] = sent;
+        } catch (err) {
+          // TC ID 중복 같은 409 는 이유를 그대로 보여 준다.
+          // "저장 실패"만 뜨면 무엇을 고쳐야 하는지 알 수 없다.
+          const detail = (err as { response?: { data?: { detail?: string } } })
+            ?.response?.data?.detail;
+          toast.error(detail ? translateError(detail) : t("autoSaveFailed"));
+          // 저장되지 않은 값을 화면에 남기지 않는다
+          restoreRow(key);
+        }
+      };
+      const chain = (saveChainRef.current[key] ?? Promise.resolve()).then(run);
+      saveChainRef.current[key] = chain;
+      void chain.finally(() => {
+        if (saveChainRef.current[key] === chain) delete saveChainRef.current[key];
+      });
     }, 300);
   }, [projectId, restoreRow]);
   autoSaveRowRef.current = autoSaveRow;
@@ -634,18 +698,26 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     }
     // 번호와 TC ID 를 루프 밖에서 한 번에 계산한다. handleAddRow 를 await 루프로
     // 돌리면 rowData 클로저가 갱신되지 않아 모든 행이 같은 값을 받는다.
-    const baseNo = rowData.reduce((m, r) => Math.max(m, r.no || 0), 0);
-    const seed = dominantTcIdPrefix(rowData.map((r) => r.tc_id));
-    const prefix = seed?.prefix ?? "TC-";
-    const numWidth = seed?.numWidth ?? 3;
-    const baseNum = seed?.maxNum ?? 0;
+    // ★TC ID 는 프로젝트 전체에서 유일하다. 화면의 행(지금 시트, 필터 결과)만 보면 다른 시트의
+    //   번호와 부딪혀 409 가 난다. 프로젝트 전체 목록을 받아 계산하고, 못 받으면 화면 행으로 한다.
+    let sheetRows: TestCase[] = rowData;
+    let projectIds: (string | null | undefined)[] = rowData.map((r) => r.tc_id);
+    try {
+      const all = await testCasesApi.list(projectId);
+      projectIds = all.map((r) => r.tc_id);
+      sheetRows = [...rowData, ...all.filter((r) => r.sheet_name === activeSheet)];
+    } catch (err) {
+      console.error(err);
+    }
+    const baseNo = sheetRows.reduce((m, r) => Math.max(m, r.no || 0), 0);
+    const newIds = nextNewTcIds(sheetRows.map((r) => r.tc_id), projectIds, count);
 
     const created: TestCase[] = [];
     try {
       for (let i = 1; i <= count; i++) {
         const newRow: Partial<TestCase> = {
           no: baseNo + i,
-          tc_id: prefix + String(baseNum + i).padStart(numWidth, "0"),
+          tc_id: newIds[i - 1],
           type: "",
           category: "",
           depth1: "",
@@ -663,8 +735,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         };
         created.push(await testCasesApi.create(projectId, newRow as TestCase));
       }
-    } catch {
-      toast.error(t("addRowFailed"));
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? `${t("addRowFailed")} ${translateError(detail)}` : t("addRowFailed"));
     }
 
     if (created.length === 0) return;
@@ -962,6 +1035,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     if (!e) return;
     if (e.key === "d" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
+      // 화면 값을 바꾼 뒤 서버가 403 으로 거절하고 되돌리는 것보다 처음부터 막는다
+      if (!canEditTC) return;
       const api = gridApiRef.current;
       if (!api || !event.column) return;
       const field = event.column.getColId();
@@ -989,7 +1064,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         toast.success(t("fillCount", { count: filled, value: sourceValue }));
       }
     }
-  }, [pushUndo, autoSaveRow]);
+  }, [pushUndo, autoSaveRow, canEditTC]);
 
   // ── TC 복제 (서버) ──
   const handleCloneSelected = useCallback(async () => {
@@ -1061,6 +1136,20 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
 
   // 시트가 없고 "기본"도 없으면 시트 추가 화면 표시
   const hasSheet = sheets.length > 0;
+
+  if (!hasSheet && sheetsFailed) {
+    return (
+      <div role="alert" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "calc(100vh - 220px)", gap: 16 }}>
+        <div style={{ fontSize: 15, color: "var(--text-danger)" }}>{t("sheetsLoadFailed")}</div>
+        <button
+          style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid var(--border-input)", backgroundColor: "transparent", color: "var(--text-primary)", fontSize: 14, cursor: "pointer" }}
+          onClick={() => { loadSheets(); loadData(); }}
+        >
+          {t("common:retry")}
+        </button>
+      </div>
+    );
+  }
 
   if (!hasSheet && !loading) {
     return (
@@ -1174,7 +1263,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                 aria-label={t("common:addRowCount")}
                 disabled={!activeSheet}
                 title={!activeSheet ? t("addRowPickSheet") : undefined}
-                defaultValue="5"
+                value=""
                 onChange={async (e) => {
                   const count = parseInt(e.target.value);
                   if (!count) return;
@@ -1182,6 +1271,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   if (added) toast.success(t("rowsAdded", { count: added }));
                 }}
               >
+                <option value="" disabled>{t("common:addRowCount")}</option>
                 <option value="1">{t("rowCount", { count: 1 })}</option>
                 <option value="3">{t("rowCount", { count: 3 })}</option>
                 <option value="5">{t("rowCount", { count: 5 })}</option>
@@ -1350,7 +1440,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                     try {
                       const data = await filtersApi.apply(projectId, filterConditions, filterLogic, activeSheet || undefined);
                       if (seq !== loadSeqRef.current) return;
+                      resetSnapshots(data);
                       setRowData(data);
+                      setFilterApplied(true);
                       toast.success(t("filterApplied", { count: data.length }));
                     } catch {
                       toast.error(t("filterApplyFailed"));

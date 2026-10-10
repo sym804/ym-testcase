@@ -28,7 +28,7 @@
     "goToProjects": "프로젝트 목록으로"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.2.2.0 | AGPL-3.0",
+  "version": "YM TestCase v2.2.3.0 | AGPL-3.0",
   "copy": "복사",
   "copiedToClipboard": "클립보드에 복사되었습니다.",
   "undo": "되돌리기",
@@ -106,5 +106,6 @@
   "selectRow": "이 프로젝트 선택",
   "addRowCount": "추가할 행 수",
   "uploadTooLarge": "파일이 너무 큽니다. {{mb}}MB 까지 올릴 수 있습니다.",
-  "uploadTooLargeNoLimit": "파일이 너무 큽니다."
+  "uploadTooLargeNoLimit": "파일이 너무 큽니다.",
+  "retry": "다시 시도"
 }

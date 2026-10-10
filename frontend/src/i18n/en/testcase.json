@@ -182,5 +182,6 @@
   "refCircular": "(Circular reference: {{id}})",
   "refNotFound": "(Reference target not found: {{id}})",
   "refTitle": "{{id}} precondition",
-  "refTitleUpto": "{{id}} precondition 1-{{upto}}"
+  "refTitleUpto": "{{id}} precondition 1-{{upto}}",
+  "sheetsLoadFailed": "Failed to load sheets. Your data is intact; please try again."
 }

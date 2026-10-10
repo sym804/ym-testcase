@@ -182,5 +182,6 @@
   "refCircular": "(순환 참조: {{id}})",
   "refNotFound": "(참조 대상을 찾을 수 없음: {{id}})",
   "refTitle": "{{id}} 사전조건",
-  "refTitleUpto": "{{id}} 사전조건 1~{{upto}}"
+  "refTitleUpto": "{{id}} 사전조건 1~{{upto}}",
+  "sheetsLoadFailed": "시트 목록을 불러오지 못했습니다. 데이터는 그대로 있으니 다시 시도해 주세요."
 }
