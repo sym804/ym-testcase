@@ -123,3 +123,6 @@ frontend/_*.mjs
 .superpowers/
 # 이관 스크립트가 남기는 제외 행(실 데이터 원문)
 excluded_rows*.json
+
+# Vercel CLI 연결 정보(orgId, projectId). 조직 배포 레포에서 생긴다
+.vercel
