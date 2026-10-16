@@ -28,7 +28,7 @@
     "goToProjects": "Go to Projects"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.2.5.1 | AGPL-3.0",
+  "version": "YM TestCase v2.2.6.0 | AGPL-3.0",
   "copy": "Copy",
   "copiedToClipboard": "Copied to clipboard.",
   "undo": "Undo",
@@ -54,6 +54,7 @@
     "selfParent": "Cannot set itself as parent.",
     "childAsParent": "Cannot set a child sheet as parent.",
     "cannotAddToFolder": "Cannot add TCs directly to a folder. Use a child sheet.",
+    "cannotCopyFolder": "Folders cannot be copied. Pick a sheet.",
     "testPlanNotFound": "Test plan does not exist.",
     "testPlanWrongProject": "Cannot link a test plan from another project.",
     "completedRunReadonly": "Completed test runs cannot be edited. Reopen it first.",

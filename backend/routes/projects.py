@@ -8,7 +8,7 @@ from database import get_db
 from routes.attachments import run_object_deletions, schedule_object_deletions
 from models import User, Project, ProjectMember, ProjectRole, TestRun, TestResult, Attachment
 from schemas import ProjectCreate, ProjectUpdate, ProjectResponse
-from auth import get_current_user, role_required, get_project_role, check_project_access
+from auth import get_current_user, get_project_role, check_project_access
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +104,11 @@ def list_projects(
 def create_project(
     payload: ProjectCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(role_required("qa_manager")),
+    current_user: User = Depends(get_current_user),
 ):
+    # 로그인한 사용자는 누구나 만든다. 만든 사람은 그 프로젝트의 admin 멤버가 되고,
+    # 다른 프로젝트에 대한 권한은 멤버 표로만 정해지므로 넓어지지 않는다.
+    # 프로젝트 admin 이면 열리는 전역 정보(멤버 후보 목록)는 최소 칸만 준다(members.py).
     project = Project(
         name=payload.name,
         description=payload.description,

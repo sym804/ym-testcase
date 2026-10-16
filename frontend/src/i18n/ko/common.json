@@ -28,7 +28,7 @@
     "goToProjects": "프로젝트 목록으로"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.2.5.1 | AGPL-3.0",
+  "version": "YM TestCase v2.2.6.0 | AGPL-3.0",
   "copy": "복사",
   "copiedToClipboard": "클립보드에 복사되었습니다.",
   "undo": "되돌리기",
@@ -54,6 +54,7 @@
     "selfParent": "자기 자신을 부모로 설정할 수 없습니다.",
     "childAsParent": "하위 시트를 부모로 설정할 수 없습니다.",
     "cannotAddToFolder": "폴더에는 TC를 직접 추가할 수 없습니다. 하위 시트를 사용하세요.",
+    "cannotCopyFolder": "폴더는 복사할 수 없습니다. 시트를 골라 주세요.",
     "testPlanNotFound": "존재하지 않는 테스트 플랜입니다.",
     "testPlanWrongProject": "다른 프로젝트의 테스트 플랜은 연결할 수 없습니다.",
     "completedRunReadonly": "완료된 테스트 런은 수정할 수 없습니다. 재오픈 후 수정하세요.",

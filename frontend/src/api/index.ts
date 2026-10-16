@@ -2,6 +2,7 @@ import client, { API_BASE_URL } from "./client";
 import { withStagedUpload } from "./uploads";
 import type {
   User,
+  UserCandidate,
   Project,
   ProjectMember,
   TestCase,
@@ -266,6 +267,13 @@ export const testCasesApi = {
     const res = await client.put<{ id: number; name: string; old_name: string }>(
       `/api/projects/${projectId}/testcases/sheets/${sheetId}/rename`,
       { new_name: newName }
+    );
+    return res.data;
+  },
+
+  copySheet: async (projectId: number, sheetId: number) => {
+    const res = await client.post<SheetNode & { source_id: number }>(
+      `/api/projects/${projectId}/testcases/sheets/${sheetId}/copy`
     );
     return res.data;
   },
@@ -604,7 +612,7 @@ export const membersApi = {
   },
 
   availableUsers: async (projectId: number) => {
-    const res = await client.get<User[]>(
+    const res = await client.get<UserCandidate[]>(
       `/api/projects/${projectId}/members/available-users`
     );
     return res.data;
