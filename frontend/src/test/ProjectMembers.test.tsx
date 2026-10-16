@@ -31,7 +31,6 @@ vi.mock("../api", () => ({
 
 import { membersApi } from "../api";
 import toast from "react-hot-toast";
-import { UserRole } from "../types";
 
 const mockMembers = [
   { id: 1, project_id: 1, user_id: 10, role: "admin", added_at: "2026-01-01T00:00:00", display_name: "생성자", username: "creator" },
@@ -39,9 +38,9 @@ const mockMembers = [
 ];
 
 const mockUsers = [
-  { id: 10, username: "creator", display_name: "생성자", role: UserRole.ADMIN, must_change_password: false, created_at: "2026-01-01" },
-  { id: 20, username: "testerA", display_name: "테스터A", role: UserRole.USER, must_change_password: false, created_at: "2026-01-01" },
-  { id: 30, username: "newUser", display_name: "신규사용자", role: UserRole.USER, must_change_password: false, created_at: "2026-01-01" },
+  { id: 10, username: "creator", display_name: "생성자" },
+  { id: 20, username: "testerA", display_name: "테스터A" },
+  { id: 30, username: "newUser", display_name: "신규사용자" },
 ];
 
 beforeEach(() => {

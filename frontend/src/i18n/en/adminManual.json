@@ -169,7 +169,7 @@
     "qaLevel": "Manager",
     "qaPerms": "User list view + access to all projects",
     "userLevel": "Standard",
-    "userPerms": "Assigned projects + public projects access",
+    "userPerms": "Assigned projects + public projects access, create projects (Project Admin of their own)",
     "projectRoleTitle": "6-2. Project Roles",
     "projTh1": "Role",
     "projTh2": "Description",
@@ -306,10 +306,10 @@
     "projects": {
       "title": "Projects",
       "list": "Project list",
-      "create": "Create project (Admin)",
+      "create": "Create project (any signed-in user, creator becomes Project Admin)",
       "detail": "Project detail",
       "update": "Update project",
-      "delete": "Delete project (Admin)"
+      "delete": "Delete project (Project Admin)"
     },
     "testCases": {
       "title": "Test Cases",
@@ -325,6 +325,7 @@
       "sheetDelete": "Delete sheet (cascading children)",
       "sheetRename": "Rename sheet",
       "sheetMove": "Move sheet (change parent)",
+      "sheetCopy": "Copy sheet (with TCs, not folders)",
       "importPreview": "Import preview",
       "import": "Excel/CSV/Markdown Import (Jira/Xray/Zephyr compatible)",
       "export": "Excel Export"

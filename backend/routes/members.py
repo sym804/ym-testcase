@@ -75,15 +75,22 @@ def list_available_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
 ):
-    """멤버 추가용 사용자 목록 - 이미 멤버인 사용자 제외"""
-    from schemas import UserResponse
+    """멤버 추가용 사용자 목록 - 이미 멤버인 사용자 제외
+
+    ★로그인한 누구나 프로젝트를 만들고 그 프로젝트의 admin 이 된다. 그래서 이 목록은
+      사실상 모든 사용자가 본다. 고르는 데 필요한 id, 아이디, 표시 이름만 주고, 사용 중인
+      계정만 준다. 역할·상태·연결된 Google 이메일 같은 계정 관리 정보는 /api/auth/users
+      (QA Manager 이상)에서만 본다.
+    """
+    from models import UserStatus
     existing_user_ids = {m.user_id for m in db.query(ProjectMember).filter(
         ProjectMember.project_id == project_id
     ).all()}
     users = db.query(User).filter(
-        ~User.id.in_(existing_user_ids) if existing_user_ids else True
+        User.status == UserStatus.active,
+        ~User.id.in_(existing_user_ids) if existing_user_ids else True,
     ).order_by(User.id).all()
-    return [UserResponse.model_validate(u) for u in users]
+    return [{"id": u.id, "username": u.username, "display_name": u.display_name} for u in users]
 
 
 @router.post("", response_model=ProjectMemberResponse, status_code=status.HTTP_201_CREATED)
@@ -99,7 +106,11 @@ def add_member(
         raise HTTPException(status_code=404, detail="Project not found")
 
     user = db.query(User).filter(User.id == payload.user_id).first()
-    if not user:
+    # ★누구나 자기 프로젝트의 admin 이 되므로, 후보 목록에서 뺀 승인 대기·중지 계정을 id 를
+    #   하나씩 넣어 보며 알아낼 수 있다(응답에 아이디가 실린다). 없는 계정과 같은 404 로 답한다.
+    #   시스템 관리자는 원래 전체 사용자 목록을 보므로 승인 전에 미리 배정하는 길을 남긴다.
+    from models import UserStatus
+    if not user or (user.status != UserStatus.active and not _is_system_manager(current_user)):
         raise HTTPException(status_code=404, detail="User not found")
 
     # 중복 체크

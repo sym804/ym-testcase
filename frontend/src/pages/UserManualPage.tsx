@@ -286,6 +286,7 @@ export default function UserManualPage() {
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li5") }} />
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li6") }} />
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li6b") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li6c") }} />
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li7") }} />
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.fs_li8") }} />
             </ul>
@@ -383,6 +384,14 @@ export default function UserManualPage() {
               <li>{t("sheetTree.ren_li3")}</li>
               <li>{t("sheetTree.ren_li4")}</li>
               <li>{t("sheetTree.ren_li5")}</li>
+            </ul>
+
+            <h3 style={s.h3}>{t("sheetTree.h3_copy")}</h3>
+            <ul style={s.ul}>
+              <li dangerouslySetInnerHTML={{ __html: t("sheetTree.copy_li1") }} />
+              <li dangerouslySetInnerHTML={{ __html: t("sheetTree.copy_li2") }} />
+              <li>{t("sheetTree.copy_li3")}</li>
+              <li>{t("sheetTree.copy_li4")}</li>
             </ul>
 
             <div style={s.infoBox} dangerouslySetInnerHTML={{ __html: t("sheetTree.info1") }} />
@@ -839,7 +848,7 @@ export default function UserManualPage() {
                 </tr>
               </thead>
               <tbody>
-                <tr><td style={s.td}>{t("roles.role_createProject")}</td><td style={s.tdCheck}>O</td><td style={s.tdCheck}>O</td><td style={s.tdX}>X</td></tr>
+                <tr><td style={s.td}>{t("roles.role_createProject")}</td><td style={s.tdCheck}>O</td><td style={s.tdCheck}>O</td><td style={s.tdCheck}>O</td></tr>
                 <tr><td style={s.td}>{t("roles.role_manageUsers")}</td><td style={s.tdCheck}>O</td><td style={s.tdX}>X</td><td style={s.tdX}>X</td></tr>
                 <tr><td style={s.td}>{t("roles.role_resetPassword")}</td><td style={s.tdCheck}>O</td><td style={s.tdX}>X</td><td style={s.tdX}>X</td></tr>
                 <tr><td style={s.td}>{t("roles.role_viewUsers")}</td><td style={s.tdCheck}>O</td><td style={s.tdCheck}>O</td><td style={s.tdX}>X</td></tr>
@@ -868,6 +877,7 @@ export default function UserManualPage() {
               <ul style={{ margin: "8px 0 0 20px", lineHeight: 1.8 }}>
                 <li dangerouslySetInnerHTML={{ __html: t("roles.dual_li1") }} />
                 <li dangerouslySetInnerHTML={{ __html: t("roles.dual_li2") }} />
+                <li dangerouslySetInnerHTML={{ __html: t("roles.dual_li2b") }} />
                 <li dangerouslySetInnerHTML={{ __html: t("roles.dual_li3") }} />
                 <li dangerouslySetInnerHTML={{ __html: t("roles.dual_li4") }} />
                 <li dangerouslySetInnerHTML={{ __html: t("roles.dual_li5") }} />

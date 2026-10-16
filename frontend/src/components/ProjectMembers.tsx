@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { membersApi } from "../api";
-import type { ProjectMember, User } from "../types";
+import type { ProjectMember, UserCandidate } from "../types";
 import toast from "react-hot-toast";
 import { translateError } from "../utils/errorMessage";
 import { useAuth } from "../contexts/AuthContext";
@@ -22,7 +22,7 @@ export default function ProjectMembers({ projectId, createdBy, myRole }: Props) 
     admin: t("members.admin"),
   };
   const [members, setMembers] = useState<ProjectMember[]>([]);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<UserCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [addUserId, setAddUserId] = useState<number | "">("");
   const [addRole, setAddRole] = useState("tester");

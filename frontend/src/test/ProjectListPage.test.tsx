@@ -122,14 +122,15 @@ describe("ProjectListPage", () => {
     });
   });
 
-  it("일반 사용자에게는 새 프로젝트 버튼을 표시하지 않는다", async () => {
+  it("일반 사용자에게도 새 프로젝트 버튼을 표시하고 일괄 삭제 체크박스는 숨긴다", async () => {
     mockState.role = "user";
     mockState.display_name = "일반사용자";
     renderPage();
     await waitFor(() => {
       expect(screen.getAllByText("Project A").length).toBeGreaterThan(0);
     }, { timeout: 3000 });
-    expect(screen.queryByText("+ 새 프로젝트")).not.toBeInTheDocument();
+    expect(screen.getByText("+ 새 프로젝트")).toBeInTheDocument();
+    expect(screen.queryByLabelText("전체 선택")).not.toBeInTheDocument();
   });
 
   it("새 프로젝트 모달을 열고 닫을 수 있다", async () => {
@@ -159,6 +160,26 @@ describe("ProjectListPage", () => {
     await waitFor(() => {
       expect(projectsApi.create).toHaveBeenCalled();
       expect(toast.success).toHaveBeenCalledWith("프로젝트가 생성되었습니다.");
+    });
+  });
+
+  it("일반 사용자도 모달에서 프로젝트를 생성하고 목록을 다시 불러온다", async () => {
+    mockState.role = "user";
+    mockState.display_name = "일반사용자";
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText("+ 새 프로젝트")).toBeInTheDocument();
+    });
+    const overviewCalls = vi.mocked(overviewApi.get).mock.calls.length;
+    await user.click(screen.getByText("+ 새 프로젝트"));
+    await user.type(screen.getByPlaceholderText("프로젝트 이름"), "My Project");
+    await user.click(screen.getByText("생성"));
+
+    await waitFor(() => {
+      expect(projectsApi.create).toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalledWith("프로젝트가 생성되었습니다.");
+      expect(vi.mocked(overviewApi.get).mock.calls.length).toBeGreaterThan(overviewCalls);
     });
   });
 

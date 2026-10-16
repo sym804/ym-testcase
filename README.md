@@ -169,7 +169,7 @@ Google 로그인을 켜려면 Google Cloud 콘솔에서 OAuth 클라이언트를
 | 기능 | 설명 |
 |---|---|
 | 스프레드시트 TC 편집 | ag-grid 기반 인라인 편집, 다중 행 추가, 벌크 삭제 |
-| 시트 트리 구조 | N-depth 계층형 Test Suite 관리, 그 자리에서 이름 변경 |
+| 시트 트리 구조 | N-depth 계층형 Test Suite 관리, 그 자리에서 이름 변경, TC 포함 시트 복사 |
 | 커스텀 필드 | text, number, select, multiselect, checkbox, date |
 | 테스트 런 | 실행 결과 기록, 진행률 추적, 재실행 |
 | 테스트 플랜 | 릴리즈 단위 수행 관리, 마일스톤별 진행률 |

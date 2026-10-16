@@ -19,6 +19,9 @@ export enum TestRunStatus {
 }
 
 // Models
+/** 멤버 추가 후보. 서버는 고르는 데 필요한 칸만 준다(members.py list_available_users). */
+export type UserCandidate = Pick<User, "id" | "username" | "display_name">;
+
 export interface User {
   id: number;
   username: string;

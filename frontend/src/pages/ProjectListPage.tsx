@@ -225,10 +225,10 @@ export default function ProjectListPage() {
               <ProgressBar data={{ ...sm, total: sm.total_tc }} noTcLabel={t("noTC")} />
             </div>
 
-            {/* 프로젝트 추가/삭제 버튼 */}
-            {isAdmin && (
+            {/* 프로젝트 추가/삭제 버튼. 생성은 로그인한 누구나, 일괄 삭제는 관리자만 */}
+            {user && (
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
-                {selectedIds.size > 0 && (
+                {isAdmin && selectedIds.size > 0 && (
                   <button style={s.deleteBtn} onClick={handleBulkDelete} disabled={deleting}>
                     {deleting ? t("common:deleting") : t("deleteCount", { count: selectedIds.size })}
                   </button>

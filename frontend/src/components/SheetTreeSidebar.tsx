@@ -115,6 +115,29 @@ export default function SheetTreeSidebar({
     }
   };
 
+  // ── 시트 복사 ──
+  // 빠르게 두 번 누르면 복사본이 둘 생긴다. 요청이 끝날 때까지 다음 클릭을 버린다.
+  const copyBusy = useRef(false);
+
+  const handleCopy = async (node: SheetNode) => {
+    if (copyBusy.current) return;
+    copyBusy.current = true;
+    try {
+      const created = await testCasesApi.copySheet(projectId, node.id);
+      if (created.parent_id) {
+        setExpandedSheets(prev => new Set([...prev, created.parent_id!]));
+      }
+      setActiveSheet(created.name);
+      onSheetChange();
+      toast.success(t("sheetCopied", { name: node.name, newName: created.name, count: created.tc_count }));
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t("sheetCopyFailed"));
+    } finally {
+      copyBusy.current = false;
+    }
+  };
+
   if (flatSheets.length <= 1 && flatSheets[0]?.name === "기본") return null;
 
   const renderNode = (node: SheetNode, depth: number): React.ReactNode => {
@@ -243,6 +266,26 @@ export default function SheetTreeSidebar({
                   startRename(node);
                 }}
               >✎</span>
+              {/* id 0 은 시트 행 없이 TC 만 있는 이름을 서버가 끼워 넣은 호환 노드라 복사할 시트가 없다 */}
+              {!node.is_folder && node.id > 0 && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  title={t("copySheet")}
+                  aria-label={t("copySheet")}
+                  style={{ cursor: "pointer", fontSize: 11, opacity: 0.4, padding: "0 2px" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopy(node);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" && e.key !== " ") return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCopy(node);
+                  }}
+                >⧉</span>
+              )}
               <span
                 title={node.is_folder ? t("deleteFolder") : t("deleteSheet")}
                 style={{ cursor: "pointer", fontSize: 12, opacity: 0.4, padding: "0 2px" }}

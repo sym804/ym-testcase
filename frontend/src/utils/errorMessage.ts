@@ -51,6 +51,7 @@ const ERROR_MAP: Record<string, string> = {
   "자기 자신을 부모로 설정할 수 없습니다.": "errors.selfParent",
   "하위 시트를 부모로 설정할 수 없습니다.": "errors.childAsParent",
   "폴더에는 TC를 직접 추가할 수 없습니다. 하위 시트를 사용하세요.": "errors.cannotAddToFolder",
+  "폴더는 복사할 수 없습니다. 시트를 골라 주세요.": "errors.cannotCopyFolder",
   // Test runs
   "존재하지 않는 테스트 플랜입니다.": "errors.testPlanNotFound",
   "다른 프로젝트의 테스트 플랜은 연결할 수 없습니다.": "errors.testPlanWrongProject",

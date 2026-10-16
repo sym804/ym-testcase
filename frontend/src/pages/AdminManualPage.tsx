@@ -448,6 +448,7 @@ npx tsc --noEmit`}</pre>
                 ["DELETE", "/api/projects/{id}/testcases/sheets/{name}", t("apiRef.testCases.sheetDelete")],
                 ["PUT", "/api/projects/{id}/testcases/sheets/{sheet_id}/rename", t("apiRef.testCases.sheetRename")],
                 ["PUT", "/api/projects/{id}/testcases/sheets/{sheet_id}/move", t("apiRef.testCases.sheetMove")],
+                ["POST", "/api/projects/{id}/testcases/sheets/{sheet_id}/copy", t("apiRef.testCases.sheetCopy")],
                 ["POST", "/api/projects/{id}/testcases/import/preview", t("apiRef.testCases.importPreview")],
                 ["POST", "/api/projects/{id}/testcases/import", t("apiRef.testCases.import")],
                 ["GET", "/api/projects/{id}/testcases/export", t("apiRef.testCases.export")],

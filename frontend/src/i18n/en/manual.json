@@ -120,7 +120,7 @@
     "create_li1": "Click the <strong>\"+ New Project\"</strong> button in the upper right.",
     "create_li2": "Enter the project name and description.",
     "create_li3": "Click the <strong>Create</strong> button.",
-    "warn1": "<strong>Permission:</strong> Only Admin role can create projects.",
+    "warn1": "<strong>Permission:</strong> Any signed-in user can create a project and becomes its Project Admin. Only Admin and QA Manager can bulk delete projects.",
     "h3_bulkDelete": "2-4. Bulk Delete Projects",
     "bulk_li1": "Select projects using the checkboxes on the left side of the overview table.",
     "bulk_li2": "Click the header checkbox to select/deselect all.",
@@ -203,6 +203,7 @@
     "fs_li5": "<strong>All view:</strong> When there are 2 or more sheets, an \"All\" item appears at the top of the sidebar to show TCs from every sheet. Projects with several sheets open TC Management with \"All\" selected. Adding rows and drag reordering work after you pick a sheet.",
     "fs_li6": "<strong>Delete:</strong> Delete using the inline <strong>x</strong> button on folders/sheets. Deleting a folder also deletes all child items and TCs.",
     "fs_li6b": "<strong>Rename:</strong> Click the inline <strong>✎</strong> button on a folder/sheet, or double-click its name, to edit the name in place. See 5-5 for details.",
+    "fs_li6c": "<strong>Copy:</strong> Click the inline <strong>⧉</strong> button on a sheet to create a copy, TCs included, right below the original. See 5-6 for details.",
     "fs_li7": "<strong>On Import,</strong> Excel file sheet names are directly created as sheets in the sidebar tree.",
     "fs_li8": "<strong>Sidebar collapse/expand:</strong> Use the ◀/▶ toggle button to collapse or expand the sidebar.",
     "h3_gridEdit": "4-3. Grid Editing",
@@ -293,6 +294,11 @@
     "ren_li3": "Renaming a sheet also renames it on its TCs and on test runs scoped to that sheet. If the sheet is the one you are viewing, the grid keeps showing it under the new name.",
     "ren_li4": "If a sheet with the same name exists or TC numbers collide, the change is not saved and the reason is shown. The input stays open so you can try another name.",
     "ren_li5": "Only project Admins can rename.",
+    "h3_copy": "5-6. Copy Sheet",
+    "copy_li1": "Click the inline <strong>⧉</strong> button on a sheet (📄) row to create <strong>Original name (복사)</strong> in the same folder, right below the original, and select it. If that name is taken, a number is added: (복사 2), (복사 3).",
+    "copy_li2": "The TCs come over in the same order and No restarts from 1. TC IDs must be unique within a project, so <code>-copy</code> is appended as with TC clone. IDs are cut at 50 characters from the end, so <code>-copy</code> may be cut off, and a number such as <code>-2</code> is added on collision. Deleted TCs are not copied.",
+    "copy_li3": "TC content and custom fields are copied. Test results, change history and attachments are not. TC ID references in preconditions keep pointing at the original TCs.",
+    "copy_li4": "Folders cannot be copied. In-progress test runs that cover the whole project get the copied TCs as Not Started (NS). Only project Admins can copy sheets.",
     "info1": "<strong>Backward compatible:</strong> If you don't use folders, you can manage TCs with sheets only, just like before."
   },
   "import": {
@@ -605,7 +611,8 @@
     "h3_dualRoles": "14-3. Relationship Between System Roles and Project Roles",
     "info1": "<strong>Dual role structure:</strong> System roles (Admin/QA Manager/User) determine global permissions, while project roles (Project Admin/Project Tester) determine permissions within that project.",
     "dual_li1": "<strong>System Admin</strong>: Full access to all projects. All features available regardless of project role",
-    "dual_li2": "<strong>QA Manager</strong>: Can access all projects. Can create projects. Admin-level permissions within projects",
+    "dual_li2": "<strong>QA Manager</strong>: Can access all projects. Admin-level permissions within projects",
+    "dual_li2b": "<strong>All users</strong>: Can create projects and are Project Admin of the projects they create",
     "dual_li3": "<strong>User + Project Admin</strong>: Can create/edit/delete TCs, manage runs, and change settings in that project",
     "dual_li4": "<strong>User + Project Tester</strong>: Can record test results, view dashboard/reports in that project. Cannot create/delete TCs",
     "dual_li5": "<strong>User (not a member)</strong>: Can only view public projects. Cannot access private projects"

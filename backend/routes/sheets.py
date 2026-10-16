@@ -266,6 +266,114 @@ def rename_sheet(
     return {"id": sheet.id, "name": sheet.name, "old_name": old_name}
 
 
+SHEET_NAME_MAX_LEN = 100
+_COPY_SUFFIX = " (복사)"
+
+
+def _copy_name(base: str, taken: set[str]) -> str:
+    """'<원본> (복사)', 겹치면 '(복사 2)', '(복사 3)' ... 100자를 넘으면 원본 쪽을 줄인다."""
+    n = 1
+    while True:
+        suffix = _COPY_SUFFIX if n == 1 else f" (복사 {n})"
+        candidate = base[: SHEET_NAME_MAX_LEN - len(suffix)] + suffix
+        if candidate not in taken:
+            return candidate
+        n += 1
+
+
+@router.post("/sheets/{sheet_id}/copy", status_code=201)
+def copy_sheet(
+    project_id: int,
+    sheet_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(check_project_access("admin")),
+    _lock: None = Depends(project_write_lock),
+):
+    """시트 하나를 살아 있는 TC 와 함께 복제한다. 새 시트는 원본 바로 다음 자리에 둔다.
+
+    수행 결과·변경 이력·첨부는 복사하지 않는다. TC 는 새 TC 로 만들어지고
+    TC ID 는 프로젝트 안에서 유일해야 하므로 TC 복제와 같은 '-copy' 규칙으로 새로 받는다.
+    """
+    # testcases.py 가 이 모듈을 import 하므로 여기서는 함수 안에서 가져온다.
+    from routes.testcases import _CLONE_FIELDS
+    from services.run_sync_service import sync_project_in_progress_runs
+    from services.tc_id_service import allocate_tc_id, taken_tc_ids
+
+    _get_project_or_404(project_id, db)
+
+    src = db.query(TestCaseSheet).filter(
+        TestCaseSheet.id == sheet_id, TestCaseSheet.project_id == project_id
+    ).first()
+    if not src:
+        raise HTTPException(status_code=404, detail="시트를 찾을 수 없습니다.")
+    # ★폴더는 TC 를 담지 않고 하위 시트만 담는다. 하위까지 복사하려면 트리 전체를
+    #   새 이름으로 다시 짜야 해서 이번 범위에서 뺐다.
+    if src.is_folder:
+        raise HTTPException(status_code=400, detail="폴더는 복사할 수 없습니다. 시트를 골라 주세요.")
+
+    # ★시트 행 없이 그 이름을 쓰는 살아 있는 TC 도 센다. 지운 시트의 TC 를 복원하면 이렇게 남는다.
+    #   시트 이름만 보면 복사본이 남의 TC 와 같은 시트로 섞이고 번호가 그 뒤에 이어 붙는다.
+    names = {r[0] for r in db.query(TestCaseSheet.name).filter(TestCaseSheet.project_id == project_id).all()}
+    names |= {
+        r[0] for r in db.query(TestCase.sheet_name).filter(
+            TestCase.project_id == project_id, TestCase.deleted_at.is_(None)
+        ).distinct().all()
+    }
+    new_name = _copy_name(src.name, names)
+
+    # 원본 바로 다음 자리를 비운다. 같은 부모 아래 뒤쪽 형제를 한 칸씩 민다.
+    parent_filter = (
+        TestCaseSheet.parent_id.is_(None) if src.parent_id is None else TestCaseSheet.parent_id == src.parent_id
+    )
+    db.query(TestCaseSheet).filter(
+        TestCaseSheet.project_id == project_id,
+        parent_filter,
+        TestCaseSheet.sort_order > src.sort_order,
+    ).update({TestCaseSheet.sort_order: TestCaseSheet.sort_order + 1}, synchronize_session=False)
+
+    sheet = TestCaseSheet(
+        project_id=project_id, name=new_name, sort_order=src.sort_order + 1,
+        parent_id=src.parent_id, is_folder=False,
+    )
+    db.add(sheet)
+    db.flush()
+
+    originals = (
+        db.query(TestCase)
+        .filter(
+            TestCase.project_id == project_id,
+            TestCase.sheet_name == src.name,
+            TestCase.deleted_at.is_(None),
+        )
+        .order_by(TestCase.no, TestCase.id)
+        .all()
+    )
+    # 새 이름은 살아 있는 TC 가 아무도 쓰지 않는 이름이라 번호를 1 부터 바로 매긴다.
+    #   TC 복제처럼 건마다 max(no)+1 을 물으면 수천 건 시트에서 그만큼 왕복하며 쓰기 잠금을 쥔다.
+    taken = taken_tc_ids(project_id, db)
+    copies = []
+    for no, orig in enumerate(originals, start=1):
+        data = {f: getattr(orig, f) for f in _CLONE_FIELDS}
+        data["sheet_name"] = new_name
+        new_id = allocate_tc_id(f"{orig.tc_id}-copy", taken)
+        taken.add(new_id)
+        copies.append(TestCase(project_id=project_id, no=no, tc_id=new_id, created_by=current_user.id, **data))
+    db.add_all(copies)
+    db.flush()
+
+    # 동기화까지 한 트랜잭션으로 묶는다. 복사를 먼저 커밋하고 동기화가 실패하면 복사본은 남는데
+    #   화면은 실패로 보여서, 다시 누르면 복사본이 하나 더 생긴다.
+    if originals:
+        sync_project_in_progress_runs(project_id, db, commit=False)
+    db.commit()
+    db.refresh(sheet)
+    return {
+        "id": sheet.id, "name": sheet.name, "parent_id": sheet.parent_id,
+        "sort_order": sheet.sort_order, "is_folder": False,
+        "tc_count": len(originals), "children": [], "source_id": src.id,
+    }
+
+
 class _SheetMove(BaseModel):
     parent_id: Optional[int] = None
     sort_order: Optional[int] = None

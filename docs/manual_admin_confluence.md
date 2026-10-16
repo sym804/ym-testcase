@@ -202,7 +202,7 @@ npx tsc -b
 |---|---|---|
 | **Admin** | 최상위 | 모든 기능 + 사용자 관리 + 비밀번호 초기화 + 역할 변경 |
 | **QA Manager** | 관리 | 사용자 목록 조회 + 모든 프로젝트 접근 |
-| **User** | 일반 | 소속 프로젝트 + 공개 프로젝트 접근 |
+| **User** | 일반 | 소속 프로젝트 + 공개 프로젝트 접근 + 프로젝트 생성(만든 프로젝트의 Project Admin) |
 
 ### 6-2. 프로젝트 역할
 
@@ -321,10 +321,10 @@ npx tsc -b
 | Method | Endpoint | 설명 |
 |---|---|---|
 | GET | /api/projects | 프로젝트 목록 |
-| POST | /api/projects | 프로젝트 생성 (Admin) |
+| POST | /api/projects | 프로젝트 생성 (로그인 사용자 누구나, 만든 사람이 Project Admin) |
 | GET | /api/projects/{id} | 프로젝트 상세 |
 | PUT | /api/projects/{id} | 프로젝트 수정 |
-| DELETE | /api/projects/{id} | 프로젝트 삭제 (Admin) |
+| DELETE | /api/projects/{id} | 프로젝트 삭제 (Project Admin) |
 
 ### 테스트 케이스
 
