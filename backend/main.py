@@ -55,21 +55,21 @@ load_auth_config(os.environ)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from alembic.config import Config as AlembicConfig
-    from alembic import command as alembic_command
-    from alembic.script import ScriptDirectory
     from database import engine
     from services.schema_version import assert_known_revision
 
-    # script_location 은 alembic.ini 의 %(here)s 기준이라 작업 폴더와 무관하다.
-    # 접속 주소는 alembic/env.py 가 환경변수에서 직접 읽는다.
-    alembic_cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), "alembic.ini"))
-
     with engine.connect() as conn:
-        assert_known_revision(conn, ScriptDirectory.from_config(alembic_cfg))
+        assert_known_revision(conn)
 
     # 서버리스에서는 끈다. 실행 환경마다 동시에 돌기 때문이다. 배포 워크플로가 대신 한다.
+    # alembic 은 이 경로에서만 올린다. 콜드 스타트에 임포트 비용을 싣지 않기 위해서다.
     if env_flag("RUN_MIGRATIONS_ON_STARTUP"):
+        from alembic.config import Config as AlembicConfig
+        from alembic import command as alembic_command
+
+        # script_location 은 alembic.ini 의 %(here)s 기준이라 작업 폴더와 무관하다.
+        # 접속 주소는 alembic/env.py 가 환경변수에서 직접 읽는다.
+        alembic_cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), "alembic.ini"))
         alembic_command.upgrade(alembic_cfg, "head")
         app.state.schema_behind = False
     else:
@@ -84,7 +84,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YM TestCase API",
     description="Your Method, Your Test Case Manager",
-    version="2.2.4.0",
+    version="2.2.4.1",
     lifespan=lifespan,
     # 배포는 /api/* 만 백엔드로 보낸다(vercel.json). 문서도 그 아래에 둔다.
     docs_url="/api/docs",
@@ -120,14 +120,12 @@ def _check_schema(target_app) -> None:
 
     옛 스키마에서 새 코드가 돌면 없는 칸을 찾다 500 이 나고 이유가 드러나지 않는다.
     """
-    from alembic.config import Config as AlembicConfig
-    from alembic.script import ScriptDirectory
     from database import engine
     from services.schema_version import schema_status
 
-    cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), "alembic.ini"))
+    # alembic 을 올리지 않고 리비전 상수로 판정한다. 새 인스턴스의 첫 요청이 이 비용을 낸다.
     with engine.connect() as conn:
-        status = schema_status(conn, ScriptDirectory.from_config(cfg))
+        status = schema_status(conn)
     import time
     target_app.state.schema_behind = status in ("empty", "behind", "legacy")
     target_app.state.schema_checked_at = time.monotonic()

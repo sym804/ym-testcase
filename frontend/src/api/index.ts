@@ -32,6 +32,12 @@ import type {
   AuthConfig,
 } from "../types";
 
+// ★진행 중인 프로젝트 목록 요청을 같이 쓴다(projectsApi.list). Header 와 프로젝트 목록
+//   화면이 같은 순간에 각자 불러 요청이 2회 나갔다. 끝나면 비우므로 결과를 캐시하지는
+//   않는다(다음 호출은 새로 받는다). 로그인·로그아웃에서도 비운다. 다른 계정의 요청에
+//   합류하지 않게 하기 위해서다.
+let projectsListInFlight: Promise<Project[]> | null = null;
+
 // ─── Auth ────────────────────────────────────────────
 /** Google 로그인 시작 주소. 페이지 이동으로 연다(화면에 Google 스크립트를 넣지 않는다) */
 export function googleStartUrl(mode: "login" | "link", next?: string): string {
@@ -52,11 +58,15 @@ export const authApi = {
   },
 
   login: async (form: LoginForm) => {
-    const res = await client.post<{ access_token: string; token_type: string }>(
-      "/api/auth/login",
-      form
-    );
-    return res.data;
+    try {
+      const res = await client.post<{ access_token: string; token_type: string }>(
+        "/api/auth/login",
+        form
+      );
+      return res.data;
+    } finally {
+      projectsListInFlight = null;
+    }
   },
 
   register: async (form: Omit<RegisterForm, "confirm_password">): Promise<User> => {
@@ -104,15 +114,30 @@ export const authApi = {
   },
 
   logout: async () => {
-    await client.post("/api/auth/logout");
+    try {
+      await client.post("/api/auth/logout");
+    } finally {
+      projectsListInFlight = null;
+    }
   },
 };
 
 // ─── Projects ────────────────────────────────────────
 export const projectsApi = {
   list: async () => {
-    const res = await client.get<Project[]>("/api/projects");
-    return res.data;
+    let p = projectsListInFlight;
+    if (!p) {
+      p = client
+        .get<Project[]>("/api/projects")
+        .then((res) => res.data)
+        .finally(() => {
+          // 그 사이 무효화되고 새 요청이 들어왔으면 그것은 지우지 않는다
+          if (projectsListInFlight === p) projectsListInFlight = null;
+        });
+      projectsListInFlight = p;
+    }
+    // 호출한 쪽마다 배열을 따로 준다. 한쪽이 정렬해도 다른 쪽 상태가 바뀌지 않게.
+    return [...(await p)];
   },
 
   getOne: async (id: number) => {
@@ -120,18 +145,32 @@ export const projectsApi = {
     return res.data;
   },
 
+  // 바꾼 뒤의 목록 요청이 바꾸기 전에 출발한 요청을 받아 쓰지 않게 끝날 때 비운다.
+  // 시작할 때만 비우면 변경이 진행되는 동안 출발한 목록 요청에 합류한다.
   create: async (data: Partial<Project>) => {
-    const res = await client.post<Project>("/api/projects", data);
-    return res.data;
+    try {
+      const res = await client.post<Project>("/api/projects", data);
+      return res.data;
+    } finally {
+      projectsListInFlight = null;
+    }
   },
 
   update: async (id: number, data: Partial<Project>) => {
-    const res = await client.put<Project>(`/api/projects/${id}`, data);
-    return res.data;
+    try {
+      const res = await client.put<Project>(`/api/projects/${id}`, data);
+      return res.data;
+    } finally {
+      projectsListInFlight = null;
+    }
   },
 
   delete: async (id: number) => {
-    await client.delete(`/api/projects/${id}`);
+    try {
+      await client.delete(`/api/projects/${id}`);
+    } finally {
+      projectsListInFlight = null;
+    }
   },
 };
 

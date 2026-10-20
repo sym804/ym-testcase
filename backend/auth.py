@@ -73,13 +73,13 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-_DUMMY_HASH: Optional[str] = None
+#: 타이밍 균일화용 더미 해시. 미리 만든 값이다(원문은 버린 임의 문자열).
+#: ★실행 중에 만들면 콜드 스타트나 그 인스턴스의 첫 실패 요청이 bcrypt 를 한 번 더 내서
+#:   응답 시간이 달라진다. 비용(rounds)은 hash_password 와 같아야 한다(테스트가 본다).
+_DUMMY_HASH = "$2b$12$Bhq4VTFyj38EzX4Sm4naveuUvKvuLd5pj8dEmxhRasBNMVFcrGFKu"
 
 
 def _dummy_hash() -> str:
-    global _DUMMY_HASH
-    if _DUMMY_HASH is None:
-        _DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
     return _DUMMY_HASH
 
 
