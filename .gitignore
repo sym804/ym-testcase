@@ -76,7 +76,6 @@ blog/
 주식데이터/
 *.xlsx
 # QA 산출물은 추적한다. 수행 이력 자체가 이 프로젝트의 결과물이다.
-!Issue_list.xlsx
 !TC_Manager_Regression_Checklist_v2_merged.xlsx
 !TC_Manager_Full_Regression_Checklist.xlsx
 !frontend/frontend_test_cases.xlsx

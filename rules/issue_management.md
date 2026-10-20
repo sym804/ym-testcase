@@ -144,9 +144,10 @@ Open → Won't Fix (수정 안 함)
 
 ## 관리 파일
 
-- `Issue_list.xlsx` - 시트 구성: 이슈 로그 (94건) / 통계
+- `issue_log.json` - 이슈 로그 정본. 같은 폴더의 `issue_log.html` 을 브라우저로 열어 본다
+  (2026-10-20 `Issue_list.xlsx` 에서 옮김. 엑셀의 `통계` 시트는 뷰어가 매번 새로 센다)
 - `Release_note.md` - 릴리즈별 변경사항 및 알려진 이슈
-- Linear 팀 `Sym` - 이슈 식별자 `SYM-n` (엑셀과 1:1 동기화)
+- Linear 팀 `Sym` - 이슈 식별자 `SYM-n` (이슈 로그와 1:1 동기화)
   이 레포는 public 이라 Linear 를 쓴다. `gh issue create` 를 쓰지 않는다.
   Linear 로 넘어오기 전 GitHub 이슈가 그대로 남아 있어 엑셀 `트래커` 칸에는
   과거 행의 정수 키와 새 행의 `SYM-n` 이 섞인다. 대조할 때는 키 모양으로 출처를 가른다.
