@@ -47,9 +47,9 @@
 - [ ] 기존 데이터 정합성 확인 (스키마 변경 시)
 
 ### 이슈 정리 (push 전 필수)
-- [ ] Issue_list.xlsx에 이번 버전 이슈 추가/업데이트
-- [ ] 재현 방법/개선 사항 + 원인 및 수정/개선 사유 빈 셀 없는지 확인
-- [ ] Linear 동기화. `issuelog` 가 트래커와 엑셀을 한 번에 쓴다
+- [ ] issue_log.json 에 이번 버전 이슈 추가/업데이트 (손으로 고치지 말고 `issuelog` 로)
+- [ ] 재현 절차/완료 조건 + 원인 및 수정/결과 빈 칸 없는지 확인 (`issue_log.html` 에서 본다)
+- [ ] Linear 동기화. `issuelog` 가 트래커와 이슈 로그를 한 번에 쓴다
       (`python ~/.claude/tools/issuelog/run.py new ym-testcase ...`, 완료 건은 상태를 Done 으로)
 - [ ] 조인 확인 (`python ~/.claude/tools/issuelog/run.py check ym-testcase`)
 
@@ -63,7 +63,7 @@
 - [ ] 사본 대조 통과 확인 (`python -m pytest backend/tests_unit/test_version_consistency.py -q`)
 
 ### 커밋 & 푸시
-- [ ] 변경 파일 스테이징 (소스 + Issue_list.xlsx + Release_note.md + rules/)
+- [ ] 변경 파일 스테이징 (소스 + issue_log.json + issue_log.html + Release_note.md + rules/)
 - [ ] 커밋 메시지: `vX.X.X 릴리즈 (주요 변경 요약)`
 - [ ] 태그 생성: `git tag vX.X.X`
 - [ ] `git push origin main --tags` (기본 브랜치는 `main` 이다)
@@ -93,6 +93,7 @@
 ## 관리 파일
 
 - `Release_note.md` - 전체 릴리즈 이력
-- `Issue_list.xlsx` - 이슈 추적. `트래커` 칸이 Linear 식별자(`SYM-n`)와 잇는 조인 키다
+- `issue_log.json` - 이슈 추적. `트래커` 칸이 Linear 식별자(`SYM-n`)와 잇는 조인 키다.
+  `issue_log.html` 이 뷰어다
 - `rules/versioning.md` - 버전 체계
 - `rules/issue_management.md` - 이슈 관리 규칙
