@@ -19,7 +19,7 @@ from schemas import (
     AccountRequestCreate, AccountRequestListItem, AccountRequestReject,
     ResetPasswordWithCode,
 )
-from auth import hash_password, verify_password, ensure_password_fits, role_required, get_session_user, revoke_user_api_keys, admin_session_required
+from auth import _dummy_hash, hash_password, verify_password, ensure_password_fits, role_required, get_session_user, revoke_user_api_keys, admin_session_required
 from routes.auth import _check_rate_limit, _clear_failures, _record_failure
 from services import rate_limit
 from services.client_ip import client_ip
@@ -39,7 +39,7 @@ CODE_TTL_HOURS = 24
 # bcrypt 를 한 번도 돌리지 않아 성공 경로보다 눈에 띄게 빨리 응답한다.
 # 그래서 실패 경로마다 이 해시로 한 번씩 대조해 비용을 맞춘다.
 # 결과를 쓰지 않는다고 지우면 타이밍 차이가 그대로 되살아난다.
-_DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
+# ★auth._dummy_hash() 를 쓴다(미리 만든 해시). 모듈 로드 때 계산하면 콜드 스타트마다 bcrypt 한 번(로컬 -X importtime 실측 0.16초)을 낸다.
 
 # 접수 남용 방어. auth.py 의 로그인 제한은 실패만 세므로 여기에 쓸 수 없다.
 # ★DB 에 센다(services/rate_limit). 메모리에 세면 서버리스 인스턴스마다 따로 센다.
@@ -243,7 +243,7 @@ def reset_password_with_code(
     user = find_user_by_identifier(db, ident)
     # 대기·중지 계정은 복구 대상이 아니다. 실패 응답은 다른 실패와 같게 둔다.
     if not user or user.status != UserStatus.active:
-        verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화. 위 _DUMMY_HASH 주석 참고
+        verify_password(payload.code, _dummy_hash())  # 타이밍 균일화. 위 더미 해시 주석 참고
         _record_failure(request, ident, db)
         raise fail
 
@@ -264,12 +264,12 @@ def reset_password_with_code(
     approved = approved_requests().all()
     req = approved[0] if approved else None
     if not req or not req.code_hash:
-        verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화
+        verify_password(payload.code, _dummy_hash())  # 타이밍 균일화
         _record_failure(request, ident, db)
         raise fail
 
     if req.code_expires_at is None or req.code_expires_at < now_kst():
-        verify_password(payload.code, _DUMMY_HASH)  # 타이밍 균일화
+        verify_password(payload.code, _dummy_hash())  # 타이밍 균일화
         _record_failure(request, ident, db)
         raise fail
 

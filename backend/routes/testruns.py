@@ -8,9 +8,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, subqueryload, load_only
 from sqlalchemy import func, case
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.utils import get_column_letter
 
 from database import get_db
 from models import User, Project, TestCase, TestCaseSheet, TestRun, TestResult, TestRunStatus, TestResultValue, Attachment
@@ -904,6 +901,11 @@ def export_testrun_excel(
     current_user: User = Depends(check_project_access("viewer")),
 ):
     """Export test run results as Excel file."""
+    # openpyxl 은 이 함수에서만 쓴다. 모듈 최상단에서 올리면 콜드 스타트마다 임포트 비용을 낸다.
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
     _get_project_or_404(project_id, db)
 
     run = (

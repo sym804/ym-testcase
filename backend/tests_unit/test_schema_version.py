@@ -161,3 +161,27 @@ def test_판정이_실패하면_503(monkeypatch):
     finally:
         for k, v in saved.items():
             setattr(state, k, v)
+
+
+# ── 리비전 상수: 콜드 스타트에서 alembic 없이 판정한다 ───────────────────────────
+
+def test_리비전_상수가_alembic_이력과_같다():
+    """마이그레이션을 추가하고 상수를 안 고치면 새 DB 가 ahead 로 판정돼 뒤처짐 503 이 꺼진다."""
+    from services.schema_version import HEAD_REVISIONS, KNOWN_REVISIONS
+
+    sd = _script_dir()
+    assert set(KNOWN_REVISIONS) == {r.revision for r in sd.walk_revisions()}
+    assert set(HEAD_REVISIONS) == set(sd.get_heads())
+
+
+def test_script_dir_없이도_같은_판정을_낸다(conn):
+    _set_rev(conn, "0001_pg_baseline")
+    assert schema_status(conn) == "behind"
+    conn.execute(text("UPDATE alembic_version SET version_num = :h"), {"h": _script_dir().get_current_head()})
+    assert schema_status(conn) == "current"
+    conn.execute(text("UPDATE alembic_version SET version_num = '0099_future'"))
+    assert schema_status(conn) == "ahead"
+    conn.execute(text("UPDATE alembic_version SET version_num = '5e0b8c2d4f17'"))
+    assert schema_status(conn) == "legacy"
+    with pytest.raises(RuntimeError, match="sqlite-legacy"):
+        assert_known_revision(conn)

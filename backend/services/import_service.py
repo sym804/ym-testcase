@@ -7,7 +7,6 @@ from typing import Optional
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from openpyxl import load_workbook
 
 from models import TestCase
 from services.tc_id_service import allocate_tc_id, fit_tc_id, taken_tc_ids
@@ -738,6 +737,9 @@ _OLE2_SIGNATURE = bytes.fromhex("D0CF11E0A1B11AE1")
 
 def _load_workbook_from_upload(file: UploadFile):
     """UploadFile을 읽어 openpyxl Workbook으로 반환한다."""
+    # openpyxl 은 이 함수에서만 쓴다. 모듈 최상단에서 올리면 콜드 스타트마다 임포트 비용을 낸다.
+    from openpyxl import load_workbook
+
     if not (file.filename or "").lower().endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="Only .xlsx files are supported")
 

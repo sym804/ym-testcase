@@ -9,9 +9,12 @@ v2.0 에서 SQLite 시절 이력 14개를 PostgreSQL 기준점 하나로 압축�
   삭제는 다음 릴리즈 원칙이라 옛 코드가 새 스키마에서 돈다.
 """
 import logging
+from typing import TYPE_CHECKING, Optional
 
-from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
+
+if TYPE_CHECKING:
+    from alembic.script import ScriptDirectory
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +25,29 @@ LEGACY_SQLITE_REVISIONS = frozenset({
     "c9e2f4a17b03", "d41b6c8e5a27", "e5a83f21c760", "f2b7c04e91a8",
 })
 
+#: 이 코드가 아는 리비전과 head. 서버리스 콜드 스타트에서 alembic 을 올리지 않고
+#: 판정하려고 상수로 둔다(앱 로드 뒤 alembic 임포트가 첫 요청에 더한 시간, 로컬 실측 0.16초).
+#: ★마이그레이션을 추가하면 둘 다 고친다. tests_unit/test_schema_version.py 가
+#:   alembic 이력과 대조해 어긋나면 실패한다. 안 고치면 새 DB 가 ahead 로 판정돼
+#:   뒤처짐 503 이 조용히 꺼진다.
+KNOWN_REVISIONS = frozenset({
+    "0001_pg_baseline", "0003_rate_limit_events", "0004_staged_uploads",
+    "0005_supabase_rls", "0006_storage_deletions", "0007_account_identity",
+    "0008_google_email",
+})
+HEAD_REVISIONS = frozenset({"0008_google_email"})
 
-def assert_known_revision(conn, script_dir: ScriptDirectory) -> None:
+
+def _known_and_heads(script_dir: Optional["ScriptDirectory"]) -> tuple[set, set]:
+    if script_dir is None:
+        return set(KNOWN_REVISIONS), set(HEAD_REVISIONS)
+    return {rev.revision for rev in script_dir.walk_revisions()}, set(script_dir.get_heads())
+
+
+def assert_known_revision(conn, script_dir: Optional["ScriptDirectory"] = None) -> None:
     if "alembic_version" not in inspect(conn).get_table_names():
         return
-    known = {rev.revision for rev in script_dir.walk_revisions()}
+    known, _ = _known_and_heads(script_dir)
     current = [r[0] for r in conn.execute(text("SELECT version_num FROM alembic_version"))]
     legacy = [r for r in current if r in LEGACY_SQLITE_REVISIONS]
     if legacy:
@@ -41,7 +62,7 @@ def assert_known_revision(conn, script_dir: ScriptDirectory) -> None:
         logger.warning("DB 스키마 리비전 %s 를 이 코드가 모른다. 코드보다 새 스키마(롤백 상태)로 본다.", newer)
 
 
-def schema_status(conn, script_dir: ScriptDirectory) -> str:
+def schema_status(conn, script_dir: Optional["ScriptDirectory"] = None) -> str:
     """DB 스키마와 코드의 관계. empty / current / behind / ahead / legacy.
 
     ahead 는 코드가 모르는 더 새 리비전(롤백 상태)이다. 막지 않는다.
@@ -54,8 +75,7 @@ def schema_status(conn, script_dir: ScriptDirectory) -> str:
         return "empty"
     if current & LEGACY_SQLITE_REVISIONS:
         return "legacy"
-    known = {rev.revision for rev in script_dir.walk_revisions()}
+    known, heads = _known_and_heads(script_dir)
     if current - known:
         return "ahead"
-    heads = set(script_dir.get_heads())
     return "current" if current == heads else "behind"

@@ -30,7 +30,9 @@ def test_api_는_백엔드로_나머지는_프론트로_이_순서():
 
 def test_프론트는_SPA_로_index_html_을_돌려준다():
     rw = _cfg()["services"]["frontend"]["rewrites"]
-    assert {"source": "/(.*)", "destination": "/index.html"} in rw
+    # /assets 는 빼서 없는 자산이 404 가 되게 한다. 폴백 HTML 이 자산의 1년 캐시 규칙을
+    # 받으면 옛 청크 주소에 HTML 이 굳는다.
+    assert {"source": "/((?!assets/).*)", "destination": "/index.html"} in rw
 
 
 def test_매일_정리_Cron():
@@ -97,3 +99,11 @@ def test_index_html_이_부르는_외부_출처를_CSP_가_허용한다():
             assert origin(href.group(1)) in csp["font-src"], tag
     for src in re.findall(r'<script\b[^>]*src="(https://[^"]+)"', html):
         assert origin(src) in csp["script-src"], src
+
+
+def test_해시_붙은_자산만_장기_캐시한다():
+    """/assets 는 파일명에 내용 해시가 있어 1년 immutable 이 안전하다. 화면마다 304 재검증을 없앤다.
+    index.html 에 붙으면 새 배포를 못 받으므로 다른 규칙에는 없어야 한다."""
+    headers = _cfg()["services"]["frontend"]["headers"]
+    cache = {rule["source"]: h["value"] for rule in headers for h in rule["headers"] if h["key"] == "Cache-Control"}
+    assert cache == {"/assets/(.*)": "public, max-age=31536000, immutable"}

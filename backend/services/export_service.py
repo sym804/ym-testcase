@@ -2,10 +2,6 @@ import io
 from urllib.parse import quote
 
 from fastapi.responses import StreamingResponse
-from openpyxl import Workbook
-from openpyxl.comments import Comment
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
 
 from services.excel_safe import safe_cell as _sanitize_cell
 from services.precondition_service import build_index, expand_text, has_ref
@@ -60,6 +56,12 @@ def export_testcases_excel(
 
     색인은 프로젝트 전체 TC 로 만든다. 시트 분리 시에도 참조를 따라갈 수 있어야 한다.
     """
+    # openpyxl 은 이 함수에서만 쓴다. 모듈 최상단에서 올리면 콜드 스타트마다 임포트 비용을 낸다.
+    from openpyxl import Workbook
+    from openpyxl.comments import Comment
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
     index = build_index(testcases)
     wb = Workbook()
 

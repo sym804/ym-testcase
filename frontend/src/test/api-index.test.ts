@@ -115,6 +115,94 @@ describe("projectsApi", () => {
     expect(result).toEqual(projects);
   });
 
+  it("list called concurrently shares one request, each caller gets its own array", async () => {
+    let resolve!: (v: unknown) => void;
+    mockGet.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
+    const a = projectsApi.list();
+    const b = projectsApi.list();
+    resolve({ data: [{ id: 1, name: "P1" }] });
+    const [ra, rb] = await Promise.all([a, b]);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    expect(ra).toEqual(rb);
+    expect(ra).not.toBe(rb);
+  });
+
+  it("list after the previous one settled sends a new request (no result cache)", async () => {
+    mockGet.mockResolvedValueOnce({ data: [] }).mockResolvedValueOnce({ data: [{ id: 2 }] });
+    await projectsApi.list();
+    expect(await projectsApi.list()).toEqual([{ id: 2 }]);
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it("list started while create is in flight is not reused after create finishes", async () => {
+    let resolveOld!: (v: unknown) => void;
+    let resolvePost!: (v: unknown) => void;
+    mockPost.mockReturnValueOnce(new Promise((r) => { resolvePost = r; }));
+    const creating = projectsApi.create({ name: "New" });
+    // 변경이 진행되는 동안 다른 화면이 목록을 부른다(서버 커밋 전)
+    mockGet.mockReturnValueOnce(new Promise((r) => { resolveOld = r; }));
+    const stale = projectsApi.list();
+    resolvePost({ data: { id: 9 } });
+    await creating;
+    mockGet.mockResolvedValueOnce({ data: [{ id: 9 }] });
+    const fresh = projectsApi.list();
+    resolveOld({ data: [] });
+    expect(await fresh).toEqual([{ id: 9 }]);
+    expect(await stale).toEqual([]);
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it("list after logout and login does not join the previous account's request", async () => {
+    let resolveA!: (v: unknown) => void;
+    mockGet.mockReturnValueOnce(new Promise((r) => { resolveA = r; }));
+    const forA = projectsApi.list();
+    mockPost.mockResolvedValueOnce({}).mockResolvedValueOnce({ data: { access_token: "t", token_type: "bearer" } });
+    await authApi.logout();
+    await authApi.login({ username: "b", password: "pw" } as any);
+    mockGet.mockResolvedValueOnce({ data: [{ id: 2, name: "B only" }] });
+    const forB = projectsApi.list();
+    resolveA({ data: [{ id: 1, name: "A private" }] });
+    expect(await forB).toEqual([{ id: 2, name: "B only" }]);
+    await forA;
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["login", () => authApi.login({ username: "b", password: "bad" } as any)],
+    ["logout", () => authApi.logout()],
+  ])("failed %s still drops the in-flight list", async (_name, call) => {
+    let resolveA!: (v: unknown) => void;
+    mockGet.mockReturnValueOnce(new Promise((r) => { resolveA = r; }));
+    const forA = projectsApi.list();
+    mockPost.mockRejectedValueOnce(new Error("401"));
+    await expect(call()).rejects.toThrow("401");
+    mockGet.mockResolvedValueOnce({ data: [] });
+    const next = projectsApi.list();
+    resolveA({ data: [{ id: 1 }] });
+    expect(await next).toEqual([]);
+    await forA;
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it("an older list settling does not clear a newer in-flight list", async () => {
+    let resolveOld!: (v: unknown) => void;
+    let resolveNew!: (v: unknown) => void;
+    mockGet.mockReturnValueOnce(new Promise((r) => { resolveOld = r; }));
+    const older = projectsApi.list();
+    mockDelete.mockResolvedValueOnce({});
+    await projectsApi.delete(1);
+    mockGet.mockReturnValueOnce(new Promise((r) => { resolveNew = r; }));
+    const newer = projectsApi.list();
+    resolveOld({ data: [{ id: 1 }] });
+    await older;
+    // 새 요청이 아직 진행 중이면 다음 호출은 그것에 합류해야 한다
+    const joined = projectsApi.list();
+    resolveNew({ data: [] });
+    expect(await newer).toEqual([]);
+    expect(await joined).toEqual([]);
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
   it("getOne sends GET with project id", async () => {
     const project = { id: 5, name: "P5" };
     mockGet.mockResolvedValueOnce({ data: project });

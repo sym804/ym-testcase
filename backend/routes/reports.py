@@ -8,9 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload, load_only
 from sqlalchemy import func, case
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
 
 import logging
 
@@ -1123,6 +1120,11 @@ def report_excel(
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
+    # openpyxl 은 이 함수에서만 쓴다. 모듈 최상단에서 올리면 콜드 스타트마다 임포트 비용을 낸다.
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
     if not run_id:
         raise HTTPException(status_code=400, detail="run_id is required")
     project = _get_project_or_404(project_id, db)

@@ -70,6 +70,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const [sheets, setSheets] = useState<SheetNode[]>([]);
   // 시트 조회 실패를 '시트 없음' 과 구분한다. 삼키면 TC 가 수백 건 있어도 빈 프로젝트 화면이 뜬다.
   const [sheetsFailed, setSheetsFailed] = useState(false);
+  // 시트 목록 요청이 끝난(성공이든 실패든) 프로젝트. 첫 TC 목록 요청을 여기에 맞춘다.
+  const [sheetsLoadedFor, setSheetsLoadedFor] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
   const [expandedSheets, setExpandedSheets] = useState<Set<number>>(new Set());
 
@@ -258,6 +260,8 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
       console.error(err);
       setSheetsFailed(true);
       toast.error(t("sheetsLoadFailed"), { id: "sheets-load-failed" });
+    } finally {
+      setSheetsLoadedFor(projectId);
     }
   }, [projectId, t]);
 
@@ -330,9 +334,15 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     loadCustomFields();
   }, [loadSheets, loadCustomFields]);
 
+  // ★시트 목록을 받은 뒤에 TC 목록을 받는다. loadData 가 flatSheets 에 의존해서, 함께
+  //   보내면 시트가 도착하는 순간 같은 목록을 한 번 더 받았다(처음 열 때 요청 2회).
+  //   대신 첫 표는 시트 응답 뒤에 그려진다(예전에는 정렬 전 표가 먼저 보일 수 있었다).
+  //   요청을 하나로 줄이면 서버리스에서 동시 요청이 새 인스턴스로 갈라지는 일도 준다.
+  //   시트 목록이 실패해도 finally 에서 표시하므로 표는 뜬다.
   useEffect(() => {
+    if (sheetsLoadedFor !== projectId) return;
     loadData();
-  }, [loadData]);
+  }, [loadData, sheetsLoadedFor, projectId]);
 
   // ── Ctrl+Z / Ctrl+Y 글로벌 키보드 단축키 ──
   useEffect(() => {
