@@ -7,7 +7,7 @@
   "github": "https://github.com/sym804/ym-testcase/issues/",
   "linear": "https://linear.app/sym804/issue/"
  },
- "updated_at": "2026-10-28T23:51:45+09:00",
+ "updated_at": "2026-10-30T14:42:57+09:00",
  "fields": [
   "이슈번호",
   "발견일",
@@ -5731,8 +5731,12 @@
    "재현 빈도": "- 항상(코드 경로)",
    "증거": "- 2026-10-28 보안 전수 점검(읽기 전용). 코드 경로와 설정을 본세션이 직접 대조했다. 실제 악용은 실행하지 않았다",
    "발견 경로 / 왜 지금인가": "- 코드 리뷰",
+   "원인 및 수정 / 결과": "원인: * auto_importer 는 TC 일괄 가져오기용으로 만든 사람 계정이었고 role=admin, 약한 비밀번호였다\n* 이관 스크립트 copy_all 은 users 를 거르지 않아 SQLite 에서 로컬 PostgreSQL, 다시 시험 배포(ymtc-test) DB 로 그대로 옮겨졌다\n* 시험 배포 DB 를 대조하니 auto_importer 외에 테스트 계정 7개(관리자 robin 포함)의 비밀번호가 공개 레포 테스트 코드에 적힌 값과 같았다(해시를 로컬에서 대조, 로그인 시도 없음)\n\n수정 내용: * scripts/migrate_sqlite_to_pg.py: --disable-user(검증 뒤 커밋 전에 status=disabled, token_version+1), 쓰기 전 검사(원본에 없는 이름, 관리자 전원 차단 거부), 관리자 목록 출력\n* 로컬 실사용 DB: auto_importer 사용 중지(만든 TC 99건이 가리키므로 삭제하지 않음)\n* 시험 배포 DB: auto_importer, robin, robin1, viewer, tester1, **testuser**, **sec_viewer**, **regtest_viewer** 사용 중지. 공개 비밀번호 로그인이 403 \"사용이 중지된 계정입니다\" 로 바뀐 것을 확인\n* 비밀번호 변경 강제는 쓰지 않았다. 옛 비밀번호를 아는 사람이 먼저 바꾸면 계정을 가져가므로 막는 쪽이 맞다",
+   "재발 방지 / 하지 않을 것": "* scripts/test_migrate_sqlite_to_pg.py 4건(막기와 세션 무효화, 관리자 목록 안내, 없는 계정 거부, 관리자 전원 차단 거부). 가드를 빼면 각각 실패 확인\n* README 이관 절차에 --disable-user 안내",
+   "영향 범위": "* 이관 스크립트, 로컬 실사용 DB, 시험 배포 DB 의 users\n* 남은 것: 로컬 DB 의 테스트 계정(robin 등)은 그대로. 회사 배포 DB 에 이 계정들이 있는지는 미확인",
    "발생 버전": "System 2.2.6.1",
-   "상태": "진행중",
+   "수정 버전": "* System 2.2.7.0 / BE 2.2.5.0 / FE 1.13.5.0 (커밋: b75fb0b)",
+   "상태": "완료",
    "트래커": "SYM-205"
   },
   {
@@ -5749,8 +5753,12 @@
    "재현 빈도": "- 항상(코드 경로)",
    "증거": "- 2026-10-28 보안 전수 점검(읽기 전용). 코드 경로와 설정을 본세션이 직접 대조했다. 실제 악용은 실행하지 않았다",
    "발견 경로 / 왜 지금인가": "- 코드 리뷰",
+   "원인 및 수정 / 결과": "원인: * check_serverless_config 가 STORAGE_BACKEND 만 필수로 봤다. ENV 가 빠지면 첫 관리자 토큰 검사, Secure 쿠키, HSTS, SECRET_KEY 필수 검사가 함께 꺼진다\n\n수정 내용: * VERCEL 환경에서 ENV=production, SECRET_KEY(공백만 있는 값 포함), AUTH_APPROVAL 이 없으면 기동 중단\n* deploy_company.md, deploy_public.md, .env.example, manual_admin_confluence.md 에 필수 조건 반영",
+   "재발 방지 / 하지 않을 것": "* tests_unit/test_runtime_env.py: 각 값이 빠진 경우, ENV=development, 공백 SECRET_KEY, 로컬 기동 유지. 옛 코드로 돌리면 4건 실패\n* 하위 프로세스에 부모의 GOOGLE\\_*, AUTH\\_* 를 넘기지 않게 해 전체 실행 순서 의존 제거",
+   "영향 범위": "* Vercel 배포. ENV 나 AUTH_APPROVAL 이 없으면 다음 배포부터 함수가 뜨지 않는다. 시험 배포(ymtc-test)는 AUTH\\_\\* 가 없어 다음 배포 전에 넣어야 한다",
    "발생 버전": "System 2.2.6.1",
-   "상태": "진행중",
+   "수정 버전": "* System 2.2.7.0 / BE 2.2.5.0 / FE 1.13.5.0 (커밋: b75fb0b)",
+   "상태": "완료",
    "트래커": "SYM-206"
   },
   {
@@ -5767,8 +5775,12 @@
    "재현 빈도": "- 항상(코드 경로)",
    "증거": "- 2026-10-28 보안 전수 점검(읽기 전용). 코드 경로와 설정을 본세션이 직접 대조했다. 실제 악용은 실행하지 않았다",
    "발견 경로 / 왜 지금인가": "- 코드 리뷰",
+   "원인 및 수정 / 결과": "원인: * 사전조건 해석기 테스트를 만들 때 실제 회사 시트 문구를 픽스처로 썼다. 보고서 파일명 예시 등에도 제품명이 들어갔다\n\n수정 내용: * backend/test_precondition.py, frontend/src/test/precondition.test.ts 를 가상의 쇼핑몰 문구와 ID(ORD-API-01, PAY-0n, CPN-0n)로 교체. 번호 범위, 이어지는 줄, 범위 밖 제외, 순환 참조 단언은 그대로\n* 보고서 파일명 예시, 매뉴얼 예시, 주석, 이전 릴리즈 노트 예시의 제품명 교체. .gitignore 의 제품명 파일은 \\*.test.txt 로\n* issue_log 의 이 이슈 행에 적힌 제품명도 일반화",
+   "재발 방지 / 하지 않을 것": "* 없음. 작업 트리 git grep 0건 확인까지만 했다\n* 원문은 git 히스토리(3538e35 이후)와 공개 원격 브랜치에 남아 있다. 히스토리 정리는 별도 판단",
+   "영향 범위": "* 테스트와 문서 문자열만. 동작 변화 없음",
    "발생 버전": "System 2.2.6.1",
-   "상태": "진행중",
+   "수정 버전": "* System 2.2.7.0 / BE 2.2.5.0 / FE 1.13.5.0 (커밋: b75fb0b)",
+   "상태": "완료",
    "트래커": "SYM-207"
   },
   {
@@ -5785,8 +5797,12 @@
    "재현 빈도": "- 항상(코드 경로)",
    "증거": "- 2026-10-28 보안 전수 점검(읽기 전용). 코드 경로와 설정을 본세션이 직접 대조했다. 실제 악용은 실행하지 않았다",
    "발견 경로 / 왜 지금인가": "- 코드 리뷰",
+   "원인 및 수정 / 결과": "원인: * python-jose 3.5.0 은 수정판이 없는 취약점(PYSEC-2026-4298)이 있고 ecdsa(PYSEC-2026-1325)를 끌고 온다\n* fpdf2 2.8.6(CVE 2건, 2.8.8 수정), dompurify 3.4.15(Critical), follow-redirects 1.16.0(High)\n\n수정 내용: * python-jose 를 PyJWT 2.15.1 로 교체([auth.py](<http://auth.py>), google_oauth.py, staged_upload.py). 예외는 PyJWTError\n* fpdf2 2.8.9, dompurify 3.4.17, follow-redirects 1.16.2\n* pip-audit, npm audit --omit=dev 모두 0건",
+   "재발 방지 / 하지 않을 것": "* python-jose 발급 토큰을 PyJWT 로 디코드해 기존 세션 유지 확인. 만료, 서명 불일치, alg none, 빈 값은 모두 PyJWTError\n* 백엔드 전체 테스트와 프론트 테스트, 빌드 통과",
+   "영향 범위": "* 로그인 토큰, Google 로그인 흐름 토큰, 업로드 토큰. 기존 세션은 유지\n* PyJWT 는 32바이트보다 짧은 SECRET_KEY 에 경고를 낸다(동작은 같음)",
    "발생 버전": "System 2.2.6.1",
-   "상태": "진행중",
+   "수정 버전": "* System 2.2.7.0 / BE 2.2.5.0 / FE 1.13.5.0 (커밋: b75fb0b)",
+   "상태": "완료",
    "트래커": "SYM-208"
   },
   {
