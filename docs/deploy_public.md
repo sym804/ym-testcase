@@ -68,6 +68,7 @@ Remove-Item Env:DATABASE_URL, Env:DATABASE_URL_DIRECT
 
 `TRUSTED_PROXY_HEADER` 를 비우면 모든 요청이 프록시 주소 하나로 잡힙니다. 가입 횟수 제한(시간당 30건)이 사이트 전체에 걸리고, 누군가 한 계정의 비밀번호를 열 번 틀리면 그 계정은 모든 접속자에게 5분 동안 잠깁니다.
 `DATABASE_URL_DIRECT` 는 Vercel 에 넣지 않습니다. 서버리스에서는 앱이 마이그레이션을 하지 않습니다.
+`ENV`, `SECRET_KEY`, `AUTH_APPROVAL` 중 하나라도 비면 서버가 시작하지 않습니다.
 
 3. Settings, Functions 에서 Function Region 을 Supabase 와 같은 지역(Seoul 이면 `icn1`)으로 바꿉니다. 기본값(미국 동부)으로 두면 서울 DB 와 왕복하느라 응답마다 2초 가까이 걸립니다.
 4. Deployments 에서 최근 배포를 Redeploy 합니다. 환경변수와 리전은 다음 배포부터 적용됩니다.
@@ -80,7 +81,7 @@ Remove-Item Env:DATABASE_URL, Env:DATABASE_URL_DIRECT
 
 ## 5. 가입 정책
 
-공개 주소는 누구나 열 수 있습니다. 기본값(`AUTH_APPROVAL=none`)이면 아무나 가입해 바로 씁니다.
+공개 주소는 누구나 열 수 있습니다. `AUTH_APPROVAL=none` 을 고르면 아무나 가입해 바로 씁니다.
 가입한 사람은 비공개가 아닌 프로젝트를 모두 볼 수 있습니다.
 
 - 혼자 쓰거나 아는 사람만 쓰면 `AUTH_APPROVAL=all`. 가입하면 승인 대기가 되고, 관리자 화면에서 승인한 사람만 들어옵니다

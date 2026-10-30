@@ -695,3 +695,43 @@ def test_로컬_저장소가_uploads_와_같은_폴더면_재실행_때_새_키�
     with dst.begin() as conn:
         rep = mig.migrate_attachments(conn, up, st)
     assert rep.orphan_files == []
+
+
+# ── SYM-205: 자동화용·테스트용 계정을 막아서 옮긴다 ─────────────────────────
+
+def test_disable_user_는_검증_뒤_계정을_막고_세션을_끊는다(tmp_path, dst, mig, target_url, monkeypatch, capsys):
+    monkeypatch.setenv("STORAGE_BACKEND", "local")
+    monkeypatch.setenv("UPLOAD_DIR", str(tmp_path / "store"))
+    up = _uploads(tmp_path, {"abc.png": PNG_BYTES})
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--uploads", up, "--storage", "local",
+                          "--excluded-out", str(tmp_path / "ex.json"), "--disable-user", "qa"))
+    assert code == 0, capsys.readouterr().err
+    rows = _q(dst, "SELECT username, status::text, token_version FROM users ORDER BY id")
+    assert rows == [("admin", "active", 0), ("qa", "disabled", 4)]
+    out = capsys.readouterr().out
+    assert "막은 계정: qa" in out
+    assert "관리자 권한으로 옮기는 계정: admin" in out
+
+
+def test_disable_user_없이_옮기면_관리자_목록과_막는_방법을_알린다(tmp_path, dst, mig, target_url, capsys):
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--dry-run",
+                          "--excluded-out", str(tmp_path / "ex.json")))
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "관리자 권한으로 옮기는 계정: admin" in out
+    assert "--disable-user" in out
+
+
+def test_원본에_없는_계정을_막으라고_하면_아무것도_쓰지_않고_멈춘다(tmp_path, dst, mig, target_url, capsys):
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--dry-run",
+                          "--excluded-out", str(tmp_path / "ex.json"), "--disable-user", "nobody"))
+    assert code == 1
+    assert "nobody" in capsys.readouterr().err
+    assert _q(dst, "SELECT count(*) FROM users") == [(0,)]
+
+
+def test_관리자를_모두_막으면_멈춘다(tmp_path, dst, mig, target_url, capsys):
+    code = mig.main(_argv(make_legacy_db(tmp_path), target_url, "--dry-run",
+                          "--excluded-out", str(tmp_path / "ex.json"), "--disable-user", "admin"))
+    assert code == 1
+    assert "관리자" in capsys.readouterr().err

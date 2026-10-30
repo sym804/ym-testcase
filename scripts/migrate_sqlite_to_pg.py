@@ -2,7 +2,7 @@
 
     python scripts/migrate_sqlite_to_pg.py --source <tc_manager.db> --target <postgresql+psycopg2://...>
         [--uploads <backend/uploads> --storage local|supabase] [--allow-orphan test_case_history:347]
-        [--dry-run] [--excluded-out excluded_rows.json]
+        [--dry-run] [--excluded-out excluded_rows.json] [--disable-user auto_importer]
 
 순서: 사전 점검 -> 복사(한 트랜잭션) -> 독립 검증 -> 커밋 -> 첨부를 Storage 로.
 대상은 미리 `alembic upgrade head` 로 기준점 스키마를 올려 둔 빈 DB 다.
@@ -345,6 +345,37 @@ def copy_all(src, conn, excluded: dict) -> dict:
     return counts
 
 
+def check_disable_users(src, names: set) -> None:
+    """막을 계정이 원본에 있고, 막은 뒤에도 쓸 수 있는 관리자가 남는지 쓰기 전에 본다."""
+    if not names:
+        return
+    rows = {r["username"]: r["role"] for r in src.execute("SELECT username, role FROM users")}
+    problems = [f"--disable-user {n}: 원본에 없는 계정입니다" for n in sorted(names - set(rows))]
+    if not problems and not [u for u, role in rows.items() if role == "admin" and u not in names]:
+        problems.append("--disable-user 로 관리자 계정을 모두 막으면 아무도 관리할 수 없습니다")
+    if problems:
+        raise MigrationError(problems)
+
+
+def disable_users(conn, names: set) -> list[str]:
+    """옮긴 계정 중 지정한 것을 막는다(SYM-205). 로그인, 기존 세션, API 키가 모두 거부된다.
+
+    원본과 달라지므로 검증 뒤, 커밋 전에 부른다. 지우지 않고 막는 이유는 그 계정이 만든
+    TC 와 이력이 created_by 로 가리키고 있어서다.
+    """
+    from sqlalchemy import text
+
+    if not names:
+        return []
+    return sorted(conn.execute(text(
+        "UPDATE users SET status = 'disabled', token_version = token_version + 1 "
+        "WHERE username = ANY(:names) RETURNING username"), {"names": sorted(names)}).scalars())
+
+
+def admin_usernames(src) -> list[str]:
+    return [r[0] for r in src.execute("SELECT username FROM users WHERE role = 'admin' ORDER BY id")]
+
+
 def fix_sequences(conn) -> None:
     """다음 id 가 max(id)+1 이 되게 한다. 빈 테이블은 1 부터.
 
@@ -607,6 +638,8 @@ def main(argv=None) -> int:
                    help="FK 고아 행을 옮기지 않고 제외한다. 여러 번 줄 수 있다")
     p.add_argument("--excluded-out", default="excluded_rows.json", help="제외한 행을 보관할 JSON")
     p.add_argument("--dry-run", action="store_true", help="점검·복사·검증 후 되돌린다. 첨부는 건드리지 않는다")
+    p.add_argument("--disable-user", action="append", default=[], metavar="USERNAME",
+                   help="옮긴 뒤 막아 둘 계정(자동화용, 테스트용 등). 여러 번 줄 수 있다")
     p.add_argument("--attachments-only", action="store_true",
                    help="데이터는 이미 옮겼고 첨부 단계만 다시 돈다(첨부 단계가 실패했을 때)")
     a = p.parse_args(argv)
@@ -631,6 +664,8 @@ def main(argv=None) -> int:
             print(f"첨부 저장소: {_choose_storage(a)}")
             return _run_attachments(eng, a.uploads)
         pre = precheck(src, eng, allow)
+        disable = set(a.disable_user)
+        check_disable_users(src, disable)
         n_att = src.execute("SELECT count(*) FROM attachments").fetchone()[0]
         if n_att and not a.dry_run:
             if not a.uploads:
@@ -647,6 +682,7 @@ def main(argv=None) -> int:
             if problems:
                 trans.rollback()
                 raise MigrationError(["검증 실패. 아무것도 남기지 않았습니다"] + problems)
+            disabled = disable_users(conn, disable)
             if a.dry_run:
                 trans.rollback()
             else:
@@ -655,6 +691,16 @@ def main(argv=None) -> int:
             print(f"  {t}: {n}")
         excluded = {t: sorted(ids) for t, ids in pre.excluded.items()}
         print(f"제외: {excluded} -> {a.excluded_out}")
+        # ★계정은 비밀번호째 그대로 옮긴다. 자동화용·테스트용 관리자가 섞여 있으면 새 서버에서도
+        #   같은 비밀번호로 들어올 수 있으니 목록을 보이고 막을 방법을 알린다(SYM-205).
+        active_admins = [u for u in admin_usernames(src) if u not in disable]
+        print(f"관리자 권한으로 옮기는 계정: {', '.join(active_admins)}")
+        if disabled:
+            print(f"막은 계정: {', '.join(disabled)}" + (" (dry-run 이라 되돌림)" if a.dry_run else ""))
+        elif a.dry_run:
+            print("쓰지 않는 계정은 실제 실행에 --disable-user <아이디> 를 붙이면 막아서 옮깁니다")
+        else:
+            print("쓰지 않는 계정은 관리자 화면에서 사용 중지하세요")
         if a.dry_run:
             print("dry-run: 점검, 복사, 검증 통과. 되돌렸습니다")
             return 0

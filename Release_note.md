@@ -21,11 +21,39 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v2.2.6.1  (2026-10-20)
-├── Frontend       v1.13.4.1
-├── Backend        v2.2.4.1
+YM TestCase System  v2.2.7.0  (2026-10-30)
+├── Frontend       v1.13.5.0
+├── Backend        v2.2.5.0
 └── Database       v1.2.0.0
 ```
+
+---
+
+## System 2.2.7.0 / BE 2.2.5.0 / FE 1.13.5.0 - [fix] 보안 점검 지적 4건 수정 (2026-10-30)
+
+### 이슈
+
+- SYM-205 auto_importer 가 약한 비밀번호의 활성 admin 으로 남아 있고 이관 스크립트가 그대로 옮긴다 (bug/critical/security)
+- SYM-206 서버리스 기동 검사가 ENV=production 을 강제하지 않아 빠지면 운영 보호가 함께 꺼진다 (bug/major/security)
+- SYM-207 공개 레포 테스트 파일에 회사 제품 TC 원문이 들어 있다 (bug/major/security)
+- SYM-208 DOMPurify 와 python-jose 등 운영 의존성에 알려진 취약점이 있다 (bug/major/security)
+
+### 변경
+
+- 이관 스크립트 `--disable-user`: 지정 계정을 막고 세션 무효화. 관리자 목록 출력
+- 이미 옮긴 DB 의 auto_importer 와 공개된 비밀번호를 쓰는 계정 사용 중지(로컬, 시험 배포)
+- 서버리스는 `ENV=production`, `SECRET_KEY`, `AUTH_APPROVAL` 중 하나라도 없으면 기동 중단
+- 의존성: python-jose -> PyJWT 2.15.1, fpdf2 2.8.9, dompurify 3.4.17, follow-redirects 1.16.2(감사 0건)
+- 테스트와 예시의 회사 제품 문구를 가상 문구로 교체. QA 2인 통과
+
+### 영향
+
+- 기존 로그인 세션 유지
+- Vercel 에 `ENV`, `AUTH_APPROVAL` 이 없으면 다음 배포부터 기동 실패
+
+### 조치
+
+- Vercel 환경변수 `ENV=production`, `AUTH_APPROVAL` 확인 후 재배포
 
 ---
 

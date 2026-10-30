@@ -14,7 +14,8 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import requests
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError as JWTError
 
 from auth import ALGORITHM, SECRET_KEY
 

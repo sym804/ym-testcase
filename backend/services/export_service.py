@@ -48,7 +48,7 @@ def export_testcases_excel(
 ) -> StreamingResponse:
     """TC 목록을 Excel 파일로 생성하여 StreamingResponse로 반환한다.
 
-    사전조건이 다른 TC 를 참조하는 경우(예: "REC-API-01 의 사전조건 1~4 참조"),
+    사전조건이 다른 TC 를 참조하는 경우(예: "ORD-API-01 의 사전조건 1~4 참조"),
     엑셀에서는 앱의 호버 팝업이 없어 참조가 읽히지 않는다. 두 가지로 보완한다.
 
     - expand_refs=False (기본): 참조 문구는 그대로 두고, 펼친 사전조건을 셀 메모로 단다.

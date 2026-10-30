@@ -47,6 +47,14 @@ def check_serverless_config() -> None:
         raise RuntimeError(
             "서버리스에서는 STORAGE_BACKEND=supabase 가 필요하다. 함수의 디스크는 꺼지면 사라진다."
         )
+    # ★ENV 가 빠지면 첫 관리자 토큰 검사, Secure 쿠키, HSTS, SECRET_KEY 필수 검사가 한꺼번에
+    #   꺼진다. 서버리스는 인터넷에 열린 배포라 개발 모드로 뜰 이유가 없다(SYM-206).
+    #   AUTH_APPROVAL 은 기본값(none)이 가입을 바로 열어 두므로 운영에서는 고른 값을 적게 한다.
+    if os.getenv("ENV") != "production":
+        raise RuntimeError("서버리스에서는 ENV=production 이 필요하다. 빠지면 운영 보호가 함께 꺼진다.")
+    missing = [n for n in ("SECRET_KEY", "AUTH_APPROVAL") if not (os.getenv(n) or "").strip()]
+    if missing:
+        raise RuntimeError(f"서버리스에서는 {', '.join(missing)} 를 지정해야 한다.")
     if not os.getenv("TRUSTED_PROXY_HEADER"):
         logger.error(
             "TRUSTED_PROXY_HEADER 가 비어 있다. 서버리스에서는 소켓 주소가 프록시라 조직 전체가 "
