@@ -7,7 +7,7 @@
   "github": "https://github.com/sym804/ym-testcase/issues/",
   "linear": "https://linear.app/sym804/issue/"
  },
- "updated_at": "2026-10-30T14:42:57+09:00",
+ "updated_at": "2026-10-30T14:51:31+09:00",
  "fields": [
   "이슈번호",
   "발견일",
@@ -5819,6 +5819,24 @@
    "발생 버전": "System 2.2.6.1",
    "상태": "진행중",
    "트래커": "SYM-209"
+  },
+  {
+   "이슈번호": "BUG-204",
+   "발견일": "2026-10-30",
+   "유형": "bug",
+   "심각도": "minor",
+   "영역": "etc",
+   "제목": "CI E2E 가 ubuntu-latest 26.04 에서 Playwright 브라우저 설치에 실패한다",
+   "증상 / 현재 상태": "- CI 의 E2E (Playwright) 작업이 Install Playwright browsers 단계에서 종료코드 1 로 끝난다",
+   "기대 결과 / 바꾼 뒤 상태": "- E2E 작업이 브라우저를 설치하고 테스트를 돌린다",
+   "실제 결과": "- Error: ERROR: Playwright does not support chromium on ubuntu26.04-x64",
+   "재현 절차 / 완료 조건": "1. main 에 푸시한다\n2. CI 워크플로의 E2E (Playwright) 작업 로그를 연다",
+   "재현 빈도": "- 항상",
+   "증거": "- 실행 b75fb0b, 7bb69cc 두 번 모두 같은 오류. 직전 성공은 2026-10-20(70d5193)",
+   "발견 경로 / 왜 지금인가": "- 기타(푸시 후 CI 확인)",
+   "발생 버전": "- System 2.2.7.0",
+   "상태": "진행중",
+   "트래커": "SYM-210"
   }
  ]
 }
