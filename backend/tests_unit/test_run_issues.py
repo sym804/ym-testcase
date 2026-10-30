@@ -403,7 +403,7 @@ def test_리포트에_연관_TC_가_실린다(db, made):
 
 @pytest.mark.parametrize("text, refs", [
     ("SF-1081 · sf1006-issues #1 (Major/미등록)", [("SF-1081", None)]),
-    ("starfort-issues #13 (Minor/미등록) · starfort-issues #14", []),
+    ("shop-issues #13 (Minor/미등록) · shop-issues #14", []),
     (f"재현됨 {LINEAR}, SF-1081 참고", [("SF-1081", LINEAR)]),
     ("SF-1 · SF-2 · SF-1", [("SF-1", None), ("SF-2", None)]),
     ("https://docs.example.com/page.", [(None, "https://docs.example.com/page")]),
@@ -418,7 +418,7 @@ def test_추가_후보는_등록하지_않은_것만_TC_와_함께(db, made):
     _add_tc(db, made, "ASP-01", 1, link="SF-1081 · sf1006-issues #1 (Major/미등록)")
     _add_tc(db, made, "ASP-02", 2, link="SF-1085 · sf1006-issues #5")
     _add_tc(db, made, "ASP-03", 3, link="SF-1085", result=TestResultValue.PASS)
-    _add_tc(db, made, "ASP-04", 4, link="starfort-issues #13 (Minor/미등록)")
+    _add_tc(db, made, "ASP-04", 4, link="shop-issues #13 (Minor/미등록)")
     _add(db, made, title="등록됨", url=LINEAR)  # SF-1081
     data = report_json(project_id=project.id, run_id=run.id, db=db, current_user=user)
     assert data["issue_candidates"] == [

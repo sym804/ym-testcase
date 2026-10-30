@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // YM TestCase 결과 업로드 CLI. 의존성 없이 Node 18+ 만으로 돈다(fetch · FormData 내장).
 //
-//   YMTC_API_KEY=ymtc_... node scripts/ymtc-upload.mjs --project 1 --run-name "Starfort e2e" results.json
+//   YMTC_API_KEY=ymtc_... node scripts/ymtc-upload.mjs --project 1 --run-name "Shop e2e" results.json
 //
 // 수행 이름만 주면 서버가 같은 이름의 다음 회차를 만들어 기록한다(처음이면 R1).
 // API 키는 환경변수로만 받는다. 인자로 받으면 CI 로그와 셸 이력에 남는다.

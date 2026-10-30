@@ -38,7 +38,7 @@ describe("resolveTcIdSeed", () => {
 });
 
 describe("planTcIdFill", () => {
-  it("중복된 TC ID를 이어서 다시 매긴다 (Starfort TC2 상황)", () => {
+  it("중복된 TC ID를 이어서 다시 매긴다 (실사용 시트의 TC2 상황)", () => {
     const all = ["SFW-001", "SFW-002", "SFW-003", ...Array(4).fill("TC-001")];
     const plan = planTcIdFill(all, [2, 3, 4, 5, 6]);
     expect(idsOf(all, plan!)).toEqual([

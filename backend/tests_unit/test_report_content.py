@@ -336,14 +336,14 @@ def test_파일명은_프로젝트_수행_Test_Report_날짜_형식이고_금지
     from types import SimpleNamespace as NS
     when = _dt(2026, 9, 30, 15, 0)
     # 프로젝트 이름 · 버전 · 꼬리 "테스트" 를 빼고 공백 없이 붙인다
-    run = NS(name="Starfort 1.5 계정 · 세션 정책 테스트", version="v1.5", round=2)
-    assert report_filename("Starfort", run, "pdf", when) == "Starfort_계정·세션정책_Test_Report_20260930.pdf"
+    run = NS(name="Shop 1.5 계정 · 세션 정책 테스트", version="v1.5", round=2)
+    assert report_filename("Shop", run, "pdf", when) == "Shop_계정·세션정책_Test_Report_20260930.pdf"
     # 버전 표기가 달라도(1.5 / v1.5) 빠지고, 영문 Test 꼬리도 뺀다
     run = NS(name="Full Regression Test 1.5", version="1.5", round=1)
-    assert report_filename("Starfort", run, "xlsx", when) == "Starfort_FullRegression_Test_Report_20260930.xlsx"
+    assert report_filename("Shop", run, "xlsx", when) == "Shop_FullRegression_Test_Report_20260930.xlsx"
     # 수행 이름이 프로젝트 이름뿐이면 원래 이름을 쓴다
-    run = NS(name="Starfort", version=None, round=1)
-    assert report_filename("Starfort", run, "pdf", when) == "Starfort_Starfort_Test_Report_20260930.pdf"
+    run = NS(name="Shop", version=None, round=1)
+    assert report_filename("Shop", run, "pdf", when) == "Shop_Shop_Test_Report_20260930.pdf"
     # Windows 금지 문자는 밑줄
     made = _make(db, [("A", "High", "c", R.PASS, None, None, "t1")], project_name="웹/앱: QA?")
     _, run, _ = made

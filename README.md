@@ -120,7 +120,7 @@ python scripts/migrate_sqlite_to_pg.py --source backend/tc_manager.db \
   --target postgresql+psycopg2://ymtc:ymtc@127.0.0.1:54329/ymtc --uploads backend/uploads --dry-run
 ```
 
-4. 통과하면 `--dry-run` 을 빼고 `--storage local` 을 붙여 다시 실행합니다. 첨부는 `backend/uploads/attachments/` 에 복사됩니다. 이미 지워진 TC 를 가리키는 이력 같은 고아 행이 있으면 스크립트가 목록을 내고 멈춥니다. 옮기지 않아도 되는 행이면 `--allow-orphan 테이블:id` 로 제외하고, 제외한 행은 `excluded_rows.json` 에 남습니다
+4. 통과하면 `--dry-run` 을 빼고 `--storage local` 을 붙여 다시 실행합니다. 첨부는 `backend/uploads/attachments/` 에 복사됩니다. 이미 지워진 TC 를 가리키는 이력 같은 고아 행이 있으면 스크립트가 목록을 내고 멈춥니다. 옮기지 않아도 되는 행이면 `--allow-orphan 테이블:id` 로 제외하고, 제외한 행은 `excluded_rows.json` 에 남습니다. 계정은 비밀번호째 옮겨지므로, 스크립트가 보여 주는 관리자 목록에 자동화용이나 테스트용 계정이 있으면 `--disable-user 아이디` 를 붙여 막은 채로 옮깁니다
 5. 옛 서버(SQLite 버전)와 새 서버를 같이 띄우고 응답을 비교합니다. 프로젝트 목록, 대시보드, 리포트가 모두 같아야 합니다
 
 ```bash

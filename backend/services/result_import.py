@@ -1,6 +1,6 @@
 """자동화 결과 파일(Playwright JSON · JUnit XML)을 회차 결과로 옮기는 규칙.
 
-`starfort project/tc/record_run_from_e2e.py` 가 하던 판정을 서버로 옮긴 것이다
+외부 E2E 기록 스크립트(`record_run_from_e2e.py`)가 하던 판정을 서버로 옮긴 것이다
 (docs/plan_playwright_integration.md 4-7). 기록 스크립트와 같은 파일을 넣으면
 PASS · FAIL · NS 건수가 같아야 한다.
 

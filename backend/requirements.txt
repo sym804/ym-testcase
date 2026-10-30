@@ -4,12 +4,12 @@ sqlalchemy==2.0.48
 psycopg2-binary
 alembic
 pydantic[email]==2.13.4  # keep >=2.13: pydantic-core 2.33.x has no cp314 wheel
-python-jose[cryptography]==3.5.0
+PyJWT==2.15.1  # python-jose 3.5.0 은 수정판 없는 취약점(PYSEC-2026-4298)과 ecdsa 의존이 있어 교체(SYM-208)
 passlib[bcrypt]==1.7.4
 bcrypt==5.0.0
 python-multipart==0.0.32  # 0.0.22 는 multipart 헤더 무제한 DoS(GHSA-pp6c-gr5w-3c5g) 등 high 2건
 python-dotenv==1.2.3
 openpyxl==3.1.5
-fpdf2==2.8.6
+fpdf2==2.8.9  # 2.8.6 은 CVE-2026-114609, CVE-2026-114610(2.8.8 수정)
 google-auth==2.61.0  # Google ID 토큰 검증(서명, aud, iss, 만료)
 requests==2.34.2  # google-auth 의 HTTP 전송. 개발 의존성에만 있으면 운영에서 ImportError

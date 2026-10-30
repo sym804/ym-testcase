@@ -333,7 +333,7 @@ Issue Link 칸에 주소(http/https)나 이슈 키를 적으면 옆에 ↗ 가 �
 # Playwright 실행 뒤 결과 올리기 (Node 18 이상)
 PLAYWRIGHT_JSON_OUTPUT_NAME=results.json npx playwright test --reporter=list,json
 YMTC_API_KEY=ymtc_... node scripts/ymtc-upload.mjs \
-  --url http://127.0.0.1:8008 --project 1 --run-name "Starfort e2e" --version 1.6 results.json
+  --url http://127.0.0.1:8008 --project 1 --run-name "Shop e2e" --version 1.6 results.json
 ```
 
 ⚠️ **JUnit XML 주의**: Playwright 의 junit 리포터는 `embedAnnotationsAsProperties: true` 를 켜야 test.fail 결함 재현이 FAIL 로 구분됩니다. 끄면 통과로 기록됩니다.
@@ -399,7 +399,7 @@ YMTC_API_KEY=ymtc_... node scripts/ymtc-upload.mjs \
 4. 이슈: 제목과 링크로 이슈를 추가하거나 「이전 회차 이슈 가져오기」로 복사해 옵니다. 상태(해결 · 유지 · 부분 해결 · 미확인)를 찍으면 미해결 · 처리 완료 두 묶음으로 나뉘고, 연관 TC 가 모두 PASS 인 미확인 이슈에는 "해결 후보" 가 붙습니다.
 5. 실패·차단 항목: FAIL 과 BLOCK 결과를 우선순위 높은 순으로, 실제 결과 · 이슈 링크와 함께 확인합니다.
 6. 우선순위별 요약과 카테고리별 요약: 건수와 PASS Rate 를 확인합니다.
-7. **PDF 다운로드**: 화면과 같은 차례의 리포트 파일(문구는 화면 언어). 파일 이름은 `프로젝트명_수행이름_Test_Report_날짜.pdf` (예: `Starfort_계정·세션정책_Test_Report_20260930.pdf`)
+7. **PDF 다운로드**: 화면과 같은 차례의 리포트 파일(문구는 화면 언어). 파일 이름은 `프로젝트명_수행이름_Test_Report_날짜.pdf` (예: `Shop_계정·세션정책_Test_Report_20260930.pdf`)
 8. **Excel 다운로드**: Summary 시트(전체 현황, 수행 비교, 이슈, 우선순위별, 카테고리별 · 화면 언어)와 Results 시트(전체 결과)
 
 ---

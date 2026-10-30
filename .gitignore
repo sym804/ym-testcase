@@ -103,7 +103,7 @@ LICENSE_AGPL
 /.env.example
 
 # ── 로컬 QA 자격증명·데이터 (공개 저장소에 올리지 않는다) ──
-starfort.test.txt
+*.test.txt
 ym-testcase-credentials.txt
 *-credentials.txt
 *.db.bak*

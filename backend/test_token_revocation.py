@@ -139,13 +139,13 @@ def test_로그인_유지의_만료가_31일을_넘지_않는다():
     """무기한에 가까운 토큰은 유출되면 되돌릴 수 없다."""
     from datetime import datetime, timezone
 
-    from jose import jwt
+    import jwt
 
     r = login("admin", ADMIN_PW, remember_me=True)
     assert r.status_code == 200, r.text
     token = r.json()["access_token"]
 
-    claims = jwt.get_unverified_claims(token)
+    claims = jwt.decode(token, options={"verify_signature": False})
     exp = datetime.fromtimestamp(claims["exp"], tz=timezone.utc)
     days = (exp - datetime.now(timezone.utc)).days
     assert days <= 31, f"로그인 유지 토큰이 {days}일 유효하다"
@@ -153,9 +153,9 @@ def test_로그인_유지의_만료가_31일을_넘지_않는다():
 
 def test_토큰에_버전_클레임이_실린다():
     r = login("admin", ADMIN_PW)
-    from jose import jwt
+    import jwt
 
-    claims = jwt.get_unverified_claims(r.json()["access_token"])
+    claims = jwt.decode(r.json()["access_token"], options={"verify_signature": False})
     assert "ver" in claims, f"버전 클레임이 없다: {sorted(claims)}"
 
 
@@ -166,7 +166,7 @@ def test_버전_클레임이_없는_옛_토큰은_막힌다():
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from datetime import datetime, timedelta
 
-    from jose import jwt
+    import jwt
 
     import auth as auth_mod
 

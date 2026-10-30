@@ -55,7 +55,7 @@ npx tsc -b
 | 변수명 | 기본값 | 설명 | 필수 |
 |---|---|---|---|
 | `SECRET_KEY` | (자동 생성/dev) | JWT 서명 키. **프로덕션 필수 설정** | ⚠️ 프로덕션 필수 |
-| `ENV` | development | 환경 구분. production 시 SECRET_KEY 미설정 에러 | 선택 |
+| `ENV` | development | 환경 구분. production 시 SECRET_KEY 미설정 에러 | 선택. 서버리스는 `production` 필수 |
 | `DATABASE_URL` | (필수) | PostgreSQL 주소. 로컬 예: `postgresql+psycopg2://ymtc:ymtc@127.0.0.1:54329/ymtc`, 배포는 Supabase 트랜잭션 풀러 | 필수 |
 | `DATABASE_URL_DIRECT` | - | 마이그레이션 전용 직결(또는 세션 풀러) 주소. 비우면 DATABASE_URL | 선택 |
 | `TOKEN_EXPIRE_HOURS` | 72 | 일반 로그인 유지 시간 (시간) | 선택 |
@@ -71,7 +71,7 @@ npx tsc -b
 | `GOOGLE_REDIRECT_URI` | 개발: `http://localhost:5173/api/auth/google/callback` | Google 콘솔에 등록한 리디렉션 URI. 운영은 필수 | 선택 |
 | `AUTH_COMPANY_DOMAINS` | - | 회사 도메인(쉼표 구분). Google 이 알려 준 Workspace 도메인으로만 판정 | 선택 |
 | `AUTH_ALLOW_PERSONAL` | 1 | 0 이면 회사 계정만 받음. 이때 `AUTH_COMPANY_DOMAINS` 필수, 이메일 가입은 항상 승인 대기 | 선택 |
-| `AUTH_APPROVAL` | none | 관리자 승인 대상. `none`(모두 바로 사용) / `personal`(회사 Workspace Google 계정만 바로 사용, 나머지는 대기. 이메일 가입은 회사 주소여도 대기) / `all`(모두). 단 `AUTH_ALLOW_PERSONAL=0` 이면 이메일 가입은 이 값과 관계없이 승인 대기 | 선택 |
+| `AUTH_APPROVAL` | none | 관리자 승인 대상. `none`(모두 바로 사용) / `personal`(회사 Workspace Google 계정만 바로 사용, 나머지는 대기. 이메일 가입은 회사 주소여도 대기) / `all`(모두). 단 `AUTH_ALLOW_PERSONAL=0` 이면 이메일 가입은 이 값과 관계없이 승인 대기 | 선택. 서버리스는 필수 |
 | `BOOTSTRAP_TOKEN` | - | 운영(ENV=production) 빈 DB 의 첫 관리자 만들기에 필요한 값 | 선택 |
 | `REGISTER_MAX_PER_HOUR` | 30 | IP 하나의 시간당 가입 요청 수 | 선택 |
 

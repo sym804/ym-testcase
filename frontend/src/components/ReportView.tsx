@@ -672,7 +672,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "8px 10px",
     borderBottom: "1px solid var(--border-color)",
     color: "var(--text-primary)",
-    // 한글이 글자 단위로 끊기지 않게 단어 단위로 줄을 변경한다("Opticon 연/동" 방지).
+    // 한글이 글자 단위로 끊기지 않게 단어 단위로 줄을 변경한다("API 연/동" 방지).
     // 한 단어가 칸보다 길면(주소 등) 그때만 단어 안에서 끊는다.
     wordBreak: "keep-all" as const,
     overflowWrap: "anywhere" as const,

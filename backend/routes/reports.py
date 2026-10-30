@@ -517,7 +517,7 @@ def _safe_name(text: str) -> str:
 
 
 def _run_slug(project_name: str, run: TestRun) -> str:
-    """파일 이름에 넣을 수행 이름. "Starfort 1.5 계정 · 세션 정책 테스트" -> "계정·세션정책".
+    """파일 이름에 넣을 수행 이름. "Shop 1.5 계정 · 세션 정책 테스트" -> "계정·세션정책".
 
     프로젝트 이름과 버전은 파일 이름의 다른 자리에 이미 있으니 빼고, 꼬리의 "테스트"/"Test" 도
     빼며(파일 이름에 Test_Report 가 붙는다), 남은 글자는 공백 없이 붙인다(09-30 사용자 형식).
@@ -539,7 +539,7 @@ def _run_slug(project_name: str, run: TestRun) -> str:
 def report_filename(project_name: str, run: TestRun, ext: str, when: datetime = None) -> str:
     """내려받을 파일 이름: {프로젝트}_{수행}_Test_Report_{YYYYMMDD}.{ext}
 
-    예: Starfort_계정·세션정책_Test_Report_20260930.pdf (09-30 사용자 형식). 날짜는 내려받는 날이다.
+    예: Shop_계정·세션정책_Test_Report_20260930.pdf (09-30 사용자 형식). 날짜는 내려받는 날이다.
     예전 이름 {프로젝트}_Report_R{회차} 는 어느 테스트인지 몰라 파일만 보고 구분할 수 없었다.
     """
     day = (when or report_now()).strftime("%Y%m%d")
