@@ -186,6 +186,97 @@ def export_testcases_excel(
     return _xlsx_response(output, project)
 
 
+#: Markdown 표 열. 머리글 이름은 Markdown 가져오기(map_header)가 읽는 이름과 같아야
+#: 내보낸 파일을 다시 가져올 수 있다. 엑셀의 수행 결과 빈 열 4개는 표만 넓혀서 뺀다.
+MD_COLUMNS = [
+    ("No", "no"), ("TC ID", "tc_id"), ("Type", "type"), ("Category", "category"),
+    ("Depth1", "depth1"), ("Depth2", "depth2"), ("Priority", "priority"),
+    ("Platform", "test_type"), ("Precondition", "precondition"), ("Steps", "test_steps"),
+    ("Expected Result", "expected_result"), ("Remarks", "remarks"),
+]
+
+
+def _md_cell(value) -> str:
+    """값 하나를 표 칸 안에 들어가는 한 줄로 바꾼다.
+
+    가져오기 파서는 `\\|` 를 파이프로, `<br>` 을 줄바꿈으로, `&lt;` `&gt;` `&amp;` 를
+    글자로 되돌린다. 그 역순으로 쓴다.
+
+    - `&` 와 `<` 를 엔티티로 쓴다. 원문에 `<br>` 이라는 글자가 있으면 줄바꿈과 구별할 수
+      없어서다. 웹 TC 에는 "<br> 태그가 렌더된다" 같은 문장이 실제로 나온다.
+      `&` 까지 바꿔야 원문 `&lt;` 가 `<` 로 둔갑하지 않는다.
+    - 역슬래시는 따로 이스케이프하지 않아도 된다. 원문 `a\\|b` 는 `a\\\\|b` 로 나가고,
+      파서가 뒤쪽 `\\|` 만 파이프로 바꿔 `a\\|b` 로 돌아온다.
+    """
+    if value is None:
+        return ""
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("&", "&amp;").replace("<", "&lt;")
+    return text.replace("|", "\\|").replace("\n", "<br>")
+
+
+def _md_heading(name: str) -> str:
+    """시트·프로젝트 이름을 헤딩 한 줄로 쓴다. 이름 속 줄바꿈은 헤딩을 쪼개거나 표를 끼워 넣으므로 공백으로 바꾼다."""
+    return " ".join(str(name).splitlines()).strip() or "기본"
+
+
+def _md_table(tcs, index, expand_refs: bool) -> list[str]:
+    lines = [
+        "| " + " | ".join(h for h, _ in MD_COLUMNS) + " |",
+        "|" + "|".join("---" for _ in MD_COLUMNS) + "|",
+    ]
+    for tc in tcs:
+        cells = []
+        for _, field in MD_COLUMNS:
+            value = getattr(tc, field)
+            if field == "precondition" and expand_refs and has_ref(value):
+                value = expand_text(tc.tc_id, index)
+            cells.append(_md_cell(value))
+        lines.append("| " + " | ".join(cells) + " |")
+    return lines
+
+
+def build_testcases_markdown(project, testcases, split_sheets: bool, expand_refs: bool = False) -> str:
+    """TC 목록을 Markdown 문서로 만든다. 가져오기는 표 바로 위 헤딩을 시트 이름으로 쓴다.
+
+    - split_sheets=False: `## Test Cases` 아래 표 하나. 엑셀 통합 모드의 시트 이름과 같다.
+    - split_sheets=True: 시트마다 `## <시트 이름>` 과 표. 차례는 받은 목록 그대로다.
+      다시 가져왔을 때 시트 구성이 유지되는 것은 이 모드뿐이다. 통합 모드는 엑셀과
+      같이 전부 `Test Cases` 시트로 들어간다.
+
+    엑셀은 참조를 펼친 사전조건을 셀 메모로 달지만 Markdown 에는 메모가 없다.
+    expand_refs=False 면 참조 문구를 그대로 두고, True 면 펼친 전문으로 바꾼다.
+    """
+    index = build_index(testcases)
+    lines = [f"# {_md_heading(project.name)}", ""]
+    if split_sheets:
+        groups: dict[str, list] = {}
+        for tc in testcases:
+            groups.setdefault(tc.sheet_name or "기본", []).append(tc)
+        if not groups:
+            groups["Test Cases"] = []
+    else:
+        groups = {"Test Cases": list(testcases)}
+
+    for name, tcs in groups.items():
+        lines += [f"## {_md_heading(name)}", ""]
+        lines += _md_table(tcs, index, expand_refs)
+        lines.append("")
+    return "\n".join(lines)
+
+
+def export_testcases_markdown(
+    project, testcases, split_sheets: bool, expand_refs: bool = False
+) -> StreamingResponse:
+    body = build_testcases_markdown(project, testcases, split_sheets, expand_refs).encode("utf-8")
+    encoded = quote(f"{project.name}_TestCases.md")
+    return StreamingResponse(
+        io.BytesIO(body),
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
+    )
+
+
 def _xlsx_response(output, project) -> StreamingResponse:
     filename = f"{project.name}_TestCases.xlsx"
     encoded = quote(filename)

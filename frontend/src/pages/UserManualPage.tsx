@@ -268,6 +268,7 @@ export default function UserManualPage() {
                 <tr><td style={s.td}>{t("tcManage.row_search_btn")}</td><td style={s.td}>{t("tcManage.row_search_func")}</td><td style={s.td}>{t("tcManage.row_search_desc")}</td></tr>
               </tbody>
             </table>
+            <img src="/manual-images/45_tc_export_modal.png" alt={t("tcManage.imgAlt_export")} style={s.img} />
 
             <h3 style={s.h3}>{t("tcManage.h3_folderSheet")}</h3>
             <p style={s.p} dangerouslySetInnerHTML={{ __html: t("tcManage.folderSheet_p1") }} />
@@ -491,6 +492,7 @@ export default function UserManualPage() {
               <li dangerouslySetInnerHTML={{ __html: t("mdImport.notes_li3") }} />
               <li>{t("mdImport.notes_li4")}</li>
               <li>{t("mdImport.notes_li5")}</li>
+              <li dangerouslySetInnerHTML={{ __html: t("mdImport.notes_li6") }} />
             </ul>
 
             <div style={s.tipBox} dangerouslySetInnerHTML={{ __html: t("mdImport.tip1") }} />

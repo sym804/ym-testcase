@@ -443,6 +443,15 @@ describe("testCasesApi", () => {
       responseType: "blob",
     });
   });
+
+  it("exportExcel 에 md 를 주면 format=md 를 보낸다", async () => {
+    mockGet.mockResolvedValueOnce({ data: new Blob(["# P"]) });
+    await testCasesApi.exportExcel(1, true, false, "md");
+    expect(mockGet).toHaveBeenCalledWith("/api/projects/1/testcases/export", {
+      params: { split_sheets: true, expand_refs: false, format: "md" },
+      responseType: "blob",
+    });
+  });
 });
 
 // ─── Test Runs ───────────────────────────────────────

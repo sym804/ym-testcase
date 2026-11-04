@@ -890,6 +890,48 @@ test.describe("14. Import/Export", () => {
 
     await request.delete(`/api/projects/${pid}`, { headers: h });
   });
+
+  test("TC-EXP-005: Markdown Export 후 다른 프로젝트로 Import 왕복 (SYM-211)", async ({ request }) => {
+    const loginRes = await request.post("/api/auth/login", { data: { username: "admin", password: PASSWORD } });
+    const { access_token } = await loginRes.json();
+    const h = { Authorization: `Bearer ${access_token}` };
+    const stamp = Date.now();
+    const src = (await (await request.post("/api/projects", { data: { name: `E2E_MD_Src_${stamp}` }, headers: h })).json()).id;
+    const dst = (await (await request.post("/api/projects", { data: { name: `E2E_MD_Dst_${stamp}` }, headers: h })).json()).id;
+
+    try {
+      const steps = "1. 결제 | 카드\n2. <br> 글자 확인";
+      for (const sheet of ["결제", "환불"]) {
+        await request.post(`/api/projects/${src}/testcases/sheets`, { data: { name: sheet, parent_id: null, is_folder: false }, headers: h });
+        const r = await request.post(`/api/projects/${src}/testcases`, {
+          data: { no: 1, tc_id: `MD-${sheet}-${stamp}`, sheet_name: sheet, test_steps: steps, expected_result: "a & b" },
+          headers: h,
+        });
+        expect(r.status()).toBe(201);
+      }
+
+      const exp = await request.get(`/api/projects/${src}/testcases/export`, { headers: h, params: { format: "md", split_sheets: "true" } });
+      expect(exp.status()).toBe(200);
+      expect(exp.headers()["content-type"]).toContain("text/markdown");
+
+      const imp = await request.post(`/api/projects/${dst}/testcases/import`, {
+        headers: h,
+        multipart: { file: { name: "export.md", mimeType: "text/markdown", buffer: await exp.body() } },
+      });
+      expect(imp.status()).toBe(201);
+      expect((await imp.json()).sheets.map((s: { sheet: string }) => s.sheet)).toEqual(["결제", "환불"]);
+
+      const list = await (await request.get(`/api/projects/${dst}/testcases`, { headers: h })).json();
+      expect(list).toHaveLength(2);
+      for (const tc of list) {
+        expect(tc.test_steps).toBe(steps);
+        expect(tc.expected_result).toBe("a & b");
+      }
+    } finally {
+      await request.delete(`/api/projects/${src}`, { headers: h });
+      await request.delete(`/api/projects/${dst}`, { headers: h });
+    }
+  });
 });
 
 // ============================================================================

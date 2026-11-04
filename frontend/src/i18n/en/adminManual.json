@@ -328,7 +328,7 @@
       "sheetCopy": "Copy sheet (with TCs, not folders)",
       "importPreview": "Import preview",
       "import": "Excel/CSV/Markdown Import (Jira/Xray/Zephyr compatible)",
-      "export": "Excel Export"
+      "export": "Excel / Markdown Export (format=xlsx|md, default xlsx)"
     },
     "testRuns": {
       "title": "Test Runs",

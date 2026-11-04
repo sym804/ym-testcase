@@ -144,6 +144,13 @@ test("전체 매뉴얼 스크린샷 재캡처", async ({ page, request }) => {
   // 23. TC 툴바
   await page.screenshot({ path: path.join(SAVE_DIR, "23_tc_toolbar.png") });
 
+  // 45. TC 내보내기 창 (Markdown 선택 상태)
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByLabel("Markdown (.md)").check();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(SAVE_DIR, "45_tc_export_modal.png") });
+  await page.getByRole("button", { name: "취소" }).click();
+
   // 08. TC 그리드 상세
   await page.screenshot({ path: path.join(SAVE_DIR, "08_tc_grid_detail.png") });
 

@@ -1044,14 +1044,15 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportSplit, setExportSplit] = useState(false);
   const [exportExpandRefs, setExportExpandRefs] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"xlsx" | "md">("xlsx");
 
   const handleExport = async () => {
     try {
-      const blob = await testCasesApi.exportExcel(projectId, exportSplit, exportExpandRefs);
+      const blob = await testCasesApi.exportExcel(projectId, exportSplit, exportExpandRefs, exportFormat);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `testcases_${projectId}.xlsx`;
+      a.download = `testcases_${projectId}.${exportFormat}`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success(t("exportSuccess"));
@@ -1363,7 +1364,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             </>
           )}
           <button style={styles.btnGhost} onClick={() => setShowExportModal(true)}>
-            Excel Export
+            {t("export")}
           </button>
           <div style={styles.separator} />
           <button onClick={handleResultHistory} disabled={selectedCount !== 1}
@@ -1978,7 +1979,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         </div>
       )}
 
-      {/* ── Excel Export 옵션 모달 ── */}
+      {/* ── Export 옵션 모달 ── */}
       {showExportModal && (
         <div style={sheetModalStyles.overlay} onClick={() => setShowExportModal(false)}>
           <div style={{ ...sheetModalStyles.panel, maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
@@ -1986,13 +1987,23 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
               <h3 style={sheetModalStyles.title}>{t("exportTitle")}</h3>
             </div>
             <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", gap: 16, paddingBottom: 12, borderBottom: "1px solid var(--border-color)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
+                  <input type="radio" name="exportFormat" checked={exportFormat === "xlsx"} onChange={() => setExportFormat("xlsx")} />
+                  {t("exportFormatXlsx")}
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
+                  <input type="radio" name="exportFormat" checked={exportFormat === "md"} onChange={() => setExportFormat("md")} />
+                  {t("exportFormatMd")}
+                </label>
+              </div>
               <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
                 <input type="radio" name="exportMode" checked={!exportSplit} onChange={() => setExportSplit(false)} />
                 {t("exportMerged")}
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
                 <input type="radio" name="exportMode" checked={exportSplit} onChange={() => setExportSplit(true)} />
-                {t("exportSplitSheets")}
+                {exportFormat === "md" ? t("exportSplitSheetsMd") : t("exportSplitSheets")}
               </label>
               <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 12, marginTop: 4 }}>
                 <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text-primary)" }}>
@@ -2005,7 +2016,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
                   <span>
                     {t("exportExpandRefs")}
                     <span style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                      {t("exportExpandRefsHint")}
+                      {exportFormat === "md" ? t("exportExpandRefsHintMd") : t("exportExpandRefsHint")}
                     </span>
                   </span>
                 </label>

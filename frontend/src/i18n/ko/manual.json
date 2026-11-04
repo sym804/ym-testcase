@@ -148,6 +148,7 @@
   "tcManage": {
     "title": "4. TC 관리",
     "imgAlt_toolbar": "TC 관리 툴바",
+    "imgAlt_export": "TC 내보내기 창 (형식 선택)",
     "h3_toolbar": "4-1. 툴바 기능",
     "th1": "버튼",
     "th2": "기능",
@@ -176,9 +177,9 @@
     "row_import_btn": "Excel Import",
     "row_import_func": "엑셀 가져오기",
     "row_import_desc": "엑셀 파일에서 TC 가져오기. 여러 시트가 있으면 선택 가능. 동일 TC ID는 덮어쓰기",
-    "row_export_btn": "Excel Export",
-    "row_export_func": "엑셀 내보내기",
-    "row_export_desc": "현재 TC 목록을 서식이 적용된 엑셀 파일로 다운로드",
+    "row_export_btn": "Export",
+    "row_export_func": "엑셀 / Markdown 내보내기",
+    "row_export_desc": "현재 TC 목록을 서식이 적용된 엑셀 파일 또는 Markdown 표로 다운로드. 시트 분리로 받은 Markdown 은 다시 Import 하면 같은 시트로 들어갑니다",
     "row_history_btn": "📊 결과이력",
     "row_history_func": "수행 결과 히스토리",
     "row_history_desc": "TC 1건 선택 후 클릭하면 해당 TC의 모든 테스트 수행 결과를 런별 타임라인으로 표시. 각 런의 결과(PASS/FAIL/BLOCK 등), 버전, 라운드, 수행일을 확인 가능",
@@ -353,6 +354,7 @@
     "notes_li3": "TC ID가 없는 행은 <code>MD-0001</code>, <code>MD-0002</code> 형식으로 자동 생성됩니다.",
     "notes_li4": "테이블 사이의 일반 텍스트(설명, 목록 등)는 무시됩니다.",
     "notes_li5": "인코딩: UTF-8, UTF-8 BOM, CP949(EUC-KR) 자동 감지됩니다.",
+    "notes_li6": "셀 안 줄바꿈은 <code>&lt;br&gt;</code> 로 적습니다. <code>&amp;lt;</code> <code>&amp;gt;</code> <code>&amp;amp;</code> 는 각각 <code>&lt;</code> <code>&gt;</code> <code>&amp;</code> 로 읽습니다. Export 로 받은 파일도 이 규칙으로 적혀 있습니다.",
     "tip1": "<strong>TIP:</strong> GitHub, Notion, Obsidian 등에서 작성한 Markdown 테이블을 그대로 .md 파일로 저장하여 import할 수 있습니다."
   },
   "advancedFilter": {
