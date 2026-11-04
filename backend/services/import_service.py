@@ -769,6 +769,9 @@ def _is_md_file(filename: str) -> bool:
 # ── Markdown Import ──────────────────────────────────────────────────────────
 
 _MD_SEPARATOR_RE = re.compile(r"^\|[\s:-]+\|[\s:|-]*$")
+_MD_BR_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
+_MD_ENTITIES = {"&lt;": "<", "&gt;": ">", "&amp;": "&"}
+_MD_ENTITY_RE = re.compile("|".join(map(re.escape, _MD_ENTITIES)))
 
 
 def _decode_text(file_content: bytes) -> Optional[str]:
@@ -792,7 +795,17 @@ def _parse_md_row(line: str) -> list[str]:
     # \| 를 플레이스홀더로 치환 후 split, 다시 복원
     placeholder = "\x00PIPE\x00"
     line = line.replace("\\|", placeholder)
-    return [cell.strip().replace(placeholder, "|") for cell in line.split("|")]
+    # 표 칸 안 줄바꿈은 <br> 로만 적을 수 있다. 내보내기도 그렇게 쓰고, 원문의 < 와 & 는
+    # 엔티티로 쓴다. 그래서 <br> 을 먼저 줄바꿈으로 바꾸고 엔티티를 나중에 푼다.
+    return [
+        _unescape_md_entities(_MD_BR_RE.sub("\n", cell.strip())).replace(placeholder, "|")
+        for cell in line.split("|")
+    ]
+
+
+def _unescape_md_entities(text: str) -> str:
+    """&lt; &gt; &amp; 셋만 한 번에 푼다. &amp; 를 먼저 풀면 &amp;lt; 가 < 로 두 번 풀린다."""
+    return _MD_ENTITY_RE.sub(lambda m: _MD_ENTITIES[m.group(0)], text)
 
 
 def _parse_md_tables(file_content: bytes) -> list[dict]:

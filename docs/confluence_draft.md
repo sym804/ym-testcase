@@ -238,7 +238,7 @@ YM TestCase는 테스트 케이스(TC)의 작성, 관리, 테스트 수행, 결�
 | TC ID 자동채우기 | 빈 TC ID 자동 생성 | 프로젝트 약어 기반 |
 | 일괄 변경 | 선택 행 필드 일괄 수정 | 우선순위, 카테고리 등 |
 | Excel Import | TC 가져오기 | .xlsx, CSV, Markdown (10MB 이하). .xls 는 .xlsx 로 변환 |
-| Excel Export | 엑셀 TC 내보내기 | 서식 적용된 엑셀 다운로드 |
+| Export | 엑셀 / Markdown TC 내보내기 | 서식 적용된 엑셀 또는 Markdown 표 다운로드 |
 | 변경이력 | TC 수정 내역 확인 | 필드별 변경 전/후 값, 변경자 |
 | 바꾸기 | 찾기/바꾸기 | 선택 범위 텍스트 치환 |
 | 검색 | TC 필터링 | TC ID, 카테고리, 내용 검색 |

@@ -337,7 +337,7 @@ npx tsc -b
 | DELETE | /api/projects/{id}/testcases/{tc_id} | TC 삭제 (소프트) |
 | POST | /api/projects/{id}/testcases/{tc_id}/restore | TC 복원 |
 | POST | /api/projects/{id}/testcases/import | Excel Import |
-| GET | /api/projects/{id}/testcases/export | Excel Export |
+| GET | /api/projects/{id}/testcases/export | Excel / Markdown Export (`format` 은 xlsx 또는 md) |
 
 ### 테스트 런
 

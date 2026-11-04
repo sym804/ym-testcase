@@ -325,10 +325,13 @@ export const testCasesApi = {
     return res.data;
   },
 
-  exportExcel: async (projectId: number, splitSheets = false, expandRefs = false) => {
+  exportExcel: async (projectId: number, splitSheets = false, expandRefs = false, format: "xlsx" | "md" = "xlsx") => {
+    // xlsx 는 서버 기본값이라 format 을 보내지 않는다. 예전 호출과 요청이 같다.
+    const params: Record<string, unknown> = { split_sheets: splitSheets, expand_refs: expandRefs };
+    if (format !== "xlsx") params.format = format;
     const res = await client.get(
       `/api/projects/${projectId}/testcases/export`,
-      { params: { split_sheets: splitSheets, expand_refs: expandRefs }, responseType: "blob" }
+      { params, responseType: "blob" }
     );
     return res.data;
   },

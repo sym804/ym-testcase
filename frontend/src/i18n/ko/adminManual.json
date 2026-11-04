@@ -328,7 +328,7 @@
       "sheetCopy": "시트 복사 (TC 포함, 폴더 제외)",
       "importPreview": "Import 미리보기",
       "import": "Excel/CSV/Markdown Import (Jira/Xray/Zephyr 호환)",
-      "export": "Excel Export"
+      "export": "Excel / Markdown Export (format=xlsx|md, 기본 xlsx)"
     },
     "testRuns": {
       "title": "테스트 런",

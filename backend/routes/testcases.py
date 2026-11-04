@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from pydantic import BaseModel
@@ -22,7 +22,7 @@ from services.import_service import (
     _parse_md_table, _preview_csv, MAX_IMPORT_SIZE,
     SHEET_NAME_MAX_LEN, raise_if_overlong,
 )
-from services.export_service import export_testcases_excel
+from services.export_service import export_testcases_excel, export_testcases_markdown
 from services.sheet_order import leaf_sheet_order
 from services.upload_guard import read_limited_sync
 from services.staged_upload import resolve_file
@@ -803,6 +803,7 @@ def export_testcases(
     project_id: int,
     split_sheets: bool = False,
     expand_refs: bool = False,
+    file_format: Literal["xlsx", "md"] = Query("xlsx", alias="format"),
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
 ):
@@ -819,4 +820,6 @@ def export_testcases(
     #   이 파일만 빠져 있었다).
     order = leaf_sheet_order(project_id, db)
     testcases.sort(key=lambda tc: (order.get(tc.sheet_name or "기본", len(order)), tc.no or 0, tc.id))
+    if file_format == "md":
+        return export_testcases_markdown(project, testcases, split_sheets, expand_refs)
     return export_testcases_excel(project, testcases, split_sheets, expand_refs)

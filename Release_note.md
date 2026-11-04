@@ -21,11 +21,34 @@
 ## 현재 버전
 
 ```
-YM TestCase System  v2.2.7.0  (2026-10-30)
-├── Frontend       v1.13.5.0
-├── Backend        v2.2.5.0
+YM TestCase System  v2.2.8.0  (2026-11-05)
+├── Frontend       v1.13.6.0
+├── Backend        v2.2.6.0
 └── Database       v1.2.0.0
 ```
+
+---
+
+## System 2.2.8.0 / BE 2.2.6.0 / FE 1.13.6.0 - [feat] TC 목록 Markdown 내보내기 추가 (2026-11-05)
+
+### 이슈
+
+- SYM-211 TC 목록을 Markdown 파일로 내보내기 (enhancement/minor/backend)
+
+### 변경
+
+- `GET /api/projects/{id}/testcases/export` 에 `format=md` 추가. 기본값 xlsx 유지
+- 시트 통합은 `## Test Cases` 표 하나, 시트 분리는 시트마다 `## 시트 이름` 과 표. 사전조건 참조 펼치기 옵션 공통
+- 칸 안 줄바꿈 `<br>`, 파이프 `\|`, `<` `&` 는 엔티티. Markdown 가져오기 표 형식과 같아 다시 가져오기 가능
+- Markdown 가져오기: 칸의 `<br>` 을 줄바꿈으로, `&lt;` `&gt;` `&amp;` 를 글자로 복원
+- 내보내기 창에 형식 선택(Excel / Markdown). 툴바 버튼 이름 `Excel Export` -> `Export`
+- 사용자 매뉴얼 문구와 스크린샷, 회귀 체크리스트 TC-EXP-004, 005, E2E 왕복 1건. QA 2인 통과
+
+### 영향
+
+- Excel 내보내기 요청과 결과는 변경 없음
+- Markdown 가져오기에서 `<br>` 은 줄바꿈으로, `&lt;` `&gt;` `&amp;` 는 글자로 저장
+- 시트 구성이 유지되는 다시 가져오기는 시트 분리 모드만 해당
 
 ---
 

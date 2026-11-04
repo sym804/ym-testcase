@@ -148,6 +148,7 @@
   "tcManage": {
     "title": "4. TC Management",
     "imgAlt_toolbar": "TC management toolbar",
+    "imgAlt_export": "TC export dialog (format selection)",
     "h3_toolbar": "4-1. Toolbar Functions",
     "th1": "Button",
     "th2": "Function",
@@ -176,9 +177,9 @@
     "row_import_btn": "Excel Import",
     "row_import_func": "Import from Excel",
     "row_import_desc": "Import TCs from Excel files. Multiple sheets can be selected. Duplicate TC IDs are overwritten",
-    "row_export_btn": "Excel Export",
-    "row_export_func": "Export to Excel",
-    "row_export_desc": "Download current TC list as a formatted Excel file",
+    "row_export_btn": "Export",
+    "row_export_func": "Export to Excel / Markdown",
+    "row_export_desc": "Download current TC list as a formatted Excel file or as Markdown tables. A Markdown file exported with split sheets imports back into the same sheets",
     "row_history_btn": "📊 Result History",
     "row_history_func": "Execution Result History",
     "row_history_desc": "Select 1 TC and click to view all test execution results as a timeline by run. Shows each run's result (PASS/FAIL/BLOCK etc.), version, round, and execution date",
@@ -353,6 +354,7 @@
     "notes_li3": "Rows without a TC ID are auto-generated in <code>MD-0001</code>, <code>MD-0002</code> format.",
     "notes_li4": "Plain text (descriptions, lists, etc.) between tables is ignored.",
     "notes_li5": "Encoding: UTF-8, UTF-8 BOM, CP949 (EUC-KR) auto-detected.",
+    "notes_li6": "Write line breaks inside a cell as <code>&lt;br&gt;</code>. <code>&amp;lt;</code> <code>&amp;gt;</code> <code>&amp;amp;</code> are read as <code>&lt;</code> <code>&gt;</code> <code>&amp;</code>. Files from Export follow the same rules.",
     "tip1": "<strong>TIP:</strong> You can save Markdown tables from GitHub, Notion, Obsidian, etc. as .md files and import them directly."
   },
   "advancedFilter": {
