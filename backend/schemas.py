@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List, Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 #: TC ID 길이 상한. 컬럼이 String(50) 인데 SQLite 는 길이를 강제하지 않아서,
 #: 검증이 없으면 긴 값이 그대로 쌓이고 PostgreSQL 로 옮길 때 그 데이터를 못 옮긴다.
@@ -359,7 +359,10 @@ class TestResultResponse(BaseModel):
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     duration_sec: Optional[float] = None
-    test_case: Optional[TestCaseResponse] = None
+    # ★ORM 에서는 case_view 를 읽는다. 종료된 수행이면 종료 시점 TC 내용이다(services/tc_snapshot.py).
+    #   응답 키는 그대로 test_case 다. dict 로 만들 때는 test_case 키도 받는다.
+    test_case: Optional[TestCaseResponse] = Field(
+        None, validation_alias=AliasChoices("case_view", "test_case"))
 
     model_config = ConfigDict(from_attributes=True)
 

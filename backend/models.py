@@ -261,11 +261,21 @@ class TestResult(Base):
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
     duration_sec = Column(Float, nullable=True)
+    # 수행을 종료한 순간의 TC 내용. 진행 중이면 NULL 이고 지금 TC 를 읽는다.
+    # ★none_as_null: 기본 JSON 은 None 을 JSON null 로 써서 IS NULL 이 거짓이 된다.
+    #   고정을 풀었는데 "고정됨" 으로 읽히면 안 된다. 규칙은 services/tc_snapshot.py.
+    tc_snapshot = Column(JSON(none_as_null=True), nullable=True)
 
     test_run = relationship("TestRun", back_populates="results")
     test_case = relationship("TestCase", back_populates="test_results")
     executor = relationship("User", back_populates="test_results")
     attachments = relationship("Attachment", back_populates="test_result", cascade="all, delete-orphan")
+
+    @property
+    def case_view(self):
+        """화면·엑셀·리포트가 읽는 TC. 종료된 수행이면 종료 시점 내용이다."""
+        from services.tc_snapshot import case_view
+        return case_view(self)
 
     __table_args__ = (
         Index("ix_test_results_run_id", "test_run_id"),
@@ -338,6 +348,18 @@ class RunIssue(Base):
 
     @property
     def tc_ids(self) -> list:
+        """이 수행에서 보이는 TC ID. 종료된 수행이면 종료 시점 ID 다(결과 행과 같은 규칙).
+
+        결과 쪽은 고정된 ID 를 보여 주는데 이슈 쪽만 지금 ID 를 보이면, 종료 뒤 TC ID 를
+        바꿨을 때 같은 TC 가 리포트에서 두 이름으로 나온다.
+        """
+        from services.tc_snapshot import frozen_tc_ids
+        frozen = frozen_tc_ids(self.test_run)
+        return [frozen.get(tc.id, tc.tc_id) for tc in self.test_cases]
+
+    @property
+    def live_tc_ids(self) -> list:
+        """지금 TC ID. 다른 수행으로 옮겨 연결할 때 쓴다(그 수행은 지금 TC 로 찾는다)."""
         return [tc.tc_id for tc in self.test_cases]
 
     __table_args__ = (

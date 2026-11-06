@@ -19,6 +19,7 @@ from models import (
 from services.excel_safe import safe_cell
 from services.issue_key import find_issue_refs
 from services.sheet_order import leaf_sheet_order, sort_results_for_export
+from services.tc_snapshot import frozen_col
 from auth import get_current_user, check_project_access
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,7 @@ def _category_summary_sql(run_id: int, db: Session) -> list:
     """SQL 집계로 카테고리별 통계 생성."""
     rows = (
         db.query(
-            TestCase.category,
+            frozen_col("category").label("category"),
             func.count(TestResult.id).label("total"),
             func.sum(case((TestResult.result == TestResultValue.PASS, 1), else_=0)).label("passed"),
             func.sum(case((TestResult.result == TestResultValue.FAIL, 1), else_=0)).label("failed"),
@@ -100,9 +101,10 @@ def _category_summary_sql(run_id: int, db: Session) -> list:
             func.sum(case((TestResult.result == TestResultValue.NA, 1), else_=0)).label("na"),
             func.sum(case((TestResult.result == TestResultValue.NS, 1), else_=0)).label("ns"),
         )
+        .select_from(TestCase)
         .join(TestResult, TestResult.test_case_id == TestCase.id)
         .filter(TestResult.test_run_id == run_id)
-        .group_by(TestCase.category)
+        .group_by(frozen_col("category"))
         .all()
     )
     # NULL 과 빈 문자열을 한 줄(None)로 합친다. 따로 두면 같은 이름의 행이 두 번 나온다.
@@ -185,18 +187,18 @@ def _issue_items(run: TestRun, db: Session) -> list:
     )
     results = sort_results_for_export(results, leaf_sheet_order(run.project_id, db))
     # sorted 는 안정 정렬이라 우선순위가 같으면 위의 차례가 유지된다
-    results = sorted(results, key=lambda r: priority_sort_key(r.test_case.priority))
+    results = sorted(results, key=lambda r: priority_sort_key(r.case_view.priority))
     return [
         {
-            "tc_id": r.test_case.tc_id,
+            "tc_id": r.case_view.tc_id,
             "result": r.result.value if hasattr(r.result, "value") else r.result,
             # 빈 문자열과 공백만 있는 값은 None 이다. 요약 표(_category_summary_sql)와 같은 규칙.
-            "priority": (r.test_case.priority or "").strip() or None,
-            "category": (r.test_case.category or "").strip() or None,
-            "depth1": r.test_case.depth1,
-            "depth2": r.test_case.depth2,
-            "test_steps": r.test_case.test_steps,
-            "expected_result": r.test_case.expected_result,
+            "priority": (r.case_view.priority or "").strip() or None,
+            "category": (r.case_view.category or "").strip() or None,
+            "depth1": r.case_view.depth1,
+            "depth2": r.case_view.depth2,
+            "test_steps": r.case_view.test_steps,
+            "expected_result": r.case_view.expected_result,
             "actual_result": r.actual_result,
             "issue_link": r.issue_link,
             "executed_by": r.executor.display_name if r.executor else None,
@@ -212,7 +214,7 @@ def _priority_summary_sql(run_id: int, db: Session) -> list:
     """
     rows = (
         db.query(
-            TestCase.priority,
+            frozen_col("priority").label("priority"),
             func.count(TestResult.id).label("total"),
             func.sum(case((TestResult.result == TestResultValue.PASS, 1), else_=0)).label("passed"),
             func.sum(case((TestResult.result == TestResultValue.FAIL, 1), else_=0)).label("failed"),
@@ -220,9 +222,10 @@ def _priority_summary_sql(run_id: int, db: Session) -> list:
             func.sum(case((TestResult.result == TestResultValue.NA, 1), else_=0)).label("na"),
             func.sum(case((TestResult.result == TestResultValue.NS, 1), else_=0)).label("ns"),
         )
+        .select_from(TestCase)
         .join(TestResult, TestResult.test_case_id == TestCase.id)
         .filter(TestResult.test_run_id == run_id)
-        .group_by(TestCase.priority)
+        .group_by(frozen_col("priority"))
         .all()
     )
     # 공백만 다른 값과 NULL 을 한 줄로 합친다
@@ -292,7 +295,10 @@ def _comparison(run: TestRun, db: Session):
 
     def result_map(run_id):
         rows = (
-            db.query(TestResult.test_case_id, TestResult.result, TestCase.tc_id, TestCase.priority, TestCase.category)
+            db.query(
+                TestResult.test_case_id, TestResult.result, frozen_col("tc_id").label("tc_id"),
+                frozen_col("priority").label("priority"), frozen_col("category").label("category"),
+            )
             .join(TestCase, TestResult.test_case_id == TestCase.id)
             .filter(TestResult.test_run_id == run_id)
             .all()
@@ -393,7 +399,8 @@ def _run_issues(run: TestRun, db: Session) -> list:
     """
     result_of: dict = {}
     for tc_id, result in (
-        db.query(TestCase.tc_id, TestResult.result)
+        db.query(frozen_col("tc_id"), TestResult.result)
+        .select_from(TestCase)
         .join(TestResult, TestResult.test_case_id == TestCase.id)
         .filter(TestResult.test_run_id == run.id)
     ):
@@ -474,8 +481,8 @@ def _issue_candidates(run: TestRun, registered: list, db: Session) -> list:
             c = found.setdefault(key or url, {"issue_key": key, "url": url, "tc_ids": []})
             if url and not c["url"]:
                 c["url"] = url
-            if r.test_case.tc_id not in c["tc_ids"]:
-                c["tc_ids"].append(r.test_case.tc_id)
+            if r.case_view.tc_id not in c["tc_ids"]:
+                c["tc_ids"].append(r.case_view.tc_id)
     return list(found.values())
 
 
@@ -1344,7 +1351,7 @@ def report_excel(
         ws_results.column_dimensions[get_column_letter(col)].width = w
 
     for row_idx, r in enumerate(results, 2):
-        tc = r.test_case
+        tc = r.case_view
         result_val = r.result.value if hasattr(r.result, "value") else r.result
         row_values = [
             # ★No 는 저장된 no 가 아니라 이 목록의 순번이다(수행 엑셀과 같은 규약).
