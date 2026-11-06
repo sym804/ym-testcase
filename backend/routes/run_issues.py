@@ -24,6 +24,7 @@ from schemas import (
     RunIssueCarryOver, RunIssueCarryOverResult, RunIssueCreate, RunIssueResponse, RunIssueUpdate,
 )
 from services.issue_key import extract_issue_key
+from services.tc_snapshot import frozen_col
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/testruns/{run_id}/issues",
@@ -57,16 +58,21 @@ def _resolve_test_cases(db: Session, run_id: int, tc_ids: list[str], strict: boo
     """
     if not tc_ids:
         return []
+    # ★이 수행에서 보이는 TC ID 로 찾는다. 종료된 수행은 종료 시점 ID 다(tc_snapshot.py).
+    #   화면이 받은 tc_ids 를 그대로 다시 보내므로, 지금 ID 로 찾으면 종료 뒤 ID 를 바꾼
+    #   TC 가 "수행에 없다" 로 422 가 된다.
+    shown = frozen_col("tc_id")
     rows = (
-        db.query(TestCase)
+        db.query(TestCase, shown.label("shown_tc_id"))
+        .select_from(TestCase)
         .join(TestResult, TestResult.test_case_id == TestCase.id)
-        .filter(TestResult.test_run_id == run_id, TestCase.tc_id.in_(tc_ids))
+        .filter(TestResult.test_run_id == run_id, shown.in_(tc_ids))
         .all()
     )
     by_id: dict[str, TestCase] = {}
-    for tc in rows:
-        if tc.tc_id not in by_id or (by_id[tc.tc_id].deleted_at is not None and tc.deleted_at is None):
-            by_id[tc.tc_id] = tc
+    for tc, key in rows:
+        if key not in by_id or (by_id[key].deleted_at is not None and tc.deleted_at is None):
+            by_id[key] = tc
     missing = [t for t in tc_ids if t not in by_id]
     if missing and strict:
         raise HTTPException(status_code=422, detail=f"TC not in this run: {', '.join(missing)}")
@@ -233,7 +239,8 @@ def carry_over_run_issues(
             origin_round=src.origin_round if src.origin_round is not None else source.round,
             verdict="unverified",
             created_by=current_user.id,
-            test_cases=_resolve_test_cases(db, run.id, src.tc_ids, strict=False),
+            # 새 수행은 지금 TC 로 찾는다. 원본이 종료된 수행이면 tc_ids 는 종료 시점 ID 라 쓰지 않는다.
+            test_cases=_resolve_test_cases(db, run.id, src.live_tc_ids, strict=False),
         )
         db.add(issue)
         added.append(issue)

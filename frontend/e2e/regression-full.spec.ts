@@ -539,6 +539,44 @@ test.describe("6. 테스트 수행", () => {
 
     await request.delete(`/api/projects/${pid}`, { headers: h });
   });
+
+  test("TC-RUN-024: 완료된 수행은 TC 를 고쳐도 완료 시점 내용을 유지한다", async ({ request }) => {
+    const loginRes = await request.post("/api/auth/login", { data: { username: "admin", password: PASSWORD } });
+    const { access_token } = await loginRes.json();
+    const h = { Authorization: `Bearer ${access_token}` };
+    const pid = (await (await request.post("/api/projects", { data: { name: `E2E_Freeze_${Date.now()}` }, headers: h })).json()).id;
+
+    try {
+      const tc = await (await request.post(`/api/projects/${pid}/testcases`, {
+        data: { no: 1, tc_id: "FRZ-001", test_steps: "1. 처음 절차", expected_result: "처음 기대", priority: "높음" },
+        headers: h,
+      })).json();
+      const run = await (await request.post(`/api/projects/${pid}/testruns`, { data: { name: "Freeze" }, headers: h })).json();
+      const shown = async () => {
+        const body = await (await request.get(`/api/projects/${pid}/testruns/${run.id}`, { headers: h })).json();
+        return body.results[0].test_case;
+      };
+      const edit = async (data: Record<string, string>) => {
+        const r = await request.put(`/api/projects/${pid}/testcases/${tc.id}`, { data, headers: h });
+        expect(r.status()).toBe(200);
+      };
+
+      // 진행 중에는 고친 TC 가 바로 보인다
+      await edit({ test_steps: "1. 진행 중 수정" });
+      expect((await shown()).test_steps).toBe("1. 진행 중 수정");
+
+      expect((await request.put(`/api/projects/${pid}/testruns/${run.id}/complete`, { headers: h })).status()).toBe(200);
+      await edit({ tc_id: "FRZ-001-B", test_steps: "1. 완료 뒤 수정", priority: "낮음" });
+      const frozen = await shown();
+      expect([frozen.tc_id, frozen.test_steps, frozen.priority]).toEqual(["FRZ-001", "1. 진행 중 수정", "높음"]);
+
+      // 다시 열면 최신 TC 를 보여 준다
+      expect((await request.put(`/api/projects/${pid}/testruns/${run.id}/reopen`, { headers: h })).status()).toBe(200);
+      expect((await shown()).tc_id).toBe("FRZ-001-B");
+    } finally {
+      await request.delete(`/api/projects/${pid}`, { headers: h });
+    }
+  });
 });
 
 // ============================================================================

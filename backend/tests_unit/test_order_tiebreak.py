@@ -25,7 +25,9 @@ from services.sheet_order import sort_results_for_export
 
 
 def _row(tc_id, sheet, no):
-    return SimpleNamespace(test_case_id=tc_id, test_case=SimpleNamespace(id=tc_id, sheet_name=sheet, no=no))
+    tc = SimpleNamespace(id=tc_id, sheet_name=sheet, no=no)
+    # 결과 행은 case_view 로 TC 를 읽는다(종료된 수행이면 종료 시점 내용).
+    return SimpleNamespace(test_case_id=tc_id, test_case=tc, case_view=tc)
 
 
 def test_내보내기_정렬은_들어온_차례와_무관하다():

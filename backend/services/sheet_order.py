@@ -64,8 +64,8 @@ def sort_results_for_export(results, order: dict):
     return sorted(
         results,
         key=lambda r: (
-            order.get(r.test_case.sheet_name, last) if r.test_case else last,
-            r.test_case.no if r.test_case else 0,
+            order.get(r.case_view.sheet_name, last) if r.case_view else last,
+            r.case_view.no if r.case_view else 0,
             r.test_case_id,
         ),
     )

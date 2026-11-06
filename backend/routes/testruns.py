@@ -20,6 +20,7 @@ from routes.attachments import run_object_deletions, schedule_object_deletions
 from services.staged_upload import PURPOSE_LIMITS, resolve_file
 from services.locks import LockNs, advisory_xact_lock, project_write_lock
 from services.run_sync_service import sync_run_results
+from services.tc_snapshot import freeze_run, unfreeze_run
 from services.excel_safe import safe_cell
 from services.sheet_order import leaf_sheet_order, sort_results_for_export
 from services.upload_guard import read_limited_sync
@@ -238,7 +239,7 @@ def get_testrun(
     if loaded:
         db.expunge(loaded)
         # 시트가 여럿이면 no 가 겹친다. TC id 로 동점을 깨 조회마다 같은 차례가 되게 한다.
-        loaded.results.sort(key=lambda r: (r.test_case.no if r.test_case else 0, r.test_case_id))
+        loaded.results.sort(key=lambda r: (r.case_view.no if r.case_view else 0, r.test_case_id))
     return loaded
 
 
@@ -735,6 +736,8 @@ def complete_testrun(
         return run
     run.status = TestRunStatus.completed
     run.completed_at = now_kst()
+    # 이미 실행한 TC 다. 종료 뒤 TC 를 고쳐도 이 수행은 지금 내용으로 남는다(tc_snapshot.py).
+    freeze_run(run.id, db)
 
     db.commit()
     db.refresh(run)
@@ -764,6 +767,8 @@ def reopen_testrun(
     db.refresh(run)
     run.status = TestRunStatus.in_progress
     run.completed_at = None
+    # 다시 진행 중이다. 진행 중인 수행은 지금 TC 를 보여 준다. 다시 종료하면 그때 다시 고정한다.
+    unfreeze_run(run.id, db)
     db.commit()
 
     # 완료 상태였던 동안 추가된 TC는 동기화 대상에서 빠져 있었다.
@@ -963,7 +968,7 @@ def export_testrun_excel(
     sorted_results = sort_results_for_export(run.results, leaf_sheet_order(project_id, db))
 
     for row_idx, tr in enumerate(sorted_results, 2):
-        tc = tr.test_case
+        tc = tr.case_view
         result_display = "" if tr.result == TestResultValue.NS else ("N/A" if tr.result == TestResultValue.NA else tr.result.value)
 
         # ★No 는 저장된 no 가 아니라 이 목록의 순번이다. 파일은 수행 전체를 담으므로
