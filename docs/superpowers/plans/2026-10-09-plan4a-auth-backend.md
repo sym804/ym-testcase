@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 작업 위치: 워크트리 `C:\Users\ymseo\Documents\tc_manager-pg`, 브랜치 `feat/auth`. 원본 폴더 `tc_manager`(사용자 실사용)는 건드리지 않는다.
+- 작업 위치: 워크트리 `../tc_manager-pg`, 브랜치 `feat/auth`. 원본 폴더 `tc_manager`(사용자 실사용)는 건드리지 않는다.
 - 커밋은 태스크마다 로컬에만 한다. **푸시는 계획 4a 끝의 QA 2인 대조 뒤에** 한다(지난 계획에서 QA 전 푸시를 지적받았다).
 - 테스트는 실 DB 를 건드리지 않는다. 새 테스트는 전부 `backend/tests_unit` 안에서 `pg_engine` + 앱 직접 기동으로 돈다. 실사용 서버(8008)가 떠 있으면 서버 테스트(`backend/test_*.py`)는 `TEST_PORT=8018 TEST_BASE_URL=http://127.0.0.1:8018` 로 돌린다.
 - 전체 백엔드 테스트: `cd backend && TEST_PORT=8018 TEST_BASE_URL=http://127.0.0.1:8018 TEST_ADMIN_PASSWORD=test1234 python -m pytest -q -k "not test_dompurify_installed"`

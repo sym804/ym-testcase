@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 작업 위치: worktree `C:\Users\ymseo\Documents\tc_manager-pg`, 브랜치 `feat/postgresql`. 계획 1 위에 쌓는다.
+- 작업 위치: worktree `../tc_manager-pg`, 브랜치 `feat/postgresql`. 계획 1 위에 쌓는다.
 - 테스트 실행: `cd backend && TEST_PORT=8018 TEST_BASE_URL=http://127.0.0.1:8018 TEST_ADMIN_PASSWORD=test1234 python -m pytest ...`
 - 동시성 테스트는 배리어로 시작을 맞추고, 성공 건수·증가량·중복 0건을 정확히 단언하며, 잠금을 뺀 코드에서 실패하는지 먼저 확인한다(스펙 테스트 절).
 - 잠금 키는 `pg_advisory_xact_lock(int4, int4)` 두 정수 형태. 첫째는 용도(`services/locks.py` 의 `LockNs`), 둘째는 대상 id.
