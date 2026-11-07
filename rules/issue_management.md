@@ -154,8 +154,6 @@ Open → Won't Fix (수정 안 함)
 
 ### 라벨 체계
 
-| 구분 | 라벨 |
-|---|---|
-| **분류** | `bug`, `enhancement`, `security`, `encoding`, `performance` |
-| **영역** | `frontend`, `backend`, `db`, `security`, `etc` |
-| **심각도** | `block`, `critical`, `major`, `minor`, `trivial` |
+- 분류: `bug`, `enhancement`, `security`, `encoding`, `performance`
+- 영역: `frontend`, `backend`, `db`, `security`, `etc`
+- 심각도: `blocker`, `critical`, `major`, `minor`, `trivial`
