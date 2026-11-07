@@ -18,7 +18,7 @@
 
 ## Global Constraints
 
-- 작업 위치: worktree `C:\Users\ymseo\Documents\tc_manager-pg`, 브랜치 `feat/postgresql`. 원본 폴더와 `main` 은 건드리지 않는다(컷오버 전까지 사용자의 로컬 SQLite 사용을 유지).
+- 작업 위치: worktree `../tc_manager-pg`, 브랜치 `feat/postgresql`. 원본 폴더와 `main` 은 건드리지 않는다(컷오버 전까지 사용자의 로컬 SQLite 사용을 유지).
 - 로컬 PostgreSQL 포트 `54329`, 테스트 서버 포트 `TEST_PORT=8018`. 사용자의 8008/5173 과 겹치지 않는다.
 - 테스트 DB 주소의 호스트는 `127.0.0.1`, `localhost`, `::1` 만 허용한다.
 - `DATABASE_URL` 이 없으면 기동 단계에서 예외. SQLite 기본값을 어디에도 두지 않는다.
