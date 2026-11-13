@@ -67,9 +67,9 @@ const mockOverview = {
   summary: { total_projects: 2, active_tc: 150, in_progress_runs: 2, in_progress_fail_block: 10 },
   active_runs: [activeA, activeA2],
   projects: [
-    { id: 1, name: "Project A", description: "설명A", is_private: false, created_at: "2026-01-01", active_tc: 100,
+    { id: 1, name: "Project A", description: "설명A", is_private: false, owner_name: "김민지", created_at: "2026-01-01", active_tc: 100,
       in_progress: [activeA, activeA2], last_completed: doneA },
-    { id: 2, name: "Project B", description: "", is_private: true, created_at: "2026-01-05", active_tc: 50,
+    { id: 2, name: "Project B", description: "", is_private: true, owner_name: null, created_at: "2026-01-05", active_tc: 50,
       in_progress: [], last_completed: null },
   ],
 };
@@ -128,6 +128,18 @@ describe("ProjectListPage - 요약", () => {
     await screen.findByText("전체 현황");
     expect(overviewApi.get).toHaveBeenCalledTimes(1);
     expect(projectsApi.list).not.toHaveBeenCalled();
+  });
+});
+
+describe("ProjectListPage - 영역 순서", () => {
+  it("요약 다음에 프로젝트 표, 그 다음에 진행 중인 수행 표가 온다", async () => {
+    renderPage();
+    await screen.findByText("전체 현황");
+    const titles = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(titles).toEqual(["전체 현황", "프로젝트", "진행 중인 수행"]);
+    const proj = table("프로젝트");
+    const runs = table("진행 중인 수행");
+    expect(proj.compareDocumentPosition(runs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
@@ -204,6 +216,17 @@ describe("ProjectListPage - 프로젝트 표", () => {
     const row = rowOf(table("프로젝트"), "Project A");
     const rate = within(row).getByText("-");
     expect(rate.style.color).toBe("var(--text-secondary)");
+  });
+
+  it("프로젝트 소유자를 보여 주고 없으면 '-'", async () => {
+    renderPage();
+    await screen.findByText("전체 현황");
+    expect(within(table("프로젝트")).getByRole("columnheader", { name: "소유자" })).toBeInTheDocument();
+    const a = rowOf(table("프로젝트"), "Project A");
+    const b = rowOf(table("프로젝트"), "Project B");
+    expect(a).toHaveTextContent("김민지");
+    const ownerIdx = Array.from(table("프로젝트").querySelectorAll("th")).findIndex((th) => th.textContent === "소유자");
+    expect(b.cells[ownerIdx]).toHaveTextContent(/^-$/);
   });
 
   it("프로젝트 설명을 보여 주고 없으면 '설명 없음'", async () => {

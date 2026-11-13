@@ -46,7 +46,8 @@
     "inProgress": "In progress",
     "lastCompleted": "Last completed",
     "createdAt": "Created",
-    "passRate": "Pass rate"
+    "passRate": "Pass rate",
+    "owner": "Owner"
   },
   "deleteAllFailed": "Delete failed. All {{count}} project(s) failed.",
   "deletePartial": "{{deleted}} deleted, {{failed}} failed.",

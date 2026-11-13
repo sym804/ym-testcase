@@ -36,6 +36,8 @@ interface ProjectRow {
   name: string;
   description: string | null;
   is_private: boolean;
+  /** 프로젝트를 만든 사람의 표시 이름 */
+  owner_name: string | null;
   created_at: string;
   active_tc: number;
   in_progress: RunSummary[];
@@ -240,6 +242,115 @@ export default function ProjectListPage() {
               </section>
             )}
 
+            {/* ── 프로젝트: 카드 목록과 수치 표를 하나로 합쳤다. 사용자가 맨 위에서 바로 찾도록 진행 중인 수행보다 먼저 둔다 ── */}
+            <section style={s.section}>
+              <h2 style={s.sectionTitle}>{t("projects")}</h2>
+              {/* 프로젝트 추가/삭제 버튼은 표 바로 위. 생성은 로그인한 누구나, 일괄 삭제는 관리자만 */}
+              {user && (
+                <div style={s.actions}>
+                  {isAdmin && selectedIds.size > 0 && (
+                    <button style={s.deleteBtn} onClick={handleBulkDelete} disabled={deleting}>
+                      {deleting ? t("common:deleting") : t("deleteCount", { count: selectedIds.size })}
+                    </button>
+                  )}
+                  <button style={s.newBtn} onClick={() => setShowModal(true)}>
+                    {t("newProject")}
+                  </button>
+                </div>
+              )}
+              {projects.length === 0 ? (
+                <div style={s.empty}>{t("noProjects")}</div>
+              ) : (
+                <div style={s.tableWrap}>
+                  <table style={s.table} aria-label={t("projects")}>
+                    <thead>
+                      <tr>
+                        {isAdmin && (
+                          <th style={{ ...s.th, width: 36, textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              aria-label={t("common:selectAll")}
+                              checked={projects.length > 0 && projects.every((p) => selectedIds.has(p.id))}
+                              onChange={(e) => setSelectedIds(e.target.checked ? new Set(projects.map((p) => p.id)) : new Set())}
+                              style={s.check}
+                            />
+                          </th>
+                        )}
+                        <th style={s.th}>{t("table.project")}</th>
+                        <th style={s.th}>{t("table.owner")}</th>
+                        <th style={s.thNum}>{t("activeTC")}</th>
+                        <th style={{ ...s.th, minWidth: 220 }}>{t("table.inProgress")}</th>
+                        <th style={{ ...s.th, minWidth: 220 }}>{t("table.lastCompleted")}</th>
+                        <th style={s.thNum}>{t("table.createdAt")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projects.map((p) => {
+                        const cur = p.in_progress[0];
+                        const last = p.last_completed;
+                        return (
+                          <tr
+                            key={p.id}
+                            style={{ ...s.tr, backgroundColor: selectedIds.has(p.id) ? "rgba(45,74,122,0.08)" : undefined }}
+                            onClick={() => navigate(`/projects/${p.id}`)}
+                          >
+                            {isAdmin && (
+                              <td style={{ ...s.td, textAlign: "center" as const }} onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }}>
+                                <input type="checkbox" aria-label={t("common:selectRow")} checked={selectedIds.has(p.id)} onChange={() => {}} style={s.check} />
+                              </td>
+                            )}
+                            <td style={s.td}>
+                              <Link to={`/projects/${p.id}`} style={{ ...s.link, fontWeight: 600 }} onClick={(e) => e.stopPropagation()}>
+                                {p.name}
+                              </Link>
+                              <div style={s.desc}>{p.description || t("noDescription")}</div>
+                            </td>
+                            <td style={s.tdSub}>{p.owner_name || "-"}</td>
+                            <td style={s.tdNum}>{p.active_tc}</td>
+                            <td style={s.td}>
+                              {cur ? (
+                                <>
+                                  <Link to={runHref(cur)} style={s.runLink} onClick={(e) => e.stopPropagation()}>
+                                    {runLabel(cur)}
+                                  </Link>
+                                  {p.in_progress.length > 1 && (
+                                    <span style={s.more}>{t("moreRuns", { count: p.in_progress.length - 1 })}</span>
+                                  )}
+                                  <div style={s.barCell}>
+                                    <ProgressBar run={cur} noTcLabel={t("noTC")} />
+                                    <span style={s.barPct}>{cur.progress}%</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <span style={s.none}>{t("noRun")}</span>
+                              )}
+                            </td>
+                            <td style={s.td}>
+                              {last ? (
+                                <>
+                                  <Link to={runHref(last)} style={s.runLink} onClick={(e) => e.stopPropagation()}>
+                                    {runLabel(last)}
+                                  </Link>
+                                  <div style={s.lastRow}>
+                                    <span style={{ color: passRateColor(last.pass_rate), fontWeight: 700 }}>{formatPassRate(last.pass_rate)}</span>
+                                    <span style={{ color: last.fail ? RESULT_COLORS.fail : undefined }}>FAIL {last.fail}</span>
+                                    <span>{fmtDate(last.completed_at)}</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <span style={s.none}>{t("noRun")}</span>
+                              )}
+                            </td>
+                            <td style={s.tdNumSub}>{fmtDate(p.created_at)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
             {/* ── 진행 중인 수행: 프로젝트를 가로질러 지금 돌고 있는 것 ── */}
             <section style={s.section}>
               <h2 style={s.sectionTitle}>{t("activeRuns")}</h2>
@@ -285,113 +396,6 @@ export default function ProjectListPage() {
                           <td style={s.tdNumSub}>{fmtDate(r.created_at)}</td>
                         </tr>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-
-            {/* ── 프로젝트: 카드 목록과 수치 표를 하나로 합쳤다 ── */}
-            <section style={s.section}>
-              <h2 style={s.sectionTitle}>{t("projects")}</h2>
-              {/* 프로젝트 추가/삭제 버튼은 표 바로 위. 생성은 로그인한 누구나, 일괄 삭제는 관리자만 */}
-              {user && (
-                <div style={s.actions}>
-                  {isAdmin && selectedIds.size > 0 && (
-                    <button style={s.deleteBtn} onClick={handleBulkDelete} disabled={deleting}>
-                      {deleting ? t("common:deleting") : t("deleteCount", { count: selectedIds.size })}
-                    </button>
-                  )}
-                  <button style={s.newBtn} onClick={() => setShowModal(true)}>
-                    {t("newProject")}
-                  </button>
-                </div>
-              )}
-              {projects.length === 0 ? (
-                <div style={s.empty}>{t("noProjects")}</div>
-              ) : (
-                <div style={s.tableWrap}>
-                  <table style={s.table} aria-label={t("projects")}>
-                    <thead>
-                      <tr>
-                        {isAdmin && (
-                          <th style={{ ...s.th, width: 36, textAlign: "center" }}>
-                            <input
-                              type="checkbox"
-                              aria-label={t("common:selectAll")}
-                              checked={projects.length > 0 && projects.every((p) => selectedIds.has(p.id))}
-                              onChange={(e) => setSelectedIds(e.target.checked ? new Set(projects.map((p) => p.id)) : new Set())}
-                              style={s.check}
-                            />
-                          </th>
-                        )}
-                        <th style={s.th}>{t("table.project")}</th>
-                        <th style={s.thNum}>{t("activeTC")}</th>
-                        <th style={{ ...s.th, minWidth: 220 }}>{t("table.inProgress")}</th>
-                        <th style={{ ...s.th, minWidth: 220 }}>{t("table.lastCompleted")}</th>
-                        <th style={s.thNum}>{t("table.createdAt")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {projects.map((p) => {
-                        const cur = p.in_progress[0];
-                        const last = p.last_completed;
-                        return (
-                          <tr
-                            key={p.id}
-                            style={{ ...s.tr, backgroundColor: selectedIds.has(p.id) ? "rgba(45,74,122,0.08)" : undefined }}
-                            onClick={() => navigate(`/projects/${p.id}`)}
-                          >
-                            {isAdmin && (
-                              <td style={{ ...s.td, textAlign: "center" as const }} onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }}>
-                                <input type="checkbox" aria-label={t("common:selectRow")} checked={selectedIds.has(p.id)} onChange={() => {}} style={s.check} />
-                              </td>
-                            )}
-                            <td style={s.td}>
-                              <Link to={`/projects/${p.id}`} style={{ ...s.link, fontWeight: 600 }} onClick={(e) => e.stopPropagation()}>
-                                {p.name}
-                              </Link>
-                              <div style={s.desc}>{p.description || t("noDescription")}</div>
-                            </td>
-                            <td style={s.tdNum}>{p.active_tc}</td>
-                            <td style={s.td}>
-                              {cur ? (
-                                <>
-                                  <Link to={runHref(cur)} style={s.runLink} onClick={(e) => e.stopPropagation()}>
-                                    {runLabel(cur)}
-                                  </Link>
-                                  {p.in_progress.length > 1 && (
-                                    <span style={s.more}>{t("moreRuns", { count: p.in_progress.length - 1 })}</span>
-                                  )}
-                                  <div style={s.barCell}>
-                                    <ProgressBar run={cur} noTcLabel={t("noTC")} />
-                                    <span style={s.barPct}>{cur.progress}%</span>
-                                  </div>
-                                </>
-                              ) : (
-                                <span style={s.none}>{t("noRun")}</span>
-                              )}
-                            </td>
-                            <td style={s.td}>
-                              {last ? (
-                                <>
-                                  <Link to={runHref(last)} style={s.runLink} onClick={(e) => e.stopPropagation()}>
-                                    {runLabel(last)}
-                                  </Link>
-                                  <div style={s.lastRow}>
-                                    <span style={{ color: passRateColor(last.pass_rate), fontWeight: 700 }}>{formatPassRate(last.pass_rate)}</span>
-                                    <span style={{ color: last.fail ? RESULT_COLORS.fail : undefined }}>FAIL {last.fail}</span>
-                                    <span>{fmtDate(last.completed_at)}</span>
-                                  </div>
-                                </>
-                              ) : (
-                                <span style={s.none}>{t("noRun")}</span>
-                              )}
-                            </td>
-                            <td style={s.tdNumSub}>{fmtDate(p.created_at)}</td>
-                          </tr>
-                        );
-                      })}
                     </tbody>
                   </table>
                 </div>

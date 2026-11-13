@@ -150,6 +150,7 @@ def test_프로젝트_행에_설명_생성일_활성_TC_를_싣는다(env):
     proj, _ = _project(env, "A", n_tc=4, desc="설명")
     row = _row(_overview(env), proj)
     assert (row["name"], row["description"], row["active_tc"], row["is_private"]) == ("A", "설명", 4, False)
+    assert row["owner_name"] == "관리자", "소유자는 프로젝트를 만든 사람의 표시 이름"
     assert row["created_at"] is not None
     assert row["in_progress"] == [] and row["last_completed"] is None
 
@@ -244,6 +245,18 @@ def test_프로젝트는_최근_생성_순이다(env):
     db.commit()
     assert second.id > first.id
     assert [p["name"] for p in _overview(env)["projects"]] == ["먼저 등록", "나중 등록"]
+
+
+def test_소유자는_보는_사람이_아니라_만든_사람이다(env):
+    db, admin = env
+    other = User(username="maker", password_hash="x", display_name="홍길동", role="user")
+    db.add(other)
+    db.flush()
+    p = Project(name="남이 만든", created_by=other.id)
+    db.add(p)
+    db.commit()
+    data = _overview(env)  # 관리자가 본다
+    assert _row(data, p)["owner_name"] == "홍길동"
 
 
 def test_프로젝트가_없으면_빈_응답(env):

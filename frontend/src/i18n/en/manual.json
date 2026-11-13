@@ -110,7 +110,7 @@
     "feat_progress_title": "Runs in progress",
     "feat_progress_desc": "Lists the runs in progress across all projects, most recently started first. Each run shows its name and round, version and environment, a result bar (PASS/FAIL/BLOCK/N/A/Not Executed), executed TCs, FAIL and BLOCK counts, and Pass Rate. Click a row to open that run in the Test Run tab.",
     "feat_table_title": "Project table",
-    "feat_table_desc": "For each project it shows active TCs, the run in progress (\"+N more\" when there are several), and the Pass Rate, FAIL count and completion date of the last completed run. The last completed run is the one completed most recently, so creating a new round does not change it. Pass Rate = PASS ÷ (PASS+FAIL+BLOCK), and it shows - instead of 0% when there are no verdicts.",
+    "feat_table_desc": "For each project it shows the owner (the user who created it), active TCs, the run in progress (\"+N more\" when there are several), and the Pass Rate, FAIL count and completion date of the last completed run. The last completed run is the one completed most recently, so creating a new round does not change it. Pass Rate = PASS ÷ (PASS+FAIL+BLOCK), and it shows - instead of 0% when there are no verdicts.",
     "h3_cards": "2-2. Navigating from the project table",
     "imgAlt_cards": "Project table",
     "cards_li1": "Click a project name to open the project, or a run name to open that run in the Test Run tab.",

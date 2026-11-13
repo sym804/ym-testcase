@@ -127,6 +127,12 @@ def global_overview(
 
     stats = _run_stats(db, [r.id for r in active] + [r.id for r in last_done.values()])
 
+    # 소유자 = 프로젝트를 만든 사람(설정 화면의 "생성자" 와 같다). 표시 이름을 한 번에 읽는다.
+    creator_ids = {p.created_by for p in projects}
+    owners = dict(
+        db.query(User.id, User.display_name).filter(User.id.in_(creator_ids)).all()
+    ) if creator_ids else {}
+
     active_runs = [_run_summary(r, stats.get(r.id), names[r.project_id]) for r in active]
     by_project: dict[int, list[dict]] = {}
     for r in active_runs:
@@ -140,6 +146,7 @@ def global_overview(
             "name": p.name,
             "description": p.description,
             "is_private": bool(p.is_private),
+            "owner_name": owners.get(p.created_by),
             "created_at": p.created_at,
             "active_tc": tc_counts.get(p.id, 0),
             "in_progress": by_project.get(p.id, []),

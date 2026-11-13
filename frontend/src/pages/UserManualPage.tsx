@@ -180,18 +180,19 @@ export default function UserManualPage() {
                   <p style={s.featureDesc}>{t("projectList.feat_summary_desc")}</p>
                 </div>
               </div>
-              <div style={s.featureCard}>
-                <div style={s.featureIcon}>📈</div>
-                <div>
-                  <strong>{t("projectList.feat_progress_title")}</strong>
-                  <p style={s.featureDesc}>{t("projectList.feat_progress_desc")}</p>
-                </div>
-              </div>
+              {/* 화면 순서와 같다: 요약 -> 프로젝트 표 -> 진행 중인 수행 */}
               <div style={s.featureCard}>
                 <div style={s.featureIcon}>📋</div>
                 <div>
                   <strong>{t("projectList.feat_table_title")}</strong>
                   <p style={s.featureDesc}>{t("projectList.feat_table_desc")}</p>
+                </div>
+              </div>
+              <div style={s.featureCard}>
+                <div style={s.featureIcon}>📈</div>
+                <div>
+                  <strong>{t("projectList.feat_progress_title")}</strong>
+                  <p style={s.featureDesc}>{t("projectList.feat_progress_desc")}</p>
                 </div>
               </div>
             </div>

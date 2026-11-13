@@ -109,7 +109,7 @@ test("전체 매뉴얼 스크린샷 재캡처", async ({ page, request }) => {
   await page.screenshot({ path: path.join(SAVE_DIR, "04_project_list_overview.png") });
 
   // 05. 프로젝트 표 (SYM-225 전에는 카드 목록이었다)
-  await page.getByRole("table", { name: "프로젝트" }).evaluate((el) => (el.closest("section") ?? el).scrollIntoView({ block: "start" }));
+  await page.getByRole("table", { name: "프로젝트" }).evaluate((el) => { const sec = el.closest("section") ?? el; window.scrollTo(0, sec.getBoundingClientRect().top + window.scrollY - 64); });
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(SAVE_DIR, "05_project_list_cards.png") });
   await page.evaluate(() => window.scrollTo(0, 0));

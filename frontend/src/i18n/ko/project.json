@@ -46,7 +46,8 @@
     "inProgress": "진행 중 수행",
     "lastCompleted": "최근 완료 수행",
     "createdAt": "생성일",
-    "passRate": "합격률"
+    "passRate": "합격률",
+    "owner": "소유자"
   },
   "deleteAllFailed": "삭제하지 못했습니다. {{count}}개 모두 실패했습니다.",
   "deletePartial": "{{deleted}}개 삭제, {{failed}}개 실패했습니다.",
