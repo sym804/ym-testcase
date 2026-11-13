@@ -301,6 +301,7 @@ export default function UserManualPage() {
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.grid_li4") }} />
               <li>{t("tcManage.grid_li5")}</li>
               <li dangerouslySetInnerHTML={{ __html: t("tcManage.grid_li6") }} />
+              <li>{t("tcManage.grid_li7")}</li>
             </ul>
 
             <h3 style={s.h3}>{t("tcManage.h3_deleteRestore")}</h3>

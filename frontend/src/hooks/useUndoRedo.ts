@@ -77,6 +77,19 @@ export function useUndoRedo(gridApiRef: React.RefObject<GridApi | null>) {
     setRedoCount(redoStackRef.current.length);
   }, [gridApiRef]);
 
+  /** 한 행의 몇 칸 기록을 양쪽 스택에서 지운다. 같은 묶음의 다른 칸 기록은 남긴다.
+   *  다른 사용자의 값으로 바뀐 칸을 되돌리면 그 값을 옛 값으로 덮어 저장하기 때문이다(SYM-224). */
+  const dropFieldHistory = useCallback((rowId: string, fields: Set<string>) => {
+    if (fields.size === 0) return;
+    const prune = (stack: UndoGroup[]) => stack
+      .map((group) => group.filter((e) => !(e.rowId === rowId && fields.has(e.field))))
+      .filter((group) => group.length > 0);
+    undoStackRef.current = prune(undoStackRef.current);
+    redoStackRef.current = prune(redoStackRef.current);
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(redoStackRef.current.length);
+  }, []);
+
   const handleUndo = useCallback(() => {
     const group = undoStackRef.current.pop();
     if (!group) return;
@@ -93,6 +106,6 @@ export function useUndoRedo(gridApiRef: React.RefObject<GridApi | null>) {
     undoStackRef, redoStackRef, isUndoRedoRef,
     undoCount, redoCount, setUndoCount, setRedoCount,
     autoSaveRowRef,
-    pushUndo, applyUndoRedo, handleUndo, handleRedo,
+    pushUndo, applyUndoRedo, handleUndo, handleRedo, dropFieldHistory,
   };
 }

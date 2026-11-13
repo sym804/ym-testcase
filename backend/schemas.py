@@ -249,6 +249,17 @@ class TestCaseUpdate(BaseModel):
     remarks: Optional[str] = None
     sheet_name: Optional[str] = Field(None, max_length=100)
     custom_fields: Optional[dict[str, Any]] = None
+    # 화면이 고치기 전에 본 값(칸 이름 -> 값). 보내면 그 칸의 서버 값이 그 사이 바뀌었는지 보고
+    # 바뀌었으면 409 로 거절한다(SYM-224). 보내지 않으면 예전처럼 저장한다(스크립트 · API 키 호환).
+    base_values: Optional[dict[str, Any]] = None
+
+    @field_validator("base_values")
+    @classmethod
+    def _base_custom_fields_is_map(cls, v):
+        # 커스텀 칸은 키마다 대조하므로 객체여야 한다. 다른 형식이면 대조 중 500 이 난다.
+        if v and v.get("custom_fields") is not None and not isinstance(v["custom_fields"], dict):
+            raise ValueError("base_values.custom_fields 는 객체여야 합니다")
+        return v
 
 
 class TestCaseResponse(BaseModel):
@@ -298,6 +309,16 @@ class TestCaseBulkItem(BaseModel):
     remarks: Optional[str] = None
     sheet_name: Optional[str] = Field(None, max_length=100)
     custom_fields: Optional[dict[str, Any]] = None
+    # 단건 수정(TestCaseUpdate.base_values)과 같다.
+    base_values: Optional[dict[str, Any]] = None
+
+    @field_validator("base_values")
+    @classmethod
+    def _base_custom_fields_is_map(cls, v):
+        # 커스텀 칸은 키마다 대조하므로 객체여야 한다. 다른 형식이면 대조 중 500 이 난다.
+        if v and v.get("custom_fields") is not None and not isinstance(v["custom_fields"], dict):
+            raise ValueError("base_values.custom_fields 는 객체여야 합니다")
+        return v
 
 
 class TestCaseBulkUpdate(BaseModel):

@@ -215,6 +215,7 @@
     "grid_li4": "Cell edits are <strong>auto-saved</strong>. There is no separate save button.",
     "grid_li5": "New rows are also saved to the server immediately and can be undone with Undo (Ctrl+Z).",
     "grid_li6": "<strong>Drag and drop sorting:</strong> Grab the drag handle (≡) in the No column and drag rows up/down to reorder TCs. The new order is automatically saved to the server. (Edit permission required)",
+    "grid_li7": "If two people edit the same cell of the same TC, the later save is rejected with a notice that another user changed it first, and the row is updated to the latest values. Your edits in other cells of that row are still saved. Edits to different cells are both kept.",
     "h3_deleteRestore": "4-4. TC Deletion and Restoration",
     "dr_li1": "When you delete a TC, it is <strong>soft deleted</strong>. It is not permanently deleted immediately.",
     "dr_li2": "Deleted TCs can be <strong>restored within 7 days</strong>. After 7 days, they are automatically permanently deleted.",

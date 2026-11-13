@@ -207,10 +207,13 @@ export const testCasesApi = {
     return res.data;
   },
 
-  update: async (projectId: number, tcId: number, data: Partial<TestCase>) => {
+  /** baseValues: 고치기 전에 화면이 본 값. 보내면 그 칸을 그 사이 다른 사람이 고쳤을 때 409 로 거절된다. */
+  update: async (
+    projectId: number, tcId: number, data: Partial<TestCase>, baseValues?: Record<string, unknown>,
+  ) => {
     const res = await client.put<TestCase>(
       `/api/projects/${projectId}/testcases/${tcId}`,
-      data
+      baseValues ? { ...data, base_values: baseValues } : data
     );
     return res.data;
   },

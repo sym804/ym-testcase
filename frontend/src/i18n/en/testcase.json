@@ -1,6 +1,7 @@
 {
   "loadFailed": "Failed to load test cases.",
   "autoSaveFailed": "Auto-save failed",
+  "editConflict": "Cells another user changed first were not saved: {{tcId}} ({{fields}}). The row now shows the latest values.",
   "orderSaveFailed": "Failed to save order",
   "orderNeedsWholeSheet": "Reordering needs the whole sheet in view. Clear filters and try again.",
   "addRowFailed": "Failed to add row.",

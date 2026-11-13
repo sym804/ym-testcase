@@ -41,6 +41,37 @@ const TYPE_OPTIONS = ["Func.", "UI/UX", "Perf.", "Security", "API", "Data"];
 // 우선순위 값과 색은 utils/priority 에 있다. 테스트 수행 그리드와 같이 쓴다.
 const PLATFORM_OPTIONS = ["Web", "Mobile Web", "Mobile App", "iOS", "Android", "PC", "API", "공통"];
 
+/** 사용자가 고치는 칸. 충돌로 서버 값을 다시 받을 때 이 칸만 화면에 반영한다(no 는 화면용 번호일 수 있다). */
+const EDITABLE_TC_FIELDS = [
+  "tc_id", "type", "category", "depth1", "depth2", "priority", "test_type", "precondition",
+  "test_steps", "expected_result", "r1", "r2", "r3", "remarks", "sheet_name",
+] as const;
+
+/** 충돌 안내에 쓰는 칸 이름 기본값. 열 머리글(fieldDisplay 의 기본 이름)과 같다. */
+const TC_FIELD_DEFAULT_NAMES: Record<string, string> = {
+  tc_id: "TC ID", type: "Type", category: "Category", depth1: "Depth 1", depth2: "Depth 2",
+  priority: "Priority", test_type: "Platform", precondition: "Precondition", test_steps: "Test Steps",
+  expected_result: "Expected Result", remarks: "Remarks", r1: "R1", r2: "R2", r3: "R3", sheet_name: "Sheet",
+};
+
+/** 빈 문자열과 null 은 같은 값이다. 그리드는 지운 칸을 "" 로, 서버는 null 로 들고 있다. */
+function sameValue(a: unknown, b: unknown): boolean {
+  const n = (v: unknown) => (v === "" || v === undefined ? null : v);
+  return JSON.stringify(n(a)) === JSON.stringify(n(b));
+}
+
+/** 다른 사용자가 먼저 고쳐 거절된 저장(409)의 본문. 서버가 그 행의 현재 값을 같이 준다. */
+interface EditConflict {
+  conflicts: { id: number; fields: string[] }[];
+  current: TestCase[];
+}
+
+function editConflictOf(err: unknown): EditConflict | null {
+  const res = (err as { response?: { status?: number; data?: Partial<EditConflict> } })?.response;
+  if (res?.status !== 409 || !Array.isArray(res.data?.conflicts) || !Array.isArray(res.data?.current)) return null;
+  return res.data as EditConflict;
+}
+
 /** 행 복사. custom_fields 는 편집기가 객체를 직접 고치므로 따로 복사해야 스냅샷과 갈라진다. */
 function cloneRow(row: TestCase): TestCase {
   return { ...row, custom_fields: row.custom_fields ? { ...row.custom_fields } : row.custom_fields };
@@ -108,7 +139,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     undoStackRef, redoStackRef, isUndoRedoRef,
     undoCount, redoCount, setUndoCount, setRedoCount,
     autoSaveRowRef,
-    pushUndo, handleUndo, handleRedo,
+    pushUndo, handleUndo, handleRedo, dropFieldHistory,
   } = useUndoRedo(gridApiRef);
 
   // ── 찾기/바꾸기 ──
@@ -370,6 +401,9 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     name: fc?.[key]?.display_name || defaultName,
     visible: fc?.[key]?.visible !== false,
   });
+  // 자동 저장 콜백이 최신 칸 이름을 보게 한다(fieldDisplay 는 렌더마다 새로 만들어진다).
+  const fieldDisplayRef = useRef(fieldDisplay);
+  fieldDisplayRef.current = fieldDisplay;
 
   // ── i18n display maps for DB enum values ──
   const priorityRefData: Record<string, string> = useMemo(() => priorityDisplayMap(t), [t]);
@@ -602,6 +636,62 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
     gridApi.refreshCells({ rowNodes: [node], force: true });
   }, []);
 
+  // ★다른 사용자가 먼저 고쳐 저장이 거절됐을 때(SYM-224). 부딪힌 칸과 이 화면이 고치지 않은 칸은
+  //   화면과 기준을 서버 값으로 바꾼다. 이 화면이 고쳤지만 부딪히지 않은 칸은 화면 값을 두고 기준은
+  //   옛 값으로 둔다. pending 은 그 칸이 남았는지(옛 기준값으로 다시 저장), replaced 는 서버 값으로
+  //   바뀐 칸의 컬럼 id 다(그 칸의 되돌리기 기록을 지운다).
+  const applyServerRow = useCallback((rowKey: string, server: TestCase, fields: string[]) => {
+    const gridApi = gridApiRef.current;
+    const node = gridApi?.getRowNode(rowKey);
+    const replaced: string[] = [];
+    if (!gridApi || !node?.data) return { pending: false, replaced };
+    const prev = (lastSavedRef.current[rowKey] ?? cloneRow(node.data as TestCase)) as unknown as Record<string, unknown>;
+    const cur = node.data as unknown as Record<string, unknown>;
+    const srv = server as unknown as Record<string, unknown>;
+    const next: Record<string, unknown> = { ...prev };
+    let pending = false;
+    // ★남는 편집의 기준값은 서버 값이 아니라 옛 기준값으로 둔다. 요청이 오가는 사이 고친 칸은
+    //   서버가 이번에 보지 않은 칸이라, 기준을 서버 값으로 올리면 다른 사람이 그 칸에 먼저 쓴 값을
+    //   다시 저장이 검사 없이 덮는다. 옛 기준이면 서버가 다시 409 로 알린다.
+    // 부딪힌 칸은 요청 뒤에 다시 고친 값이 있어도 서버 값으로 바꾼다. restoreRow 는 거부 뒤 다시
+    //   고친 칸을 남기지만, 충돌은 남의 값이 있다는 뜻이라 그 값을 먼저 보여 준다.
+    for (const f of EDITABLE_TC_FIELDS) {
+      if (fields.includes(f) || sameValue(cur[f], prev[f])) {
+        // 부딪힌 칸은 화면 값이 우연히 서버 값과 같아도 기록을 지운다. 남은 기록이 그 칸을
+        //   옛 값으로 되돌리면 기준이 이미 서버 값이라 검사 없이 남의 값을 덮는다.
+        if (fields.includes(f) || !sameValue(cur[f], srv[f])) replaced.push(f);
+        cur[f] = srv[f];
+        next[f] = srv[f];
+      } else if (!sameValue(cur[f], srv[f])) {
+        pending = true;
+        next[f] = prev[f];
+      } else {
+        next[f] = srv[f];
+      }
+    }
+    const prevCf = (prev.custom_fields ?? {}) as Record<string, unknown>;
+    const srvCf = { ...((srv.custom_fields ?? {}) as Record<string, unknown>) };
+    const curCf = { ...((cur.custom_fields ?? {}) as Record<string, unknown>) };
+    const nextCf = { ...srvCf };
+    for (const ck of new Set([...Object.keys(prevCf), ...Object.keys(srvCf), ...Object.keys(curCf)])) {
+      if (fields.includes(`custom_fields.${ck}`) || sameValue(curCf[ck], prevCf[ck])) {
+        if (fields.includes(`custom_fields.${ck}`) || !sameValue(curCf[ck], srvCf[ck])) replaced.push(`cf_${ck}`);
+        if (ck in srvCf) curCf[ck] = srvCf[ck];
+        else delete curCf[ck];
+      } else if (!sameValue(curCf[ck], srvCf[ck])) {
+        pending = true;
+        // 최상위 칸과 같은 이유로 남는 키의 기준은 옛 기준값
+        if (ck in prevCf) nextCf[ck] = prevCf[ck];
+        else delete nextCf[ck];
+      }
+    }
+    cur.custom_fields = curCf;
+    next.custom_fields = nextCf;
+    lastSavedRef.current[rowKey] = next as unknown as TestCase;
+    gridApi.refreshCells({ rowNodes: [node], force: true });
+    return { pending, replaced };
+  }, []);
+
   // 행마다 저장을 한 줄로 세운다. 앞 요청이 끝나기 전에 다음 요청이 나가면 서버에서 순서가
   // 뒤바뀌어 옛 값이 남을 수 있다(서버리스 콜드 스타트처럼 응답이 늦을 때).
   const saveChainRef = useRef<Record<string, Promise<void>>>({});
@@ -625,8 +715,11 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         //   이 화면이 들고 있던 옛 값으로 알림 없이 되돌린다. 서버는 보낸 칸만 고친다(exclude_unset).
         const base = lastSavedRef.current[key] as unknown as Record<string, unknown> | undefined;
         let payload: Record<string, unknown> = saveData;
+        // 고친 칸의 '고치기 전 값'. 서버가 그 사이 다른 사람이 같은 칸을 고쳤는지 본다(SYM-224).
+        let baseValues: Record<string, unknown> | undefined;
         if (base) {
           payload = {};
+          baseValues = {};
           for (const [k, v] of Object.entries(saveData)) {
             if (k === "_originalNo") continue;
             const before = k === "no" && "_originalNo" in base ? base._originalNo : base[k];
@@ -634,14 +727,32 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
             // 요청이 오가는 사이의 편집이 '보낸 값' 에 섞여 거부 때 되돌릴 칸을 잘못 고른다.
             if (JSON.stringify(v ?? null) !== JSON.stringify(before ?? null)) {
               payload[k] = k === "custom_fields" && v ? { ...(v as Record<string, unknown>) } : v;
+              baseValues[k] = k === "custom_fields" ? { ...((before ?? {}) as Record<string, unknown>) } : before ?? null;
             }
           }
           if (Object.keys(payload).length === 0) return;
         }
         try {
-          await testCasesApi.update(projectId, data.id, payload as Partial<TestCase>);
+          await testCasesApi.update(projectId, data.id, payload as Partial<TestCase>, baseValues);
           lastSavedRef.current[key] = sent;
         } catch (err) {
+          const conflict = editConflictOf(err);
+          const server = conflict?.current.find((c) => c.id === data.id);
+          if (conflict && server) {
+            const fields = conflict.conflicts.find((c) => c.id === data.id)?.fields ?? [];
+            const names = fields.map((f) =>
+              f.startsWith("custom_fields.") ? f.slice("custom_fields.".length) : fieldDisplayRef.current(f, TC_FIELD_DEFAULT_NAMES[f] ?? f).name);
+            toast.error(t("editConflict", { tcId: server.tc_id, fields: names.join(", ") }));
+            const { pending, replaced } = applyServerRow(key, server, fields);
+            // 다른 사용자의 값으로 바뀐 칸을 되돌리면 그 값을 덮어 저장한다. 그 칸 기록은 지운다.
+            dropFieldHistory(key, new Set(replaced));
+            // 부딪히지 않은 이 화면의 편집은 옛 기준값으로 다시 저장한다(그 칸도 남이 고쳤으면 다시 409)
+            if (pending) {
+              const node = gridApiRef.current?.getRowNode(key);
+              if (node?.data) autoSaveRowRef.current?.(node.data as TestCase);
+            }
+            return;
+          }
           // TC ID 중복 같은 409 는 이유를 그대로 보여 준다.
           // "저장 실패"만 뜨면 무엇을 고쳐야 하는지 알 수 없다.
           const detail = (err as { response?: { data?: { detail?: string } } })
@@ -657,7 +768,7 @@ export default function TestCaseGrid({ projectId, project, highlightTcId }: Prop
         if (saveChainRef.current[key] === chain) delete saveChainRef.current[key];
       });
     }, 300);
-  }, [projectId, restoreRow]);
+  }, [projectId, restoreRow, applyServerRow, dropFieldHistory, t, autoSaveRowRef]);
   autoSaveRowRef.current = autoSaveRow;
 
   const handleRowDragEnd = useCallback(async () => {

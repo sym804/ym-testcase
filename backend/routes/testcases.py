@@ -2,6 +2,8 @@ import logging
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -47,6 +49,101 @@ router = APIRouter(
     prefix="/api/projects/{project_id}/testcases",
     tags=["testcases"],
 )
+
+
+# ── 칸 단위 충돌 검사 (SYM-224) ─────────────────────────────────────────────
+# 자동 저장은 바뀐 칸만 보내므로 다른 칸을 고친 두 사람은 둘 다 저장된다. 같은 칸은 나중
+# 저장이 앞의 값을 알림 없이 덮었다. 화면이 고치기 전에 본 값(base_values)을 같이 보내면,
+# 그 칸의 서버 값이 그 사이 바뀌었는지 보고 바뀌었으면 요청 전체를 거절한다.
+# 시트 잠금을 쓰지 않는 이유: 한 시트에 여럿이 TC 를 나눠 쓰는 것이 보통이고, 브라우저를
+# 닫으면 풀리지 않는 잠금을 서버리스에서 관리해야 한다.
+
+_FIELD_LABELS = {
+    "tc_id": "TC ID", "type": "유형", "category": "분류", "depth1": "Depth 1",
+    "depth2": "Depth 2", "priority": "우선순위", "test_type": "플랫폼",
+    "precondition": "사전 조건", "test_steps": "테스트 스텝", "expected_result": "기대 결과",
+    "r1": "R1", "r2": "R2", "r3": "R3", "remarks": "비고", "sheet_name": "시트",
+}
+
+
+def _canon(v):
+    """비교용 정규형. 참·거짓은 숫자와 가른다(파이썬 == 는 True 와 1 을 같게 본다).
+    숫자는 정수와 실수를 가르지 않는다. JSONB 에 2.0 으로 들어간 값을 브라우저는 2 로 읽어 보낸다."""
+    if isinstance(v, bool):
+        return ("bool", v)
+    if isinstance(v, int):
+        return ("num", v)  # float 로 바꾸면 2**53 을 넘는 서로 다른 정수가 같아진다
+    if isinstance(v, float):
+        return ("num", int(v) if v.is_integer() else v)
+    if isinstance(v, dict):
+        return ("map", tuple(sorted((str(k), _canon(x)) for k, x in v.items())))
+    if isinstance(v, (list, tuple)):
+        return ("list", tuple(_canon(x) for x in v))
+    return v
+
+
+def _same(a, b) -> bool:
+    """빈 문자열과 None 은 같은 값이다. 그리드는 지운 칸을 빈 문자열로, 서버는 None 으로 들고 있다."""
+    a = None if a == "" else a
+    b = None if b == "" else b
+    return _canon(jsonable_encoder(a)) == _canon(jsonable_encoder(b))
+
+
+def _check_base(tc: TestCase, data: dict, base: Optional[dict]) -> list[str]:
+    """고친 칸 가운데 서버 값이 base 와 달라진 칸 이름을 돌려준다. data 는 고칠 값으로 바꿔 둔다.
+
+    - base 에 없는 칸은 보지 않는다(화면이 기준값을 모르는 칸).
+    - 서버 값이 이미 새 값과 같으면 충돌이 아니다(두 사람이 같은 값으로 고친 경우).
+    - custom_fields 는 키마다 본다. 바뀐 키만 서버 값 위에 얹어, 다른 사람이 고친 다른 키를
+      화면의 옛 값으로 되돌리지 않는다. 새 값에서 빠진 키는 지운다.
+    """
+    if base is None:
+        return []
+    conflicts: list[str] = []
+    for key, value in list(data.items()):
+        if key not in base:
+            continue
+        if key == "custom_fields":
+            cur = dict(tc.custom_fields or {})
+            before = base.get(key) or {}
+            after = value or {}
+            merged = dict(cur)
+            for ck in sorted(set(before) | set(after)):
+                if _same(after.get(ck), before.get(ck)):
+                    continue  # 이 화면이 고치지 않은 키
+                if not _same(cur.get(ck), before.get(ck)) and not _same(cur.get(ck), after.get(ck)):
+                    conflicts.append(f"custom_fields.{ck}")
+                if ck in after:
+                    merged[ck] = after[ck]
+                else:
+                    merged.pop(ck, None)
+            data[key] = merged
+            continue
+        current = getattr(tc, key)
+        if not _same(current, base[key]) and not _same(current, value):
+            conflicts.append(key)
+    return conflicts
+
+
+def _conflict_label(field: str) -> str:
+    if field.startswith("custom_fields."):
+        return field.split(".", 1)[1]
+    return _FIELD_LABELS.get(field, field)
+
+
+def _conflict_response(db: Session, found: list[tuple[TestCase, list[str]]]) -> JSONResponse:
+    """409 와 함께 서버의 현재 행을 준다. 화면이 그 행을 다시 그린다. 아무것도 저장하지 않는다."""
+    current = [jsonable_encoder(TestCaseResponse.model_validate(tc)) for tc, _ in found]
+    db.rollback()
+    names = "; ".join(
+        f"{row['tc_id']} ({', '.join(_conflict_label(f) for f in fields)})"
+        for row, (_, fields) in zip(current, found)
+    )
+    return JSONResponse(status_code=409, content={
+        "detail": f"다른 사용자가 먼저 고친 칸이 있습니다: {names}. 최신 값으로 다시 읽습니다.",
+        "conflicts": [{"id": row["id"], "fields": fields} for row, (_, fields) in zip(current, found)],
+        "current": current,
+    })
 
 
 def _get_project_or_404(project_id: int, db: Session) -> Project:
@@ -153,6 +250,22 @@ def bulk_update_testcases(
 
     updated: list[TestCase] = []
     touched_sheets: set[str] = set()
+    ids = [i.id for i in payload.items]
+    if len(set(ids)) != len(ids):
+        # 같은 TC 가 두 번이면 앞 항목이 고친 값을 뒤 항목이 서버 값으로 읽는다(검사와 409 의 current 가 틀린다).
+        raise HTTPException(status_code=400, detail="같은 TC 가 두 번 들어 있습니다.")
+    if any("sheet_name" in i.model_fields_set for i in payload.items):
+        # ★시트를 옮길 수 있는 요청은 프로젝트 잠금을 행 잠금보다 먼저 잡는다. 정렬 · 삭제 · 시트 작업이
+        #   프로젝트 잠금 -> 행 순서라 거꾸로 잡으면 교착한다.
+        advisory_xact_lock(db, LockNs.PROJECT_WRITE, project_id)
+    # ★대상 행 전부를 id 순서로 먼저 잠근다. 잠그지 않으면 같은 기준값을 본 두 요청이 둘 다 검사를
+    #   통과한다. 일부만(기준값이 있는 행만) 잠그거나 항목 순서대로 잡으면, 순서가 엇갈린 두 요청이
+    #   서로 상대가 잡은 행을 기다려 교착한다. 하나라도 어긋나면 아무것도 고치지 않는다.
+    checked = sorted(ids)
+    if checked:
+        db.query(TestCase).filter(TestCase.id.in_(checked), TestCase.project_id == project_id) \
+            .order_by(TestCase.id).with_for_update().populate_existing().all()
+    found: list[tuple[TestCase, list[str]]] = []
     for item in payload.items:
         # ★지운 TC 는 고치지 않는다. 단건 수정과 같은 이유다(화면에 없는 행의 TC ID 가
         #   바뀌면 복원했을 때 다른 것이 된다). 없는 id 처럼 건너뛴다.
@@ -162,9 +275,14 @@ def bulk_update_testcases(
         ).first()
         if not tc:
             continue
-        item_data = item.model_dump(exclude_unset=True, exclude={"id"})
+        item_data = item.model_dump(exclude_unset=True, exclude={"id", "base_values"})
         # 단건 수정과 같은 이유로 번호는 받지 않는다.
         item_data.pop("no", None)
+        conflict = _check_base(tc, item_data, item.base_values)
+        if conflict:
+            found.append((tc, conflict))
+        if found:
+            continue  # 남은 항목은 검사만 한다. 아래에서 전부 거절한다.
         if "sheet_name" in item_data:
             _validate_sheet_name(project_id, item_data["sheet_name"], db)
         old_sheet = tc.sheet_name
@@ -184,6 +302,9 @@ def bulk_update_testcases(
         if changes:
             _record_history(db, tc, changes, current_user.id)
         updated.append(tc)
+
+    if found:
+        return _conflict_response(db, found)
 
     for sheet in touched_sheets:
         renumber_sheet(project_id, sheet, db)
@@ -293,21 +414,34 @@ def update_testcase(
 
     # ★지운 TC 는 수정 대상이 아니다. 고칠 수 있으면 삭제와 복원의 의미가
     #   흔들리고, 화면에 없는 행의 TC ID 가 변경되어 복원했을 때 다른 것이 된다.
-    tc = db.query(TestCase).filter(
+    query = db.query(TestCase).filter(
         TestCase.id == tc_id,
         TestCase.project_id == project_id,
         TestCase.deleted_at.is_(None),
-    ).first()
+    )
+    if "sheet_name" in payload.model_fields_set:
+        # ★시트를 옮길 수 있는 요청은 프로젝트 잠금을 행 잠금보다 먼저 잡는다. 정렬 · 삭제 · 시트 작업이
+        #   프로젝트 잠금 -> 행 순서라, 행을 먼저 잡으면(기준값 잠금이나 이동 전 UPDATE 자동 flush) 교착한다.
+        advisory_xact_lock(db, LockNs.PROJECT_WRITE, project_id)
+    if payload.base_values is not None:
+        # ★행을 잠그고 읽는다. 잠그지 않으면 같은 기준값을 본 두 요청이 둘 다 검사를 통과해
+        #   늦게 끝난 쪽이 덮는다. 기다린 쪽은 앞선 커밋 뒤의 값을 다시 읽어 검사에 걸린다.
+        query = query.with_for_update().populate_existing()
+    tc = query.first()
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found")
 
-    update_data = payload.model_dump(exclude_unset=True)
+    update_data = payload.model_dump(exclude_unset=True, exclude={"base_values"})
     # ★번호는 여기서 변경할 수 없다. 시트 안 순번이라 사람이 정할 값이 아니고,
     #   임의 값을 넣으면 구멍이 생기거나 유니크 제약에 걸린다. 순서를 변경하려면
     #   정렬 API 를 쓴다.
     update_data.pop("no", None)
     if "sheet_name" in update_data:
         _validate_sheet_name(project_id, update_data["sheet_name"], db)
+
+    conflict = _check_base(tc, update_data, payload.base_values)
+    if conflict:
+        return _conflict_response(db, [(tc, conflict)])
 
     old_sheet = tc.sheet_name
     moved = "sheet_name" in update_data and update_data["sheet_name"] != old_sheet
@@ -320,8 +454,9 @@ def update_testcase(
         setattr(tc, key, value)
 
     if moved:
-        # 번호를 건드리는 경우만 프로젝트 잠금을 잡는다. 셀 하나 고치는 자동 저장까지
-        # 잠그면 가져오기 같은 긴 작업 동안 모든 저장이 줄을 선다.
+        # 시트 칸을 보낸 요청은 위에서 이미 잡았다(같은 트랜잭션에서 다시 잡아도 된다). 셀 하나
+        # 고치는 자동 저장은 시트를 보내지 않아 잠그지 않는다. 잠그면 가져오기 같은 긴 작업 동안
+        # 모든 저장이 줄을 선다.
         advisory_xact_lock(db, LockNs.PROJECT_WRITE, project_id)
         # 옮긴 TC 는 도착 시트의 끝으로 보낸다. 번호를 그대로 들고 가면 그 시트에
         # 이미 있는 번호와 겹친다. 그 뒤 양쪽 시트를 1..N 으로 맞춘다.
