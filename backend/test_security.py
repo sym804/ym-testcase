@@ -692,7 +692,11 @@ class TestCodeSecurity:
         assert "is_private" in code
         assert "ProjectMember" in code
         assert "UserRole.admin" in code
-        assert "created_by" not in code
+        # 접근은 멤버 표로만 정한다. 생성자 우회 판정을 두지 않는다(SYM-192).
+        # 파일 전체가 아니라 접근을 정하는 함수만 본다. created_by 는 소유자 이름 표시(SYM-226)에 쓴다
+        start = code.index("def visible_projects(")
+        end = code.index("\ndef ", start + 1)
+        assert "created_by" not in code[start:end]
 
 
 class TestBrokenAccessControl:
