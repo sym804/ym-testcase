@@ -468,7 +468,7 @@ cp -r backup/uploads_20261009/* backend/uploads/
 | `37_account_help_reset.png` | 계정 도움 요청 (비밀번호 재설정) | 사용자 매뉴얼 2-6 |
 | `38_reset_password_page.png` | 비밀번호 재설정 페이지 | 사용자 매뉴얼 2-6 |
 | `04_project_list_overview.png` | 프로젝트 목록 전체 현황 | 사용자 매뉴얼 3-1 |
-| `05_project_list_cards.png` | 프로젝트 카드 | 사용자 매뉴얼 3-2 |
+| `05_project_list_cards.png` | 프로젝트 표 | 사용자 매뉴얼 3-2 |
 | `06_project_create_modal.png` | 프로젝트 생성 모달 | 사용자 매뉴얼 3-3 |
 | `07_project_detail_tc_tab.png` | 프로젝트 상세 (TC 탭) | 사용자 매뉴얼 5 |
 | `08_tc_grid_detail.png` | TC 그리드 상세 | 사용자 매뉴얼 6-2 |

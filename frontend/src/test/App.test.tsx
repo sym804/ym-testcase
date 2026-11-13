@@ -18,12 +18,11 @@ vi.mock("../api", () => ({
   googleStartUrl: (mode: string) => `/api/auth/google/start?mode=${mode}`,
   projectsApi: { list: vi.fn().mockResolvedValue([]) },
   overviewApi: {
+    // 메인 화면 응답 모양(SYM-225)
     get: vi.fn().mockResolvedValue({
-      total_projects: 0,
-      total_testcases: 0,
-      total_testruns: 0,
-      avg_pass_rate: 0,
-      project_summaries: [],
+      summary: { total_projects: 0, active_tc: 0, in_progress_runs: 0, in_progress_fail_block: 0 },
+      active_runs: [],
+      projects: [],
     }),
   },
 }));
@@ -108,6 +107,8 @@ describe("App Routing", () => {
       });
       // 로그인 페이지가 아님을 확인
       expect(screen.queryByPlaceholderText("아이디 또는 이메일을 입력하세요")).not.toBeInTheDocument();
+      // 화면이 실제로 그려졌는지(렌더 오류로 빈 화면이 된 채 통과하지 않게)
+      expect(await screen.findByText("전체 현황")).toBeInTheDocument();
     });
 
     it("must_change_password가 true이면 비밀번호 변경 모달을 표시한다", async () => {

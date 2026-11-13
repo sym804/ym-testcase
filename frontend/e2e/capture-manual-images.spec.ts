@@ -3,6 +3,7 @@
  * 실행: npx playwright test e2e/capture-manual-images.spec.ts
  */
 import { test, expect, type Page } from "@playwright/test";
+import { projectLink } from "./nav";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -24,7 +25,7 @@ async function createProject(page: Page, name: string) {
   await page.getByPlaceholder("프로젝트 이름").fill(name);
   await page.getByRole("button", { name: "생성" }).click();
   await page.waitForTimeout(2000);
-  await page.locator("h3").filter({ hasText: name }).click();
+  await projectLink(page, name).click();
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(2000);
 }
@@ -147,7 +148,7 @@ test.describe("매뉴얼 스크린샷 캡처", () => {
     await page.waitForTimeout(1000);
 
     // 프로젝트 진입
-    await page.locator("h3").filter({ hasText: "매뉴얼 캡처용 프로젝트" }).click();
+    await projectLink(page, "매뉴얼 캡처용 프로젝트").click();
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(3000);
 

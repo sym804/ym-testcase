@@ -35,6 +35,16 @@ function ProjectPageContent() {
   const tabParam = searchParams.get("tab");
   const activeTab = tabParam && TAB_KEYS.includes(tabParam) ? tabParam : "tc";
   const highlightTcId = searchParams.get("highlight") || undefined;
+  // 메인 화면의 수행 링크(?tab=run&run=<id>). 수행 화면이 그 수행을 연 뒤 지운다(SYM-225)
+  const runParam = Number(searchParams.get("run"));
+  const openRunId = Number.isInteger(runParam) && runParam > 0 ? runParam : null;
+  const clearRunParam = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("run");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const setActiveTab = useCallback((tab: string) => {
     setSearchParams((prev) => {
@@ -106,7 +116,9 @@ function ProjectPageContent() {
       <div style={activeTab === "tc" || activeTab === "run" || activeTab === "compare" ? styles.contentWide : styles.content}>
         <Suspense fallback={<div style={{ textAlign: "center", padding: 40, color: "var(--text-secondary)" }}>{t("common:loadingData")}</div>}>
           {activeTab === "tc" && <TestCaseGrid projectId={projectId} project={project} highlightTcId={highlightTcId} />}
-          {activeTab === "run" && <TestRunManager projectId={projectId} project={project} />}
+          {activeTab === "run" && (
+            <TestRunManager projectId={projectId} project={project} openRunId={openRunId} onRunOpened={clearRunParam} />
+          )}
           {activeTab === "compare" && <CompareView projectId={projectId} />}
           {activeTab === "dashboard" && <Dashboard projectId={projectId} />}
           {activeTab === "report" && <ReportView projectId={projectId} project={project} />}

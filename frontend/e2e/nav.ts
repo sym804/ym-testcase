@@ -17,3 +17,15 @@ export async function navigateExpectingRedirect(page: Page, go: (p: Page) => Pro
 }
 
 export const commit = { waitUntil: "commit" } as const;
+
+/**
+ * 메인 화면 프로젝트 표의 프로젝트 이름 링크(SYM-225 전에는 카드의 h3 였다).
+ * 수행 링크(`/projects/1?tab=run&run=9`)는 빼고 프로젝트로 가는 링크만 고른다.
+ */
+export function projectLinks(page: Page) {
+  return page.locator('a[href^="/projects/"]:not([href*="?"])');
+}
+
+export function projectLink(page: Page, name: string | RegExp) {
+  return projectLinks(page).filter({ hasText: name });
+}

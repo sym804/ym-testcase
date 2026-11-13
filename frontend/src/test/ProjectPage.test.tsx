@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import ProjectPage from "../pages/ProjectPage";
 import { UserRole } from "../types";
 
@@ -66,7 +66,12 @@ vi.mock("../components/TestCaseGrid", async () => {
   return { default: MockGrid };
 });
 vi.mock("../components/TestRunManager", () => ({
-  default: () => <div data-testid="run-manager">TestRunManager</div>,
+  // openRunId 를 드러내고 onRunOpened 를 누를 수 있게 둔다(메인 화면 수행 링크, SYM-225)
+  default: (p: { openRunId?: number | null; onRunOpened?: () => void }) => (
+    <div data-testid="run-manager" data-open-run={String(p.openRunId ?? "")}>
+      <button onClick={p.onRunOpened}>run-opened</button>TestRunManager
+    </div>
+  ),
 }));
 
 vi.mock("react-chartjs-2", () => ({
@@ -92,15 +97,37 @@ beforeEach(() => {
   vi.mocked(usersApi.list).mockResolvedValue([]);
 });
 
-function renderPage() {
+function renderPage(url = "/projects/1") {
   return render(
-    <MemoryRouter initialEntries={["/projects/1"]}>
+    <MemoryRouter initialEntries={[url]}>
       <Routes>
-        <Route path="/projects/:id" element={<ProjectPage />} />
+        <Route path="/projects/:id" element={<><ProjectPage /><LocationProbe /></>} />
       </Routes>
     </MemoryRouter>
   );
 }
+
+function LocationProbe() {
+  const loc = useLocation();
+  return <div data-testid="location">{loc.search}</div>;
+}
+
+describe("ProjectPage - 메인 화면 수행 링크", () => {
+  it("?run= 을 수행 화면에 넘기고, 연 뒤 주소에서 지운다", async () => {
+    const user = userEvent.setup();
+    renderPage("/projects/1?tab=run&run=9");
+    const mgr = await screen.findByTestId("run-manager");
+    expect(mgr.dataset.openRun).toBe("9");
+    await user.click(screen.getByText("run-opened"));
+    await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("?tab=run"));
+    expect(screen.getByTestId("run-manager").dataset.openRun).toBe("");
+  });
+
+  it("숫자가 아닌 run 값은 넘기지 않는다", async () => {
+    renderPage("/projects/1?tab=run&run=abc");
+    expect((await screen.findByTestId("run-manager")).dataset.openRun).toBe("");
+  });
+});
 
 describe("ProjectPage", () => {
   it("프로젝트 이름을 표시한다", async () => {

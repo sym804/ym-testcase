@@ -3,6 +3,7 @@
  * 실행: npx playwright test e2e/capture-readme.spec.ts --retries=0
  */
 import { test, expect, type Page } from "@playwright/test";
+import { projectLink } from "./nav";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -76,8 +77,8 @@ test("README + 매뉴얼 스크린샷 (ymseo_test)", async ({ page, request }) =
   await page.screenshot({ path: path.join(SAVE_DIR, "project_list.png") });
   await page.screenshot({ path: path.join(MANUAL_DIR, "04_project_list_overview.png") });
 
-  // 05. 프로젝트 카드 (스크롤)
-  await page.evaluate(() => window.scrollTo(0, 600));
+  // 05. 프로젝트 표 (SYM-225 전에는 카드 목록이었다)
+  await page.getByRole("table", { name: "프로젝트" }).evaluate((el) => (el.closest("section") ?? el).scrollIntoView({ block: "start" }));
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(MANUAL_DIR, "05_project_list_cards.png") });
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -93,7 +94,7 @@ test("README + 매뉴얼 스크린샷 (ymseo_test)", async ({ page, request }) =
   }
 
   // ymseo_test 프로젝트 진입
-  await page.locator("h3").filter({ hasText: "ymseo_test" }).first().click();
+  await projectLink(page, "ymseo_test").first().click();
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(3000);
 
@@ -204,7 +205,7 @@ test("README + 매뉴얼 스크린샷 (ymseo_test)", async ({ page, request }) =
   await page.waitForTimeout(2000);
   await page.screenshot({ path: path.join(MANUAL_DIR, "20_dark_mode_project.png") });
 
-  await page.locator("h3").filter({ hasText: "ymseo_test" }).first().click();
+  await projectLink(page, "ymseo_test").first().click();
   await page.waitForTimeout(2000);
   await page.getByRole("button", { name: "대시보드" }).click();
   await page.waitForTimeout(2000);

@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
+import { projectLink } from "./nav";
 
 // 일반 사용자(시스템 역할 user)가 프로젝트를 만들고, 시트 트리의 복사 버튼으로 시트를 TC 째 복사한다.
 // CI 의 E2E 백엔드는 AUTH_APPROVAL=personal 이라 이메일 가입은 승인 대기가 된다. 관리자가 승인한다.
@@ -42,7 +43,7 @@ test("일반 사용자가 프로젝트를 만들고 시트를 TC 째 복사한�
     await page.getByText("+ 새 프로젝트").click();
     await page.getByPlaceholder("프로젝트 이름").fill(projectName);
     await page.getByRole("button", { name: "생성" }).click();
-    const card = page.locator("h3").filter({ hasText: projectName });
+    const card = projectLink(page, projectName);
     await expect(card).toBeVisible({ timeout: 10000 });
 
     // 2. 시트와 TC 는 API 로 준비한다(이 테스트가 보는 것은 복사 버튼)

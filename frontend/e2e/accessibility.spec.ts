@@ -6,6 +6,7 @@
  * DOM 때문에 우리가 고칠 수 없는 항목에서 계속 빨개진다.
  */
 import AxeBuilder from "@axe-core/playwright";
+import { projectLink } from "./nav";
 import { expect, test, type Page } from "@playwright/test";
 
 const PASSWORD = "test1234";
@@ -110,7 +111,7 @@ test.describe("접근성", () => {
     await page.getByRole("button", { name: "로그인" }).click();
     await expect(page).toHaveURL(/\/projects/);
 
-    await page.locator("h3").filter({ hasText: name }).click();
+    await projectLink(page, name).click();
     await expect(page.locator(".ag-header-cell").first()).toBeVisible({ timeout: 20000 });
 
     const violations = await scan(page);

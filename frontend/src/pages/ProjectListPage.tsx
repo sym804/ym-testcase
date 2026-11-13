@@ -1,40 +1,56 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { projectsApi, overviewApi } from "../api";
 import { useAuth } from "../contexts/AuthContext";
-import type { Project } from "../types";
 import { UserRole } from "../types";
 import toast from "react-hot-toast";
 import Header from "../components/Header";
 
-interface ProjectSummary {
-  id: number;
+/** 수행 하나의 요약. 수치는 지금 남은 TC 기준이다(SYM-225). */
+interface RunSummary {
+  project_id: number;
+  project_name: string;
+  run_id: number;
   name: string;
+  round: number;
+  version: string | null;
+  environment: string | null;
+  status: string;
+  created_at: string;
+  completed_at: string | null;
   total: number;
+  /** NS 가 아닌 결과 행 */
+  executed: number;
   pass: number;
   fail: number;
   block: number;
   na: number;
-  not_started: number;
   progress: number;
   /** 판정(PASS/FAIL/BLOCK)이 없으면 null (SYM-133) */
   pass_rate: number | null;
 }
 
+interface ProjectRow {
+  id: number;
+  name: string;
+  description: string | null;
+  is_private: boolean;
+  created_at: string;
+  active_tc: number;
+  in_progress: RunSummary[];
+  last_completed: RunSummary | null;
+}
+
 interface OverviewData {
   summary: {
     total_projects: number;
-    total_tc: number;
-    pass: number;
-    fail: number;
-    block: number;
-    na: number;
-    not_started: number;
-    progress: number;
-    pass_rate: number | null;
+    active_tc: number;
+    in_progress_runs: number;
+    in_progress_fail_block: number;
   };
-  projects: ProjectSummary[];
+  active_runs: RunSummary[];
+  projects: ProjectRow[];
 }
 
 function formatPassRate(rate: number | null) {
@@ -45,8 +61,9 @@ const RESULT_COLORS = {
   pass: "var(--color-pass)",
   fail: "var(--color-fail)",
   block: "var(--color-block)",
-  na: "#6B7280",
-  not_started: "#D1D5DB",
+  // 테마 변수. 고정색이면 다크에서 미수행 막대가 하얗게 튀고, N/A 와 미수행이 같은 회색이 된다.
+  na: "var(--color-na)",
+  not_started: "var(--color-ns-accent)",
 };
 
 /** 값이 없을 때는 합격 색을 칠하지 않는다 */
@@ -54,14 +71,19 @@ function passRateColor(rate: number | null) {
   return rate == null ? "var(--text-secondary)" : RESULT_COLORS.pass;
 }
 
-function ProgressBar({ data, noTcLabel }: { data: { pass: number; fail: number; block: number; na: number; not_started: number; total: number }; noTcLabel?: string }) {
-  if (data.total === 0) return <div style={s.barEmpty}>{noTcLabel || "No TC"}</div>;
+/** 수행 화면을 그 수행이 열린 채로 연다(TestRunManager 가 ?run= 을 읽는다). */
+function runHref(r: Pick<RunSummary, "project_id" | "run_id">) {
+  return `/projects/${r.project_id}?tab=run&run=${r.run_id}`;
+}
+
+function ProgressBar({ run, noTcLabel }: { run: RunSummary; noTcLabel: string }) {
+  if (run.total === 0) return <div style={s.barEmpty}>{noTcLabel}</div>;
   const segments = [
-    { key: "pass", val: data.pass, color: RESULT_COLORS.pass },
-    { key: "fail", val: data.fail, color: RESULT_COLORS.fail },
-    { key: "block", val: data.block, color: RESULT_COLORS.block },
-    { key: "na", val: data.na, color: RESULT_COLORS.na },
-    { key: "ns", val: data.not_started, color: RESULT_COLORS.not_started },
+    { key: "pass", val: run.pass, color: RESULT_COLORS.pass },
+    { key: "fail", val: run.fail, color: RESULT_COLORS.fail },
+    { key: "block", val: run.block, color: RESULT_COLORS.block },
+    { key: "na", val: run.na, color: RESULT_COLORS.na },
+    { key: "ns", val: run.total - run.executed, color: RESULT_COLORS.not_started },
   ];
   return (
     <div style={s.barTrack}>
@@ -69,12 +91,7 @@ function ProgressBar({ data, noTcLabel }: { data: { pass: number; fail: number; 
         seg.val > 0 ? (
           <div
             key={seg.key}
-            style={{
-              width: `${(seg.val / data.total) * 100}%`,
-              backgroundColor: seg.color,
-              height: "100%",
-              transition: "width 0.3s",
-            }}
+            style={{ width: `${(seg.val / run.total) * 100}%`, backgroundColor: seg.color, height: "100%" }}
             title={`${seg.key.toUpperCase()}: ${seg.val}`}
           />
         ) : null
@@ -87,7 +104,6 @@ export default function ProjectListPage() {
   const { user } = useAuth();
   const { t, i18n } = useTranslation("project");
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -96,14 +112,11 @@ export default function ProjectListPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
 
+  // 프로젝트 목록과 수치를 한 번에 받는다. 따로 받으면 두 응답 사이에 프로젝트가 생기거나
+  // 지워졌을 때 표와 수치가 어긋난다.
   const loadData = async () => {
     try {
-      const [projList, ov] = await Promise.all([
-        projectsApi.list(),
-        overviewApi.get(),
-      ]);
-      setProjects(projList);
-      setOverview(ov);
+      setOverview(await overviewApi.get());
     } catch (err) {
       console.error(err);
       toast.error(t("loadFailed"));
@@ -115,6 +128,16 @@ export default function ProjectListPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const fmtDate = (v: string | null | undefined) => {
+    if (!v) return "-";
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? "-" : d.toLocaleDateString(i18n.language === "ko" ? "ko-KR" : "en-US");
+  };
+  const runLabel = (r: RunSummary) => `${r.name} · ${t("roundN", { count: r.round })}`;
+  // 응답 모양이 어긋나도(옛 서버, 부분 응답) 화면이 렌더 오류로 죽지 않게 빈 목록으로 둔다
+  const projects = overview?.projects ?? [];
+  const activeRuns = overview?.active_runs ?? [];
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,8 +164,7 @@ export default function ProjectListPage() {
     }
   };
 
-  const toggleSelect = (id: number, e?: { stopPropagation?: () => void }) => {
-    e?.stopPropagation?.();
+  const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) { next.delete(id); } else { next.add(id); }
@@ -187,201 +209,196 @@ export default function ProjectListPage() {
     <div style={{ minHeight: "100vh", backgroundColor: "var(--bg-page)" }}>
       <Header />
       <div style={s.container}>
-
-        {/* ── 전체 대시보드 ── */}
-        {!loading && sm && (
-          <section style={s.section}>
-            <h2 style={s.sectionTitle}>{t("overview")}</h2>
-
-            {/* Summary cards */}
-            <div style={s.summaryGrid}>
-              <div style={s.summaryCard}>
-                <div style={s.summaryLabel}>{t("totalProjects")}</div>
-                <div style={s.summaryValue}>{sm.total_projects}</div>
-              </div>
-              <div style={s.summaryCard}>
-                <div style={s.summaryLabel}>{t("totalTC")}</div>
-                <div style={s.summaryValue}>{sm.total_tc}</div>
-              </div>
-              <div style={s.summaryCard}>
-                <div style={s.summaryLabel}>{t("progress")}</div>
-                <div style={{ ...s.summaryValue, color: "var(--accent)" }}>{sm.progress}%</div>
-              </div>
-              <div style={s.summaryCard}>
-                <div style={s.summaryLabel}>{t("passRate")}</div>
-                <div style={{ ...s.summaryValue, color: passRateColor(sm.pass_rate) }}>{formatPassRate(sm.pass_rate)}</div>
-              </div>
-            </div>
-
-            {/* Overall bar */}
-            <div style={s.overallBar}>
-              <div style={s.barLabelRow}>
-                <span style={{ ...s.legend, color: RESULT_COLORS.pass }}>PASS {sm.pass}</span>
-                <span style={{ ...s.legend, color: RESULT_COLORS.fail }}>FAIL {sm.fail}</span>
-                <span style={{ ...s.legend, color: RESULT_COLORS.block }}>BLOCK {sm.block}</span>
-                <span style={{ ...s.legend, color: RESULT_COLORS.na }}>N/A {sm.na}</span>
-                <span style={{ ...s.legend, color: "var(--text-secondary)" }}>{t("notStarted")} {sm.not_started}</span>
-              </div>
-              <ProgressBar data={{ ...sm, total: sm.total_tc }} noTcLabel={t("noTC")} />
-            </div>
-
-            {/* 프로젝트 추가/삭제 버튼. 생성은 로그인한 누구나, 일괄 삭제는 관리자만 */}
-            {user && (
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
-                {isAdmin && selectedIds.size > 0 && (
-                  <button style={s.deleteBtn} onClick={handleBulkDelete} disabled={deleting}>
-                    {deleting ? t("common:deleting") : t("deleteCount", { count: selectedIds.size })}
-                  </button>
-                )}
-                <button style={s.newBtn} onClick={() => setShowModal(true)}>
-                  {t("newProject")}
-                </button>
-              </div>
-            )}
-
-            {/* Per-project table */}
-            {overview.projects.length > 0 && (
-              <>
-              <div style={s.tableWrap}>
-                <table style={s.table}>
-                  <thead>
-                    <tr>
-                      {isAdmin && (
-                        <th style={{ ...s.th, width: 36, textAlign: "center" }}>
-                          <input
-                            type="checkbox"
-                            aria-label={t("common:selectAll")}
-                            checked={overview.projects.length > 0 && overview.projects.every((p) => selectedIds.has(p.id))}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedIds(new Set(overview.projects.map((p) => p.id)));
-                              } else {
-                                setSelectedIds(new Set());
-                              }
-                            }}
-                            style={{ width: 15, height: 15, cursor: "pointer" }}
-                          />
-                        </th>
-                      )}
-                      <th style={s.th}>{t("table.project")}</th>
-                      <th style={{ ...s.th, ...s.thNum }}>TC</th>
-                      <th style={{ ...s.th, ...s.thNum }}>PASS</th>
-                      <th style={{ ...s.th, ...s.thNum }}>FAIL</th>
-                      <th style={{ ...s.th, ...s.thNum }}>BLOCK</th>
-                      <th style={{ ...s.th, ...s.thNum }}>N/A</th>
-                      <th style={{ ...s.th, ...s.thNum }}>{t("notStarted")}</th>
-                      <th style={{ ...s.th, width: 200 }}>{t("table.progress")}</th>
-                      <th style={{ ...s.th, ...s.thNum }}>Pass Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {overview.projects.map((p) => (
-                      <tr
-                        key={p.id}
-                        style={{
-                          ...s.tr,
-                          backgroundColor: selectedIds.has(p.id) ? "rgba(45,74,122,0.08)" : undefined,
-                        }}
-                        onClick={() => navigate(`/projects/${p.id}`)}
-                      >
-                        {isAdmin && (
-                          <td style={{ ...s.td, textAlign: "center" as const }} onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }}>
-                            <input
-                              type="checkbox"
-                              aria-label={t("common:selectRow")}
-                              checked={selectedIds.has(p.id)}
-                              onChange={() => {}}
-                              style={{ width: 15, height: 15, cursor: "pointer" }}
-                            />
-                          </td>
-                        )}
-                        <td style={s.tdName}>{p.name}</td>
-                        <td style={s.tdNum}>{p.total}</td>
-                        <td style={{ ...s.tdNum, color: RESULT_COLORS.pass }}>{p.pass}</td>
-                        <td style={{ ...s.tdNum, color: RESULT_COLORS.fail }}>{p.fail}</td>
-                        <td style={{ ...s.tdNum, color: RESULT_COLORS.block }}>{p.block}</td>
-                        <td style={{ ...s.tdNum, color: RESULT_COLORS.na }}>{p.na}</td>
-                        <td style={s.tdNum}>{p.not_started}</td>
-                        <td style={s.td}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <ProgressBar data={p} noTcLabel={t("noTC")} />
-                            <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{p.progress}%</span>
-                          </div>
-                        </td>
-                        <td style={{ ...s.tdNum, color: passRateColor(p.pass_rate), fontWeight: 700 }}>
-                          {formatPassRate(p.pass_rate)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              </>
-            )}
-          </section>
-        )}
-
-        {/* ── 프로젝트 목록 ── */}
-        <section style={s.section}>
-          <h2 style={{ ...s.sectionTitle, marginBottom: 16 }}>{t("projects")}</h2>
-
-          {loading ? (
-            <div style={s.loading}>{t("common:loadingData")}</div>
-          ) : projects.length === 0 ? (
-            <div style={s.empty}>{t("noProjects")}</div>
-          ) : (
-            <div style={s.grid}>
-              {projects.map((p) => {
-                const ps = overview?.projects.find((x) => x.id === p.id);
-                return (
-                  <div
-                    key={p.id}
-                    role="button"
-                    tabIndex={0}
-                    style={s.card}
-                    onClick={() => navigate(`/projects/${p.id}`)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/projects/${p.id}`); } }}
-                    onMouseEnter={(e) => {
-                      const el = e.currentTarget as HTMLDivElement;
-                      el.style.borderTopColor = "var(--accent)";
-                      el.style.borderLeftColor = "var(--accent)";
-                      el.style.borderRightColor = "var(--accent)";
-                      el.style.borderBottomColor = "var(--accent)";
-                    }}
-                    onMouseLeave={(e) => {
-                      const el = e.currentTarget as HTMLDivElement;
-                      el.style.borderTopColor = "";
-                      el.style.borderLeftColor = "";
-                      el.style.borderRightColor = "";
-                      el.style.borderBottomColor = "";
-                    }}
-                  >
-                    <div style={s.cardAccent} />
-                    <h3 style={s.cardTitle}>{p.name}</h3>
-                    <p style={s.cardDesc}>{p.description || t("noDescription")}</p>
-                    {ps && (
-                      <div style={s.cardStats}>
-                        <ProgressBar data={ps} noTcLabel={t("noTC")} />
-                        <div style={s.cardStatRow}>
-                          <span>TC {ps.total}</span>
-                          <span style={{ color: RESULT_COLORS.pass }}>P {ps.pass}</span>
-                          <span style={{ color: RESULT_COLORS.fail }}>F {ps.fail}</span>
-                          <span style={{ color: "#64748B" }}>{ps.progress}%</span>
-                        </div>
-                      </div>
-                    )}
-                    <div style={s.cardDate}>
-                      {(() => {
-                        const d = new Date(p.created_at);
-                        return isNaN(d.getTime()) ? "-" : d.toLocaleDateString(i18n.language === "ko" ? "ko-KR" : "en-US");
-                      })()}
+        {loading ? (
+          <div style={s.loading}>{t("common:loadingData")}</div>
+        ) : (
+          <>
+            {/* ── 요약: 개수만 센다. 서로 다른 수행을 섞어 더한 진행률 · 합격률은 뜻이 없어 뺐다 ── */}
+            {sm && (
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>{t("overview")}</h2>
+                <div style={s.summaryGrid}>
+                  <div style={s.summaryCard}>
+                    <div style={s.summaryLabel}>{t("totalProjects")}</div>
+                    <div style={s.summaryValue}>{sm.total_projects}</div>
+                  </div>
+                  <div style={s.summaryCard}>
+                    <div style={s.summaryLabel}>{t("activeTC")}</div>
+                    <div style={s.summaryValue}>{sm.active_tc}</div>
+                  </div>
+                  <div style={s.summaryCard}>
+                    <div style={s.summaryLabel}>{t("inProgressRuns")}</div>
+                    <div style={{ ...s.summaryValue, color: "var(--accent)" }}>{sm.in_progress_runs}</div>
+                  </div>
+                  <div style={s.summaryCard}>
+                    <div style={s.summaryLabel}>{t("inProgressFailBlock")}</div>
+                    <div style={{ ...s.summaryValue, color: sm.in_progress_fail_block > 0 ? RESULT_COLORS.fail : "var(--text-primary)" }}>
+                      {sm.in_progress_fail_block}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+                </div>
+              </section>
+            )}
+
+            {/* ── 진행 중인 수행: 프로젝트를 가로질러 지금 돌고 있는 것 ── */}
+            <section style={s.section}>
+              <h2 style={s.sectionTitle}>{t("activeRuns")}</h2>
+              {activeRuns.length === 0 ? (
+                <div style={s.emptySmall}>{t("noActiveRuns")}</div>
+              ) : (
+                <div style={s.tableWrap}>
+                  <table style={s.table} aria-label={t("activeRuns")}>
+                    <thead>
+                      <tr>
+                        <th style={s.th}>{t("table.project")}</th>
+                        <th style={s.th}>{t("table.run")}</th>
+                        <th style={s.th}>{t("table.versionEnv")}</th>
+                        <th style={{ ...s.th, width: 200 }}>{t("table.progress")}</th>
+                        <th style={s.thNum}>{t("table.executed")}</th>
+                        <th style={s.thNum}>FAIL</th>
+                        <th style={s.thNum}>BLOCK</th>
+                        <th style={s.thNum}>{t("table.passRate")}</th>
+                        <th style={s.thNum}>{t("table.startedAt")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeRuns.map((r) => (
+                        <tr key={r.run_id} style={s.tr} onClick={() => navigate(runHref(r))}>
+                          <td style={s.td}>{r.project_name}</td>
+                          <td style={s.tdName}>
+                            {/* 링크라서 키보드로도 연다. 행 클릭은 마우스용 보조 */}
+                            <Link to={runHref(r)} style={s.link} onClick={(e) => e.stopPropagation()}>
+                              {runLabel(r)}
+                            </Link>
+                          </td>
+                          <td style={s.tdSub}>{[r.version, r.environment].filter(Boolean).join(" · ") || "-"}</td>
+                          <td style={s.td}>
+                            <div style={s.barCell}>
+                              <ProgressBar run={r} noTcLabel={t("noTC")} />
+                              <span style={s.barPct}>{r.progress}%</span>
+                            </div>
+                          </td>
+                          <td style={s.tdNum}>{r.executed}/{r.total}</td>
+                          <td style={{ ...s.tdNum, color: r.fail ? RESULT_COLORS.fail : undefined }}>{r.fail}</td>
+                          <td style={{ ...s.tdNum, color: r.block ? RESULT_COLORS.block : undefined }}>{r.block}</td>
+                          <td style={{ ...s.tdNum, color: passRateColor(r.pass_rate) }}>{formatPassRate(r.pass_rate)}</td>
+                          <td style={s.tdNumSub}>{fmtDate(r.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/* ── 프로젝트: 카드 목록과 수치 표를 하나로 합쳤다 ── */}
+            <section style={s.section}>
+              <h2 style={s.sectionTitle}>{t("projects")}</h2>
+              {/* 프로젝트 추가/삭제 버튼은 표 바로 위. 생성은 로그인한 누구나, 일괄 삭제는 관리자만 */}
+              {user && (
+                <div style={s.actions}>
+                  {isAdmin && selectedIds.size > 0 && (
+                    <button style={s.deleteBtn} onClick={handleBulkDelete} disabled={deleting}>
+                      {deleting ? t("common:deleting") : t("deleteCount", { count: selectedIds.size })}
+                    </button>
+                  )}
+                  <button style={s.newBtn} onClick={() => setShowModal(true)}>
+                    {t("newProject")}
+                  </button>
+                </div>
+              )}
+              {projects.length === 0 ? (
+                <div style={s.empty}>{t("noProjects")}</div>
+              ) : (
+                <div style={s.tableWrap}>
+                  <table style={s.table} aria-label={t("projects")}>
+                    <thead>
+                      <tr>
+                        {isAdmin && (
+                          <th style={{ ...s.th, width: 36, textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              aria-label={t("common:selectAll")}
+                              checked={projects.length > 0 && projects.every((p) => selectedIds.has(p.id))}
+                              onChange={(e) => setSelectedIds(e.target.checked ? new Set(projects.map((p) => p.id)) : new Set())}
+                              style={s.check}
+                            />
+                          </th>
+                        )}
+                        <th style={s.th}>{t("table.project")}</th>
+                        <th style={s.thNum}>{t("activeTC")}</th>
+                        <th style={{ ...s.th, minWidth: 220 }}>{t("table.inProgress")}</th>
+                        <th style={{ ...s.th, minWidth: 220 }}>{t("table.lastCompleted")}</th>
+                        <th style={s.thNum}>{t("table.createdAt")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projects.map((p) => {
+                        const cur = p.in_progress[0];
+                        const last = p.last_completed;
+                        return (
+                          <tr
+                            key={p.id}
+                            style={{ ...s.tr, backgroundColor: selectedIds.has(p.id) ? "rgba(45,74,122,0.08)" : undefined }}
+                            onClick={() => navigate(`/projects/${p.id}`)}
+                          >
+                            {isAdmin && (
+                              <td style={{ ...s.td, textAlign: "center" as const }} onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }}>
+                                <input type="checkbox" aria-label={t("common:selectRow")} checked={selectedIds.has(p.id)} onChange={() => {}} style={s.check} />
+                              </td>
+                            )}
+                            <td style={s.td}>
+                              <Link to={`/projects/${p.id}`} style={{ ...s.link, fontWeight: 600 }} onClick={(e) => e.stopPropagation()}>
+                                {p.name}
+                              </Link>
+                              <div style={s.desc}>{p.description || t("noDescription")}</div>
+                            </td>
+                            <td style={s.tdNum}>{p.active_tc}</td>
+                            <td style={s.td}>
+                              {cur ? (
+                                <>
+                                  <Link to={runHref(cur)} style={s.runLink} onClick={(e) => e.stopPropagation()}>
+                                    {runLabel(cur)}
+                                  </Link>
+                                  {p.in_progress.length > 1 && (
+                                    <span style={s.more}>{t("moreRuns", { count: p.in_progress.length - 1 })}</span>
+                                  )}
+                                  <div style={s.barCell}>
+                                    <ProgressBar run={cur} noTcLabel={t("noTC")} />
+                                    <span style={s.barPct}>{cur.progress}%</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <span style={s.none}>{t("noRun")}</span>
+                              )}
+                            </td>
+                            <td style={s.td}>
+                              {last ? (
+                                <>
+                                  <Link to={runHref(last)} style={s.runLink} onClick={(e) => e.stopPropagation()}>
+                                    {runLabel(last)}
+                                  </Link>
+                                  <div style={s.lastRow}>
+                                    <span style={{ color: passRateColor(last.pass_rate), fontWeight: 700 }}>{formatPassRate(last.pass_rate)}</span>
+                                    <span style={{ color: last.fail ? RESULT_COLORS.fail : undefined }}>FAIL {last.fail}</span>
+                                    <span>{fmtDate(last.completed_at)}</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <span style={s.none}>{t("noRun")}</span>
+                              )}
+                            </td>
+                            <td style={s.tdNumSub}>{fmtDate(p.created_at)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </div>
 
       {/* Create Modal */}
@@ -441,102 +458,54 @@ export default function ProjectListPage() {
   );
 }
 
+const cell: React.CSSProperties = { padding: "10px 12px", borderBottom: "1px solid var(--border-color)", verticalAlign: "top" };
+const head: React.CSSProperties = {
+  textAlign: "left",
+  padding: "10px 12px",
+  borderBottom: "2px solid var(--border-color)",
+  color: "var(--text-secondary)",
+  fontWeight: 600,
+  whiteSpace: "nowrap",
+  fontSize: 12,
+};
+
 const s: Record<string, React.CSSProperties> = {
   container: { maxWidth: 1200, margin: "0 auto", padding: "24px 24px 48px" },
-  section: { marginBottom: 36 },
+  section: { marginBottom: 32 },
   sectionTitle: { fontSize: 20, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 16px" },
 
   /* Summary cards */
-  summaryGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
-    gap: 14,
-    marginBottom: 16,
-  },
-  summaryCard: {
-    backgroundColor: "var(--bg-card)",
-    borderRadius: 10,
-    padding: "16px 18px",
-    boxShadow: "var(--shadow)",
-  },
+  summaryGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 },
+  summaryCard: { backgroundColor: "var(--bg-card)", borderRadius: 10, padding: "16px 18px", boxShadow: "var(--shadow)" },
   summaryLabel: { fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 },
   summaryValue: { fontSize: 26, fontWeight: 700, color: "var(--text-primary)" },
 
-  /* Overall bar */
-  overallBar: {
-    backgroundColor: "var(--bg-card)",
-    borderRadius: 10,
-    padding: "14px 18px",
-    boxShadow: "var(--shadow)",
-    marginBottom: 16,
-  },
-  barLabelRow: {
-    display: "flex",
-    gap: 16,
-    marginBottom: 8,
-    fontSize: 12,
-    fontWeight: 600,
-  },
-  legend: { fontWeight: 600 },
-  barTrack: {
-    display: "flex",
-    height: 10,
-    borderRadius: 5,
-    overflow: "hidden",
-    backgroundColor: "var(--border-color)",
-  },
+  /* Progress bar */
+  barTrack: { display: "flex", height: 10, borderRadius: 5, overflow: "hidden", backgroundColor: "var(--border-color)", flex: 1, minWidth: 80 },
   barEmpty: { fontSize: 12, color: "var(--text-secondary)" },
+  barCell: { display: "flex", alignItems: "center", gap: 8, marginTop: 4 },
+  barPct: { fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" },
 
-  /* Table */
-  tableWrap: {
-    backgroundColor: "var(--bg-card)",
-    borderRadius: 10,
-    boxShadow: "var(--shadow)",
-    overflow: "auto",
-  },
-  table: { width: "100%", borderCollapse: "collapse" as const, fontSize: 13 },
-  th: {
-    textAlign: "left" as const,
-    padding: "10px 12px",
-    borderBottom: "2px solid var(--border-color)",
-    color: "var(--text-secondary)",
-    fontWeight: 600,
-    whiteSpace: "nowrap" as const,
-    fontSize: 12,
-  },
-  thNum: {
-    textAlign: "right" as const,
-    padding: "10px 12px",
-    borderBottom: "2px solid var(--border-color)",
-    color: "var(--text-secondary)",
-    fontWeight: 600,
-    whiteSpace: "nowrap" as const,
-    fontSize: 12,
-    width: 60,
-  },
+  /* Tables */
+  tableWrap: { backgroundColor: "var(--bg-card)", borderRadius: 10, boxShadow: "var(--shadow)", overflow: "auto" },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
+  th: head,
+  thNum: { ...head, textAlign: "right", width: 60 },
   tr: { cursor: "pointer" },
-  td: { padding: "10px 12px", borderBottom: "1px solid var(--border-color)" },
-  tdName: {
-    padding: "10px 12px",
-    borderBottom: "1px solid var(--border-color)",
-    fontWeight: 600,
-    color: "var(--accent)",
-  },
-  tdNum: {
-    padding: "10px 12px",
-    borderBottom: "1px solid var(--border-color)",
-    textAlign: "right" as const,
-    fontWeight: 600,
-    fontVariantNumeric: "tabular-nums",
-  },
+  td: cell,
+  tdName: { ...cell, fontWeight: 600 },
+  tdSub: { ...cell, color: "var(--text-secondary)", whiteSpace: "nowrap" },
+  tdNum: { ...cell, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" },
+  tdNumSub: { ...cell, textAlign: "right", color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" },
+  link: { color: "var(--accent)", textDecoration: "none" },
+  runLink: { color: "var(--text-primary)", textDecoration: "none", fontWeight: 600 },
+  desc: { fontSize: 12, color: "var(--text-secondary)", marginTop: 2, maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  more: { fontSize: 12, color: "var(--text-secondary)", marginLeft: 6 },
+  none: { color: "var(--text-secondary)" },
+  lastRow: { display: "flex", gap: 10, marginTop: 4, fontSize: 12, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" },
+  check: { width: 15, height: 15, cursor: "pointer" },
 
-  /* Project cards */
-  topRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
+  actions: { display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 },
   newBtn: {
     padding: "8px 18px",
     borderRadius: 8,
@@ -557,47 +526,20 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: "pointer",
   },
-  loading: { textAlign: "center" as const, color: "var(--text-secondary)", padding: 60, fontSize: 16 },
-  empty: { textAlign: "center" as const, color: "var(--text-secondary)", padding: 60, fontSize: 16 },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-    gap: 16,
-  },
-  card: {
+  loading: { textAlign: "center", color: "var(--text-secondary)", padding: 60, fontSize: 16 },
+  empty: { textAlign: "center", color: "var(--text-secondary)", padding: 60, fontSize: 16 },
+  emptySmall: {
     backgroundColor: "var(--bg-card)",
     borderRadius: 10,
-    borderTop: "1px solid var(--border-color)",
-    borderLeft: "1px solid var(--border-color)",
-    borderRight: "1px solid var(--border-color)",
-    borderBottom: "1px solid var(--border-color)",
-    padding: "0 20px 18px",
-    cursor: "pointer",
-    transition: "border-color 0.15s",
-    overflow: "hidden",
-  },
-  cardAccent: {
-    height: 4,
-    backgroundColor: "var(--accent)",
-    margin: "0 -20px",
-    marginBottom: 16,
-  },
-  cardTitle: { fontSize: 16, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 4px" },
-  cardDesc: { fontSize: 13, color: "var(--text-secondary)", margin: "0 0 12px", lineHeight: 1.5 },
-  cardStats: { marginBottom: 10 },
-  cardStatRow: {
-    display: "flex",
-    gap: 10,
-    marginTop: 6,
-    fontSize: 11,
-    fontWeight: 600,
+    boxShadow: "var(--shadow)",
     color: "var(--text-secondary)",
+    padding: "18px 20px",
+    fontSize: 14,
   },
-  cardDate: { fontSize: 11, color: "var(--text-secondary)" },
 
   /* Modal */
   overlay: {
-    position: "fixed" as const,
+    position: "fixed",
     top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: "rgba(0,0,0,0.5)",
     display: "flex",
@@ -614,7 +556,7 @@ const s: Record<string, React.CSSProperties> = {
     boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
   },
   modalTitle: { margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "var(--text-primary)" },
-  modalForm: { display: "flex", flexDirection: "column" as const, gap: 8 },
+  modalForm: { display: "flex", flexDirection: "column", gap: 8 },
   label: { fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginTop: 8 },
   input: {
     padding: "10px 14px",

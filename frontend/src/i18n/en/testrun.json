@@ -3,6 +3,7 @@
   "hidePanel": "Hide panel",
   "showPanel": "Show list",
   "loadFailed": "Failed to load test run list.",
+  "runNotFound": "The linked test run was not found. It may have been deleted or belong to another project.",
   "resultLoadFailed": "Failed to load test results.",
   "noRuns": "No test runs registered.",
   "newRun": "+ Create New Test Run",

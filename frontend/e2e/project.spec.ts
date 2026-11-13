@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { projectLink } from "./nav";
 
 async function login(page: Page) {
   await page.goto("/login");
@@ -15,8 +16,52 @@ test.describe("프로젝트 관리", () => {
 
   test("프로젝트 목록 표시", async ({ page }) => {
     await expect(page.getByText("전체 프로젝트")).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText("전체 TC")).toBeVisible();
-    await expect(page.getByText("Pass Rate").first()).toBeVisible();
+    await expect(page.getByText("활성 TC").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "진행 중인 수행" })).toBeVisible();
+    // 프로젝트가 없으면 표 대신 빈 안내가 나온다(CI 는 빈 DB 에서 시작한다). 영역 제목으로 본다
+    await expect(page.getByRole("heading", { name: "프로젝트", exact: true })).toBeVisible();
+  });
+
+  // SYM-225: 메인 화면의 진행 중 수행 링크로 그 수행이 열린다
+  test("진행 중 수행 링크로 그 수행이 열린다", async ({ page, request }) => {
+    const login = await request.post("/api/auth/login", {
+      data: { username: "admin", password: process.env.TEST_ADMIN_PASSWORD || "test1234" },
+    });
+    expect(login.status(), await login.text()).toBe(200);
+    const h = { Authorization: `Bearer ${(await login.json()).access_token}` };
+    const stamp = Date.now();
+    const name = `E2E_OV_${stamp}`;
+    const runName = `회귀_${stamp}`;
+    const pr = await request.post("/api/projects", { headers: h, data: { name } });
+    expect(pr.status(), await pr.text()).toBe(201);
+    const pid = (await pr.json()).id as number;
+    try {
+      expect((await request.post(`/api/projects/${pid}/testcases/sheets`, { headers: h, data: { name: "S" } })).status()).toBe(200);
+      for (const id of ["OV-1", "OV-2"]) {
+        const r = await request.post(`/api/projects/${pid}/testcases`, { headers: h, data: { tc_id: id, sheet_name: "S", test_steps: "1" } });
+        expect(r.status(), await r.text()).toBe(201);
+      }
+      const rr = await request.post(`/api/projects/${pid}/testruns`, {
+        headers: h, data: { name: runName, version: "1.0", environment: "e2e" },
+      });
+      expect(rr.status(), await rr.text()).toBe(201);
+
+      await page.reload();
+      const link = page.getByRole("table", { name: "진행 중인 수행" }).getByRole("link", { name: `${runName} · 1회차` });
+      await expect(link).toBeVisible({ timeout: 10000 });
+      const row = page.getByRole("table", { name: "프로젝트" }).getByRole("row").filter({ hasText: name });
+      await expect(row).toContainText(`${runName} · 1회차`);
+
+      await link.click();
+      // 수행을 연 뒤 주소의 run 은 지운다(새로고침 때 다시 열지 않게)
+      await expect(page).toHaveURL(new RegExp(`/projects/${pid}\\?tab=run$`), { timeout: 10000 });
+      // 수행을 열었을 때만 보이는 머리글(버전 · 환경)
+      await expect(page.getByText(/버전: 1\.0 \| 환경: e2e/)).toBeVisible({ timeout: 10000 });
+    } finally {
+      // 정리가 실패하면 다음 실행에 프로젝트가 남는다
+      const del = await request.delete(`/api/projects/${pid}`, { headers: h });
+      expect(del.status(), await del.text()).toBeLessThan(300);
+    }
   });
 
   test("새 프로젝트 생성 → 삭제", async ({ page }) => {
@@ -28,7 +73,7 @@ test.describe("프로젝트 관리", () => {
     await page.getByRole("button", { name: "생성" }).click();
 
     // 프로젝트 카드가 렌더링될 때까지 대기 후 클릭
-    const card = page.locator("h3").filter({ hasText: projectName });
+    const card = projectLink(page, projectName);
     await expect(card).toBeVisible({ timeout: 10000 });
     await card.click();
 

@@ -38,6 +38,9 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 interface Props {
   projectId: number;
   project: import("../types").Project;
+  /** 열자마자 고를 수행(메인 화면 링크의 ?run=). 고른 뒤 onRunOpened 를 부른다 */
+  openRunId?: number | null;
+  onRunOpened?: () => void;
 }
 
 const RESULT_OPTIONS = ["", "PASS", "FAIL", "BLOCK", "N/A"];
@@ -57,7 +60,7 @@ function resultCellStyle(params: CellClassParams) {
   return base;
 }
 
-export default function TestRunManager({ projectId, project }: Props) {
+export default function TestRunManager({ projectId, project, openRunId, onRunOpened }: Props) {
   const { t, i18n } = useTranslation("testrun");
   const { t: tcT } = useTranslation("testcase");
   const priorityDisplay = useMemo(() => priorityDisplayMap(tcT), [tcT]);
@@ -68,6 +71,8 @@ export default function TestRunManager({ projectId, project }: Props) {
   const [selectedRun, setSelectedRun] = useState<TestRun | null>(null);
   const [results, setResults] = useState<TestResult[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
+  // 수행 목록을 한 번이라도 받았는지(조회 실패와 "수행 없음" 을 가른다)
+  const [runsLoaded, setRunsLoaded] = useState(false);
   const [loadingResults, setLoadingResults] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -259,9 +264,12 @@ export default function TestRunManager({ projectId, project }: Props) {
 
   const loadRuns = useCallback(async () => {
     setLoadingRuns(true);
+    // 목록을 다시 받는 동안에는 수행 링크를 판정하지 않는다
+    setRunsLoaded(false);
     try {
       const data = await testRunsApi.list(projectId);
       setRuns(data);
+      setRunsLoaded(true);
     } catch {
       toast.error(t("loadFailed"));
     } finally {
@@ -391,6 +399,20 @@ export default function TestRunManager({ projectId, project }: Props) {
 
   useEffect(() => { loadRunDetailRef.current = loadRunDetail; }, [loadRunDetail]);
   useEffect(() => { selectedRunRef.current = selectedRun; }, [selectedRun]);
+
+  // ★메인 화면의 수행 링크(?run=<id>)로 들어오면 그 수행을 연다(SYM-225). 주소는 ProjectPage 가
+  //   읽어 넘기고, 연 뒤 onRunOpened 로 지운다. 남겨 두면 다른 수행을 골랐다가 새로고침했을 때
+  //   링크의 수행으로 되돌아간다.
+  //   ★목록을 받은 뒤에만 판정한다. 조회가 실패했을 때 빈 목록으로 판정하면 있는 수행도 "없음" 으로
+  //   안내하고 링크를 지운다. 실패하면 링크를 남겨 새로고침으로 다시 열 수 있게 둔다.
+  useEffect(() => {
+    if (openRunId == null || !runsLoaded) return;
+    const target = runs.find((r) => r.id === openRunId);
+    if (target) loadRunDetail(target);
+    else toast.error(t("runNotFound"));
+    onRunOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 수행 목록이 온 뒤 한 번만
+  }, [openRunId, runs, runsLoaded]);
 
   // countTick을 의존성에 넣어 그리드 변경 시 재계산
   const getGridRows = useCallback(() => {

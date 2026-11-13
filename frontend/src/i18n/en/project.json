@@ -38,8 +38,24 @@
   },
   "table": {
     "project": "Project",
-    "progress": "Progress"
+    "progress": "Progress",
+    "run": "Run",
+    "versionEnv": "Version·Env",
+    "executed": "Done/Total",
+    "startedAt": "Started",
+    "inProgress": "In progress",
+    "lastCompleted": "Last completed",
+    "createdAt": "Created",
+    "passRate": "Pass rate"
   },
   "deleteAllFailed": "Delete failed. All {{count}} project(s) failed.",
-  "deletePartial": "{{deleted}} deleted, {{failed}} failed."
+  "deletePartial": "{{deleted}} deleted, {{failed}} failed.",
+  "activeTC": "Active TCs",
+  "inProgressRuns": "Runs in progress",
+  "inProgressFailBlock": "FAIL·BLOCK in progress",
+  "activeRuns": "Runs in progress",
+  "noActiveRuns": "No runs in progress.",
+  "roundN": "Round {{count}}",
+  "moreRuns": "+{{count}} more",
+  "noRun": "-"
 }

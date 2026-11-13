@@ -1224,15 +1224,15 @@ class TestDeletedAtFilter:
         assert total_after < total_before
 
     def test_deleted_tc_excluded_from_overview(self):
-        """소프트 삭제된 TC가 overview total_tc에서 제외"""
+        """소프트 삭제된 TC가 overview active_tc에서 제외(SYM-225 전 이름은 total_tc)"""
         if not self.tc_id:
             pytest.skip("TC not created")
         r_before = requests.get(f"{BASE}/api/dashboard/overview", headers=self.h)
-        total_before = r_before.json()["summary"]["total_tc"]
+        total_before = r_before.json()["summary"]["active_tc"]
         # 소프트 삭제
         requests.delete(f"{BASE}/api/projects/{self.pub_id}/testcases/{self.tc_id}", headers=self.h)
         r_after = requests.get(f"{BASE}/api/dashboard/overview", headers=self.h)
-        total_after = r_after.json()["summary"]["total_tc"]
+        total_after = r_after.json()["summary"]["active_tc"]
         assert total_after < total_before
 
     def test_restore_brings_back_tc(self):

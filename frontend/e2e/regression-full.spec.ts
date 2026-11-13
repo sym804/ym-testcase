@@ -3,7 +3,7 @@
  * 체크리스트 192개 TC 중 자동화 가능한 항목 전부 커버
  */
 import { test, expect, type Page } from "@playwright/test";
-import { commit, navigateExpectingRedirect } from "./nav";
+import { commit, navigateExpectingRedirect, projectLink, projectLinks } from "./nav";
 
 const PASSWORD = "test1234";
 
@@ -19,7 +19,7 @@ async function createProject(page: Page, name: string) {
   await page.getByText("+ 새 프로젝트").click();
   await page.getByPlaceholder("프로젝트 이름").fill(name);
   await page.getByRole("button", { name: "생성" }).click();
-  await page.locator("h3").filter({ hasText: name }).click();
+  await projectLink(page, name).click();
   await page.waitForLoadState("networkidle");
 }
 
@@ -147,22 +147,23 @@ test.describe("1. 인증", () => {
 test.describe("2. 프로젝트 목록", () => {
   test.beforeEach(async ({ page }) => { await login(page); });
 
-  test("TC-PL-001: 카드 레이아웃 표시", async ({ page }) => {
+  test("TC-PL-001: 요약 카드 표시", async ({ page }) => {
     await expect(page.getByText("전체 프로젝트")).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText("전체 TC")).toBeVisible();
-    await expect(page.getByText("Pass Rate").first()).toBeVisible();
+    await expect(page.getByText("활성 TC").first()).toBeVisible();
+    await expect(page.getByText("진행 중 수행").first()).toBeVisible();
+    await expect(page.getByText("진행 중 FAIL·BLOCK")).toBeVisible();
   });
 
   test("TC-PL-004: 프로젝트 카드 정보", async ({ page }) => {
     test.skip(!!process.env.CI, "CI 환경에서는 기존 프로젝트 필요");
-    // 카드에 프로젝트 이름이 h3로 표시
-    const cards = page.locator("h3");
+    // 프로젝트 표에 프로젝트 이름이 링크로 표시(SYM-225 전에는 카드의 h3)
+    const cards = projectLinks(page);
     expect(await cards.count()).toBeGreaterThan(0);
   });
 
   test("TC-PL-005: 프로젝트 카드 → 상세 이동", async ({ page }) => {
     test.skip(!!process.env.CI, "CI 환경에서는 기존 프로젝트 필요");
-    const firstCard = page.locator("h3").first();
+    const firstCard = projectLinks(page).first();
     const name = await firstCard.textContent();
     await firstCard.click();
     await expect(page.getByRole("button", { name: "TC 관리" })).toBeVisible({ timeout: 10000 });
@@ -173,9 +174,9 @@ test.describe("2. 프로젝트 목록", () => {
     await page.getByText("+ 새 프로젝트").click();
     await page.getByPlaceholder("프로젝트 이름").fill(name);
     await page.getByRole("button", { name: "생성" }).click();
-    await expect(page.locator("h3").filter({ hasText: name })).toBeVisible({ timeout: 10000 });
+    await expect(projectLink(page, name)).toBeVisible({ timeout: 10000 });
     // 정리
-    await page.locator("h3").filter({ hasText: name }).click();
+    await projectLink(page, name).click();
     await deleteProject(page, name);
   });
 
@@ -208,7 +209,7 @@ test.describe("2. 프로젝트 목록", () => {
     await createProject(page, name);
     await deleteProject(page, name);
     // 삭제 후 목록에서 안 보임
-    const card = page.locator("h3").filter({ hasText: name });
+    const card = projectLink(page, name);
     await expect(card).not.toBeVisible();
   });
 });
@@ -311,7 +312,7 @@ test.describe("4. 프로젝트 상세", () => {
   });
   test.afterEach(async ({ page }) => {
     try { await page.goto("/projects");
-      await page.locator("h3").filter({ hasText: projectName }).click();
+      await projectLink(page, projectName).click();
       await deleteProject(page, projectName);
     } catch { /* ignore */ }
   });
@@ -372,7 +373,7 @@ test.describe("5. TC 관리", () => {
   });
   test.afterEach(async ({ page }) => {
     try { await page.goto("/projects");
-      await page.locator("h3").filter({ hasText: projectName }).click();
+      await projectLink(page, projectName).click();
       await deleteProject(page, projectName);
     } catch { /* ignore */ }
   });

@@ -1,10 +1,21 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import func, case
+"""메인 화면 전체 현황 (SYM-225)
 
-from database import get_db
-from models import User, UserRole, Project, ProjectMember, TestCase, TestRun, TestResult, TestResultValue
+진행 중 수행과 최근 완료 수행을 따로 센다. 예전에는 프로젝트마다 id 가 가장 큰 수행 하나로
+세어, 새 회차를 만들기만 해도 그 프로젝트가 진행률 0% 로 떨어지고 어느 수행의 숫자인지도
+보이지 않았다. 서로 다른 수행을 섞어 더한 진행률 · 합격률도 뜻이 없어 요약에서 뺐다.
+
+수치는 지금 남은 TC 기준이다(지운 TC 제외). 대시보드의 수행 보기와 같은 기준이다
+(services/tc_snapshot.py 머리 주석). 합격률은 판정(PASS/FAIL/BLOCK)이 없으면 None(SYM-133).
+"""
+from fastapi import APIRouter, Depends
+from sqlalchemy import and_, case, func, or_
+from sqlalchemy.orm import Session
+
 from auth import get_current_user
+from database import get_db
+from models import (
+    Project, ProjectMember, TestCase, TestResult, TestResultValue, TestRun, TestRunStatus, User, UserRole,
+)
 
 router = APIRouter(
     prefix="/api/dashboard",
@@ -12,159 +23,136 @@ router = APIRouter(
 )
 
 
+def visible_projects(db: Session, user: User) -> list[Project]:
+    """이 사용자가 메인 화면에서 볼 프로젝트. 관리자 · QA 매니저는 전부, 그 밖은 공개 + 멤버."""
+    q = db.query(Project)
+    if user.role not in (UserRole.admin, UserRole.qa_manager):
+        member_ids = db.query(ProjectMember.project_id).filter(ProjectMember.user_id == user.id)
+        q = q.filter(or_(Project.is_private.is_(False), Project.id.in_(member_ids)))
+    # 최근에 만든 프로젝트가 위다(프로젝트 목록 API 와 같은 순서).
+    return q.order_by(Project.created_at.desc(), Project.id.desc()).all()
+
+
+def _run_stats(db: Session, run_ids: list[int]) -> dict[int, dict]:
+    """수행별 결과 집계(한 번). 지금 남은 TC 의 결과 행만 센다."""
+    if not run_ids:
+        return {}
+    is_ = lambda v: func.sum(case((TestResult.result == v, 1), else_=0))  # noqa: E731
+    rows = (
+        db.query(
+            TestResult.test_run_id,
+            func.count(TestResult.id),
+            is_(TestResultValue.PASS), is_(TestResultValue.FAIL),
+            is_(TestResultValue.BLOCK), is_(TestResultValue.NA), is_(TestResultValue.NS),
+        )
+        .join(TestCase, TestCase.id == TestResult.test_case_id)
+        .filter(TestResult.test_run_id.in_(run_ids), TestCase.deleted_at.is_(None))
+        .group_by(TestResult.test_run_id)
+        .all()
+    )
+    out = {}
+    for run_id, total, p, f, b, na, ns in rows:
+        out[run_id] = {"total": int(total), "pass": int(p or 0), "fail": int(f or 0),
+                       "block": int(b or 0), "na": int(na or 0), "ns": int(ns or 0)}
+    return out
+
+
+def _run_summary(run: TestRun, stats: dict | None, project_name: str) -> dict:
+    s = stats or {"total": 0, "pass": 0, "fail": 0, "block": 0, "na": 0, "ns": 0}
+    total = s["total"]
+    executed = total - s["ns"]
+    judged = s["pass"] + s["fail"] + s["block"]
+    return {
+        "project_id": run.project_id,
+        "project_name": project_name,
+        "run_id": run.id,
+        "name": run.name,
+        "round": run.round or 1,
+        "version": run.version,
+        "environment": run.environment,
+        "status": run.status.value if hasattr(run.status, "value") else run.status,
+        "created_at": run.created_at,
+        "completed_at": run.completed_at,
+        "total": total,
+        "executed": executed,
+        "pass": s["pass"],
+        "fail": s["fail"],
+        "block": s["block"],
+        "na": s["na"],
+        # 분모는 그 수행이 담은 행 수다. 시트를 골라 만든 수행도 다 하면 100% 다.
+        "progress": round(executed / total * 100, 1) if total else 0.0,
+        "pass_rate": round(s["pass"] / judged * 100, 1) if judged else None,
+    }
+
+
 @router.get("/overview")
 def global_overview(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Return aggregated dashboard across all projects the user can access."""
-    all_projects = db.query(Project).all()
-
-    if current_user.role in (UserRole.admin, UserRole.qa_manager):
-        projects = all_projects
-    else:
-        member_project_ids = {
-            m.project_id
-            for m in db.query(ProjectMember.project_id)
-            .filter(ProjectMember.user_id == current_user.id)
-            .all()
-        }
-        projects = [
-            p for p in all_projects
-            if not p.is_private
-            or p.id in member_project_ids
-        ]
-
+    projects = visible_projects(db, current_user)
     project_ids = [p.id for p in projects]
-    if not project_ids:
-        return {
-            "summary": {
-                "total_projects": 0, "total_tc": 0,
-                "pass": 0, "fail": 0, "block": 0, "na": 0, "not_started": 0,
-                "progress": 0.0, "pass_rate": None,
-            },
-            "projects": [],
-        }
+    names = {p.id: p.name for p in projects}
 
-    # 1) 프로젝트별 활성 TC 수 - 1회 SQL
     tc_counts = dict(
         db.query(TestCase.project_id, func.count(TestCase.id))
         .filter(TestCase.project_id.in_(project_ids), TestCase.deleted_at.is_(None))
         .group_by(TestCase.project_id)
         .all()
-    )
+    ) if project_ids else {}
 
-    # 2) 프로젝트별 최신 TestRun ID - 서브쿼리 1회
-    latest_run_sq = (
-        db.query(
-            TestRun.project_id,
-            func.max(TestRun.id).label("max_run_id"),
-        )
-        .filter(TestRun.project_id.in_(project_ids))
-        .group_by(TestRun.project_id)
-        .subquery()
-    )
-
-    # 3) 최신 런의 결과를 SQL CASE 집계 - 1회 SQL
-    # 활성 TC만 집계하기 위해 TestCase join + deleted_at IS NULL
-    result_rows = (
-        db.query(
-            TestRun.project_id,
-            func.sum(case((TestResult.result == TestResultValue.PASS, 1), else_=0)).label("p"),
-            func.sum(case((TestResult.result == TestResultValue.FAIL, 1), else_=0)).label("f"),
-            func.sum(case((TestResult.result == TestResultValue.BLOCK, 1), else_=0)).label("b"),
-            func.sum(case((TestResult.result == TestResultValue.NA, 1), else_=0)).label("na"),
-            func.count(TestResult.id).label("with_result"),
-        )
-        .join(latest_run_sq, TestRun.id == latest_run_sq.c.max_run_id)
-        .join(TestResult, TestResult.test_run_id == TestRun.id)
-        .join(TestCase, TestCase.id == TestResult.test_case_id)
-        .filter(TestCase.deleted_at.is_(None))
-        .group_by(TestRun.project_id)
+    active = (
+        db.query(TestRun)
+        .filter(TestRun.project_id.in_(project_ids), TestRun.status == TestRunStatus.in_progress)
+        .order_by(TestRun.created_at.desc(), TestRun.id.desc())
         .all()
-    )
-    # 최신 런이 있는 프로젝트. 결과 행이 0 이면 아래 집계에는 안 잡히므로 따로 둔다.
-    latest_run_project_ids = {
-        row[0] for row in db.query(TestRun.project_id)
-        .join(latest_run_sq, TestRun.id == latest_run_sq.c.max_run_id).all()
-    }
+    ) if project_ids else []
 
-    stats_by_project = {}
-    for row in result_rows:
-        stats_by_project[row.project_id] = {
-            "pass": row.p or 0, "fail": row.f or 0,
-            "block": row.b or 0, "na": row.na or 0,
-            "with_result": row.with_result or 0,
-        }
+    # 프로젝트별 마지막 완료 수행. 만든 순서가 아니라 완료한 시각으로 고른다(같으면 id 가 큰 것).
+    last_done: dict[int, TestRun] = {}
+    if project_ids:
+        ranked = (
+            db.query(
+                TestRun.id,
+                func.row_number().over(
+                    partition_by=TestRun.project_id,
+                    order_by=(TestRun.completed_at.desc().nulls_last(), TestRun.id.desc()),
+                ).label("rk"),
+            )
+            .filter(TestRun.project_id.in_(project_ids), TestRun.status == TestRunStatus.completed)
+            .subquery()
+        )
+        for run in db.query(TestRun).join(ranked, and_(TestRun.id == ranked.c.id, ranked.c.rk == 1)).all():
+            last_done[run.project_id] = run
 
-    total_tc = 0
-    total_pass = 0
-    total_fail = 0
-    total_block = 0
-    total_na = 0
-    total_not_started = 0
+    stats = _run_stats(db, [r.id for r in active] + [r.id for r in last_done.values()])
 
-    project_summaries = []
+    active_runs = [_run_summary(r, stats.get(r.id), names[r.project_id]) for r in active]
+    by_project: dict[int, list[dict]] = {}
+    for r in active_runs:
+        by_project.setdefault(r["project_id"], []).append(r)
 
-    for proj in projects:
-        s = stats_by_project.get(proj.id)
-        # 진행 수치는 최신 런에서 나온다. 분모도 그 런이 담은 행 수여야 한다.
-        # 프로젝트 전체 TC 수를 분모로 쓰면, 시트를 골라 만든 런은 전부 수행해도
-        # 미실행이 남은 것처럼 보인다.
-        # ★"런이 아예 없다" 와 "런은 있는데 결과 행이 0 이다" 는 다르다. 후자에서
-        #   전체 TC 로 되돌리면 빈 런이 전부 미실행으로 보인다.
-        if proj.id in latest_run_project_ids:
-            count = s["with_result"] if s else 0
-        else:
-            count = tc_counts.get(proj.id, 0)
-        total_tc += count
-
-        if s:
-            p, f, b, na = s["pass"], s["fail"], s["block"], s["na"]
-            ns = max(0, count - (p + f + b + na))
-        else:
-            p, f, b, na, ns = 0, 0, 0, 0, count
-
-        total_pass += p
-        total_fail += f
-        total_block += b
-        total_na += na
-        total_not_started += ns
-
-        done = count - ns
-        progress = round(done / count * 100, 1) if count > 0 else 0.0
-        # 판정(PASS/FAIL/BLOCK)이 없으면 값 없음. 0% 로 내면 새 회차를 만드는 순간 폭락처럼 보인다(SYM-133)
-        pass_rate = round(p / (p + f + b) * 100, 1) if (p + f + b) > 0 else None
-
-        project_summaries.append({
-            "id": proj.id,
-            "name": proj.name,
-            "total": count,
-            "pass": p,
-            "fail": f,
-            "block": b,
-            "na": na,
-            "not_started": ns,
-            "progress": progress,
-            "pass_rate": pass_rate,
+    project_rows = []
+    for p in projects:
+        done = last_done.get(p.id)
+        project_rows.append({
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "is_private": bool(p.is_private),
+            "created_at": p.created_at,
+            "active_tc": tc_counts.get(p.id, 0),
+            "in_progress": by_project.get(p.id, []),
+            "last_completed": _run_summary(done, stats.get(done.id), p.name) if done else None,
         })
-
-    overall_done = total_tc - total_not_started
-    overall_progress = round(overall_done / total_tc * 100, 1) if total_tc > 0 else 0.0
-    executed = total_pass + total_fail + total_block
-    overall_pass_rate = round(total_pass / executed * 100, 1) if executed > 0 else None
 
     return {
         "summary": {
             "total_projects": len(projects),
-            "total_tc": total_tc,
-            "pass": total_pass,
-            "fail": total_fail,
-            "block": total_block,
-            "na": total_na,
-            "not_started": total_not_started,
-            "progress": overall_progress,
-            "pass_rate": overall_pass_rate,
+            "active_tc": sum(tc_counts.values()),
+            "in_progress_runs": len(active_runs),
+            "in_progress_fail_block": sum(r["fail"] + r["block"] for r in active_runs),
         },
-        "projects": project_summaries,
+        "active_runs": active_runs,
+        "projects": project_rows,
     }

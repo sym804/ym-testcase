@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { projectLink } from "./nav";
 
 const TEST_ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || "test1234";
 
@@ -14,7 +15,7 @@ async function createProject(page: Page, name: string) {
   await page.getByText("+ 새 프로젝트").click();
   await page.getByPlaceholder("프로젝트 이름").fill(name);
   await page.getByRole("button", { name: "생성" }).click();
-  const card = page.locator("h3").filter({ hasText: name });
+  const card = projectLink(page, name);
   await expect(card).toBeVisible({ timeout: 10000 });
   await card.click();
   await page.waitForLoadState("networkidle");
@@ -44,7 +45,7 @@ test.describe("시트 트리 구조", () => {
     try {
       // 프로젝트 목록으로 이동 후 삭제
       await page.goto("/projects");
-      const card = page.locator("h3").filter({ hasText: projectName });
+      const card = projectLink(page, projectName);
       if (await card.isVisible()) {
         await card.click();
         await deleteProject(page, projectName);

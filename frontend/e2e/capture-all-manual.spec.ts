@@ -3,6 +3,7 @@
  * 실행: npx playwright test e2e/capture-all-manual.spec.ts --retries=0
  */
 import { test, expect, type Page } from "@playwright/test";
+import { projectLink } from "./nav";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -107,8 +108,8 @@ test("전체 매뉴얼 스크린샷 재캡처", async ({ page, request }) => {
   // 04. 프로젝트 목록 - 전체 현황
   await page.screenshot({ path: path.join(SAVE_DIR, "04_project_list_overview.png") });
 
-  // 05. 프로젝트 카드 (스크롤 다운)
-  await page.evaluate(() => window.scrollTo(0, 600));
+  // 05. 프로젝트 표 (SYM-225 전에는 카드 목록이었다)
+  await page.getByRole("table", { name: "프로젝트" }).evaluate((el) => (el.closest("section") ?? el).scrollIntoView({ block: "start" }));
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(SAVE_DIR, "05_project_list_cards.png") });
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -125,7 +126,7 @@ test("전체 매뉴얼 스크린샷 재캡처", async ({ page, request }) => {
   }
 
   // 프로젝트 진입
-  await page.locator("h3").filter({ hasText: /MC_Screenshot/ }).first().click();
+  await projectLink(page, /MC_Screenshot/).first().click();
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(3000);
 
@@ -246,7 +247,7 @@ test("전체 매뉴얼 스크린샷 재캡처", async ({ page, request }) => {
   await page.screenshot({ path: path.join(SAVE_DIR, "20_dark_mode_project.png") });
 
   // 다크모드 대시보드
-  await page.locator("h3").filter({ hasText: /MC_Screenshot/ }).first().click();
+  await projectLink(page, /MC_Screenshot/).first().click();
   await page.waitForTimeout(2000);
   await page.getByRole("button", { name: "대시보드" }).click();
   await page.waitForTimeout(2000);

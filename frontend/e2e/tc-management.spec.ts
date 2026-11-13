@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { projectLink } from "./nav";
 
 async function login(page: Page) {
   await page.goto("/login");
@@ -19,7 +20,7 @@ test.describe("TC 관리", () => {
     await page.getByRole("button", { name: "생성" }).click();
 
     // 2. 프로젝트 진입
-    const card = page.locator("h3").filter({ hasText: projectName });
+    const card = projectLink(page, projectName);
     await expect(card).toBeVisible({ timeout: 10000 });
     await card.click();
 
@@ -57,7 +58,7 @@ test.describe("TC 관리", () => {
     await page.getByText("+ 새 프로젝트").click();
     await page.getByPlaceholder("프로젝트 이름").fill(projectName);
     await page.getByRole("button", { name: "생성" }).click();
-    const card = page.locator("h3").filter({ hasText: projectName });
+    const card = projectLink(page, projectName);
     await expect(card).toBeVisible({ timeout: 10000 });
     await card.click();
 
@@ -103,7 +104,7 @@ test.describe("자동 저장 거부 처리", () => {
     }
 
     await login(page);
-    const card = page.locator("h3").filter({ hasText: projectName }).first();
+    const card = projectLink(page, projectName).first();
     await expect(card).toBeVisible({ timeout: 15000 });
     await card.click();
     await expect(page.locator(".ag-header-cell").first()).toBeVisible({ timeout: 20000 });
@@ -168,7 +169,7 @@ test.describe("자동 저장 거부 처리", () => {
     }
 
     await login(page);
-    const card = page.locator("h3").filter({ hasText: projectName }).first();
+    const card = projectLink(page, projectName).first();
     await expect(card).toBeVisible({ timeout: 15000 });
     await card.click();
     await expect(page.locator(".ag-header-cell").first()).toBeVisible({ timeout: 20000 });
@@ -220,7 +221,7 @@ test.describe("셀 선택과 편집 진입", () => {
     await page.getByPlaceholder("프로젝트 이름").fill(projectName);
     await page.getByRole("button", { name: "생성" }).click();
 
-    const card = page.locator("h3").filter({ hasText: projectName });
+    const card = projectLink(page, projectName);
     await expect(card).toBeVisible({ timeout: 10000 });
     await card.click();
 

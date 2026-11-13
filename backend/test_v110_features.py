@@ -80,7 +80,7 @@ check("overview summary 존재", "summary" in data)
 check("overview projects 존재", "projects" in data and isinstance(data["projects"], list))
 check("overview total_projects > 0", data["summary"]["total_projects"] > 0,
       f"total={data['summary'].get('total_projects')}")
-check("overview total_tc > 0", data["summary"]["total_tc"] > 0)
+check("overview active_tc > 0", data["summary"]["active_tc"] > 0)
 
 # 인증 없이 접근
 r = requests.get(f"{BASE}/api/dashboard/overview")
