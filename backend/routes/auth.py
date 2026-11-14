@@ -32,12 +32,35 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-# Rate Limiting (실패한 로그인만 누적, IP+username 기준)
+# Rate Limiting (실패한 로그인만 누적)
 # ★DB 에 센다(services/rate_limit). 프로세스 메모리에 세면 서버리스 인스턴스마다
 #   따로 세서 잠금이 사실상 걸리지 않고, 인스턴스가 꺼지면 기록도 사라진다.
+# ★키 축이 셋이다(SYM-216). IP+아이디 하나만 두면 IP 를 바꿔 같은 계정을 다시 노리거나,
+#   한 IP 에서 아이디만 바꿔 같은 비밀번호를 돌리는 스프레이가 아이디마다 새로 허용된다.
+#   - IP+아이디: 5분 10회. 오타 낸 사용자를 짧게 막는 기존 제한
+#   - 계정: 1시간 LOGIN_ACCOUNT_MAX_PER_HOUR(기본 50). IP 를 바꿔도 같은 계정이면 같이 센다
+#   - IP: 1시간 LOGIN_IP_MAX_FAILURES_PER_HOUR(기본 100). 아이디를 바꿔도 같은 IP 면 같이 센다
+# ★계정 상한은 공격자가 일부러 채워 그 계정의 비밀번호 로그인을 최대 한 시간 막을 수 있다.
+#   감수한다. Google 로그인은 이 경로를 타지 않으므로 그쪽으로는 들어올 수 있다. 관리자 비밀번호
+#   초기화도 이 잠금을 풀지만, 기존 세션·API 키·Google 연결을 함께 끊는다.
+# ★TOO_MANY_LOGINS 는 "잠시 후" 로 둔다. 어느 축에 걸렸는지 알려 주면 어떤 상한을 채웠는지가
+#   드러나고, 5분 축에 걸린 대부분의 사용자에게는 이 문구가 맞다.
 LOGIN_MAX_FAILURES = 10
 LOGIN_WINDOW_SEC = 300  # 5분
+LOGIN_LONG_WINDOW_SEC = 3600  # 계정·IP 상한의 창
 BUCKET_LOGIN = "login"
+BUCKET_LOGIN_ACCOUNT = "login_account"
+BUCKET_LOGIN_IP = "login_ip"
+TOO_MANY_LOGINS = "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요."
+TOO_MANY_PASSWORD_CHECKS = "비밀번호 확인 시도가 너무 많습니다. 최대 1시간 뒤 다시 시도해 주세요."
+
+
+def _account_limit() -> int:
+    return int(os.getenv("LOGIN_ACCOUNT_MAX_PER_HOUR", "50"))
+
+
+def _ip_limit() -> int:
+    return int(os.getenv("LOGIN_IP_MAX_FAILURES_PER_HOUR", "100"))
 
 
 def _rate_limit_key(request: Request, username: str = "") -> str:
@@ -46,32 +69,88 @@ def _rate_limit_key(request: Request, username: str = "") -> str:
     return f"{ip}:{username}" if username else ip
 
 
+def _account_key(db: Session, ident: str) -> str:
+    """계정 상한 키. 있는 계정은 id 로 센다. 아이디와 이메일 중 무엇으로 시도해도 같은 키다.
+    없는 아이디는 정규화한 입력으로 센다."""
+    user = find_user_by_identifier(db, ident)
+    return f"user:{user.id}" if user else f"ident:{ident}"
+
+
+def _limits(request: Request, ident: str, db: Session):
+    """요청 트랜잭션에서 잠그고 세는 키 (버킷, 키, 창, 상한). 잠그는 순서가 늘 같아야 교착이 없다.
+    IP 상한은 여기 없다. 아래 _reserve_ip 가 따로 다룬다."""
+    return [
+        (BUCKET_LOGIN_ACCOUNT, _account_key(db, ident), LOGIN_LONG_WINDOW_SEC, _account_limit()),
+        (BUCKET_LOGIN, _rate_limit_key(request, ident), LOGIN_WINDOW_SEC, LOGIN_MAX_FAILURES),
+    ]
+
+
+def _enforce(db: Session, limits, detail: str = TOO_MANY_LOGINS) -> None:
+    engine = db.get_bind()
+    for bucket, key, window, limit in limits:
+        keyed_xact_lock(db, LockNs.RATE_LIMIT, f"{bucket}:{key}")
+        if rate_limit.count_recent(bucket, key, window, engine=engine) >= limit:
+            logger.warning("Rate limit exceeded: %s %s", bucket, key)
+            raise HTTPException(status_code=429, detail=detail)
+
+
+def _record(db: Session, limits) -> None:
+    engine = db.get_bind()
+    for bucket, key, _window, _limit in limits:
+        rate_limit.record(bucket, key, engine=engine)
+
+
+def _reserve_ip(request: Request, db: Session) -> None:
+    """IP 상한. 시도를 먼저 기록하고(확인과 기록이 한 번에) 성공하면 지운다.
+
+    ★요청 트랜잭션에서 이 키를 잠그면 한 사무실(NAT 하나)의 로그인이 bcrypt 한 번씩 줄을 서서
+      출근 시간에 잠금 대기 시간을 넘긴다. 잠그지 않고 세기만 하면 동시 요청이 모두 같은 수를 보고
+      통과해 상한을 넘긴다(QA1 지적). 그래서 확인과 기록만 짧은 별도 트랜잭션으로 묶는다.
+    """
+    event_id = rate_limit.reserve(BUCKET_LOGIN_IP, client_ip(request), LOGIN_LONG_WINDOW_SEC, _ip_limit(),
+                                  engine=db.get_bind())
+    if event_id is None:
+        logger.warning("Rate limit exceeded: %s %s", BUCKET_LOGIN_IP, client_ip(request))
+        raise HTTPException(status_code=429, detail=TOO_MANY_LOGINS)
+    request.state.login_ip_event = event_id
+
+
 def _check_rate_limit(request: Request, username: str, db: Session):
-    """5분간 실패 10회 이상이면 차단
+    """IP+아이디 5분 10회, 계정 1시간, IP 1시간 상한 중 하나라도 넘으면 차단
 
     ★요청 세션이 붙은 DB 에서 센다. 기본 엔진을 쓰면 테스트나 다른 연결 설정에서
       엉뚱한 DB(개발 DB)를 본다.
-    ★같은 키를 요청 트랜잭션 동안 잠근다. 잠그지 않으면 9회일 때 동시에 온 요청이
+    ★계정·IP+아이디 키는 요청 트랜잭션 동안 잠근다. 잠그지 않으면 9회일 때 동시에 온 요청이
       모두 9 를 보고 통과해 한도를 넘는다. 잠금은 요청이 끝날 때(커밋·롤백) 풀린다.
+      IP 키는 잠그지 않고 _reserve_ip 가 별도 짧은 트랜잭션에서 확인과 기록을 한 번에 한다.
     """
-    key = _rate_limit_key(request, username)
-    keyed_xact_lock(db, LockNs.RATE_LIMIT, f"{BUCKET_LOGIN}:{key}")
-    if rate_limit.count_recent(BUCKET_LOGIN, key, LOGIN_WINDOW_SEC, engine=db.get_bind()) >= LOGIN_MAX_FAILURES:
-        logger.warning("Rate limit exceeded: %s", key)
-        raise HTTPException(
-            status_code=429,
-            detail="로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
-        )
+    _enforce(db, _limits(request, username, db))
+    _reserve_ip(request, db)
 
 
 def _record_failure(request: Request, username: str, db: Session):
-    """실패한 로그인만 기록"""
-    rate_limit.record(BUCKET_LOGIN, _rate_limit_key(request, username), engine=db.get_bind())
+    """실패한 로그인만 기록. IP 축은 _reserve_ip 가 이미 남겼다."""
+    _record(db, _limits(request, username, db))
 
 
 def _clear_failures(request: Request, username: str, db: Session):
-    """로그인 성공 시 해당 키의 실패 기록 초기화"""
+    """로그인 성공 시 IP+아이디 키의 실패 기록만 초기화
+
+    ★IP 상한은 지우지 않는다. 지우면 스프레이하는 쪽이 자기 계정으로 한 번씩 로그인해 상한을
+      계속 비운다. 계정 상한도 지우지 않는다. 한 시간 50회는 본인 오타로 닿는 수가 아니다.
+    """
     rate_limit.clear(BUCKET_LOGIN, _rate_limit_key(request, username), engine=db.get_bind())
+    # 이 요청이 _reserve_ip 로 남긴 시도 한 건만 지운다. 맞혔으니 실패가 아니다.
+    event_id = getattr(request.state, "login_ip_event", None)
+    if event_id is not None:
+        rate_limit.release(event_id, engine=db.get_bind())
+        request.state.login_ip_event = None
+
+
+def _password_change_limits(user: User) -> list:
+    """비밀번호 변경의 현재 비밀번호 대조는 로그인과 같은 계정 상한에 센다.
+    세션을 손에 넣은 쪽이 이 경로로 비밀번호를 맞혀 보는 것을 막는다."""
+    return [(BUCKET_LOGIN_ACCOUNT, f"user:{user.id}", LOGIN_LONG_WINDOW_SEC, _account_limit())]
 
 
 BUCKET_REGISTER = "register"
@@ -269,7 +348,10 @@ def change_password(
     if not current_user.password_hash:
         raise HTTPException(status_code=400, detail="비밀번호가 없는 계정입니다.")
     ensure_password_fits(payload.new_password)  # bcrypt 72바이트 상한. 넘으면 400
+    limits = _password_change_limits(current_user)
+    _enforce(db, limits, TOO_MANY_PASSWORD_CHECKS)
     if not verify_password(payload.current_password, current_user.password_hash):
+        _record(db, limits)
         raise HTTPException(status_code=400, detail="현재 비밀번호가 올바르지 않습니다.")
 
     if payload.current_password == payload.new_password:
@@ -478,5 +560,8 @@ def reset_password(
     # 탈취한 쪽이 자기 Google 계정을 연결해 두었으면 그 길이 남는다. 되찾는 국면이라 끊는다.
     clear_google(user)
     db.commit()
+    # 공격자가 계정 상한을 채워 둔 계정이면 임시 비밀번호로도 한 시간 동안 못 들어온다.
+    # 관리자 초기화가 그 잠금을 푸는 수단이다.
+    rate_limit.clear(BUCKET_LOGIN_ACCOUNT, f"user:{user.id}", engine=db.get_bind())
     logger.info("Password reset by admin for user: %s", user.username)
     return {"temp_password": temp_pw}

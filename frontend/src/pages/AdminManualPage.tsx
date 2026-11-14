@@ -171,6 +171,12 @@ npx tsc --noEmit`}</pre>
                 <tr><td style={s.tdCode}>AUTH_APPROVAL</td><td style={s.td}>none</td><td style={s.td}>{t("env.approvalDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
                 <tr><td style={s.tdCode}>BOOTSTRAP_TOKEN</td><td style={s.td}>-</td><td style={s.td}>{t("env.bootstrapDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
                 <tr><td style={s.tdCode}>REGISTER_MAX_PER_HOUR</td><td style={s.td}>30</td><td style={s.td}>{t("env.registerLimitDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>LOGIN_ACCOUNT_MAX_PER_HOUR</td><td style={s.td}>50</td><td style={s.td}>{t("env.loginAccountLimitDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>LOGIN_IP_MAX_FAILURES_PER_HOUR</td><td style={s.td}>100</td><td style={s.td}>{t("env.loginIpLimitDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>STAGING_MAX_PENDING</td><td style={s.td}>30</td><td style={s.td}>{t("env.stagingPendingDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>STAGING_MAX_PENDING_MB</td><td style={s.td}>500</td><td style={s.td}>{t("env.stagingPendingMbDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>STAGING_MAX_PER_HOUR</td><td style={s.td}>120</td><td style={s.td}>{t("env.stagingHourlyDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
+                <tr><td style={s.tdCode}>XLSX_MAX_UNCOMPRESSED_MB</td><td style={s.td}>200</td><td style={s.td}>{t("env.xlsxUncompressedDesc")}</td><td style={s.td}>{t("env.optional")}</td></tr>
               </tbody>
             </table>
             <div style={s.warnBox} dangerouslySetInnerHTML={{ __html: t("env.warn1") }} />

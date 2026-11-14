@@ -82,6 +82,10 @@ const ERROR_MAP: Record<string, string> = {
   "이미 올린 업로드입니다.": "errors.uploadAlreadyReceived",
   "이미 올리는 중인 업로드입니다.": "errors.uploadInProgress",
   "이 배포에서는 저장소에 직접 올립니다.": "errors.uploadDirectOnly",
+  "압축을 푼 크기가 너무 큰 Excel 파일입니다. 시트를 나누어 올려 주세요.": "errors.xlsxTooLarge",
+  "처리하지 않은 업로드가 너무 많습니다. 최대 1시간 뒤 다시 시도해 주세요.": "errors.tooManyPendingUploads",
+  "업로드 요청이 너무 많습니다. 최대 1시간 뒤 다시 시도해 주세요.": "errors.tooManyUploads",
+  "비밀번호 확인 시도가 너무 많습니다. 최대 1시간 뒤 다시 시도해 주세요.": "errors.tooManyPasswordChecks",
   // Input limits
   "비밀번호는 72바이트 이하로 입력해 주세요(영문 72자, 한글 24자까지).": "errors.passwordTooLong",
   "입력값이 허용 길이나 형식을 벗어났습니다. 긴 값을 줄여 다시 시도해 주세요.": "errors.inputTooLong",

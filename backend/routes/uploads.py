@@ -30,8 +30,15 @@ def create_upload(
 ):
     row = staged_upload.new_upload(db, current_user, payload.purpose, payload.filename,
                                    payload.size, payload.content_type)
-    target = staged_upload.upload_target(row)
+    # ★서명 주소 발급(외부 호출, 최대 30초) 전에 커밋해 사용자별 할당량 잠금을 푼다. 쥔 채로
+    #   부르면 같은 사용자의 다음 발급이 잠금 대기 시간(10초)을 넘겨 409 가 난다(QA1 지적).
     db.commit()
+    try:
+        target = staged_upload.upload_target(row)
+    except Exception:
+        db.delete(row)
+        db.commit()
+        raise
     return {"upload_id": row.id, **target}
 
 

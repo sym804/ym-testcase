@@ -66,7 +66,7 @@ Remove-Item Env:DATABASE_URL, Env:DATABASE_URL_DIRECT
 | `BOOTSTRAP_TOKEN` | 긴 무작위 문자열. 첫 관리자를 만들 때 한 번 씁니다 |
 | `AUTH_APPROVAL` | 아래 5절에서 고릅니다 |
 
-`TRUSTED_PROXY_HEADER` 를 비우면 모든 요청이 프록시 주소 하나로 잡힙니다. 가입 횟수 제한(시간당 30건)이 사이트 전체에 걸리고, 누군가 한 계정의 비밀번호를 열 번 틀리면 그 계정은 모든 접속자에게 5분 동안 잠깁니다.
+`TRUSTED_PROXY_HEADER` 를 비우면 모든 요청이 프록시 주소 하나로 잡힙니다. 가입 횟수 제한(시간당 30건)과 로그인 실패 제한(시간당 100건)이 사이트 전체에 걸리고, 누군가 한 계정의 비밀번호를 열 번 틀리면 그 계정은 모든 접속자에게 5분 동안 잠깁니다.
 `DATABASE_URL_DIRECT` 는 Vercel 에 넣지 않습니다. 서버리스에서는 앱이 마이그레이션을 하지 않습니다.
 `ENV`, `SECRET_KEY`, `AUTH_APPROVAL` 중 하나라도 비면 서버가 시작하지 않습니다.
 

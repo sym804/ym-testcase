@@ -1,5 +1,6 @@
 import csv
 import io
+import os
 import logging
 import re
 from typing import Optional
@@ -730,6 +731,73 @@ from services.staged_upload import PURPOSE_LIMITS
 MAX_IMPORT_SIZE = PURPOSE_LIMITS["tc_import"]  # 10MB, 스테이징 업로드와 같은 값
 
 
+XLSX_TOO_LARGE = "압축을 푼 크기가 너무 큰 Excel 파일입니다. 시트를 나누어 올려 주세요."
+#: zip 항목 수 상한. 실측 xlsx 는 10~80개다. 항목마다 목차를 읽는 비용이 든다
+XLSX_MAX_ENTRIES = 2000
+
+
+def _xlsx_max_uncompressed() -> int:
+    """풀린 크기 합계 상한. 로컬 xlsx 73개의 최대 압축률이 13.7배라 10MB 파일이면 137MB 다."""
+    return int(os.getenv("XLSX_MAX_UNCOMPRESSED_MB", "200")) * 1024 * 1024
+
+
+_XLSX_CHUNK = 64 * 1024
+_READ_FAILED = "Failed to read Excel file"
+
+
+def _safe_xlsx_bytes(content: bytes) -> io.BytesIO:
+    """압축을 조금씩 풀며 크기를 재고, 검증한 내용으로 다시 묶은 xlsx 를 돌려준다(SYM-218).
+
+    ★업로드 상한(10MB)은 압축된 크기다. 같은 문자가 반복되는 시트는 수백 배로 풀려
+      openpyxl 이 메모리에 올리는 순간 함수가 죽는다.
+    ★목차(file_size)만 보면 안 된다. openpyxl 은 항목을 read() 로 통째로 읽고, zipfile 은 그때
+      압축을 최대 1GB 까지 한 번에 푼 뒤에야 목차 크기로 자른다. 목차를 1,000바이트로 속인
+      300KB 파일 하나가 메모리 601MB 를 썼다(QA1 지적, 재현). 그래서 64KB 씩 풀어 실제 크기를 재고,
+      잰 내용을 압축 없이 다시 묶어 파서에 넘긴다. 파서가 보는 목차는 실제 크기다.
+    ★풀린 조각은 모으지 않고 바로 새 묶음에 쓴다. 모았다가 이어 붙이면 항목 하나가 목록, 이어 붙인
+      사본, 출력 버퍼로 세 벌이 된다(QA 2인 지적). 돌려주는 것도 버퍼 자체다. getvalue() 는 한 벌을 더 만든다.
+    zip 이 아니면 여기서 판정하지 않고 load_workbook 의 읽기 실패(400)로 넘긴다.
+    """
+    import zipfile
+
+    limit = _xlsx_max_uncompressed()
+    try:
+        src = zipfile.ZipFile(io.BytesIO(content))
+    except zipfile.BadZipFile:
+        return io.BytesIO(content)
+    except Exception:
+        # 지원하지 않는 zip 버전 등은 BadZipFile 이 아닌 예외다. 500 이 아니라 읽기 실패로 낸다.
+        raise HTTPException(status_code=400, detail=_READ_FAILED)
+    with src:
+        infos = src.infolist()
+        if len(infos) > XLSX_MAX_ENTRIES or sum(i.file_size for i in infos) > limit:
+            raise HTTPException(status_code=400, detail=XLSX_TOO_LARGE)
+        out = io.BytesIO()
+        total = 0
+        try:
+            with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as dst:
+                for info in infos:
+                    if info.is_dir():
+                        continue
+                    with src.open(info) as f, dst.open(info.filename, "w") as w:
+                        while True:
+                            chunk = f.read(_XLSX_CHUNK)
+                            if not chunk:
+                                break
+                            total += len(chunk)
+                            if total > limit:
+                                raise HTTPException(status_code=400, detail=XLSX_TOO_LARGE)
+                            w.write(chunk)
+        except HTTPException:
+            raise
+        except Exception:
+            # CRC 불일치, 암호화된 항목, 지원하지 않는 압축 방식
+            logger.exception("Excel read failed")
+            raise HTTPException(status_code=400, detail=_READ_FAILED)
+    out.seek(0)
+    return out
+
+
 XLS_NOT_SUPPORTED = "Excel 97-2003 형식(.xls)이거나 암호가 걸린 파일은 읽을 수 없습니다. 암호를 풀고 .xlsx 로 다시 저장해 올려 주세요."
 #: OLE2 컨테이너의 첫 8바이트. Excel 97-2003 통합 문서와 암호가 걸린 .xlsx(EncryptedPackage)가 이 형식이다
 _OLE2_SIGNATURE = bytes.fromhex("D0CF11E0A1B11AE1")
@@ -750,9 +818,10 @@ def _load_workbook_from_upload(file: UploadFile):
     #   이름만 .xls 인 xlsx(다른 시스템의 내보내기에 흔하다)는 그대로 읽힌다.
     if file_content.startswith(_OLE2_SIGNATURE):
         raise HTTPException(status_code=400, detail=XLS_NOT_SUPPORTED)
+    safe = _safe_xlsx_bytes(file_content)
 
     try:
-        return load_workbook(filename=io.BytesIO(file_content), data_only=True)
+        return load_workbook(filename=safe, data_only=True)
     except Exception:
         logger.exception("Excel read failed")
         raise HTTPException(status_code=400, detail="Failed to read Excel file")

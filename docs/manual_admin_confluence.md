@@ -74,6 +74,12 @@ npx tsc -b
 | `AUTH_APPROVAL` | none | 관리자 승인 대상. `none`(모두 바로 사용) / `personal`(회사 Workspace Google 계정만 바로 사용, 나머지는 대기. 이메일 가입은 회사 주소여도 대기) / `all`(모두). 단 `AUTH_ALLOW_PERSONAL=0` 이면 이메일 가입은 이 값과 관계없이 승인 대기 | 선택. 서버리스는 필수 |
 | `BOOTSTRAP_TOKEN` | - | 운영(ENV=production) 빈 DB 의 첫 관리자 만들기에 필요한 값 | 선택 |
 | `REGISTER_MAX_PER_HOUR` | 30 | IP 하나의 시간당 가입 요청 수 | 선택 |
+| `LOGIN_ACCOUNT_MAX_PER_HOUR` | 50 | 계정 하나의 시간당 로그인·비밀번호 확인 실패 수. IP 를 바꿔도 같이 센다 | 선택 |
+| `LOGIN_IP_MAX_FAILURES_PER_HOUR` | 100 | IP 하나의 시간당 로그인 실패 수. 아이디를 바꿔도 같이 센다 | 선택 |
+| `STAGING_MAX_PENDING` | 30 | 사용자 하나가 최근 1시간에 올리고 처리하지 않은 업로드 수 | 선택 |
+| `STAGING_MAX_PENDING_MB` | 500 | 최근 1시간에 처리하지 않은 업로드의 선언 크기 합계(MB) | 선택 |
+| `STAGING_MAX_PER_HOUR` | 120 | 사용자 하나의 시간당 업로드 주소 발급 수 | 선택 |
+| `XLSX_MAX_UNCOMPRESSED_MB` | 200 | xlsx 가져오기에서 압축을 푼 크기 합계 상한 | 선택 |
 
 ⚠️ **주의**: 프로덕션 환경에서는 반드시 `SECRET_KEY`를 고유한 값으로 설정하세요. 미설정 시 서버 시작이 실패합니다.
 
@@ -268,7 +274,7 @@ npx tsc -b
 | 인증 토큰 | JWT (HS256) + httpOnly 쿠키 | TOKEN_EXPIRE_HOURS (기본 72시간), 로그인 유지는 REMEMBER_ME_DAYS (기본 30일) |
 | CSRF 방어 | csrf_token 쿠키 + X-CSRF-Token 헤더 검증 | 쿠키 로그인의 상태 변경 요청에 자동 적용 (Bearer 헤더 인증은 제외) |
 | API 키 | 사용자별 발급 · 폐기, SHA-256 해시 저장, Bearer 헤더 인증 | 만료 30 · 90 · 180 · 365일 또는 없음, 1인 20개, 비밀번호가 바뀌면 전부 폐기 |
-| 로그인 제한 | Rate Limiting | IP+사용자당 5분간 10회 (초과 시 잠금) |
+| 로그인 제한 | Rate Limiting | 실패 기준 IP+사용자 5분 10회, 계정 1시간 50회, IP 1시간 100회 (초과 시 잠금) |
 | CORS | 오리진 화이트리스트 | CORS_ORIGINS (와일드카드 금지) |
 | 파일 업로드 | 확장자 화이트리스트 + 경로 탐색 방지 | 허용 확장자 고정 |
 | XSS 방지 | DOMPurify (프론트엔드) | 마크다운 셀 렌더링 시 자동 적용 |
@@ -408,7 +414,7 @@ npx tsc -b
 |---|---|---|
 | 서버 시작 실패 (RuntimeError) | 프로덕션에서 SECRET_KEY 미설정 | 환경변수 SECRET_KEY 설정 |
 | 로그인 시 401 에러 | 잘못된 자격증명 또는 토큰 만료 | 자격증명 확인 또는 재로그인 |
-| 로그인 잠금 (429) | 5분간 10회 실패 | 5분 대기 후 재시도 |
+| 로그인 잠금 (429) | 실패 횟수 상한 초과(IP+사용자 5분 10회, 계정·IP 1시간) | 최대 1시간 대기 후 재시도. 계정 상한은 관리자가 비밀번호를 초기화하면 풀림(기존 로그인, API 키, Google 연결도 끊김) |
 | CORS 에러 | 프론트엔드 오리진 미등록 | CORS_ORIGINS에 추가 |
 | 파일 업로드 실패 | 50MB 초과 또는 비허용 확장자 | 파일 확인 |
 | 한글 깨짐 | 소스 파일 인코딩 문제 | UTF-8로 재저장 후 빌드 |

@@ -10,6 +10,7 @@
 ★선언한 크기는 믿지 않는다. 발급 때는 선언을 보고, 꺼낼 때는 실제 크기로 다시 막는다.
 ★남이 올린 것을 꺼낼 수 없다. 소유자와 목적을 대조하고, 한 번 쓴 것은 다시 쓸 수 없다.
 """
+import os
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -49,11 +50,63 @@ def _too_large(limit: int) -> HTTPException:
     return HTTPException(status_code=413, detail=f"File too large. Maximum size is {limit // MB}MB")
 
 
+TOO_MANY_PENDING = "처리하지 않은 업로드가 너무 많습니다. 최대 1시간 뒤 다시 시도해 주세요."
+TOO_MANY_UPLOADS = "업로드 요청이 너무 많습니다. 최대 1시간 뒤 다시 시도해 주세요."
+BUCKET_STAGING = "staging"
+STAGING_WINDOW_SEC = 3600
+#: 미처리 상한을 세는 범위. 미리보기·dry run 은 처리 표시를 롤백하므로 고르기만 하고 그만둔
+#: 업로드가 남는다. 정리(하루 뒤 Cron)까지 세면 그동안 업로드를 전혀 못 한다(QA1 지적).
+STAGING_PENDING_WINDOW = timedelta(hours=1)
+
+
+def _pending_limit() -> int:
+    return int(os.getenv("STAGING_MAX_PENDING", "30"))
+
+
+def _pending_bytes_limit() -> int:
+    return int(os.getenv("STAGING_MAX_PENDING_MB", "500")) * MB
+
+
+def _hourly_limit() -> int:
+    """시간당 발급 수. CI 업로드(ymtc-upload)는 실행마다 한 번이다. 파이프라인 여럿이 계정 하나를
+    같이 쓰면 그 합계로 센다(할당량은 API 키가 아니라 사용자별이다)."""
+    return int(os.getenv("STAGING_MAX_PER_HOUR", "120"))
+
+
+def _check_user_quota(db: Session, user: User, size: int) -> None:
+    """사용자별 발급 상한(SYM-219). 발급 하나가 최대 50MB 저장소 자리이고 정리는 하루 뒤다.
+
+    - 최근 1시간에 발급하고 처리하지 않은 업로드(consumed_at 이 빈 것) 개수와 선언 크기 합계
+    - 시간당 발급 횟수. 처리한 것도 센다. 발급과 처리를 반복해도 저장소는 하루 동안 찬다
+    ★선언 크기는 믿지 않는 값이다. 실제 크기는 목적별 상한(꺼낼 때 다시 잰다)을 못 넘으므로,
+      저장소 총량을 묶는 것은 시간당 발급 수다(정리 전 하루 최대 120 x 24건). 미처리 상한은 최근
+      1시간분만 세므로 짧은 시간에 몰아 쌓는 것을 막는다.
+    ★사용자별로 잠근다. 잠그지 않으면 동시에 온 발급이 모두 같은 개수를 보고 통과한다.
+    """
+    from sqlalchemy import func
+
+    from services import rate_limit
+    from services.locks import LockNs, keyed_xact_lock
+
+    keyed_xact_lock(db, LockNs.RATE_LIMIT, f"{BUCKET_STAGING}:{user.id}")
+    key = f"user:{user.id}"
+    if rate_limit.count_recent(BUCKET_STAGING, key, STAGING_WINDOW_SEC, engine=db.get_bind()) >= _hourly_limit():
+        raise HTTPException(status_code=429, detail=TOO_MANY_UPLOADS)
+    count, total = (db.query(func.count(StagedUpload.id), func.coalesce(func.sum(StagedUpload.declared_size), 0))
+                    .filter(StagedUpload.user_id == user.id, StagedUpload.consumed_at.is_(None),
+                            StagedUpload.created_at >= now_kst() - STAGING_PENDING_WINDOW).one())
+    if count >= _pending_limit() or total + size > _pending_bytes_limit():
+        raise HTTPException(status_code=429, detail=TOO_MANY_PENDING)
+    # 받기로 정한 뒤에 센다. 거절된 요청까지 세면 상한이 풀린 뒤에도 한 시간 더 막힌다.
+    rate_limit.record(BUCKET_STAGING, key, engine=db.get_bind())
+
+
 def new_upload(db: Session, user: User, purpose: str, filename: str, size: int,
                content_type: str | None) -> StagedUpload:
     limit = _limit(purpose)
     if size < 0 or size > limit:
         raise _too_large(limit)
+    _check_user_quota(db, user, size)
     upload_id = uuid.uuid4().hex
     row = StagedUpload(
         id=upload_id, user_id=user.id, purpose=purpose, filename=(filename or "file")[:255],

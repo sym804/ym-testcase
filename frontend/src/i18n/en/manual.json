@@ -51,7 +51,7 @@
     "li2": "Enter your password.",
     "li3": "Click the <strong>Login</strong> button.",
     "li4": "Upon success, you will be redirected to the project list page.",
-    "tip1": "<strong>TIP:</strong> You can attempt up to 10 logins within 5 minutes on failure. Exceeding this will temporarily lock your account.",
+    "tip1": "<strong>TIP:</strong> 10 failed logins within 5 minutes lock you out briefly. 50 failures on one account within an hour lock it for up to an hour, and an admin password reset lifts that lock.",
     "info1": "<strong>Remember me:</strong> If you check \"Remember me\", your session lasts 30 days. Without it, you are logged out automatically after 72 hours (3 days). These are the defaults; an administrator can change them.",
     "h3_google": "1-2. Sign in with Google",
     "google_li1": "Click <strong>Sign in with Google</strong> on the login screen. The button appears only when an administrator has turned on Google sign-in.",
