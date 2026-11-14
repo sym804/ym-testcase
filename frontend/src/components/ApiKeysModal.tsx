@@ -23,6 +23,8 @@ export default function ApiKeysModal({ onClose }: { onClose: () => void }) {
   const [keys, setKeys] = useState<ApiKeyItem[]>([]);
   const [name, setName] = useState("");
   const [expiry, setExpiry] = useState<number | null>(90);
+  // 기본은 결과 업로드 전용이다. 서버 기본값과 같다(SYM-217).
+  const [scope, setScope] = useState<ApiKeyItem["scope"]>("results");
   const [created, setCreated] = useState<{ name: string; key: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -42,7 +44,7 @@ export default function ApiKeysModal({ onClose }: { onClose: () => void }) {
     if (!name.trim()) { toast.error(t("apiKeyNameRequired")); return; }
     setBusy(true);
     try {
-      const res = await authApi.createApiKey(name.trim(), expiry);
+      const res = await authApi.createApiKey(name.trim(), expiry, scope);
       setCreated({ name: res.name, key: res.key });
       setName("");
       await load();
@@ -121,6 +123,17 @@ export default function ApiKeysModal({ onClose }: { onClose: () => void }) {
               ))}
             </select>
           </label>
+          <label style={styles.field}>
+            <span style={styles.label}>{t("apiKeyScope")}</span>
+            <select
+              style={styles.input}
+              value={scope}
+              onChange={(e) => setScope(e.target.value as ApiKeyItem["scope"])}
+            >
+              <option value="results">{t("apiKeyScopeResults")}</option>
+              <option value="full">{t("apiKeyScopeFull")}</option>
+            </select>
+          </label>
           <button type="submit" style={{ ...styles.submitBtn, opacity: busy ? 0.5 : 1 }} disabled={busy}>
             {t("apiKeyCreate")}
           </button>
@@ -134,6 +147,7 @@ export default function ApiKeysModal({ onClose }: { onClose: () => void }) {
               <tr>
                 <th style={styles.th}>{t("apiKeyName")}</th>
                 <th style={styles.th}>{t("apiKeyPrefix")}</th>
+                <th style={styles.th}>{t("apiKeyScope")}</th>
                 <th style={styles.th}>{t("apiKeyCreatedAt")}</th>
                 <th style={styles.th}>{t("apiKeyLastUsed")}</th>
                 <th style={styles.th}>{t("apiKeyExpiresAt")}</th>
@@ -146,6 +160,7 @@ export default function ApiKeysModal({ onClose }: { onClose: () => void }) {
                 <tr key={k.id} style={k.status === "active" ? undefined : styles.inactiveRow}>
                   <td style={styles.td}>{k.name}</td>
                   <td style={{ ...styles.td, fontFamily: "monospace" }}>{k.prefix}…</td>
+                  <td style={styles.td}>{k.scope === "full" ? t("apiKeyScopeFull") : t("apiKeyScopeResults")}</td>
                   <td style={styles.td}>{shortTime(k.created_at)}</td>
                   <td style={styles.td}>{shortTime(k.last_used_at)}</td>
                   <td style={styles.td}>{k.expires_at ? shortTime(k.expires_at) : t("apiKeyNoExpiry")}</td>

@@ -114,7 +114,7 @@ def test_API_키로_동시에_복제해도_번호가_겹치지_않는다(token, 
     """API 키 인증은 사용 시각을 커밋한 뒤 잠금을 잡는다. 그 순서에서도 잠금이 유지되는지 본다."""
     pid, tc_id = seeded
     r = requests.post(f"{BASE}/api/auth/api-keys", headers=auth(token),
-                      json={"name": "clone-race", "expires_days": 30})
+                      json={"name": "clone-race", "expires_days": 30, "scope": "full"})
     assert r.status_code == 201, r.text
     key_h = {"Authorization": "Bearer " + r.json()["key"]}
     barrier = threading.Barrier(FANOUT)

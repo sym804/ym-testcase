@@ -1,14 +1,14 @@
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from database import get_db
 from routes.attachments import run_object_deletions, schedule_object_deletions
 from models import User, Project, ProjectMember, ProjectRole, TestRun, TestResult, Attachment
 from schemas import ProjectCreate, ProjectUpdate, ProjectResponse
-from auth import get_current_user, get_project_role, check_project_access
+from auth import SESSION_ONLY_DETAIL, get_current_user, get_project_role, check_project_access
 
 logger = logging.getLogger(__name__)
 
@@ -100,12 +100,20 @@ def list_projects(
     return result
 
 
+PUBLIC_BY_KEY_DETAIL = "API 키로는 공개 프로젝트를 만들 수 없습니다. is_private 를 true 로 보내거나 로그인해서 진행해 주세요."
+
+
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 def create_project(
     payload: ProjectCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # ★API 키로는 비공개 프로젝트만 만든다(SYM-217, QA1 지적). 관리자 키로 남의 비공개 TC 를 내보내
+    #   공개 프로젝트에 가져오면 공개 전환(update_project 에서 막음)과 같은 일이 된다.
+    if not payload.is_private and getattr(request.state, "auth_method", None) == "api_key":
+        raise HTTPException(status_code=403, detail=PUBLIC_BY_KEY_DETAIL)
     # 로그인한 사용자는 누구나 만든다. 만든 사람은 그 프로젝트의 admin 멤버가 되고,
     # 다른 프로젝트에 대한 권한은 멤버 표로만 정해지므로 넓어지지 않는다.
     # 프로젝트 admin 이면 열리는 전역 정보(멤버 후보 목록)는 최소 칸만 준다(members.py).
@@ -148,6 +156,7 @@ def get_project(
 def update_project(
     project_id: int,
     payload: ProjectUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
 ):
@@ -156,6 +165,12 @@ def update_project(
         raise HTTPException(status_code=404, detail="Project not found")
 
     update_data = payload.model_dump(exclude_unset=True)
+    # ★공개 범위 변경은 API 키로 받지 않는다(SYM-217, QA1 지적). 시스템 관리자는 모든 프로젝트의
+    #   admin 이라 관리자 키로 프로젝트마다 공개로 바꾸면 비멤버 전원에게 열리고, 키를 폐기해도 남는다.
+    #   이름·설명 같은 다른 칸은 키로도 고친다.
+    if ("is_private" in update_data and update_data["is_private"] != project.is_private
+            and getattr(request.state, "auth_method", None) == "api_key"):
+        raise HTTPException(status_code=403, detail=SESSION_ONLY_DETAIL)
 
     # field_config는 JSON 문자열로 저장 (Text 컬럼, 읽을 때 json.loads)
     if "field_config" in update_data:

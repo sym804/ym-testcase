@@ -552,6 +552,9 @@ class ApiKey(Base):
     last_used_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True)
     revoked_at = Column(DateTime, nullable=True)
+    #: full: 키 주인 권한 그대로 / results: 결과 업로드 경로만(auth.RESULTS_SCOPE_ROUTES).
+    #: 범위가 생기기 전에 발급한 키는 full 이다(server_default). 새 키의 기본값은 results 다.
+    scope = Column(String(16), nullable=False, server_default="full")
 
     __table_args__ = (
         Index("ix_api_keys_user_id", "user_id"),

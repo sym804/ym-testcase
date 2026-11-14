@@ -655,10 +655,10 @@
     "row_apikey_desc": "Chosen from the user menu. Create and revoke your own API keys (see 15-1)",
     "h3_apiKey": "15-1. API keys",
     "ak_p1": "Keys used instead of a password in scripts or CI. Send one as <code>Authorization: Bearer ymtc_...</code> in the request header.",
-    "ak_li1": "Choose <strong>API keys</strong> in the user menu, set a name and expiry (30 · 90 · 180 · 365 days or never, default 90), and click <strong>Create</strong>.",
+    "ak_li1": "Choose <strong>API keys</strong> in the user menu, set a name, expiry (30 · 90 · 180 · 365 days or never, default 90) and scope (results upload only or full, default results upload only), and click <strong>Create</strong>.",
     "ak_li2": "The new key is shown only once. Use <strong>Copy</strong> and store it somewhere safe. The server keeps only a hash, so it cannot be shown again.",
-    "ak_li3": "The list shows name, key prefix, created, last used, expiry, and status. <strong>Revoke</strong> keys you no longer use; scripts using a revoked key are blocked immediately.",
-    "ak_li4": "A key has the same permissions as your account, except that it cannot manage keys, change the password, or log out, and even an admin key cannot reset passwords or approve account recovery.",
+    "ak_li3": "The list shows name, key prefix, scope, created, last used, expiry, and status. <strong>Revoke</strong> keys you no longer use; scripts using a revoked key are blocked immediately.",
+    "ak_li4": "A results-upload key can only upload CI results (ymtc-upload). Use a full key for scripts that read or edit test cases and runs. A results-upload key calling any other path gets 403 with \"This API key's scope does not allow this action.\" Even a full key cannot manage keys, change the password, log out, or manage users (user list, account requests, bulk assignment, project members), change project visibility, or create public projects; sign in for those.",
     "ak_li5": "Each person can hold up to 20 active keys.",
     "ak_warn": "<strong>Note:</strong> When the password changes (by the user, an admin reset, or account recovery), every API key of that account is revoked. Issue a new key for your scripts."
   },

@@ -28,7 +28,7 @@
     "goToProjects": "Go to Projects"
   },
   "brandName": "YM TestCase",
-  "version": "YM TestCase v2.3.2.0 | AGPL-3.0",
+  "version": "YM TestCase v2.3.3.0 | AGPL-3.0",
   "copy": "Copy",
   "copiedToClipboard": "Copied to clipboard.",
   "undo": "Undo",
@@ -109,6 +109,7 @@
     "uploadAlreadyReceived": "This upload has already been received.",
     "uploadInProgress": "This upload is already in progress.",
     "uploadDirectOnly": "This deployment uploads directly to storage.",
+    "apiKeyScopeDenied": "This API key's scope does not allow this action.",
     "xlsxTooLarge": "This Excel file is too large once uncompressed. Split the sheets and upload them separately.",
     "tooManyPendingUploads": "You have too many unprocessed uploads. Try again in up to an hour.",
     "tooManyUploads": "Too many upload requests. Try again in up to an hour.",

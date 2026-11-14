@@ -17,7 +17,7 @@ import ApiKeysModal from "../components/ApiKeysModal";
 
 const item = (over: Partial<ApiKeyItem> = {}): ApiKeyItem => ({
   id: 1, name: "CI", prefix: "ymtc_ab12cd34", created_at: "2026-10-01T10:00:00", last_used_at: null,
-  expires_at: "2026-12-30T10:00:00", revoked_at: null, status: "active", ...over,
+  expires_at: "2026-12-30T10:00:00", revoked_at: null, status: "active", scope: "results", ...over,
 });
 
 beforeEach(() => {
@@ -45,13 +45,37 @@ describe("API 키 모달", () => {
     await screen.findByText(/발급한 키가 없습니다|No keys yet/);
 
     await userEvent.type(screen.getByPlaceholderText(/e2e/), "CI");
-    await userEvent.selectOptions(screen.getByRole("combobox"), "none");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /만료|Expiry/ }), "none");
     await userEvent.click(screen.getByRole("button", { name: /^발급$|^Create$/ }));
 
-    expect(authApi.createApiKey).toHaveBeenCalledWith("CI", null);
+    // 범위를 고르지 않으면 결과 업로드 전용이다(SYM-217)
+    expect(authApi.createApiKey).toHaveBeenCalledWith("CI", null, "results");
     const box = await screen.findByTestId("api-key-created");
     expect(box).toHaveTextContent("ymtc_ab12cd34_SECRET");
     await waitFor(() => expect(authApi.listApiKeys).toHaveBeenCalledTimes(2));
+  });
+
+  it("전체 범위를 고르면 그 값으로 발급한다", async () => {
+    vi.mocked(authApi.listApiKeys).mockResolvedValue([]);
+    vi.mocked(authApi.createApiKey).mockResolvedValue({ ...item({ scope: "full" }), key: "ymtc_ab12cd34_SECRET" });
+    render(<ApiKeysModal onClose={vi.fn()} />);
+    await screen.findByText(/발급한 키가 없습니다|No keys yet/);
+    await userEvent.type(screen.getByPlaceholderText(/e2e/), "tcm");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /범위|Scope/ }), "full");
+    await userEvent.click(screen.getByRole("button", { name: /^발급$|^Create$/ }));
+    expect(authApi.createApiKey).toHaveBeenCalledWith("tcm", 90, "full");
+  });
+
+  it("목록에 키마다 범위를 보여 준다", async () => {
+    vi.mocked(authApi.listApiKeys).mockResolvedValue([
+      item(),
+      item({ id: 2, name: "tcm", prefix: "ymtc_99999999", scope: "full" }),
+    ]);
+    render(<ApiKeysModal onClose={vi.fn()} />);
+    await screen.findByText("ymtc_ab12cd34…");
+    const rows = screen.getAllByRole("row");
+    expect(within(rows[1]).getByText(/결과 업로드 전용|Results upload only/)).toBeInTheDocument();
+    expect(within(rows[2]).getByText(/전체\(내 계정 권한\)|Full \(my permissions\)/)).toBeInTheDocument();
   });
 
   it("이름이 비면 서버를 부르지 않는다", async () => {

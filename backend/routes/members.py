@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from database import get_db
 from models import User, Project, ProjectMember, ProjectRole, UserRole
 from schemas import ProjectMemberCreate, ProjectMemberUpdate, ProjectMemberResponse
-from auth import get_current_user, check_project_access, role_required
+from auth import get_current_user, get_session_user, check_project_access, role_required
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +45,12 @@ def list_members(
     project_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("viewer")),
+    _session: User = Depends(get_session_user),
 ):
-    """프로젝트 멤버 목록 조회"""
+    """프로젝트 멤버 목록 조회 (로그인 세션만)
+
+    ★관리자 키로 프로젝트마다 부르면 사용자 아이디·표시 이름·역할을 모을 수 있다(SYM-217, QA1 지적).
+    """
     members = (
         db.query(ProjectMember)
         .options(joinedload(ProjectMember.user))
@@ -74,6 +78,7 @@ def list_available_users(
     project_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _session: User = Depends(get_session_user),
 ):
     """멤버 추가용 사용자 목록 - 이미 멤버인 사용자 제외
 
@@ -99,8 +104,14 @@ def add_member(
     payload: ProjectMemberCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _session: User = Depends(get_session_user),
 ):
-    """프로젝트에 멤버 추가 (프로젝트 admin만)"""
+    """프로젝트에 멤버 추가 (프로젝트 admin만, 로그인 세션만)
+
+    ★멤버 관리(후보 목록, 추가, 역할 변경, 삭제)는 API 키로 받지 않는다(SYM-217). 시스템 관리자는
+      모든 프로젝트의 admin 이라, 관리자 키로 이 경로를 프로젝트마다 부르면 일괄 배정을 막아도
+      아무 계정을 전 프로젝트 admin 으로 올릴 수 있다(QA 2인 지적). 스크립트가 쓸 일이 없는 작업이다.
+    """
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -109,6 +120,7 @@ def add_member(
     # ★누구나 자기 프로젝트의 admin 이 되므로, 후보 목록에서 뺀 승인 대기·중지 계정을 id 를
     #   하나씩 넣어 보며 알아낼 수 있다(응답에 아이디가 실린다). 없는 계정과 같은 404 로 답한다.
     #   시스템 관리자는 원래 전체 사용자 목록을 보므로 승인 전에 미리 배정하는 길을 남긴다.
+    #   프로젝트 하나씩 고르는 배정이라 남긴다. 전 프로젝트 일괄 배정(assign-all)은 사용 중인 계정만 받는다.
     from models import UserStatus
     if not user or (user.status != UserStatus.active and not _is_system_manager(current_user)):
         raise HTTPException(status_code=404, detail="User not found")
@@ -158,6 +170,7 @@ def update_member_role(
     payload: ProjectMemberUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _session: User = Depends(get_session_user),
 ):
     """멤버 역할 변경 (프로젝트 admin만)"""
     member = db.query(ProjectMember).filter(
@@ -197,6 +210,7 @@ def remove_member(
     member_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(check_project_access("admin")),
+    _session: User = Depends(get_session_user),
 ):
     """멤버 제거 (프로젝트 admin만)"""
     member = db.query(ProjectMember).filter(
@@ -256,6 +270,11 @@ def assign_to_all_projects(
     user = db.query(User).filter(User.id == payload.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    # ★대기·중지 계정을 전 프로젝트에 배정해 두면 승인·재개되는 순간 전 프로젝트 권한이 생긴다(SYM-217).
+    #   프로젝트 하나에 미리 배정하는 길은 add_member 에 남아 있다.
+    from models import UserStatus
+    if user.status != UserStatus.active:
+        raise HTTPException(status_code=409, detail="사용 중인 계정만 처리할 수 있습니다.")
 
     valid_roles = [r.value for r in ProjectRole]
     if payload.role not in valid_roles:

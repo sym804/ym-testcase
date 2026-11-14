@@ -92,10 +92,11 @@ export const authApi = {
     return res.data;
   },
 
-  createApiKey: async (name: string, expiresDays: number | null) => {
+  createApiKey: async (name: string, expiresDays: number | null, scope: ApiKeyItem["scope"]) => {
     const res = await client.post<ApiKeyItem & { key: string }>("/api/auth/api-keys", {
       name,
       expires_days: expiresDays,
+      scope,
     });
     return res.data;
   },

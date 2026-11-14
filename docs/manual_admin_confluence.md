@@ -152,7 +152,7 @@ npx tsc -b
 
 ⚠️ **주의**: 임시 비밀번호는 화면에 1회만 표시됩니다. 반드시 메모하여 전달하세요.
 
-ℹ️ **참고**: 비밀번호를 초기화하면 그 사용자의 API 키도 모두 폐기됩니다. 초기화와 계정 복구 승인은 로그인한 관리자 화면에서만 할 수 있고, API 키로는 할 수 없습니다.
+ℹ️ **참고**: 비밀번호를 초기화하면 그 사용자의 API 키도 모두 폐기됩니다. 초기화, 계정 복구 요청 조회 · 승인 · 반려, 사용자 목록, 일괄 배정, 프로젝트 멤버 관리, 공개 범위 변경은 로그인한 화면에서만 할 수 있고, API 키로는 할 수 없습니다.
 
 ### 5-5. 초기 계정
 
@@ -273,7 +273,7 @@ npx tsc -b
 | 비밀번호 초기화 | Admin이 임시 비밀번호 발급, 강제 변경 플래그 | Admin 페이지 |
 | 인증 토큰 | JWT (HS256) + httpOnly 쿠키 | TOKEN_EXPIRE_HOURS (기본 72시간), 로그인 유지는 REMEMBER_ME_DAYS (기본 30일) |
 | CSRF 방어 | csrf_token 쿠키 + X-CSRF-Token 헤더 검증 | 쿠키 로그인의 상태 변경 요청에 자동 적용 (Bearer 헤더 인증은 제외) |
-| API 키 | 사용자별 발급 · 폐기, SHA-256 해시 저장, Bearer 헤더 인증 | 만료 30 · 90 · 180 · 365일 또는 없음, 1인 20개, 비밀번호가 바뀌면 전부 폐기 |
+| API 키 | 사용자별 발급 · 폐기, SHA-256 해시 저장, Bearer 헤더 인증 | 만료 30 · 90 · 180 · 365일 또는 없음, 1인 20개, 범위 결과 업로드 전용(기본) 또는 전체, 사용자 관리 · 멤버 관리 · 공개 범위 변경은 키 불가, 비밀번호가 바뀌면 전부 폐기 |
 | 로그인 제한 | Rate Limiting | 실패 기준 IP+사용자 5분 10회, 계정 1시간 50회, IP 1시간 100회 (초과 시 잠금) |
 | CORS | 오리진 화이트리스트 | CORS_ORIGINS (와일드카드 금지) |
 | 파일 업로드 | 확장자 화이트리스트 + 경로 탐색 방지 | 허용 확장자 고정 |
@@ -299,19 +299,19 @@ npx tsc -b
 | POST | /api/auth/logout | 로그아웃. 세션 쿠키를 지우고 그 계정의 다른 기기 세션도 모두 끊음 |
 | GET | /api/auth/me | 현재 사용자 정보 |
 | PUT | /api/auth/change-password | 비밀번호 변경 (최소 8자) |
-| GET | /api/auth/users | 사용자 목록 (QA Manager 이상) |
-| POST | /api/auth/users/{user_id}/approve | 가입 승인 (Admin) |
-| POST | /api/auth/users/{user_id}/reject | 가입 거절. 승인 대기 계정을 지움 (Admin) |
-| POST | /api/auth/users/{user_id}/disable | 사용 중지. 로그인과 API 키를 막음 (Admin) |
-| POST | /api/auth/users/{user_id}/enable | 다시 사용 (Admin) |
-| POST | /api/auth/users/{user_id}/release-email | 이메일 해제 (Admin) |
-| DELETE | /api/auth/users/{user_id} | 작업 기록이 없는 계정 삭제. 기록이 있으면 409 (Admin) |
-| PUT | /api/auth/users/{user_id}/role | 역할 변경 (Admin) |
+| GET | /api/auth/users | 사용자 목록 (QA Manager 이상, 로그인 세션만) |
+| POST | /api/auth/users/{user_id}/approve | 가입 승인 (Admin, 로그인 세션만) |
+| POST | /api/auth/users/{user_id}/reject | 가입 거절. 승인 대기 계정을 지움 (Admin, 로그인 세션만) |
+| POST | /api/auth/users/{user_id}/disable | 사용 중지. 로그인과 API 키를 막음 (Admin, 로그인 세션만) |
+| POST | /api/auth/users/{user_id}/enable | 다시 사용 (Admin, 로그인 세션만) |
+| POST | /api/auth/users/{user_id}/release-email | 이메일 해제 (Admin, 로그인 세션만) |
+| DELETE | /api/auth/users/{user_id} | 작업 기록이 없는 계정 삭제. 기록이 있으면 409 (Admin, 로그인 세션만) |
+| PUT | /api/auth/users/{user_id}/role | 역할 변경 (Admin, 로그인 세션만) |
 | PUT | /api/auth/users/{user_id}/reset-password | 비밀번호 초기화 (Admin, 로그인 세션만) |
 | POST | /api/auth/account-requests | 계정 복구 요청 접수 |
-| GET | /api/auth/account-requests | 계정 복구 요청 목록 |
-| POST | /api/auth/account-requests/{id}/approve | 계정 복구 요청 승인 |
-| POST | /api/auth/account-requests/{id}/reject | 계정 복구 요청 반려 |
+| GET | /api/auth/account-requests | 계정 복구 요청 목록 (Admin, 로그인 세션만) |
+| POST | /api/auth/account-requests/{id}/approve | 계정 복구 요청 승인 (Admin, 로그인 세션만) |
+| POST | /api/auth/account-requests/{id}/reject | 계정 복구 요청 반려 (Admin, 로그인 세션만) |
 | POST | /api/auth/reset-password/verify | 코드로 비밀번호 재설정 |
 | GET | /api/auth/api-keys | 본인 API 키 목록 (로그인 세션만) |
 | POST | /api/auth/api-keys | API 키 발급. 원문은 응답에서 1회만 (로그인 세션만) |
@@ -327,7 +327,7 @@ npx tsc -b
 | GET | /api/projects | 프로젝트 목록 |
 | POST | /api/projects | 프로젝트 생성 (로그인 사용자 누구나, 만든 사람이 Project Admin) |
 | GET | /api/projects/{id} | 프로젝트 상세 |
-| PUT | /api/projects/{id} | 프로젝트 수정 |
+| PUT | /api/projects/{id} | 프로젝트 수정 (공개 범위 변경은 로그인 세션만) |
 | DELETE | /api/projects/{id} | 프로젝트 삭제 (Project Admin) |
 
 ### 테스트 케이스
@@ -392,10 +392,10 @@ npx tsc -b
 
 | Method | Endpoint | 설명 |
 |---|---|---|
-| GET | /api/projects/{id}/members | 멤버 목록 |
-| POST | /api/projects/{id}/members | 멤버 추가 |
-| PUT | /api/projects/{id}/members/{member_id} | 멤버 역할 변경 |
-| DELETE | /api/projects/{id}/members/{member_id} | 멤버 제거 |
+| GET | /api/projects/{id}/members | 멤버 목록 (로그인 세션만) |
+| POST | /api/projects/{id}/members | 멤버 추가 (로그인 세션만) |
+| PUT | /api/projects/{id}/members/{member_id} | 멤버 역할 변경 (로그인 세션만) |
+| DELETE | /api/projects/{id}/members/{member_id} | 멤버 제거 (로그인 세션만) |
 
 ### 기타
 

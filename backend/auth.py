@@ -151,8 +151,21 @@ def generate_api_key() -> tuple[str, str]:
     return f"{API_KEY_PREFIX}{key_id}_{secrets.token_urlsafe(32)}", key_id
 
 
-def _user_from_api_key(raw: str, db: Session) -> User:
-    """API 키로 사용자를 찾는다. 어느 단계에서 실패했는지는 응답에 드러내지 않는다."""
+API_KEY_SCOPES = ("full", "results")
+#: results 범위 키가 부를 수 있는 (메서드, 라우트 경로). CI 결과 업로드(scripts/ymtc-upload.mjs)가
+#: 쓰는 경로와 키 확인용 /me 뿐이다. 업로드 발급은 목적이 result_import 인 것만 받는다(routes/uploads.py).
+RESULTS_SCOPE_ROUTES = frozenset({
+    ("GET", "/api/auth/me"),
+    ("POST", "/api/uploads"),
+    ("POST", "/api/projects/{project_id}/testruns/import"),
+    ("POST", "/api/projects/{project_id}/testruns/{run_id}/results/import"),
+})
+SCOPE_DENIED_DETAIL = "이 API 키의 범위로는 할 수 없는 작업입니다."
+SESSION_ONLY_DETAIL = "API 키로는 할 수 없는 작업입니다. 로그인해서 진행해 주세요."
+
+
+def _user_from_api_key(raw: str, db: Session):
+    """API 키로 (사용자, 범위)를 찾는다. 어느 단계에서 실패했는지는 응답에 드러내지 않는다."""
     from models import ApiKey, now_kst
 
     denied = HTTPException(
@@ -176,10 +189,11 @@ def _user_from_api_key(raw: str, db: Session) -> User:
     # ★중지·대기 계정의 키도 막는다. 이 경로는 get_current_user 의 상태 검사보다 먼저 반환한다.
     if user is None or user.status != UserStatus.active:
         raise denied
+    scope = key.scope or "full"
     if key.last_used_at is None or now - key.last_used_at >= API_KEY_TOUCH_INTERVAL:
         key.last_used_at = now
         db.commit()
-    return user
+    return user, scope
 
 
 def get_current_user(
@@ -197,7 +211,15 @@ def get_current_user(
     # API 키는 Authorization 헤더로만 받는다. 헤더 인증이라 CSRF 대상이 아니다.
     if auth_source == "header" and jwt_token.startswith(API_KEY_PREFIX):
         request.state.auth_method = "api_key"
-        return _user_from_api_key(jwt_token, db)
+        user, scope = _user_from_api_key(jwt_token, db)
+        request.state.api_key_scope = scope
+        # ★범위 검사는 라우트 경로(템플릿)로 한다. 실제 URL 로 비교하면 프로젝트 id 마다 따로 적어야 한다.
+        #   키 인증은 모두 이 함수를 거치므로 여기서 막으면 빠지는 라우트가 없다.
+        if scope != "full":
+            route_path = getattr(request.scope.get("route"), "path", None) or request.url.path
+            if (request.method, route_path) not in RESULTS_SCOPE_ROUTES:
+                raise HTTPException(status_code=403, detail=SCOPE_DENIED_DETAIL)
+        return user
     request.state.auth_method = "session"
 
     # CSRF 검증 (쿠키 인증 + 상태 변경 요청)
@@ -270,15 +292,23 @@ def get_session_user(
     로그아웃으로 그 사용자의 웹 세션을 전부 끊을 수 있으면 유출된 키의 피해가 키 밖으로 번진다.
     """
     if getattr(request.state, "auth_method", None) == "api_key":
-        raise HTTPException(status_code=403, detail="API 키로는 할 수 없는 작업입니다. 로그인해서 진행해 주세요.")
+        raise HTTPException(status_code=403, detail=SESSION_ONLY_DETAIL)
     return current_user
 
 
 def role_required(minimum_role: str):
-    """Dependency factory that enforces a minimum system role level."""
+    """시스템 역할(QA Manager, 관리자) 이상을 요구하는 의존성. 로그인 세션으로만 받는다.
+
+    ★API 키로는 받지 않는다(SYM-217). 이 의존성이 걸린 작업은 사용자 목록, 계정 요청, 전체 배정
+      조회, 일괄 배정처럼 사이트 전체를 다룬다. 관리자 키 하나로 전 사용자 이메일을 읽고 일괄
+      배정을 부를 수 있었다. 프로젝트 단위 작업은 프로젝트 권한(check_project_access)으로 판정하므로
+      여기에 걸리지 않는다. 그중 멤버 관리는 routes/members.py 가 따로 세션 전용으로 막는다.
+    """
     min_index = SYSTEM_ROLE_HIERARCHY.index(minimum_role)
 
-    def _check(current_user: User = Depends(get_current_user)) -> User:
+    def _check(request: Request, current_user: User = Depends(get_current_user)) -> User:
+        if getattr(request.state, "auth_method", None) == "api_key":
+            raise HTTPException(status_code=403, detail=SESSION_ONLY_DETAIL)
         user_role = current_user.role.value if isinstance(current_user.role, UserRole) else current_user.role
         user_index = SYSTEM_ROLE_HIERARCHY.index(user_role)
         if user_index < min_index:
@@ -297,8 +327,9 @@ def admin_session_required(
 ) -> User:
     """계정 관리(승인, 역할, 중지, 삭제 등)는 관리자 로그인 세션으로만 한다.
 
-    API 키는 사용자 권한을 통째로 갖는다. 관리자 키가 새면 자기 계정을 승인하고 관리자로 올려,
+    전체 범위 API 키는 키 주인의 권한을 갖는다. 관리자 키가 새면 자기 계정을 승인하고 관리자로 올려,
     키를 폐기해도 관리자 계정이 남는다. 그래서 계정을 바꾸는 작업은 키로 받지 않는다.
+    role_required 가 이미 키를 거절하므로 여기의 세션 확인은 두 번째 방어선이다.
     """
     return get_session_user(request, current_user)
 

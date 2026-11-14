@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from auth import get_current_user
+from auth import SCOPE_DENIED_DETAIL, get_current_user
 from database import get_db
 from models import StagedUpload, User
 from services import staged_upload
@@ -25,9 +25,13 @@ class UploadRequest(BaseModel):
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_upload(
     payload: UploadRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # 결과 업로드 전용 키는 결과 파일 자리만 받는다. 첨부·TC 가져오기 자리는 그 키로 쓸 곳이 없다.
+    if getattr(request.state, "api_key_scope", "full") != "full" and payload.purpose != "result_import":
+        raise HTTPException(status_code=403, detail=SCOPE_DENIED_DETAIL)
     row = staged_upload.new_upload(db, current_user, payload.purpose, payload.filename,
                                    payload.size, payload.content_type)
     # ★서명 주소 발급(외부 호출, 최대 30초) 전에 커밋해 사용자별 할당량 잠금을 푼다. 쥔 채로

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
-from auth import generate_api_key, get_session_user, hash_api_key
+from auth import API_KEY_SCOPES, generate_api_key, get_session_user, hash_api_key
 from database import get_db
 from models import ApiKey, User, now_kst
 
@@ -25,6 +25,8 @@ ALLOWED_EXPIRES_DAYS = (30, 90, 180, 365)
 class ApiKeyCreate(BaseModel):
     name: str = Field(..., max_length=100)
     expires_days: Optional[int] = 90
+    #: 기본은 결과 업로드 전용이다. 키 주인 권한을 통째로 주는 full 은 골라야만 준다(SYM-217).
+    scope: str = Field("results", max_length=16)
 
     @field_validator("name")
     @classmethod
@@ -32,6 +34,13 @@ class ApiKeyCreate(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("키 이름을 입력해 주세요.")
+        return v
+
+    @field_validator("scope")
+    @classmethod
+    def _check_scope(cls, v: str) -> str:
+        if v not in API_KEY_SCOPES:
+            raise ValueError(f"범위는 {', '.join(API_KEY_SCOPES)} 중에서 고릅니다.")
         return v
 
     @field_validator("expires_days")
@@ -53,6 +62,8 @@ class ApiKeyItem(BaseModel):
     revoked_at: Optional[datetime]
     #: active | expired | revoked
     status: str
+    #: full | results
+    scope: str
 
 
 class ApiKeyCreated(ApiKeyItem):
@@ -78,6 +89,7 @@ def _item(k: ApiKey, now: datetime) -> dict:
         "expires_at": k.expires_at,
         "revoked_at": k.revoked_at,
         "status": _status(k, now),
+        "scope": k.scope or "full",
     }
 
 
@@ -125,6 +137,7 @@ def create_api_key(
         key_hash=hash_api_key(raw),
         created_at=now,
         expires_at=now + timedelta(days=payload.expires_days) if payload.expires_days else None,
+        scope=payload.scope,
     )
     db.add(key)
     db.commit()

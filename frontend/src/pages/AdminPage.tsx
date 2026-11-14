@@ -183,9 +183,9 @@ export default function AdminPage() {
       const result = await usersApi.assignToAllProjects(assignTarget.id, assignRole);
       toast.success(t("assignAllSuccess", { count: result.assigned }));
       await openAssignModal(assignTarget);
-    } catch (err) {
-      console.error(err);
-      toast.error(t("assignAllFailed"));
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ? translateError(detail) : t("assignAllFailed"));
     } finally {
       setAssignLoading(false);
     }

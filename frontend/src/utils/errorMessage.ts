@@ -38,6 +38,7 @@ const ERROR_MAP: Record<string, string> = {
   "작업 기록이 있는 계정은 삭제할 수 없습니다. 사용 중지를 쓰세요.": "errors.hasActivity",
   "이 작업을 수행할 권한이 없습니다.": "errors.noPermission",
   "이 프로젝트에 접근 권한이 없습니다.": "errors.noProjectAccess",
+  "이 API 키의 범위로는 할 수 없는 작업입니다.": "errors.apiKeyScopeDenied",
   "API 키로는 할 수 없는 작업입니다. 로그인해서 진행해 주세요.": "errors.sessionOnly",
   "다른 요청과 겹쳤습니다. 다시 시도해 주세요.": "errors.concurrentRequest",
   "비밀번호를 먼저 변경해 주세요.": "errors.mustChangePassword",

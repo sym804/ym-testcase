@@ -229,6 +229,8 @@ export interface ApiKeyItem {
   expires_at: string | null;
   revoked_at: string | null;
   status: "active" | "expired" | "revoked";
+  /** full: 내 계정 권한 그대로, results: 결과 업로드 경로만 */
+  scope: "full" | "results";
 }
 
 /** 자동화 결과 파일 가져오기 응답. dry_run 이면 저장하지 않은 계산 결과다. */
