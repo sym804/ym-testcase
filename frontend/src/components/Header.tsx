@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { useEffect, useRef, useState } from "react";
 import { projectsApi, searchApi, authApi } from "../api";
+import { PROJECT_ORDER_EVENT } from "../api/events";
 import PasswordInput from "./PasswordInput";
 import ApiKeysModal from "./ApiKeysModal";
 import AccountLinkModal from "./AccountLinkModal";
@@ -32,9 +33,23 @@ export default function Header() {
   const urlProjectId = projectMatch ? parseInt(projectMatch[1]) : null;
 
   useEffect(() => {
-    if (user) {
-      projectsApi.list().then(setProjects).catch(() => {});
-    }
+    if (!user) return;
+    // 마지막 요청의 응답만 쓴다. 먼저 보낸 요청이 늦게 오면 옛 순서로 덮인다.
+    let latest = 0;
+    let alive = true;
+    const load = () => {
+      const mine = ++latest;
+      projectsApi.list()
+        .then((list) => { if (alive && mine === latest) setProjects(list); })
+        .catch(() => {});
+    };
+    load();
+    // 메인 화면에서 순서를 바꾸면 선택 목록도 같은 순서로 다시 받는다(SYM-228)
+    window.addEventListener(PROJECT_ORDER_EVENT, load);
+    return () => {
+      alive = false;
+      window.removeEventListener(PROJECT_ORDER_EVENT, load);
+    };
   }, [user]);
 
   useEffect(() => {

@@ -324,7 +324,8 @@ npx tsc -b
 
 | Method | Endpoint | 설명 |
 |---|---|---|
-| GET | /api/projects | 프로젝트 목록 |
+| GET | /api/projects | 프로젝트 목록 (내 순서: 순서를 정하지 않은 프로젝트가 위, 그 아래 저장한 순서) |
+| PUT | /api/projects/order | 내 프로젝트 순서 저장. `project_ids` 위에서 아래 순. 빠진 프로젝트는 순서 없음으로 돌아감. 볼 수 없는 id·중복은 400 |
 | POST | /api/projects | 프로젝트 생성 (로그인 사용자 누구나, 만든 사람이 Project Admin) |
 | GET | /api/projects/{id} | 프로젝트 상세 |
 | PUT | /api/projects/{id} | 프로젝트 수정 (공개 범위 변경은 로그인 세션만) |

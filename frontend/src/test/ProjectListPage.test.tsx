@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -41,6 +41,7 @@ vi.mock("../api", () => ({
     list: vi.fn(),
     create: vi.fn(),
     delete: vi.fn(),
+    saveOrder: vi.fn(),
   },
   overviewApi: { get: vi.fn() },
   searchApi: { global: vi.fn() },
@@ -91,6 +92,7 @@ beforeEach(() => {
   vi.mocked(projectsApi.create).mockResolvedValue({ id: 3, name: "New Project", description: "", jira_base_url: null, is_private: false, created_by: 1, created_at: "2026-01-10", updated_at: "2026-01-10" });
   vi.mocked(overviewApi.get).mockResolvedValue(mockOverview);
   vi.mocked(searchApi.global).mockResolvedValue([]);
+  vi.mocked(projectsApi.saveOrder).mockResolvedValue(undefined);
 });
 
 function renderPage() {
@@ -508,5 +510,187 @@ describe("ProjectListPage - Data Loading Errors", () => {
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith("데이터를 불러오지 못했습니다.");
     });
+  });
+});
+
+describe("ProjectListPage - 순서 바꾸기 (SYM-228)", () => {
+  // jsdom 에는 DragEvent 가 없어 끌기 이벤트에 clientY 가 실리지 않는다. 마우스 이벤트로 대신한다.
+  beforeAll(() => {
+    if (!("DragEvent" in window)) {
+      Object.defineProperty(window, "DragEvent", { configurable: true, value: class extends MouseEvent {} });
+    }
+  });
+  const projectNames = () =>
+    within(table("프로젝트")).getAllByRole("row").slice(1).map((r) => (r.textContent?.includes("Project A") ? "A" : "B"));
+  const handle = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name} 순서 변경`) });
+  const dt = () => ({ setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: "", dropEffect: "" });
+
+  it("손잡이를 끌어 다른 행 위쪽에 놓으면 그 앞으로 옮기고 저장한다", async () => {
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    const dataTransfer = dt();
+    fireEvent.dragStart(handle("Project B"), { dataTransfer });
+    const rowA = screen.getByTestId("project-row-1");
+    // jsdom 은 크기가 0 이라 행 가운데가 0 이다. 음수면 위쪽 절반에 놓은 것
+    fireEvent.dragOver(rowA, { dataTransfer, clientY: -1 });
+    fireEvent.drop(rowA, { dataTransfer, clientY: -1 });
+    expect(projectNames()).toEqual(["B", "A"]);
+    await waitFor(() => expect(projectsApi.saveOrder).toHaveBeenCalledWith([2, 1]));
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("아래쪽 절반에 놓으면 그 뒤로 옮긴다", async () => {
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    const dataTransfer = dt();
+    fireEvent.dragStart(handle("Project A"), { dataTransfer });
+    const rowB = screen.getByTestId("project-row-2");
+    fireEvent.dragOver(rowB, { dataTransfer, clientY: 1 });
+    fireEvent.drop(rowB, { dataTransfer, clientY: 1 });
+    expect(projectNames()).toEqual(["B", "A"]);
+    await waitFor(() => expect(projectsApi.saveOrder).toHaveBeenCalledWith([2, 1]));
+  });
+
+  it("제자리에 놓으면 저장하지 않는다", async () => {
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    const dataTransfer = dt();
+    fireEvent.dragStart(handle("Project A"), { dataTransfer });
+    const rowB = screen.getByTestId("project-row-2");
+    fireEvent.drop(rowB, { dataTransfer, clientY: -1 });
+    expect(projectNames()).toEqual(["A", "B"]);
+    expect(projectsApi.saveOrder).not.toHaveBeenCalled();
+  });
+
+  it("손잡이가 아닌 곳에서 시작한 끌기는 행을 옮기지 않는다", async () => {
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    const rowA = screen.getByTestId("project-row-1");
+    fireEvent.drop(rowA, { dataTransfer: dt(), clientY: -1 });
+    expect(projectNames()).toEqual(["A", "B"]);
+    expect(projectsApi.saveOrder).not.toHaveBeenCalled();
+  });
+
+  it("손잡이에서 위 · 아래 화살표로 옮기고 초점은 손잡이에 남는다", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    handle("Project B").focus();
+    await user.keyboard("{ArrowUp}");
+    expect(projectNames()).toEqual(["B", "A"]);
+    expect(document.activeElement).toBe(handle("Project B"));
+    await waitFor(() => expect(projectsApi.saveOrder).toHaveBeenLastCalledWith([2, 1]));
+    // 맨 위에서 위로는 움직이지 않는다
+    await user.keyboard("{ArrowUp}");
+    expect(projectsApi.saveOrder).toHaveBeenCalledTimes(1);
+    await user.keyboard("{ArrowDown}");
+    expect(projectNames()).toEqual(["A", "B"]);
+    await waitFor(() => expect(projectsApi.saveOrder).toHaveBeenLastCalledWith([1, 2]));
+  });
+
+  it("손잡이를 눌러도 프로젝트로 이동하지 않는다", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    await user.click(handle("Project A"));
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("저장은 한 줄로 보낸다. 앞 요청이 끝나기 전에 다음 요청을 보내지 않는다", async () => {
+    const user = userEvent.setup();
+    let release: () => void = () => {};
+    vi.mocked(projectsApi.saveOrder).mockImplementationOnce(() => new Promise<void>((r) => { release = r; }));
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    handle("Project B").focus();
+    await user.keyboard("{ArrowUp}");
+    await user.keyboard("{ArrowDown}");
+    await waitFor(() => expect(projectsApi.saveOrder).toHaveBeenCalledTimes(1));
+    release();
+    await waitFor(() => expect(projectsApi.saveOrder).toHaveBeenCalledTimes(2));
+    expect(projectsApi.saveOrder).toHaveBeenLastCalledWith([1, 2]);
+  });
+
+  it("저장에 실패하면 알리고 서버 순서로 다시 불러온다", async () => {
+    const user = userEvent.setup();
+    vi.mocked(projectsApi.saveOrder).mockRejectedValueOnce(new Error("500"));
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    handle("Project B").focus();
+    await user.keyboard("{ArrowUp}");
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("순서를 저장하지 못했습니다. 목록을 다시 불러옵니다."));
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    expect(overviewApi.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("저장이 실패하면 그 뒤에 쌓인 저장은 보내지 않고 서버 순서를 보여 준다 (QA1 지적)", async () => {
+    const user = userEvent.setup();
+    const pC = { ...mockOverview.projects[1], id: 3, name: "Project C" };
+    const three = { ...mockOverview, projects: [...mockOverview.projects, pC] };
+    vi.mocked(overviewApi.get).mockResolvedValue(three);
+    let fail: (e: Error) => void = () => {};
+    vi.mocked(projectsApi.saveOrder).mockImplementationOnce(() => new Promise<void>((_, rej) => { fail = rej; }));
+    const names3 = () => within(table("프로젝트")).getAllByRole("link")
+      .map((a) => a.textContent ?? "").filter((t) => /^Project [ABC]$/.test(t));
+    renderPage();
+    await waitFor(() => expect(names3()).toEqual(["Project A", "Project B", "Project C"]));
+    handle("Project C").focus();
+    await user.keyboard("{ArrowUp}");
+    await user.keyboard("{ArrowUp}");
+    expect(names3()).toEqual(["Project C", "Project A", "Project B"]);
+    await waitFor(() => expect(projectsApi.saveOrder).toHaveBeenCalledTimes(1));
+    fail(new Error("500"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    await waitFor(() => expect(names3()).toEqual(["Project A", "Project B", "Project C"]));
+    // 쌓여 있던 두 번째 저장([C, A, B])을 보내면 서버와 화면이 어긋난다
+    await new Promise((r) => setTimeout(r, 50));
+    expect(projectsApi.saveOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("저장과 다시 불러오기가 모두 실패하면 직전에 저장에 성공한 순서로 되돌린다 (QA1 2 · 3차)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    // 첫 이동은 저장에 성공한다. 받아 온 순서([A, B])가 아니라 이 순서([B, A])로 돌아와야 한다
+    handle("Project B").focus();
+    await user.keyboard("{ArrowUp}");
+    await waitFor(() => expect(projectsApi.saveOrder).toHaveBeenLastCalledWith([2, 1]));
+    vi.mocked(projectsApi.saveOrder).mockRejectedValueOnce(new Error("500"));
+    vi.mocked(overviewApi.get).mockRejectedValueOnce(new Error("network"));
+    await user.keyboard("{ArrowDown}");
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("순서를 저장하지 못했습니다. 목록을 다시 불러옵니다."));
+    await waitFor(() => expect(overviewApi.get).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(projectNames()).toEqual(["B", "A"]));
+    // 복구한 뒤 새로 옮긴 것은 정상으로 저장된다
+    handle("Project A").focus();
+    await user.keyboard("{ArrowUp}");
+    await waitFor(() => expect(projectsApi.saveOrder).toHaveBeenLastCalledWith([1, 2]));
+    expect(projectsApi.saveOrder).toHaveBeenCalledTimes(3);
+  });
+
+  it("손잡이에서 Space 와 Enter 는 화면을 움직이지 않는다", async () => {
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    // fireEvent 는 기본 동작을 막으면 false 를 돌려준다(Space 는 막지 않으면 페이지가 스크롤된다)
+    expect(fireEvent.keyDown(handle("Project A"), { key: " " })).toBe(false);
+    expect(fireEvent.keyDown(handle("Project A"), { key: "Enter" })).toBe(false);
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(projectsApi.saveOrder).not.toHaveBeenCalled();
+  });
+
+  it("키보드로 옮기면 새 위치를 화면 낭독기에 알린다", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(projectNames()).toEqual(["A", "B"]));
+    handle("Project B").focus();
+    await user.keyboard("{ArrowUp}");
+    expect(screen.getByRole("status")).toHaveTextContent("Project B: 2개 중 1번째");
+  });
+
+  it("프로젝트가 하나면 순서 안내를 보여 주지 않는다", async () => {
+    vi.mocked(overviewApi.get).mockResolvedValue({ ...mockOverview, projects: [mockOverview.projects[0]] });
+    renderPage();
+    await waitFor(() => expect(screen.getAllByText("Project A").length).toBeGreaterThanOrEqual(1));
+    expect(screen.queryByText(/순서를 바꿀 수 있습니다/)).not.toBeInTheDocument();
   });
 });

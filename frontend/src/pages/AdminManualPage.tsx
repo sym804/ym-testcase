@@ -436,6 +436,7 @@ npx tsc --noEmit`}</pre>
               ]},
               { title: t("apiRef.projects.title"), endpoints: [
                 ["GET", "/api/projects", t("apiRef.projects.list")],
+                ["PUT", "/api/projects/order", t("apiRef.projects.order")],
                 ["POST", "/api/projects", t("apiRef.projects.create")],
                 ["GET", "/api/projects/{id}", t("apiRef.projects.detail")],
                 ["PUT", "/api/projects/{id}", t("apiRef.projects.update")],

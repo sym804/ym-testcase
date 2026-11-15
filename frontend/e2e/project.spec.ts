@@ -4,7 +4,7 @@ import { projectLink } from "./nav";
 async function login(page: Page) {
   await page.goto("/login");
   await page.getByPlaceholder("아이디 또는 이메일을 입력하세요").fill("admin");
-  await page.getByPlaceholder("비밀번호를 입력하세요").fill("test1234");
+  await page.getByPlaceholder("비밀번호를 입력하세요").fill(process.env.TEST_ADMIN_PASSWORD || "test1234");
   await page.getByRole("button", { name: "로그인" }).click();
   await expect(page).toHaveURL(/\/projects/, { timeout: 10000 });
 }
@@ -61,6 +61,74 @@ test.describe("프로젝트 관리", () => {
       // 정리가 실패하면 다음 실행에 프로젝트가 남는다
       const del = await request.delete(`/api/projects/${pid}`, { headers: h });
       expect(del.status(), await del.text()).toBeLessThan(300);
+    }
+  });
+
+  // SYM-228: 손잡이를 끌어 놓으면 순서가 바뀌고 새로고침 뒤와 상단 선택 목록에도 남는다
+  test("프로젝트 순서를 끌어 놓아 바꾼다", async ({ page, request }) => {
+    // 대기 상한의 합(로그인, 새로고침 두 번, 저장 응답)이 기본 30초를 넘는다. 시간 초과로 테스트가
+    // 중단되면 finally 정리가 돌지 않아 프로젝트와 순서 행이 남는다.
+    test.setTimeout(90000);
+    const auth = await request.post("/api/auth/login", {
+      data: { username: "admin", password: process.env.TEST_ADMIN_PASSWORD || "test1234" },
+    });
+    expect(auth.status(), await auth.text()).toBe(200);
+    const h = { Authorization: `Bearer ${(await auth.json()).access_token}` };
+    const stamp = Date.now();
+    const older = `E2E_ORD_A_${stamp}`;
+    const newer = `E2E_ORD_B_${stamp}`;
+    const ids: number[] = [];
+    // 끝나면 admin 의 보이는 순서를 시작 전 그대로 되돌린다(화면이 보이는 프로젝트 전부를 저장하므로)
+    const before = await request.get("/api/projects", { headers: h });
+    expect(before.status()).toBe(200);
+    const beforeIds = ((await before.json()) as { id: number }[]).map((p) => p.id);
+    try {
+      for (const name of [older, newer]) {
+        const r = await request.post("/api/projects", { headers: h, data: { name } });
+        expect(r.status(), await r.text()).toBe(201);
+        ids.push((await r.json()).id);
+      }
+      const tbl = page.getByRole("table", { name: "프로젝트" });
+      const order = async () =>
+        (await tbl.getByRole("link").allTextContents()).filter((t) => t === older || t === newer);
+
+      await page.reload();
+      // 순서를 정하지 않은 새 프로젝트는 맨 위에 최신순으로 온다
+      await expect.poll(order, { timeout: 10000 }).toEqual([newer, older]);
+
+      // 대기마다 상한을 둔다. 놓기가 안 되거나 손잡이를 못 찾아도 실패로 끝나고 finally 가 돈다
+      const saved = page.waitForResponse(
+        (r) => r.url().endsWith("/api/projects/order") && r.request().method() === "PUT", { timeout: 10000 });
+      const handle = page.getByRole("button", { name: new RegExp(`^${older} 순서 변경`) });
+      const target = tbl.getByRole("row").filter({ hasText: newer });
+      // 대상 행의 위쪽 끝에 놓는다(위쪽 절반이면 그 행 앞으로 간다)
+      await handle.dragTo(target, { targetPosition: { x: 300, y: 3 }, timeout: 10000 });
+      expect((await saved).status()).toBe(204);
+      await expect.poll(order).toEqual([older, newer]);
+
+      await page.reload();
+      await expect.poll(order, { timeout: 10000 }).toEqual([older, newer]);
+      // 상단 프로젝트 선택 목록도 같은 순서다
+      const options = (await page.locator("header select option").allTextContents()).filter((t) => t === older || t === newer);
+      expect(options).toEqual([older, newer]);
+    } finally {
+      // 정리 단계마다 결과를 모았다가 끝에 판정한다. 하나가 실패해도 나머지가 돈다.
+      const problems: string[] = [];
+      for (const pid of ids) {
+        try {
+          const del = await request.delete(`/api/projects/${pid}`, { headers: h });
+          if (del.status() >= 300) problems.push(`DELETE ${pid}: ${del.status()} ${await del.text()}`);
+        } catch (e) {
+          problems.push(`DELETE ${pid}: ${e}`);
+        }
+      }
+      try {
+        const restore = await request.put("/api/projects/order", { headers: h, data: { project_ids: beforeIds } });
+        if (restore.status() !== 204) problems.push(`PUT order: ${restore.status()} ${await restore.text()}`);
+      } catch (e) {
+        problems.push(`PUT order: ${e}`);
+      }
+      expect(problems, "정리 실패").toEqual([]);
     }
   });
 

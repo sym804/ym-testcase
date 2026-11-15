@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { StrictMode } from "react";
 import Header from "../components/Header";
+import { PROJECT_ORDER_EVENT } from "../api/events";
+import { projectsApi } from "../api";
 import { UserRole } from "../types";
 
 // Mock contexts
@@ -78,6 +80,32 @@ describe("Header", () => {
     await waitFor(() => {
       expect(screen.getByText("프로젝트A")).toBeInTheDocument();
     });
+  });
+
+  it("먼저 보낸 목록 응답이 늦게 와도 나중 응답의 순서를 유지한다 (SYM-228)", async () => {
+    const list = vi.mocked(projectsApi.list);
+    let first: (v: unknown) => void = () => {};
+    list.mockImplementationOnce(() => new Promise((r) => { first = r as (v: unknown) => void; }) as never);
+    list.mockResolvedValueOnce([{ id: 2, name: "프로젝트B" }, { id: 1, name: "프로젝트A" }] as never);
+    renderHeader();
+    window.dispatchEvent(new Event(PROJECT_ORDER_EVENT));
+    await waitFor(() => expect(screen.getByText("프로젝트B")).toBeInTheDocument());
+    first([{ id: 1, name: "프로젝트A" }, { id: 2, name: "프로젝트B" }]);
+    await new Promise((r) => setTimeout(r, 20));
+    const opts = Array.from(document.querySelectorAll("header select option")).map((o) => o.textContent);
+    expect(opts.slice(1)).toEqual(["프로젝트B", "프로젝트A"]);
+  });
+
+  it("메인 화면에서 순서를 저장하면 프로젝트 목록을 다시 받는다 (SYM-228)", async () => {
+    const { unmount } = renderHeader();
+    await waitFor(() => expect(screen.getByText("프로젝트A")).toBeInTheDocument());
+    const before = vi.mocked(projectsApi.list).mock.calls.length;
+    window.dispatchEvent(new Event(PROJECT_ORDER_EVENT));
+    await waitFor(() => expect(vi.mocked(projectsApi.list).mock.calls.length).toBe(before + 1));
+    // 화면을 떠나면 더 듣지 않는다
+    unmount();
+    window.dispatchEvent(new Event(PROJECT_ORDER_EVENT));
+    expect(vi.mocked(projectsApi.list).mock.calls.length).toBe(before + 1);
   });
 
   it("검색 입력란을 표시한다", () => {

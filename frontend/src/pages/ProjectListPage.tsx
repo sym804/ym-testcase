@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { projectsApi, overviewApi } from "../api";
@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { UserRole } from "../types";
 import toast from "react-hot-toast";
 import Header from "../components/Header";
+import { moveItem } from "../utils/moveItem";
 
 /** 수행 하나의 요약. 수치는 지금 남은 TC 기준이다(SYM-225). */
 interface RunSummary {
@@ -113,15 +114,33 @@ export default function ProjectListPage() {
   const [creating, setCreating] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  // 끌고 있는 프로젝트와 놓일 자리(그 행의 위 또는 아래)
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dropAt, setDropAt] = useState<{ id: number; after: boolean } | null>(null);
+  // 저장은 한 줄로 보낸다. 화살표를 연달아 누르면 요청이 겹쳐 앞의 순서가 나중에 도착할 수 있다.
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  // 저장이 실패하면 올린다. 그 전에 쌓인 저장은 실패 전 화면을 바탕으로 한 것이라 보내지 않는다.
+  const orderEpoch = useRef(0);
+  // 서버가 마지막으로 확인한 순서(받아 온 목록, 저장에 성공한 순서). 다시 받기도 실패하면 이 순서로 되돌린다.
+  const confirmedIds = useRef<number[]>([]);
+  // 키보드로 옮긴 뒤 손잡이에 초점을 되돌린다(행이 다시 그려지며 초점이 사라진다)
+  const focusHandle = useRef<number | null>(null);
+  // 키보드로 옮긴 결과를 화면 낭독기에 알린다
+  const [announce, setAnnounce] = useState("");
 
   // 프로젝트 목록과 수치를 한 번에 받는다. 따로 받으면 두 응답 사이에 프로젝트가 생기거나
   // 지워졌을 때 표와 수치가 어긋난다.
-  const loadData = async () => {
+  /** 받아 오면 true. 순서 저장 실패 뒤 복구할 때 성공 여부를 본다. */
+  const loadData = async (): Promise<boolean> => {
     try {
-      setOverview(await overviewApi.get());
+      const data: OverviewData = await overviewApi.get();
+      setOverview(data);
+      confirmedIds.current = (data?.projects ?? []).map((p) => p.id);
+      return true;
     } catch (err) {
       console.error(err);
       toast.error(t("loadFailed"));
+      return false;
     } finally {
       setLoading(false);
     }
@@ -130,6 +149,67 @@ export default function ProjectListPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (focusHandle.current == null) return;
+    document.querySelector<HTMLElement>(`[data-order-handle="${focusHandle.current}"]`)?.focus();
+    focusHandle.current = null;
+  });
+
+  /** 화면 순서를 먼저 바꾸고 저장한다. 실패하면 서버 순서로 다시 받는다(SYM-228). */
+  const applyOrder = (next: ProjectRow[]) => {
+    setOverview((prev) => (prev ? { ...prev, projects: next } : prev));
+    const ids = next.map((p) => p.id);
+    const epoch = orderEpoch.current;
+    saveChain.current = saveChain.current.then(async () => {
+      if (epoch !== orderEpoch.current) return;
+      try {
+        await projectsApi.saveOrder(ids);
+        confirmedIds.current = ids;
+      } catch (err) {
+        console.error(err);
+        toast.error(t("order.saveFailed"));
+        // 다시 받는 동안 옮긴 것도 버린다. 받은 서버 순서가 화면을 덮기 때문이다.
+        orderEpoch.current++;
+        if (!(await loadData())) {
+          const rank = new Map(confirmedIds.current.map((id, i) => [id, i]));
+          setOverview((prev) => prev && {
+            ...prev,
+            projects: [...prev.projects].sort((a, b) => (rank.get(a.id) ?? -1) - (rank.get(b.id) ?? -1)),
+          });
+        }
+        orderEpoch.current++;
+      }
+    });
+  };
+
+  const moveTo = (fromId: number, toId: number, after: boolean) => {
+    const next = moveItem(projects, fromId, toId, after);
+    if (next) applyOrder(next);
+  };
+
+  const onHandleKey = (e: React.KeyboardEvent, id: number) => {
+    // 손잡이는 버튼 역할이지만 누를 동작이 없다. Space 는 막지 않으면 페이지가 스크롤된다.
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    e.stopPropagation();
+    const i = projects.findIndex((p) => p.id === id);
+    const j = e.key === "ArrowUp" ? i - 1 : i + 1;
+    if (i < 0 || j < 0 || j >= projects.length) return;
+    focusHandle.current = id;
+    moveTo(id, projects[j].id, e.key === "ArrowDown");
+    setAnnounce(t("order.moved", { name: projects[i].name, pos: j + 1, total: projects.length }));
+  };
+
+  const endDrag = () => {
+    setDragId(null);
+    setDropAt(null);
+  };
 
   const fmtDate = (v: string | null | undefined) => {
     if (!v) return "-";
@@ -248,6 +328,7 @@ export default function ProjectListPage() {
               {/* 프로젝트 추가/삭제 버튼은 표 바로 위. 생성은 로그인한 누구나, 일괄 삭제는 관리자만 */}
               {user && (
                 <div style={s.actions}>
+                  {projects.length > 1 && <span style={s.hint}>{t("order.hint")}</span>}
                   {isAdmin && selectedIds.size > 0 && (
                     <button style={s.deleteBtn} onClick={handleBulkDelete} disabled={deleting}>
                       {deleting ? t("common:deleting") : t("deleteCount", { count: selectedIds.size })}
@@ -258,6 +339,7 @@ export default function ProjectListPage() {
                   </button>
                 </div>
               )}
+              <div role="status" aria-live="polite" style={s.srOnly}>{announce}</div>
               {projects.length === 0 ? (
                 <div style={s.empty}>{t("noProjects")}</div>
               ) : (
@@ -265,6 +347,9 @@ export default function ProjectListPage() {
                   <table style={s.table} aria-label={t("projects")}>
                     <thead>
                       <tr>
+                        <th style={{ ...s.th, width: 28, padding: "10px 4px" }}>
+                          <span style={s.srOnly}>{t("order.column")}</span>
+                        </th>
                         {isAdmin && (
                           <th style={{ ...s.th, width: 36, textAlign: "center" }}>
                             <input
@@ -291,9 +376,56 @@ export default function ProjectListPage() {
                         return (
                           <tr
                             key={p.id}
-                            style={{ ...s.tr, backgroundColor: selectedIds.has(p.id) ? "rgba(45,74,122,0.08)" : undefined }}
+                            data-testid={`project-row-${p.id}`}
+                            style={{
+                              ...s.tr,
+                              backgroundColor: selectedIds.has(p.id) ? "rgba(45,74,122,0.08)" : undefined,
+                              opacity: dragId === p.id ? 0.45 : undefined,
+                              // 놓일 자리를 행의 위나 아래 선으로 보여 준다
+                              boxShadow: dropAt?.id === p.id && dragId !== p.id
+                                ? `inset 0 ${dropAt.after ? -2 : 2}px 0 var(--accent)`
+                                : undefined,
+                            }}
                             onClick={() => navigate(`/projects/${p.id}`)}
+                            onDragOver={(e) => {
+                              if (dragId == null) return;
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const after = e.clientY > rect.top + rect.height / 2;
+                              if (dropAt?.id !== p.id || dropAt.after !== after) setDropAt({ id: p.id, after });
+                            }}
+                            onDrop={(e) => {
+                              if (dragId == null) return;
+                              e.preventDefault();
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              moveTo(dragId, p.id, e.clientY > rect.top + rect.height / 2);
+                              endDrag();
+                            }}
                           >
+                            <td style={s.handleCell} onClick={(e) => e.stopPropagation()}>
+                              {/* 손잡이만 끌린다. 행 전체를 끌리게 하면 링크 · 글자 선택과 겹친다 */}
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                draggable
+                                data-order-handle={p.id}
+                                aria-label={t("order.handle", { name: p.name })}
+                                title={t("order.handle", { name: p.name })}
+                                style={{ ...s.handle, cursor: dragId === p.id ? "grabbing" : "grab" }}
+                                onDragStart={(e) => {
+                                  e.dataTransfer.effectAllowed = "move";
+                                  e.dataTransfer.setData("text/plain", String(p.id));
+                                  const row = e.currentTarget.closest("tr");
+                                  if (row) e.dataTransfer.setDragImage(row, 16, 16);
+                                  setDragId(p.id);
+                                }}
+                                onDragEnd={endDrag}
+                                onKeyDown={(e) => onHandleKey(e, p.id)}
+                              >
+                                ⠿
+                              </span>
+                            </td>
                             {isAdmin && (
                               <td style={{ ...s.td, textAlign: "center" as const }} onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }}>
                                 <input type="checkbox" aria-label={t("common:selectRow")} checked={selectedIds.has(p.id)} onChange={() => {}} style={s.check} />
@@ -508,6 +640,25 @@ const s: Record<string, React.CSSProperties> = {
   none: { color: "var(--text-secondary)" },
   lastRow: { display: "flex", gap: 10, marginTop: 4, fontSize: 12, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" },
   check: { width: 15, height: 15, cursor: "pointer" },
+  handleCell: { ...cell, width: 28, padding: "10px 4px", textAlign: "center", verticalAlign: "middle" },
+  handle: {
+    display: "inline-block",
+    padding: "2px 4px",
+    borderRadius: 4,
+    color: "var(--text-secondary)",
+    fontSize: 16,
+    lineHeight: 1,
+    userSelect: "none",
+  },
+  hint: { marginRight: "auto", alignSelf: "center", fontSize: 12, color: "var(--text-secondary)" },
+  srOnly: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    overflow: "hidden",
+    clip: "rect(0 0 0 0)",
+    whiteSpace: "nowrap",
+  },
 
   actions: { display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 },
   newBtn: {

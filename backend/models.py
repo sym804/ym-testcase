@@ -619,3 +619,18 @@ class StorageDeletion(Base):
     id = Column(Integer, primary_key=True)
     storage_key = Column(String(512), nullable=False)
     created_at = Column(DateTime, default=now_kst, nullable=False)
+
+
+# ── ProjectOrder ──────────────────────────────────────────────────────────────
+
+class ProjectOrder(Base):
+    """사용자별 메인 화면 프로젝트 순서 (SYM-228).
+
+    행이 없는 프로젝트(새로 생겼거나 아직 옮긴 적 없는 것)는 순서가 정해진 프로젝트보다 위에,
+    만든 순서 최신순으로 놓인다. 프로젝트나 사용자를 지우면 DB 가 행을 같이 지운다.
+    """
+    __tablename__ = "project_orders"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True, index=True)
+    position = Column(Integer, nullable=False)

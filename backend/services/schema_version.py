@@ -34,8 +34,9 @@ KNOWN_REVISIONS = frozenset({
     "0001_pg_baseline", "0003_rate_limit_events", "0004_staged_uploads",
     "0005_supabase_rls", "0006_storage_deletions", "0007_account_identity",
     "0008_google_email", "0009_result_tc_snapshot", "0010_api_key_scope",
+    "0011_project_orders",
 })
-HEAD_REVISIONS = frozenset({"0010_api_key_scope"})
+HEAD_REVISIONS = frozenset({"0011_project_orders"})
 
 
 def _known_and_heads(script_dir: Optional["ScriptDirectory"]) -> tuple[set, set]:

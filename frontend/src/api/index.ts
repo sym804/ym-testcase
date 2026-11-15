@@ -31,6 +31,7 @@ import type {
   StabilitySummary,
   AuthConfig,
 } from "../types";
+import { PROJECT_ORDER_EVENT } from "./events";
 
 // ★진행 중인 프로젝트 목록 요청을 같이 쓴다(projectsApi.list). Header 와 프로젝트 목록
 //   화면이 같은 순간에 각자 불러 요청이 2회 나갔다. 끝나면 비우므로 결과를 캐시하지는
@@ -171,6 +172,17 @@ export const projectsApi = {
       await client.delete(`/api/projects/${id}`);
     } finally {
       projectsListInFlight = null;
+    }
+  },
+
+  /** 내 화면의 프로젝트 순서(위에서 아래). 다른 사용자에게는 적용되지 않는다(SYM-228). */
+  saveOrder: async (projectIds: number[]) => {
+    try {
+      await client.put("/api/projects/order", { project_ids: projectIds });
+    } finally {
+      projectsListInFlight = null;
+      // 같은 화면의 상단 프로젝트 선택 목록이 새 순서를 다시 받는다
+      window.dispatchEvent(new Event(PROJECT_ORDER_EVENT));
     }
   },
 };

@@ -32,6 +32,8 @@ class LockNs(IntEnum):
     CRON = 3
     RATE_LIMIT = 4
     RUN_RESULTS = 5
+    #: 사용자별 프로젝트 순서 저장(SYM-228). 키는 사용자 id.
+    PROJECT_ORDER = 6
 
 
 def _wait_timeout_ms() -> int:

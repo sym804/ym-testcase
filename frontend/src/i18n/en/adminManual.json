@@ -311,7 +311,8 @@
     },
     "projects": {
       "title": "Projects",
-      "list": "Project list",
+      "list": "Project list (your order: projects you have not placed first, then your saved order)",
+      "order": "Save your project order. project_ids from top to bottom. Omitted projects return to unplaced. Invisible ids or duplicates: 400",
       "create": "Create project (any signed-in user, creator becomes Project Admin)",
       "detail": "Project detail",
       "update": "Update project (visibility change: signed-in session only)",

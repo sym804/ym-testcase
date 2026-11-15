@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from auth import get_current_user
 from database import get_db
+from services.project_order import ordered
 from models import (
     Project, ProjectMember, TestCase, TestResult, TestResultValue, TestRun, TestRunStatus, User, UserRole,
 )
@@ -29,8 +30,8 @@ def visible_projects(db: Session, user: User) -> list[Project]:
     if user.role not in (UserRole.admin, UserRole.qa_manager):
         member_ids = db.query(ProjectMember.project_id).filter(ProjectMember.user_id == user.id)
         q = q.filter(or_(Project.is_private.is_(False), Project.id.in_(member_ids)))
-    # 최근에 만든 프로젝트가 위다(프로젝트 목록 API 와 같은 순서).
-    return q.order_by(Project.created_at.desc(), Project.id.desc()).all()
+    # 사용자가 끌어 놓은 순서(SYM-228). 프로젝트 목록 API 와 같은 순서다.
+    return ordered(q, user.id).all()
 
 
 def _run_stats(db: Session, run_ids: list[int]) -> dict[int, dict]:

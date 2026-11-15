@@ -2,13 +2,17 @@ import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
 from routes.attachments import run_object_deletions, schedule_object_deletions
-from models import User, Project, ProjectMember, ProjectRole, TestRun, TestResult, Attachment
+from models import User, Project, ProjectMember, ProjectOrder, ProjectRole, TestRun, TestResult, Attachment
 from schemas import ProjectCreate, ProjectUpdate, ProjectResponse
 from auth import SESSION_ONLY_DETAIL, get_current_user, get_project_role, check_project_access
+from services.locks import LockNs, advisory_xact_lock
+from services.project_order import ordered
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +60,8 @@ def list_projects(
     from models import UserRole as _UR
     user_role = current_user.role.value if isinstance(current_user.role, _UR) else current_user.role
 
-    projects = db.query(Project).order_by(Project.created_at.desc()).all()
+    # 메인 화면과 같은 사용자별 순서(SYM-228). 상단 프로젝트 선택 목록이 이 순서를 쓴다.
+    projects = ordered(db.query(Project), current_user.id).all()
 
     # 멤버십 한 번에 조회 (N+1 방지)
     project_ids = [p.id for p in projects]
@@ -98,6 +103,47 @@ def list_projects(
             "my_role": proj_role,
         })
     return result
+
+
+ORDER_UNKNOWN_DETAIL = "볼 수 없거나 없는 프로젝트가 들어 있습니다. 목록을 새로고침한 뒤 다시 옮겨 주세요."
+ORDER_DUPLICATE_DETAIL = "같은 프로젝트가 두 번 들어 있습니다."
+
+
+class ProjectOrderUpdate(BaseModel):
+    #: 위에서 아래 순서. 빠진 프로젝트는 순서를 정하지 않은 것으로 돌아가 맨 위에 놓인다.
+    project_ids: List[int] = Field(..., max_length=2000)
+
+
+@router.put("/order", status_code=status.HTTP_204_NO_CONTENT)
+def update_project_order(
+    payload: ProjectOrderUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """메인 화면 프로젝트 순서 저장 (SYM-228). 내 화면에만 적용된다.
+
+    ★/{project_id} 경로보다 먼저 등록한다. 뒤에 두면 "order" 가 project_id 로 잡혀 422 가 난다.
+    """
+    from routes.overview import visible_projects
+
+    ids = payload.project_ids
+    if len(set(ids)) != len(ids):
+        raise HTTPException(status_code=400, detail=ORDER_DUPLICATE_DETAIL)
+    # 없는 프로젝트와 볼 수 없는 비공개 프로젝트를 같은 문구로 거절한다(존재 여부를 알리지 않는다).
+    visible = {p.id for p in visible_projects(db, current_user)}
+    if not set(ids) <= visible:
+        raise HTTPException(status_code=400, detail=ORDER_UNKNOWN_DETAIL)
+    # 두 탭에서 동시에 저장하면 지우고 넣는 사이가 겹쳐 PK 충돌이 난다. 사용자 단위로 줄 세운다.
+    advisory_xact_lock(db, LockNs.PROJECT_ORDER, current_user.id)
+    db.query(ProjectOrder).filter(ProjectOrder.user_id == current_user.id).delete(synchronize_session=False)
+    db.add_all(ProjectOrder(user_id=current_user.id, project_id=pid, position=i) for i, pid in enumerate(ids))
+    try:
+        db.commit()
+    except IntegrityError:
+        # 확인과 저장 사이에 다른 사람이 프로젝트를 지웠다. 전역 처리기의 "데이터 제약 조건"(409)
+        # 대신 새로고침 안내를 준다. 롤백하므로 앞의 순서가 그대로 남는다.
+        db.rollback()
+        raise HTTPException(status_code=400, detail=ORDER_UNKNOWN_DETAIL)
 
 
 PUBLIC_BY_KEY_DETAIL = "API 키로는 공개 프로젝트를 만들 수 없습니다. is_private 를 true 로 보내거나 로그인해서 진행해 주세요."

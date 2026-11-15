@@ -202,6 +202,7 @@ export default function UserManualPage() {
             <ul style={s.ul}>
               <li>{t("projectList.cards_li1")}</li>
               <li>{t("projectList.cards_li2")}</li>
+              <li>{t("projectList.cards_li3")}</li>
             </ul>
 
             <h3 style={s.h3}>{t("projectList.h3_create")}</h3>

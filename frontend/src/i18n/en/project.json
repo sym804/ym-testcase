@@ -58,5 +58,12 @@
   "noActiveRuns": "No runs in progress.",
   "roundN": "Round {{count}}",
   "moreRuns": "+{{count}} more",
-  "noRun": "-"
+  "noRun": "-",
+  "order": {
+    "handle": "Reorder {{name}}. Drag, or press the up and down arrow keys",
+    "hint": "Drag the handle (⠿) on the left to reorder. The order applies only to your view.",
+    "saveFailed": "Could not save the order. Reloading the list.",
+    "column": "Order",
+    "moved": "{{name}}: position {{pos}} of {{total}}"
+  }
 }
