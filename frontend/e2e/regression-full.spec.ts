@@ -122,7 +122,7 @@ test.describe("1. 인증", () => {
 
   test("TC-AUTH-009: 로그아웃", async ({ page }) => {
     await login(page);
-    await expect(page.getByRole("status")).toHaveCount(0, { timeout: 10000 });
+    await expect(page.locator("[data-rht-toaster] [role=status]")).toHaveCount(0, { timeout: 10000 });
     await page.locator("header button").filter({ hasText: /Admin|admin/ }).click();
     await page.getByRole("button", { name: "로그아웃" }).click();
     await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
@@ -135,7 +135,7 @@ test.describe("1. 인증", () => {
 
   test("TC-AUTH-011: 비밀번호 변경 접근", async ({ page }) => {
     await login(page);
-    await expect(page.getByRole("status")).toHaveCount(0, { timeout: 10000 });
+    await expect(page.locator("[data-rht-toaster] [role=status]")).toHaveCount(0, { timeout: 10000 });
     await page.locator("header button").filter({ hasText: /Admin|admin/ }).click();
     await expect(page.getByText("비밀번호 변경")).toBeVisible();
   });
@@ -294,7 +294,7 @@ test.describe("3. 헤더/네비게이션", () => {
   });
 
   test("TC-HDR-009: 로그아웃 버튼 표시", async ({ page }) => {
-    await expect(page.getByRole("status")).toHaveCount(0, { timeout: 10000 });
+    await expect(page.locator("[data-rht-toaster] [role=status]")).toHaveCount(0, { timeout: 10000 });
     await page.locator("header button").filter({ hasText: /Admin|admin/ }).click();
     await expect(page.getByText("로그아웃")).toBeVisible();
   });

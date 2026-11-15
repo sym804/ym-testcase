@@ -47,7 +47,8 @@ test.describe("인증 플로우", () => {
 
     // 사용자 메뉴 → 로그아웃
     // 로그인 성공 토스트가 메뉴를 가린다. 시간을 재지 말고 사라지는 것을 본다.
-    await expect(page.getByRole("status")).toHaveCount(0, { timeout: 10000 });
+    // 토스트 컨테이너 안만 센다. 메인 화면에는 순서 이동 알림용 status 영역(SYM-228)이 늘 있다.
+    await expect(page.locator("[data-rht-toaster] [role=status]")).toHaveCount(0, { timeout: 10000 });
     await page.locator("header button").filter({ hasText: "Admin" }).click();
     await page.getByRole("button", { name: "로그아웃" }).click();
     await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
